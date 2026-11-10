@@ -1,0 +1,133 @@
+diff --git a/crates/layout/src/constructive.rs b/crates/layout/src/constructive.rs
+index 62464eb..a5ff976 100644
+--- a/crates/layout/src/constructive.rs
++++ b/crates/layout/src/constructive.rs
+@@ -150,7 +150,7 @@ pub fn construct_ordered(
+     }
+     // Every edge is checked, then its way is planned over the gaps' centres. The lane changes of all edges in one corridor
+     // are ordered so that they cross least, and every edge is bound to the track of its place in that order.
+-    let prepared: Vec<(usize, Result<Prepared, Delegation>)> = indices
++    let mut prepared: Vec<(usize, Result<Prepared, Delegation>)> = indices
+         .into_iter()
+         .filter_map(|index| {
+             let edge = &graph.edges[index];
+@@ -174,6 +174,57 @@ pub fn construct_ordered(
+             Some((index, outcome))
+         })
+         .collect();
++    // The ports follow the order: on each node side, the constructed edges keep the port slots they have, but take them in the
++    // order of the lane they turn to first (at the source) or come from last (at the target), as the first planned ways give
++    // it. The ways are then planned again from the new ports.
++    let first_ways: Vec<Vec<((f64, f64), f64, f64)>> = prepared
++        .iter()
++        .map(|(_, outcome)| {
++            outcome
++                .as_ref()
++                .map(|p| lane_changes(p, spacing.track))
++                .unwrap_or_default()
++        })
++        .collect();
++    let mut sides: BTreeMap<(String, bool), Vec<(usize, f64)>> = BTreeMap::new();
++    for (slot, (_, outcome)) in prepared.iter().enumerate() {
++        if let Ok(p) = outcome {
++            let changes = &first_ways[slot];
++            let leaving = changes.first().map_or(p.to.1, |c| c.2);
++            let entering = changes.last().map_or(p.from.1, |c| c.1);
++            sides
++                .entry((p.source.clone(), true))
++                .or_default()
++                .push((slot, leaving));
++            sides
++                .entry((p.target.clone(), false))
++                .or_default()
++                .push((slot, entering));
++        }
++    }
++    for ((_, at_source), mut members) in sides {
++        if members.len() < 2 {
++            continue;
++        }
++        let mut places: Vec<f64> = members
++            .iter()
++            .filter_map(|(slot, _)| prepared[*slot].1.as_ref().ok())
++            .map(|p| if at_source { p.from.1 } else { p.to.1 })
++            .collect();
++        places.sort_by(f64::total_cmp);
++        members.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.cmp(&b.0)));
++        for ((slot, _), place) in members.iter().zip(places) {
++            if let Ok(p) = prepared[*slot].1.as_mut() {
++                if at_source {
++                    p.from.1 = place;
++                    p.start = to_point(p.vertical, p.from);
++                } else {
++                    p.to.1 = place;
++                    p.end = to_point(p.vertical, p.to);
++                }
++            }
++        }
++    }
+     let mut corridors: BTreeMap<(bool, (i64, i64)), (Vec<(usize, f64, f64)>, (f64, f64))> =
+         BTreeMap::new();
+     for (slot, (_, outcome)) in prepared.iter().enumerate() {
+@@ -259,6 +310,8 @@ fn segments_of(points: &[Point]) -> Vec<Segment> {
+ /// lane changes lie in, and the inflated obstacles.
+ struct Prepared {
+     edge_id: String,
++    source: String,
++    target: String,
+     vertical: bool,
+     from: (f64, f64),
+     to: (f64, f64),
+@@ -373,6 +426,8 @@ fn prepare_edge(
+         .collect();
+     Ok(Prepared {
+         edge_id: edge_id.to_string(),
++        source: source.to_string(),
++        target: target.to_string(),
+         vertical,
+         from: (s_main, s_across),
+         to: (t_main, t_across),
+diff --git a/crates/layout/src/lib.rs b/crates/layout/src/lib.rs
+index 7bb84dc..d4193b6 100644
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -3959,6 +3959,39 @@ fn finish_routes(snapshot: &mut Snapshot, bundle: bool) {
+             snapshot.options.row_port_order,
+         );
+     align_bundled_ports(&mut resolved, &routes);
++    // Experimental (layered construction): the construction may give a constructed edge another port slot on the same side,
++    // so a port takes the end of its route when that end lies on the port's side of its node.
++    if snapshot.options.layered_construction {
++        let rects = absolute_all(&snapshot.graph, &snapshot.boxes);
++        let by_id: BTreeMap<&str, &Route> = routes.iter().map(|r| (r.id.as_str(), r)).collect();
++        for port in resolved.iter_mut().filter(|p| !p.explicit) {
++            let (Some(route), Some(r)) =
++                (by_id.get(port.edge_id.as_str()), rects.get(&port.node_id))
++            else {
++                continue;
++            };
++            let end = if port.endpoint == "source" {
++                route.points.first()
++            } else {
++                route.points.last()
++            };
++            let Some(end) = end else {
++                continue;
++            };
++            const EPS: f64 = 1e-6;
++            let within_x = end.x >= r.x - EPS && end.x <= r.x + r.width + EPS;
++            let within_y = end.y >= r.y - EPS && end.y <= r.y + r.height + EPS;
++            let on_side = match port.side {
++                PortSide::Left => (end.x - r.x).abs() < EPS && within_y,
++                PortSide::Right => (end.x - r.x - r.width).abs() < EPS && within_y,
++                PortSide::Top => (end.y - r.y).abs() < EPS && within_x,
++                PortSide::Bottom => (end.y - r.y - r.height).abs() < EPS && within_x,
++            };
++            if on_side {
++                port.position = end.clone();
++            }
++        }
++    }
+     let drawn: Vec<Route> = routes
+         .iter()
+         .filter(|r| r.bundle_of.is_none())

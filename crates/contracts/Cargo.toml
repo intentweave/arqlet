@@ -1,0 +1,19 @@
+[package]
+name = "arqlet-contracts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Generates the TypeScript contract types in packages/contracts. Tooling only; not used by the engine."
+
+[[bin]]
+name = "export-contracts"
+path = "src/main.rs"
+
+[dependencies]
+arqlet-model = { workspace = true, features = ["ts"] }
+arqlet-scene = { workspace = true, features = ["ts"] }
+arqlet-reference = { workspace = true, features = ["ts"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ts-rs = "=12.0.1"

@@ -1,0 +1,40 @@
+{
+  "id": "qualitaet",
+  "version": 1,
+  "title": "Quality",
+  "description": "Like Readable, with placement search 600. Additional direction variants are not implemented yet.",
+  "graph": {
+    "defaultDirection": "hybrid"
+  },
+  "refine": true,
+  "budgetMs": 120000,
+  "configSet": {
+    "schemaVersion": 1,
+    "id": "qualitaet@1",
+    "layout": {
+      "algorithm": "hierarchical",
+      "candidates": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "hybridBy": "compact",
+      "minPortSpacing": 0,
+      "placementGrid": 0.0,
+      "freePlacement": true,
+      "placementSearch": 600
+    },
+    "routing": {
+      "style": "orthogonal",
+      "bundling": "none",
+      "routingCandidate": true,
+      "clearance": 0,
+      "trackSpacing": 6,
+      "corridors": false,
+      "trackSeparation": true,
+      "engine": "channel"
+    }
+  },
+  "workBudget": 13
+}

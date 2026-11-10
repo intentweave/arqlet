@@ -1,0 +1,73 @@
+{
+  "defaultDirection": "lr",
+  "edges": [
+    {
+      "id": "ce0",
+      "kind": "flow",
+      "source": "c0",
+      "target": "c1"
+    },
+    {
+      "id": "ce1",
+      "kind": "flow",
+      "source": "c1",
+      "target": "c2"
+    },
+    {
+      "id": "ce2",
+      "kind": "flow",
+      "source": "c2",
+      "target": "c3"
+    },
+    {
+      "id": "ce3",
+      "kind": "flow",
+      "source": "c3",
+      "target": "c4"
+    },
+    {
+      "id": "ce4",
+      "kind": "flow",
+      "source": "c4",
+      "target": "c5"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "c0",
+      "kind": "node",
+      "label": "Short",
+      "parentId": null
+    },
+    {
+      "id": "c1",
+      "kind": "node",
+      "label": "A label that is considerably longer than the rest of the row",
+      "parentId": null
+    },
+    {
+      "id": "c2",
+      "kind": "node",
+      "label": "Mid length text",
+      "parentId": null
+    },
+    {
+      "id": "c3",
+      "kind": "node",
+      "label": "Another long label to wrap across two lines",
+      "parentId": null
+    },
+    {
+      "id": "c4",
+      "kind": "node",
+      "label": "X",
+      "parentId": null
+    },
+    {
+      "id": "c5",
+      "kind": "node",
+      "label": "Medium sized label here",
+      "parentId": null
+    }
+  ]
+}

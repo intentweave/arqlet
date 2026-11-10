@@ -1,0 +1,16 @@
+12:06  up 1 day, 18:30, 3 users, load averages: 2,31 2,79 2,62
+workflow-dag default import 10.9 refine 1625.7 load { 2,15 2,72 2,60 }
+workflow-dag single import 14.9 refine 2.3 load { 2,15 2,72 2,60 }
+synthetic-2k default import 400.0 refine 4773.4 load { 2,05 2,59 2,55 }
+synthetic-2k single import 124.6 refine 15.6 load { 2,05 2,59 2,55 }
+org-chart default import 14.3 refine 154.3 load { 3,09 2,79 2,63 }
+org-chart single import 9.8 refine 1.5 load { 3,09 2,79 2,63 }
+network-vlan default import 5.7 refine 31.2 load { 3,09 2,79 2,63 }
+network-vlan single import 3.1 refine 0.4 load { 3,09 2,79 2,63 }
+cloud-architecture default import 5.5 refine 27.9 load { 3,09 2,79 2,63 }
+cloud-architecture single import 4.7 refine 0.4 load { 3,09 2,79 2,63 }
+deployment-cluster default import 9.5 refine 46.2 load { 3,09 2,79 2,63 }
+deployment-cluster single import 6.9 refine 0.6 load { 3,09 2,79 2,63 }
+uml-class default import 3.3 refine 15.0 load { 3,09 2,79 2,63 }
+uml-class single import 3.0 refine 0.3 load { 3,09 2,79 2,63 }
+12:08  up 1 day, 18:31, 3 users, load averages: 3,09 2,79 2,63

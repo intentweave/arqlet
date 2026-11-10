@@ -1,0 +1,156 @@
+{
+  "containerDirections": {},
+  "defaultDirection": "auto",
+  "containerStrategies": {
+    "T": "auto",
+    "N": "auto"
+  },
+  "nodes": [
+    {
+      "id": "x",
+      "kind": "symbol",
+      "label": "x",
+      "parentId": null
+    },
+    {
+      "id": "y",
+      "kind": "symbol",
+      "label": "y",
+      "parentId": null
+    },
+    {
+      "id": "T",
+      "kind": "container",
+      "label": "T",
+      "parentId": null
+    },
+    {
+      "id": "t1",
+      "kind": "symbol",
+      "label": "t1",
+      "parentId": "T"
+    },
+    {
+      "id": "t2",
+      "kind": "symbol",
+      "label": "t2",
+      "parentId": "T"
+    },
+    {
+      "id": "t3",
+      "kind": "symbol",
+      "label": "t3",
+      "parentId": "T"
+    },
+    {
+      "id": "t4",
+      "kind": "symbol",
+      "label": "t4",
+      "parentId": "T"
+    },
+    {
+      "id": "N",
+      "kind": "container",
+      "label": "N",
+      "parentId": null
+    },
+    {
+      "id": "n1",
+      "kind": "symbol",
+      "label": "n1",
+      "parentId": "N"
+    },
+    {
+      "id": "n2",
+      "kind": "symbol",
+      "label": "n2",
+      "parentId": "N"
+    },
+    {
+      "id": "n3",
+      "kind": "symbol",
+      "label": "n3",
+      "parentId": "N"
+    },
+    {
+      "id": "n4",
+      "kind": "symbol",
+      "label": "n4",
+      "parentId": "N"
+    },
+    {
+      "id": "n5",
+      "kind": "symbol",
+      "label": "n5",
+      "parentId": "N"
+    }
+  ],
+  "edges": [
+    {
+      "id": "1",
+      "kind": "flow",
+      "source": "x",
+      "target": "t1"
+    },
+    {
+      "id": "2",
+      "kind": "flow",
+      "source": "t1",
+      "target": "t2"
+    },
+    {
+      "id": "3",
+      "kind": "flow",
+      "source": "t1",
+      "target": "t3"
+    },
+    {
+      "id": "4",
+      "kind": "flow",
+      "source": "t3",
+      "target": "t4"
+    },
+    {
+      "id": "5",
+      "kind": "flow",
+      "source": "t4",
+      "target": "n1"
+    },
+    {
+      "id": "6",
+      "kind": "flow",
+      "source": "n1",
+      "target": "n2"
+    },
+    {
+      "id": "7",
+      "kind": "flow",
+      "source": "n2",
+      "target": "n3"
+    },
+    {
+      "id": "8",
+      "kind": "flow",
+      "source": "n3",
+      "target": "n4"
+    },
+    {
+      "id": "9",
+      "kind": "flow",
+      "source": "n4",
+      "target": "n1"
+    },
+    {
+      "id": "10",
+      "kind": "flow",
+      "source": "n2",
+      "target": "n5"
+    },
+    {
+      "id": "11",
+      "kind": "flow",
+      "source": "n3",
+      "target": "y"
+    }
+  ]
+}

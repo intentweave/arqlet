@@ -1,0 +1,10 @@
+{
+  "name": "intentweave-graph-export",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "(MIT OR Apache-2.0)",
+  "engines": {"node": ">=24.0.0"},
+  "scripts": {"test": "node --test test/*.test.ts", "export": "node src/cli.ts"},
+  "exports": "./src/export.ts"
+}

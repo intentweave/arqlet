@@ -1,0 +1,28 @@
+name: Rust checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --component rustfmt
+      - run: cargo +stable fmt --all -- --check
+      - run: cargo +stable check --workspace --locked
+      # Tests read the benchmark datasets, which are generated (git-ignored): deterministic, standard library only.
+      - run: python3 benchmarks/generate.py --no-manifest
+      - run: cargo +stable test --workspace --locked
+      - run: rustup target add wasm32-unknown-unknown --toolchain stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # The workspace must be installed before build.sh: its Node tests import @arqlet/* by package name.
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: sh apps/playground/build.sh examples/fixtures/small.json
+      - run: pnpm --filter @arqlet/contracts run typecheck
+      - run: pnpm --filter @arqlet/playground run typecheck
+      # The hand-written declarations of the published npm packages.
+      - run: pnpm --filter arqlet run typecheck
+      - run: pnpm --filter arqlet-react-flow-example run build

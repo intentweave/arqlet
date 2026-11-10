@@ -1,0 +1,107 @@
+{
+  "format": "layerweave-reference-corpus",
+  "version": 1,
+  "metricVersion": 3,
+  "cases": [
+    {
+      "id": "ports-fanout",
+      "file": "ports-fanout/reference.lwref.json",
+      "sha256": "a655bc900869108db496854e97f8f9143c2808ffc890a558d83dd43fce4d24ad",
+      "referenceId": "ports-fanout",
+      "inputHash": "2caf5cb2ea5593892bbac4aae17b73276069b7849c965318a6f36ad7f199d65f",
+      "payloadHash": "b2c6447e9f422e02fb4ca043149c96b14fbbe3c46170bf9752808a0afcca51d6",
+      "status": "draft",
+      "tags": [
+        "positive",
+        "unedited"
+      ],
+      "expectValid": true
+    },
+    {
+      "id": "cycle-selfloop",
+      "file": "cycle-selfloop/reference.lwref.json",
+      "sha256": "ed943e6295a1babc80a3de0e97be9db1486809ce8c324d6256168cae5e40662d",
+      "referenceId": "cycle-selfloop",
+      "inputHash": "04620452b427a861f12c55a5abedcc8e26cb18f7041cb496f33a32ff8bd3c224",
+      "payloadHash": "7b19e22cd6ac435359f6f1b5c951976971ffb5d20c23fe1ced71e172908fa9da",
+      "status": "draft",
+      "tags": [
+        "positive",
+        "unedited",
+        "cycles",
+        "self-loops"
+      ],
+      "expectValid": true
+    },
+    {
+      "id": "container-boundary",
+      "file": "container-boundary/reference.lwref.json",
+      "sha256": "505a608e746ca62b64342931e343b634e24af09157b4c30166756851507bcf76",
+      "referenceId": "container-boundary",
+      "inputHash": "7d64bc3c0da9fb41b1ebb1660033c12d9dadaeee0b0f431de8b3c0a387710903",
+      "payloadHash": "3dfddeb68368a1d95235558f48418265fbb36bf22a2f39cfb8c7d7759b9ec935",
+      "status": "draft",
+      "tags": [
+        "positive",
+        "unedited",
+        "containers"
+      ],
+      "expectValid": true
+    },
+    {
+      "id": "container-boundary-pinned",
+      "file": "container-boundary-pinned/reference.lwref.json",
+      "sha256": "f25b381a88b222eee56fb345ccab03c303a879d57a17384410a060aefda2bb40",
+      "referenceId": "container-boundary-pinned",
+      "inputHash": "1c41851fc0a6f45a8166a7de3b7422d1aa12711d951e66823d1f15584dd95774",
+      "payloadHash": "8c25cbcb6967e2495a813f7b28687ec8b013b91f6f519262a408f9f729678119",
+      "status": "draft",
+      "tags": [
+        "positive",
+        "constrained",
+        "containers"
+      ],
+      "expectValid": true,
+      "pins": [
+        "x"
+      ]
+    },
+    {
+      "id": "container-boundary-repair",
+      "file": "container-boundary-repair/reference.lwref.json",
+      "sha256": "fd428a69b89e5e64f46026e086967b91893fed9bf1f4b17ace4b0bdeab0c065a",
+      "referenceId": "container-boundary-repair",
+      "inputHash": "7d64bc3c0da9fb41b1ebb1660033c12d9dadaeee0b0f431de8b3c0a387710903",
+      "payloadHash": "6557f5d8e6f51d996994f85d50efa5a68d56042f5be72e7310fa638240e459db",
+      "status": "draft",
+      "tags": [
+        "positive",
+        "repair",
+        "containers"
+      ],
+      "expectValid": true,
+      "edits": [
+        {
+          "nodeId": "x",
+          "dx": 40.0,
+          "dy": 0.0
+        }
+      ]
+    },
+    {
+      "id": "state-tcp-moved",
+      "file": "state-tcp-moved/reference.lwref.json",
+      "sha256": "6a92921376ecd4b8a78df9c93b42606defc8557197c530df36fc22aaf8a6784c",
+      "referenceId": "state-tcp-r0",
+      "inputHash": "e9e0e7652561d553857e94bc225b30a0edcf028469d166e70acd8c91b81af307",
+      "payloadHash": "6e5a4340879d366d03b90e381ad635411cd822605db4996e474e065a1e51aced",
+      "status": "draft",
+      "tags": [
+        "negative",
+        "draft",
+        "user-draft"
+      ],
+      "expectValid": false
+    }
+  ]
+}

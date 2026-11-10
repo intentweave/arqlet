@@ -1,0 +1,13 @@
+{
+  "nodes": [
+    { "id": "a", "kind": "node", "label": "A", "parentId": null },
+    { "id": "c", "kind": "node", "label": "C", "parentId": null },
+    { "id": "b", "kind": "node", "label": "B", "parentId": null }
+  ],
+  "edges": [
+    { "id": "ac", "kind": "flow", "source": "a", "target": "c" },
+    { "id": "cb", "kind": "flow", "source": "c", "target": "b" },
+    { "id": "ab", "kind": "flow", "source": "a", "target": "b" }
+  ],
+  "defaultRouting": "auto"
+}

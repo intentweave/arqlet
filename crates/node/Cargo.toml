@@ -1,0 +1,7 @@
+[package]
+name = "arqlet-node"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Native Node adapter boundary. napi-rs integration is not implemented."

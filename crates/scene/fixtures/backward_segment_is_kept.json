@@ -1,0 +1,76 @@
+{
+  "description": "A route that doubles back is a bend-free reversal, not normalized away: its overlap with the forward run is a shared line.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 300,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "c",
+        "x": 300,
+        "y": 80,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 200,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "id": "e2",
+        "source": "c",
+        "target": "a",
+        "points": [
+          {
+            "x": 300,
+            "y": 90
+          },
+          {
+            "x": 200,
+            "y": 90
+          },
+          {
+            "x": 200,
+            "y": 10
+          },
+          {
+            "x": 120,
+            "y": 10
+          },
+          {
+            "x": 20,
+            "y": 10
+          }
+        ]
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "sharedLinePairs": 1
+  }
+}

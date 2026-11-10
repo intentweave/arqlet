@@ -1,0 +1,5 @@
+win rate on tune views: {'ordering1': 0.0, 'ordering2': 0.2, 'ordering3': 0.1, 'ordering4': 0.2, 'routing0': 0.6}
+budget 1, judge views reaching the full first-stage best of 10: planned 2, learned 3, learned per cost 3
+budget 2, judge views reaching the full first-stage best of 10: planned 4, learned 6, learned per cost 7
+budget 3, judge views reaching the full first-stage best of 10: planned 5, learned 9, learned per cost 9
+budget 4, judge views reaching the full first-stage best of 10: planned 7, learned 9, learned per cost 9

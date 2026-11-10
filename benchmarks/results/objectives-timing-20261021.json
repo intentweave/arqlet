@@ -1,0 +1,336 @@
+{
+  "machine": "Apple M3, 8 logical CPUs, macOS 25.0.0, rustc 1.95.0, release profile, threads 1",
+  "method": "Alternating runs of two engine builds on identical inputs (benchmarks/datasets, regenerated at 22:06); 3 rounds, order alternated per round, 3 repetitions per run; median of the refine medians per configuration. The machine was not idle-controlled: the timings are indicative, not a benchmark result.",
+  "comparisons": [
+    {
+      "label": "objectives commit (0de66bf) against its parent (b416c81)",
+      "old": "b416c81",
+      "new": "0de66bf",
+      "rounds": 3,
+      "repetitionsPerRun": 3,
+      "threads": 1,
+      "configurations": [
+        {
+          "dataset": "cloud-architecture",
+          "limit": 100,
+          "oldMs": 33.427,
+          "newMs": 33.826,
+          "ratio": 1.012,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "activity-order",
+          "limit": 100,
+          "oldMs": 35.71,
+          "newMs": 36.254,
+          "ratio": 1.015,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "deployment-cluster",
+          "limit": 100,
+          "oldMs": 64.77,
+          "newMs": 67.41,
+          "ratio": 1.041,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "state-order",
+          "limit": 100,
+          "oldMs": 4.545,
+          "newMs": 4.586,
+          "ratio": 1.009,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "state-tcp",
+          "limit": 100,
+          "oldMs": 8.176,
+          "newMs": 8.447,
+          "ratio": 1.033,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "workflow-dag",
+          "limit": 100,
+          "oldMs": 179.098,
+          "newMs": 187.193,
+          "ratio": 1.045,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-pipeline",
+          "limit": 100,
+          "oldMs": 29.193,
+          "newMs": 30.28,
+          "ratio": 1.037,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "org-chart",
+          "limit": 100,
+          "oldMs": 166.082,
+          "newMs": 170.605,
+          "ratio": 1.027,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "uml-class",
+          "limit": 100,
+          "oldMs": 14.036,
+          "newMs": 14.25,
+          "ratio": 1.015,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "er-diagram",
+          "limit": 100,
+          "oldMs": 13.783,
+          "newMs": 14.036,
+          "ratio": 1.018,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "bpmn-pools",
+          "limit": 100,
+          "oldMs": 14.901,
+          "newMs": 15.474,
+          "ratio": 1.038,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "network-vlan",
+          "limit": 100,
+          "oldMs": 50.958,
+          "newMs": 52.235,
+          "ratio": 1.025,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "petri-net",
+          "limit": 100,
+          "oldMs": 33.855,
+          "newMs": 34.944,
+          "ratio": 1.032,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-code",
+          "limit": 25,
+          "oldMs": 41.572,
+          "newMs": 43.473,
+          "ratio": 1.046,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-code",
+          "limit": 50,
+          "oldMs": 111.038,
+          "newMs": 115.049,
+          "ratio": 1.036,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-code",
+          "limit": 100,
+          "oldMs": 466.965,
+          "newMs": 487.229,
+          "ratio": 1.043,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "synthetic-2k",
+          "limit": 25,
+          "oldMs": 54.892,
+          "newMs": 55.222,
+          "ratio": 1.006,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "synthetic-2k",
+          "limit": 50,
+          "oldMs": 267.525,
+          "newMs": 275.046,
+          "ratio": 1.028,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "synthetic-2k",
+          "limit": 100,
+          "oldMs": 1646.288,
+          "newMs": 1656.147,
+          "ratio": 1.006,
+          "sameFingerprint": true
+        }
+      ],
+      "totalOldMs": 3236.8,
+      "totalNewMs": 3301.7,
+      "totalRatio": 1.02
+    },
+    {
+      "label": "working tree (sweep, shared end-to-end measure, key reuse) against b416c81",
+      "old": "b416c81",
+      "new": "working tree after this change",
+      "rounds": 3,
+      "repetitionsPerRun": 3,
+      "threads": 1,
+      "configurations": [
+        {
+          "dataset": "cloud-architecture",
+          "limit": 100,
+          "oldMs": 33.47,
+          "newMs": 33.135,
+          "ratio": 0.99,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "activity-order",
+          "limit": 100,
+          "oldMs": 35.681,
+          "newMs": 35.338,
+          "ratio": 0.99,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "deployment-cluster",
+          "limit": 100,
+          "oldMs": 64.986,
+          "newMs": 64.426,
+          "ratio": 0.991,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "state-order",
+          "limit": 100,
+          "oldMs": 4.545,
+          "newMs": 4.574,
+          "ratio": 1.006,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "state-tcp",
+          "limit": 100,
+          "oldMs": 8.198,
+          "newMs": 8.128,
+          "ratio": 0.991,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "workflow-dag",
+          "limit": 100,
+          "oldMs": 179.379,
+          "newMs": 174.904,
+          "ratio": 0.975,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-pipeline",
+          "limit": 100,
+          "oldMs": 29.401,
+          "newMs": 29.079,
+          "ratio": 0.989,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "org-chart",
+          "limit": 100,
+          "oldMs": 165.809,
+          "newMs": 163.419,
+          "ratio": 0.986,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "uml-class",
+          "limit": 100,
+          "oldMs": 14.08,
+          "newMs": 14.003,
+          "ratio": 0.995,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "er-diagram",
+          "limit": 100,
+          "oldMs": 13.838,
+          "newMs": 13.635,
+          "ratio": 0.985,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "bpmn-pools",
+          "limit": 100,
+          "oldMs": 14.917,
+          "newMs": 14.767,
+          "ratio": 0.99,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "network-vlan",
+          "limit": 100,
+          "oldMs": 51.216,
+          "newMs": 50.746,
+          "ratio": 0.991,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "petri-net",
+          "limit": 100,
+          "oldMs": 33.92,
+          "newMs": 33.525,
+          "ratio": 0.988,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-code",
+          "limit": 25,
+          "oldMs": 41.547,
+          "newMs": 41.289,
+          "ratio": 0.994,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-code",
+          "limit": 50,
+          "oldMs": 111.325,
+          "newMs": 109.329,
+          "ratio": 0.982,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "layerweave-code",
+          "limit": 100,
+          "oldMs": 467.522,
+          "newMs": 457.717,
+          "ratio": 0.979,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "synthetic-2k",
+          "limit": 25,
+          "oldMs": 55.251,
+          "newMs": 54.432,
+          "ratio": 0.985,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "synthetic-2k",
+          "limit": 50,
+          "oldMs": 267.836,
+          "newMs": 264.775,
+          "ratio": 0.989,
+          "sameFingerprint": true
+        },
+        {
+          "dataset": "synthetic-2k",
+          "limit": 100,
+          "oldMs": 1613.226,
+          "newMs": 1590.137,
+          "ratio": 0.986,
+          "sameFingerprint": true
+        }
+      ],
+      "totalOldMs": 3206.1,
+      "totalNewMs": 3157.4,
+      "totalRatio": 0.985
+    }
+  ]
+}

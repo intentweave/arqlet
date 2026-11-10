@@ -1,0 +1,806 @@
+{
+ "kind": "bus-routing",
+ "limit": 150,
+ "rows": [
+  {
+   "name": "activity-order",
+   "nodes": 31,
+   "edges": 40,
+   "buses": 10,
+   "members": 24,
+   "none": {
+    "crossings": 92,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 79,
+    "ink": 21886,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 82,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 79,
+    "ink": 19020,
+    "apart": 7
+   }
+  },
+  {
+   "name": "bpmn-pools",
+   "nodes": 26,
+   "edges": 24,
+   "buses": 4,
+   "members": 8,
+   "none": {
+    "crossings": 12,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 59,
+    "ink": 14609,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 12,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 59,
+    "ink": 14579,
+    "apart": 3
+   }
+  },
+  {
+   "name": "can-bus",
+   "nodes": 21,
+   "edges": 22,
+   "buses": 2,
+   "members": 11,
+   "none": {
+    "crossings": 4,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 32,
+    "ink": 9273,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 32,
+    "ink": 5198,
+    "apart": 0
+   }
+  },
+  {
+   "name": "cloud-architecture",
+   "nodes": 34,
+   "edges": 32,
+   "buses": 11,
+   "members": 31,
+   "none": {
+    "crossings": 31,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 114,
+    "ink": 38018,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 29,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 114,
+    "ink": 37793,
+    "apart": 5
+   }
+  },
+  {
+   "name": "deployment-cluster",
+   "nodes": 33,
+   "edges": 56,
+   "buses": 13,
+   "members": 50,
+   "none": {
+    "crossings": 109,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 227,
+    "ink": 70287,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 108,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 227,
+    "ink": 56458,
+    "apart": 1
+   }
+  },
+  {
+   "name": "er-diagram",
+   "nodes": 44,
+   "edges": 12,
+   "buses": 3,
+   "members": 9,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 23,
+    "ink": 3084,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 23,
+    "ink": 3082,
+    "apart": 0
+   }
+  },
+  {
+   "name": "fixed-ports",
+   "nodes": 5,
+   "edges": 7,
+   "buses": 1,
+   "members": 4,
+   "none": {
+    "crossings": 1,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 12,
+    "ink": 2216,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 1,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 12,
+    "ink": 2216,
+    "apart": 1
+   }
+  },
+  {
+   "name": "layerweave-code",
+   "nodes": 198,
+   "edges": 294,
+   "buses": 69,
+   "members": 198,
+   "none": {
+    "crossings": 753,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 1275,
+    "ink": 1423847,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 854,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 1275,
+    "ink": 1389364,
+    "apart": 26
+   }
+  },
+  {
+   "name": "layerweave-pipeline",
+   "nodes": 32,
+   "edges": 33,
+   "buses": 4,
+   "members": 13,
+   "none": {
+    "crossings": 25,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 80,
+    "ink": 18626,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 25,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 80,
+    "ink": 18100,
+    "apart": 0
+   }
+  },
+  {
+   "name": "mixed-large",
+   "nodes": 96,
+   "edges": 95,
+   "buses": 19,
+   "members": 38,
+   "none": {
+    "crossings": 726,
+    "hits": 90,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 242119,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 726,
+    "hits": 90,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 242119,
+    "apart": 19
+   }
+  },
+  {
+   "name": "mixed-layouts",
+   "nodes": 18,
+   "edges": 16,
+   "buses": 3,
+   "members": 7,
+   "none": {
+    "crossings": 5,
+    "hits": 10,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 3713,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 5,
+    "hits": 10,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 3713,
+    "apart": 3
+   }
+  },
+  {
+   "name": "nested-tree-radial",
+   "nodes": 160,
+   "edges": 121,
+   "buses": 31,
+   "members": 62,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 112,
+    "ink": 21302,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 135,
+    "ink": 22072,
+    "apart": 8
+   }
+  },
+  {
+   "name": "network-vlan",
+   "nodes": 37,
+   "edges": 47,
+   "buses": 8,
+   "members": 45,
+   "none": {
+    "crossings": 43,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 106,
+    "ink": 31989,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 48,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 106,
+    "ink": 26801,
+    "apart": 0
+   }
+  },
+  {
+   "name": "org-chart",
+   "nodes": 104,
+   "edges": 82,
+   "buses": 12,
+   "members": 24,
+   "none": {
+    "crossings": 48,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 337,
+    "ink": 92546,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 51,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 337,
+    "ink": 91918,
+    "apart": 7
+   }
+  },
+  {
+   "name": "organic-100",
+   "nodes": 100,
+   "edges": 119,
+   "buses": 20,
+   "members": 40,
+   "none": {
+    "crossings": 1,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 12773,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 1,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 12773,
+    "apart": 20
+   }
+  },
+  {
+   "name": "organic-200",
+   "nodes": 150,
+   "edges": 177,
+   "buses": 30,
+   "members": 60,
+   "none": {
+    "crossings": 5,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 19490,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 5,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 19490,
+    "apart": 30
+   }
+  },
+  {
+   "name": "organic-25",
+   "nodes": 25,
+   "edges": 29,
+   "buses": 5,
+   "members": 10,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 2751,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 2751,
+    "apart": 5
+   }
+  },
+  {
+   "name": "organic-300",
+   "nodes": 150,
+   "edges": 178,
+   "buses": 30,
+   "members": 60,
+   "none": {
+    "crossings": 2,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 17644,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 2,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 17644,
+    "apart": 30
+   }
+  },
+  {
+   "name": "organic-50",
+   "nodes": 50,
+   "edges": 59,
+   "buses": 10,
+   "members": 20,
+   "none": {
+    "crossings": 2,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 5882,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 2,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 5882,
+    "apart": 10
+   }
+  },
+  {
+   "name": "petri-net",
+   "nodes": 24,
+   "edges": 41,
+   "buses": 8,
+   "members": 25,
+   "none": {
+    "crossings": 32,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 84,
+    "ink": 26744,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 39,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 84,
+    "ink": 25814,
+    "apart": 3
+   }
+  },
+  {
+   "name": "petri-net-shapes",
+   "nodes": 24,
+   "edges": 41,
+   "buses": 8,
+   "members": 25,
+   "none": {
+    "crossings": 28,
+    "hits": 49,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 10463,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 28,
+    "hits": 49,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 10463,
+    "apart": 8
+   }
+  },
+  {
+   "name": "self-loops",
+   "nodes": 9,
+   "edges": 20,
+   "buses": 2,
+   "members": 4,
+   "none": {
+    "crossings": 0,
+    "hits": 9,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 30,
+    "ink": 2319,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 9,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 30,
+    "ink": 2319,
+    "apart": 2
+   }
+  },
+  {
+   "name": "state-order",
+   "nodes": 11,
+   "edges": 14,
+   "buses": 3,
+   "members": 6,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 19,
+    "ink": 2720,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 19,
+    "ink": 2526,
+    "apart": 0
+   }
+  },
+  {
+   "name": "state-tcp",
+   "nodes": 11,
+   "edges": 19,
+   "buses": 6,
+   "members": 14,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 26,
+    "ink": 6230,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 1,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 26,
+    "ink": 6062,
+    "apart": 0
+   }
+  },
+  {
+   "name": "synthetic-2k",
+   "nodes": 231,
+   "edges": 318,
+   "buses": 73,
+   "members": 254,
+   "none": {
+    "crossings": 3035,
+    "hits": 0,
+    "shared": 7,
+    "overlaps": 0,
+    "bends": 1613,
+    "ink": 779899,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 3103,
+    "hits": 0,
+    "shared": 8,
+    "overlaps": 0,
+    "bends": 1441,
+    "ink": 730009,
+    "apart": 41
+   }
+  },
+  {
+   "name": "tree-100",
+   "nodes": 100,
+   "edges": 99,
+   "buses": 49,
+   "members": 98,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 27885,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 27885,
+    "apart": 49
+   }
+  },
+  {
+   "name": "tree-200",
+   "nodes": 150,
+   "edges": 149,
+   "buses": 74,
+   "members": 148,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 47783,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 47783,
+    "apart": 74
+   }
+  },
+  {
+   "name": "tree-25",
+   "nodes": 25,
+   "edges": 24,
+   "buses": 12,
+   "members": 24,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 4688,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 4688,
+    "apart": 12
+   }
+  },
+  {
+   "name": "tree-300",
+   "nodes": 150,
+   "edges": 149,
+   "buses": 74,
+   "members": 148,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 47783,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 47783,
+    "apart": 74
+   }
+  },
+  {
+   "name": "tree-50",
+   "nodes": 50,
+   "edges": 49,
+   "buses": 24,
+   "members": 48,
+   "none": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 11452,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 0,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 0,
+    "ink": 11452,
+    "apart": 24
+   }
+  },
+  {
+   "name": "uml-class",
+   "nodes": 43,
+   "edges": 24,
+   "buses": 6,
+   "members": 15,
+   "none": {
+    "crossings": 6,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 49,
+    "ink": 13953,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 6,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 49,
+    "ink": 13809,
+    "apart": 4
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "nodes": 72,
+   "edges": 125,
+   "buses": 39,
+   "members": 112,
+   "none": {
+    "crossings": 553,
+    "hits": 0,
+    "shared": 1,
+    "overlaps": 0,
+    "bends": 785,
+    "ink": 305455,
+    "apart": 0
+   },
+   "bus": {
+    "crossings": 501,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "bends": 786,
+    "ink": 301522,
+    "apart": 5
+   }
+  }
+ ]
+}

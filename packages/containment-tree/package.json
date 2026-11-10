@@ -1,0 +1,15 @@
+{
+  "name": "@arqlet/containment-tree",
+  "version": "0.0.0",
+  "private": true,
+  "license": "(MIT OR Apache-2.0)",
+  "type": "module",
+  "description": "Interactive containment tree of a Arqlet scene (ADR 0010). Framework-independent; read-only in this version.",
+  "exports": {
+    "./model.js": "./model.js",
+    "./render.js": "./render.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

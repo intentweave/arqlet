@@ -1,0 +1,1353 @@
+{
+ "norm": [
+  {
+   "name": "activity-order",
+   "nodes": 31,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 15.6,
+    "hugPairs": 0,
+    "bends": 94,
+    "length": 16010.2,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 36,
+    "hugPairs": 14,
+    "bends": 90,
+    "length": 29218,
+    "ms": 3.152708999999959
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "bpmn-pools",
+   "nodes": 26,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 0,
+    "bends": 32,
+    "length": 9647,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 4,
+    "hugPairs": 7,
+    "bends": 32,
+    "length": 14326,
+    "ms": 1.960875000000101
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "cloud-architecture",
+   "nodes": 34,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 15,
+    "hugPairs": 0,
+    "bends": 110,
+    "length": 35831,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 18,
+    "hugPairs": 11,
+    "bends": 106,
+    "length": 28056,
+    "ms": 3.9343339999999216
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "deployment-cluster",
+   "nodes": 33,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 95,
+    "hugPairs": 0.6,
+    "bends": 248.8,
+    "length": 57685.8,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 71,
+    "hugPairs": 9,
+    "bends": 162,
+    "length": 46566,
+    "ms": 4.94658400000003
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "er-diagram",
+   "nodes": 44,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 15,
+    "length": 3313,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 0,
+    "bends": 14,
+    "length": 2520,
+    "ms": 1.4139999999999873
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "fixed-ports",
+   "nodes": 5,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 0,
+    "bends": 12,
+    "length": 2216,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 3,
+    "bends": 12,
+    "length": 1298,
+    "ms": 0.24133300000016789
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "layerweave-code",
+   "nodes": 204,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1379.6,
+    "hugPairs": 2.6,
+    "bends": 1246.6,
+    "length": 1513704.6,
+    "issues": 0.2
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1716,
+    "hugPairs": 108,
+    "bends": 1412,
+    "length": 1656712,
+    "ms": 40.095833000000084
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "layerweave-pipeline",
+   "nodes": 32,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 6.8,
+    "hugPairs": 0,
+    "bends": 66,
+    "length": 17907.2,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 5,
+    "hugPairs": 8,
+    "bends": 56,
+    "length": 17420,
+    "ms": 2.396582999999964
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "mixed-large",
+   "nodes": 96,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 46,
+    "sharedLinePairs": 2,
+    "totalCrossings": 529,
+    "hugPairs": 1,
+    "bends": 461,
+    "length": 301740,
+    "issues": 4
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 625,
+    "hugPairs": 30,
+    "bends": 368,
+    "length": 322176,
+    "ms": 11.288958999999977
+   },
+   "by": "lineNodeHits",
+   "vsElk": "worse"
+  },
+  {
+   "name": "mixed-layouts",
+   "nodes": 18,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 7,
+    "sharedLinePairs": 0,
+    "totalCrossings": 4.8,
+    "hugPairs": 0.2,
+    "bends": 31.8,
+    "length": 6234,
+    "issues": 2
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 4,
+    "bends": 14,
+    "length": 2612,
+    "ms": 0.7799999999999727
+   },
+   "by": "lineNodeHits",
+   "vsElk": "worse"
+  },
+  {
+   "name": "nested-tree-radial",
+   "nodes": 160,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 72,
+    "length": 12345,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 24,
+    "bends": 62,
+    "length": 5132,
+    "ms": 4.802707999999939
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "network-vlan",
+   "nodes": 37,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 25.6,
+    "hugPairs": 0.2,
+    "bends": 125.2,
+    "length": 50953.4,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 28,
+    "hugPairs": 10,
+    "bends": 94,
+    "length": 52067,
+    "ms": 2.544416000000183
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "org-chart",
+   "nodes": 104,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 32,
+    "hugPairs": 0,
+    "bends": 186.4,
+    "length": 76738.8,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 23,
+    "hugPairs": 0,
+    "bends": 148,
+    "length": 63288,
+    "ms": 7.727082999999993
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "organic-100",
+   "nodes": 100,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 124,
+    "length": 27216,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 50,
+    "bends": 72,
+    "length": 17750,
+    "ms": 3.129709000000048
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "organic-200",
+   "nodes": 150,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1.8,
+    "hugPairs": 0,
+    "bends": 173.6,
+    "length": 49177.2,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 82,
+    "bends": 108,
+    "length": 33015,
+    "ms": 6.025959000000057
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "organic-25",
+   "nodes": 25,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 34,
+    "length": 5810.8,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 9,
+    "bends": 20,
+    "length": 3615,
+    "ms": 0.8247499999999945
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "organic-300",
+   "nodes": 150,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 2.2,
+    "hugPairs": 0,
+    "bends": 183.6,
+    "length": 115052.6,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 76,
+    "bends": 112,
+    "length": 30864,
+    "ms": 5.075708000000077
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "organic-50",
+   "nodes": 50,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 67.2,
+    "length": 14410.4,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 22,
+    "bends": 40,
+    "length": 9454,
+    "ms": 1.6481249999999363
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "petri-net",
+   "nodes": 24,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 32,
+    "hugPairs": 0,
+    "bends": 84,
+    "length": 26744,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 58,
+    "hugPairs": 19,
+    "bends": 66,
+    "length": 10769,
+    "ms": 1.2934999999999945
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "petri-net-shapes",
+   "nodes": 24,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 35,
+    "sharedLinePairs": 0,
+    "totalCrossings": 44,
+    "hugPairs": 1,
+    "bends": 102,
+    "length": 27092,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 58,
+    "hugPairs": 19,
+    "bends": 66,
+    "length": 10769,
+    "ms": 1.271541999999954
+   },
+   "by": "lineNodeHits",
+   "vsElk": "worse"
+  },
+  {
+   "name": "self-loops",
+   "nodes": 9,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 7,
+    "sharedLinePairs": 4,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 42,
+    "length": 2680,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 1,
+    "bends": 24,
+    "length": 1277,
+    "ms": 0.4885420000000522
+   },
+   "by": "lineNodeHits",
+   "vsElk": "worse"
+  },
+  {
+   "name": "state-order",
+   "nodes": 11,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 19,
+    "length": 2492,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 4,
+    "bends": 16,
+    "length": 1792,
+    "ms": 0.5340840000001208
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "state-tcp",
+   "nodes": 11,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 26,
+    "length": 6230,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 9,
+    "bends": 30,
+    "length": 7279,
+    "ms": 0.6022079999997914
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "synthetic-2k",
+   "nodes": 231,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1748.6,
+    "hugPairs": 4.4,
+    "bends": 1459.6,
+    "length": 713600.4,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 3660,
+    "hugPairs": 121,
+    "bends": 1558,
+    "length": 1559571,
+    "ms": 36.35554200000024
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "tree-100",
+   "nodes": 100,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 130,
+    "length": 31692,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 51,
+    "bends": 98,
+    "length": 28440,
+    "ms": 2.4848329999999805
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "tree-200",
+   "nodes": 150,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 198,
+    "length": 53941,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 76,
+    "bends": 148,
+    "length": 49910,
+    "ms": 3.6635419999997794
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "tree-25",
+   "nodes": 25,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 30,
+    "length": 5760,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 13,
+    "bends": 24,
+    "length": 4760,
+    "ms": 0.641624999999749
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "tree-300",
+   "nodes": 150,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 198,
+    "length": 53941,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 76,
+    "bends": 148,
+    "length": 49910,
+    "ms": 3.671541000000161
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "tree-50",
+   "nodes": 50,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 64,
+    "length": 13723,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 25,
+    "bends": 48,
+    "length": 11800,
+    "ms": 1.2637079999999514
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "uml-class",
+   "nodes": 43,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 0,
+    "bends": 37,
+    "length": 9452,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 2,
+    "hugPairs": 0,
+    "bends": 38,
+    "length": 9413,
+    "ms": 2.189708000000337
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "workflow-dag",
+   "nodes": 72,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 232.4,
+    "hugPairs": 0,
+    "bends": 451.6,
+    "length": 48983.4,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 278,
+    "hugPairs": 16,
+    "bends": 434,
+    "length": 84680,
+    "ms": 8.565792000000329
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  }
+ ],
+ "frozen": [
+  {
+   "name": "layerweave-code",
+   "nodes": 188,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 3784.4,
+    "hugPairs": 7.4,
+    "bends": 1634,
+    "length": 1677298.2,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 3057,
+    "hugPairs": 137,
+    "bends": 1638,
+    "length": 2128553,
+    "ms": 43.89295899999996
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "workflow-dag",
+   "nodes": 72,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 232.4,
+    "hugPairs": 0,
+    "bends": 451.6,
+    "length": 48983.4,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 278,
+    "hugPairs": 16,
+    "bends": 434,
+    "length": 84680,
+    "ms": 8.698082999999997
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "org-chart",
+   "nodes": 104,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 32,
+    "hugPairs": 0,
+    "bends": 186.4,
+    "length": 76738.8,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 23,
+    "hugPairs": 0,
+    "bends": 148,
+    "length": 63288,
+    "ms": 7.252917000000025
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  }
+ ],
+ "raw": [
+  {
+   "name": "er-diagram",
+   "nodes": 44,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 1,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 21,
+    "length": 3263,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 0,
+    "bends": 14,
+    "length": 2520,
+    "ms": 1.5725419999999986
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 29,
+    "length": 3363
+   },
+   "by": "sharedLinePairs",
+   "vsElk": "worse"
+  },
+  {
+   "name": "fixed-ports",
+   "nodes": 5,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 0,
+    "bends": 12,
+    "length": 2216,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 3,
+    "bends": 12,
+    "length": 1298,
+    "ms": 0.3182080000000269
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1,
+    "hugPairs": 0,
+    "bends": 16,
+    "length": 2156
+   },
+   "by": "totalCrossings",
+   "vsElk": "worse"
+  },
+  {
+   "name": "layerweave-code",
+   "nodes": 204,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1379.6,
+    "hugPairs": 2.6,
+    "bends": 1246.6,
+    "length": 1513704.6,
+    "issues": 0.2
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 1716,
+    "hugPairs": 108,
+    "bends": 1412,
+    "length": 1656712,
+    "ms": 40.44083300000011
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 2723,
+    "hugPairs": 1,
+    "bends": 1567,
+    "length": 1309311
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "petri-net",
+   "nodes": 24,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 32,
+    "hugPairs": 0,
+    "bends": 84,
+    "length": 26744,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 58,
+    "hugPairs": 19,
+    "bends": 66,
+    "length": 10769,
+    "ms": 1.3441250000000764
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 49,
+    "hugPairs": 0,
+    "bends": 98,
+    "length": 11895
+   },
+   "by": "totalCrossings",
+   "vsElk": "better"
+  },
+  {
+   "name": "state-tcp",
+   "nodes": 11,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 26,
+    "length": 6230,
+    "issues": 0
+   },
+   "elkRs": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 9,
+    "bends": 30,
+    "length": 7279,
+    "ms": 0.6268749999999272
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 0,
+    "bends": 44,
+    "length": 6118
+   },
+   "by": "hugPairs",
+   "vsElk": "better"
+  },
+  {
+   "name": "activity-order",
+   "nodes": 31,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 5,
+    "totalCrossings": 121,
+    "hugPairs": 0,
+    "bends": 144,
+    "length": 28090,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e2 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 2,
+    "totalCrossings": 86,
+    "hugPairs": 22,
+    "bends": 88,
+    "length": 18178
+   }
+  },
+  {
+   "name": "bpmn-pools",
+   "nodes": 26,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 3,
+    "totalCrossings": 11,
+    "hugPairs": 3,
+    "bends": 42,
+    "length": 14043,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 1,
+    "totalCrossings": 5,
+    "hugPairs": 10,
+    "bends": 46,
+    "length": 10718
+   }
+  },
+  {
+   "name": "cloud-architecture",
+   "nodes": 34,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 51,
+    "hugPairs": 0,
+    "bends": 156.4,
+    "length": 48227,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 31,
+    "hugPairs": 0,
+    "bends": 84,
+    "length": 26948
+   }
+  },
+  {
+   "name": "deployment-cluster",
+   "nodes": 33,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 141,
+    "hugPairs": 2,
+    "bends": 255,
+    "length": 69900,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e12 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 119,
+    "hugPairs": 6,
+    "bends": 250,
+    "length": 47792
+   }
+  },
+  {
+   "name": "layerweave-pipeline",
+   "nodes": 32,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 3,
+    "totalCrossings": 39,
+    "hugPairs": 2.6,
+    "bends": 93.6,
+    "length": 18746.8,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 1,
+    "totalCrossings": 37,
+    "hugPairs": 9,
+    "bends": 80,
+    "length": 14224
+   }
+  },
+  {
+   "name": "network-vlan",
+   "nodes": 37,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0.6,
+    "totalCrossings": 55.8,
+    "hugPairs": 1.2,
+    "bends": 146.8,
+    "length": 38366.2,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e7 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 45,
+    "hugPairs": 4,
+    "bends": 104,
+    "length": 33844
+   }
+  },
+  {
+   "name": "org-chart",
+   "nodes": 104,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 4,
+    "totalCrossings": 150,
+    "hugPairs": 6,
+    "bends": 392,
+    "length": 103611,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 8,
+    "totalCrossings": 122,
+    "hugPairs": 52,
+    "bends": 308,
+    "length": 75359
+   }
+  },
+  {
+   "name": "state-order",
+   "nodes": 11,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 0,
+    "hugPairs": 1,
+    "bends": 20,
+    "length": 2988,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 2,
+    "hugPairs": 1,
+    "bends": 21,
+    "length": 2751
+   }
+  },
+  {
+   "name": "synthetic-2k",
+   "nodes": 231,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 52,
+    "totalCrossings": 5031,
+    "hugPairs": 44,
+    "bends": 1764,
+    "length": 819033,
+    "issues": 1
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3682 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 92,
+    "totalCrossings": 3868,
+    "hugPairs": 115,
+    "bends": 1548,
+    "length": 611720
+   }
+  },
+  {
+   "name": "uml-class",
+   "nodes": 43,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 11.6,
+    "hugPairs": 0,
+    "bends": 42.6,
+    "length": 12976.2,
+    "issues": 0
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 0,
+    "totalCrossings": 8,
+    "hugPairs": 0,
+    "bends": 51,
+    "length": 10423
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "nodes": 72,
+   "singlePass": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 32,
+    "totalCrossings": 1526,
+    "hugPairs": 51,
+    "bends": 692,
+    "length": 287449,
+    "issues": 1
+   },
+   "elkRs": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e1 could not be found in the current layout scope. An edge cannot cross into a different layout algorithm."
+   },
+   "default": {
+    "siblingOverlaps": 0,
+    "lineNodeHits": 0,
+    "sharedLinePairs": 244,
+    "totalCrossings": 581,
+    "hugPairs": 246,
+    "bends": 588,
+    "length": 231589
+   }
+  }
+ ]
+}

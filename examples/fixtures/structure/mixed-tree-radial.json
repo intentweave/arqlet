@@ -1,0 +1,114 @@
+{
+  "containerDirections": {},
+  "defaultDirection": "auto",
+  "nodes": [
+    {
+      "id": "x",
+      "kind": "symbol",
+      "label": "x",
+      "parentId": null
+    },
+    {
+      "id": "y",
+      "kind": "symbol",
+      "label": "y",
+      "parentId": null
+    },
+    {
+      "id": "A",
+      "kind": "container",
+      "label": "A",
+      "parentId": null
+    },
+    {
+      "id": "a1",
+      "kind": "symbol",
+      "label": "a1",
+      "parentId": "A"
+    },
+    {
+      "id": "a2",
+      "kind": "symbol",
+      "label": "a2",
+      "parentId": "A"
+    },
+    {
+      "id": "a3",
+      "kind": "symbol",
+      "label": "a3",
+      "parentId": "A"
+    },
+    {
+      "id": "B",
+      "kind": "container",
+      "label": "B",
+      "parentId": null
+    },
+    {
+      "id": "b1",
+      "kind": "symbol",
+      "label": "b1",
+      "parentId": "B"
+    },
+    {
+      "id": "b2",
+      "kind": "symbol",
+      "label": "b2",
+      "parentId": "B"
+    },
+    {
+      "id": "b3",
+      "kind": "symbol",
+      "label": "b3",
+      "parentId": "B"
+    }
+  ],
+  "edges": [
+    {
+      "id": "1",
+      "kind": "flow",
+      "source": "x",
+      "target": "a1"
+    },
+    {
+      "id": "2",
+      "kind": "flow",
+      "source": "a1",
+      "target": "a2"
+    },
+    {
+      "id": "3",
+      "kind": "flow",
+      "source": "a1",
+      "target": "a3"
+    },
+    {
+      "id": "4",
+      "kind": "flow",
+      "source": "a3",
+      "target": "b1"
+    },
+    {
+      "id": "5",
+      "kind": "flow",
+      "source": "b1",
+      "target": "b2"
+    },
+    {
+      "id": "6",
+      "kind": "flow",
+      "source": "b1",
+      "target": "b3"
+    },
+    {
+      "id": "7",
+      "kind": "flow",
+      "source": "b2",
+      "target": "y"
+    }
+  ],
+  "containerStrategies": {
+    "A": "tree",
+    "B": "radial"
+  }
+}

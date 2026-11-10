@@ -1,0 +1,1202 @@
+{
+ "containerDirections": {
+  "data": "lr",
+  "data-1": "tb",
+  "data-2": "tb",
+  "data-3": "tb",
+  "edge": "auto",
+  "edge-1": "tb",
+  "edge-2": "tb",
+  "edge-3": "tb",
+  "mesh": "auto",
+  "mesh-1": "tb",
+  "mesh-2": "tb",
+  "mesh-3": "tb",
+  "ops": "tb",
+  "ops-1": "lr",
+  "ops-2": "lr",
+  "ops-3": "lr",
+  "pipeline": "lr",
+  "pipeline-1": "tb",
+  "pipeline-2": "tb",
+  "pipeline-3": "tb"
+ },
+ "containerStrategies": {
+  "data": "none",
+  "ops": "none",
+  "pipeline": "none"
+ },
+ "defaultDirection": "auto",
+ "defaultRouting": "straight",
+ "defaultStrategy": "organic",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "calls",
+   "source": "mesh-n0",
+   "target": "pipeline-n9"
+  },
+  {
+   "id": "e2",
+   "kind": "calls",
+   "source": "mesh-n0",
+   "target": "edge-n1"
+  },
+  {
+   "id": "e3",
+   "kind": "calls",
+   "source": "mesh-n1",
+   "target": "edge-n1"
+  },
+  {
+   "id": "e4",
+   "kind": "calls",
+   "source": "mesh-n2",
+   "target": "ops-n10"
+  },
+  {
+   "id": "e5",
+   "kind": "calls",
+   "source": "mesh-n3",
+   "target": "edge-n9"
+  },
+  {
+   "id": "e6",
+   "kind": "calls",
+   "source": "mesh-n4",
+   "target": "ops-n1"
+  },
+  {
+   "id": "e7",
+   "kind": "calls",
+   "source": "mesh-n4",
+   "target": "edge-n8"
+  },
+  {
+   "id": "e8",
+   "kind": "calls",
+   "source": "mesh-n5",
+   "target": "loose-3"
+  },
+  {
+   "id": "e9",
+   "kind": "calls",
+   "source": "mesh-n6",
+   "target": "pipeline-n11"
+  },
+  {
+   "id": "e10",
+   "kind": "calls",
+   "source": "mesh-n7",
+   "target": "loose-2"
+  },
+  {
+   "id": "e11",
+   "kind": "calls",
+   "source": "mesh-n8",
+   "target": "loose-5"
+  },
+  {
+   "id": "e12",
+   "kind": "calls",
+   "source": "mesh-n8",
+   "target": "ops-n4"
+  },
+  {
+   "id": "e13",
+   "kind": "calls",
+   "source": "mesh-n9",
+   "target": "mesh-n0"
+  },
+  {
+   "id": "e14",
+   "kind": "calls",
+   "source": "mesh-n10",
+   "target": "mesh-n1"
+  },
+  {
+   "id": "e15",
+   "kind": "calls",
+   "source": "mesh-n11",
+   "target": "data-n9"
+  },
+  {
+   "id": "e16",
+   "kind": "calls",
+   "source": "pipeline-n0",
+   "target": "loose-12"
+  },
+  {
+   "id": "e17",
+   "kind": "calls",
+   "source": "pipeline-n0",
+   "target": "edge-n2"
+  },
+  {
+   "id": "e18",
+   "kind": "calls",
+   "source": "pipeline-n1",
+   "target": "mesh-n8"
+  },
+  {
+   "id": "e19",
+   "kind": "calls",
+   "source": "pipeline-n2",
+   "target": "pipeline-n6"
+  },
+  {
+   "id": "e20",
+   "kind": "calls",
+   "source": "pipeline-n3",
+   "target": "ops-n3"
+  },
+  {
+   "id": "e21",
+   "kind": "calls",
+   "source": "pipeline-n4",
+   "target": "ops-n3"
+  },
+  {
+   "id": "e22",
+   "kind": "calls",
+   "source": "pipeline-n4",
+   "target": "mesh-n5"
+  },
+  {
+   "id": "e23",
+   "kind": "calls",
+   "source": "pipeline-n5",
+   "target": "edge-n3"
+  },
+  {
+   "id": "e24",
+   "kind": "calls",
+   "source": "pipeline-n6",
+   "target": "edge-n0"
+  },
+  {
+   "id": "e25",
+   "kind": "calls",
+   "source": "pipeline-n7",
+   "target": "edge-n4"
+  },
+  {
+   "id": "e26",
+   "kind": "calls",
+   "source": "pipeline-n8",
+   "target": "mesh-n4"
+  },
+  {
+   "id": "e27",
+   "kind": "calls",
+   "source": "pipeline-n8",
+   "target": "data-n4"
+  },
+  {
+   "id": "e28",
+   "kind": "calls",
+   "source": "pipeline-n9",
+   "target": "loose-7"
+  },
+  {
+   "id": "e29",
+   "kind": "calls",
+   "source": "pipeline-n10",
+   "target": "loose-1"
+  },
+  {
+   "id": "e30",
+   "kind": "calls",
+   "source": "pipeline-n11",
+   "target": "pipeline-n2"
+  },
+  {
+   "id": "e31",
+   "kind": "calls",
+   "source": "pipeline-n12",
+   "target": "data-n9"
+  },
+  {
+   "id": "e32",
+   "kind": "calls",
+   "source": "pipeline-n12",
+   "target": "mesh-n2"
+  },
+  {
+   "id": "e33",
+   "kind": "calls",
+   "source": "pipeline-n13",
+   "target": "pipeline-n7"
+  },
+  {
+   "id": "e34",
+   "kind": "calls",
+   "source": "ops-n0",
+   "target": "mesh-n11"
+  },
+  {
+   "id": "e35",
+   "kind": "calls",
+   "source": "ops-n1",
+   "target": "pipeline-n3"
+  },
+  {
+   "id": "e36",
+   "kind": "calls",
+   "source": "ops-n2",
+   "target": "mesh-n2"
+  },
+  {
+   "id": "e37",
+   "kind": "calls",
+   "source": "ops-n2",
+   "target": "edge-n6"
+  },
+  {
+   "id": "e38",
+   "kind": "calls",
+   "source": "ops-n3",
+   "target": "pipeline-n8"
+  },
+  {
+   "id": "e39",
+   "kind": "calls",
+   "source": "ops-n4",
+   "target": "loose-8"
+  },
+  {
+   "id": "e40",
+   "kind": "calls",
+   "source": "ops-n5",
+   "target": "data-n5"
+  },
+  {
+   "id": "e41",
+   "kind": "calls",
+   "source": "ops-n6",
+   "target": "data-n13"
+  },
+  {
+   "id": "e42",
+   "kind": "calls",
+   "source": "ops-n6",
+   "target": "loose-0"
+  },
+  {
+   "id": "e43",
+   "kind": "calls",
+   "source": "ops-n7",
+   "target": "pipeline-n7"
+  },
+  {
+   "id": "e44",
+   "kind": "calls",
+   "source": "ops-n8",
+   "target": "pipeline-n11"
+  },
+  {
+   "id": "e45",
+   "kind": "calls",
+   "source": "ops-n9",
+   "target": "mesh-n4"
+  },
+  {
+   "id": "e46",
+   "kind": "calls",
+   "source": "ops-n10",
+   "target": "edge-n8"
+  },
+  {
+   "id": "e47",
+   "kind": "calls",
+   "source": "ops-n10",
+   "target": "ops-n4"
+  },
+  {
+   "id": "e48",
+   "kind": "calls",
+   "source": "ops-n11",
+   "target": "mesh-n9"
+  },
+  {
+   "id": "e49",
+   "kind": "calls",
+   "source": "data-n0",
+   "target": "pipeline-n13"
+  },
+  {
+   "id": "e50",
+   "kind": "calls",
+   "source": "data-n1",
+   "target": "ops-n0"
+  },
+  {
+   "id": "e51",
+   "kind": "calls",
+   "source": "data-n2",
+   "target": "loose-12"
+  },
+  {
+   "id": "e52",
+   "kind": "calls",
+   "source": "data-n2",
+   "target": "mesh-n9"
+  },
+  {
+   "id": "e53",
+   "kind": "calls",
+   "source": "data-n3",
+   "target": "pipeline-n3"
+  },
+  {
+   "id": "e54",
+   "kind": "calls",
+   "source": "data-n4",
+   "target": "loose-9"
+  },
+  {
+   "id": "e55",
+   "kind": "calls",
+   "source": "data-n5",
+   "target": "edge-n8"
+  },
+  {
+   "id": "e56",
+   "kind": "calls",
+   "source": "data-n6",
+   "target": "loose-9"
+  },
+  {
+   "id": "e57",
+   "kind": "calls",
+   "source": "data-n6",
+   "target": "data-n11"
+  },
+  {
+   "id": "e58",
+   "kind": "calls",
+   "source": "data-n7",
+   "target": "pipeline-n13"
+  },
+  {
+   "id": "e59",
+   "kind": "calls",
+   "source": "data-n8",
+   "target": "data-n5"
+  },
+  {
+   "id": "e60",
+   "kind": "calls",
+   "source": "data-n9",
+   "target": "pipeline-n6"
+  },
+  {
+   "id": "e61",
+   "kind": "calls",
+   "source": "data-n10",
+   "target": "loose-6"
+  },
+  {
+   "id": "e62",
+   "kind": "calls",
+   "source": "data-n10",
+   "target": "edge-n0"
+  },
+  {
+   "id": "e63",
+   "kind": "calls",
+   "source": "data-n11",
+   "target": "ops-n11"
+  },
+  {
+   "id": "e64",
+   "kind": "calls",
+   "source": "data-n12",
+   "target": "data-n8"
+  },
+  {
+   "id": "e65",
+   "kind": "calls",
+   "source": "data-n13",
+   "target": "edge-n5"
+  },
+  {
+   "id": "e66",
+   "kind": "calls",
+   "source": "edge-n0",
+   "target": "loose-2"
+  },
+  {
+   "id": "e67",
+   "kind": "calls",
+   "source": "edge-n0",
+   "target": "data-n11"
+  },
+  {
+   "id": "e68",
+   "kind": "calls",
+   "source": "edge-n1",
+   "target": "data-n2"
+  },
+  {
+   "id": "e69",
+   "kind": "calls",
+   "source": "edge-n2",
+   "target": "loose-0"
+  },
+  {
+   "id": "e70",
+   "kind": "calls",
+   "source": "edge-n3",
+   "target": "data-n11"
+  },
+  {
+   "id": "e71",
+   "kind": "calls",
+   "source": "edge-n4",
+   "target": "ops-n8"
+  },
+  {
+   "id": "e72",
+   "kind": "calls",
+   "source": "edge-n4",
+   "target": "mesh-n3"
+  },
+  {
+   "id": "e73",
+   "kind": "calls",
+   "source": "edge-n5",
+   "target": "mesh-n11"
+  },
+  {
+   "id": "e74",
+   "kind": "calls",
+   "source": "edge-n6",
+   "target": "pipeline-n8"
+  },
+  {
+   "id": "e75",
+   "kind": "calls",
+   "source": "edge-n7",
+   "target": "loose-1"
+  },
+  {
+   "id": "e76",
+   "kind": "calls",
+   "source": "edge-n8",
+   "target": "mesh-n0"
+  },
+  {
+   "id": "e77",
+   "kind": "calls",
+   "source": "edge-n8",
+   "target": "loose-0"
+  },
+  {
+   "id": "e78",
+   "kind": "calls",
+   "source": "edge-n9",
+   "target": "mesh-n8"
+  },
+  {
+   "id": "e79",
+   "kind": "calls",
+   "source": "loose-0",
+   "target": "loose-8"
+  },
+  {
+   "id": "e80",
+   "kind": "calls",
+   "source": "loose-1",
+   "target": "loose-4"
+  },
+  {
+   "id": "e81",
+   "kind": "calls",
+   "source": "loose-2",
+   "target": "ops-n2"
+  },
+  {
+   "id": "e82",
+   "kind": "calls",
+   "source": "loose-2",
+   "target": "loose-11"
+  },
+  {
+   "id": "e83",
+   "kind": "calls",
+   "source": "loose-3",
+   "target": "data-n2"
+  },
+  {
+   "id": "e84",
+   "kind": "calls",
+   "source": "loose-4",
+   "target": "loose-9"
+  },
+  {
+   "id": "e85",
+   "kind": "calls",
+   "source": "loose-5",
+   "target": "pipeline-n2"
+  },
+  {
+   "id": "e86",
+   "kind": "calls",
+   "source": "loose-6",
+   "target": "pipeline-n11"
+  },
+  {
+   "id": "e87",
+   "kind": "calls",
+   "source": "loose-6",
+   "target": "pipeline-n9"
+  },
+  {
+   "id": "e88",
+   "kind": "calls",
+   "source": "loose-7",
+   "target": "data-n6"
+  },
+  {
+   "id": "e89",
+   "kind": "calls",
+   "source": "loose-8",
+   "target": "data-n4"
+  },
+  {
+   "id": "e90",
+   "kind": "calls",
+   "source": "loose-9",
+   "target": "data-n6"
+  },
+  {
+   "id": "e91",
+   "kind": "calls",
+   "source": "loose-10",
+   "target": "data-n1"
+  },
+  {
+   "id": "e92",
+   "kind": "calls",
+   "source": "loose-10",
+   "target": "ops-n5"
+  },
+  {
+   "id": "e93",
+   "kind": "calls",
+   "source": "loose-11",
+   "target": "pipeline-n1"
+  },
+  {
+   "id": "e94",
+   "kind": "calls",
+   "source": "loose-12",
+   "target": "pipeline-n9"
+  },
+  {
+   "id": "e95",
+   "kind": "calls",
+   "source": "loose-13",
+   "target": "mesh-n8"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "mesh",
+   "kind": "container",
+   "label": "mesh",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "mesh-1",
+   "kind": "container",
+   "label": "mesh-1",
+   "parentId": "mesh"
+  },
+  {
+   "id": "mesh-2",
+   "kind": "container",
+   "label": "mesh-2",
+   "parentId": "mesh"
+  },
+  {
+   "id": "mesh-3",
+   "kind": "container",
+   "label": "mesh-3",
+   "parentId": "mesh"
+  },
+  {
+   "id": "mesh-n0",
+   "kind": "service",
+   "label": "mesh 0",
+   "parentId": "mesh",
+   "shape": "circle"
+  },
+  {
+   "id": "mesh-n1",
+   "kind": "service",
+   "label": "mesh 1",
+   "parentId": "mesh-2"
+  },
+  {
+   "id": "mesh-n2",
+   "kind": "service",
+   "label": "mesh 2",
+   "parentId": "mesh-3"
+  },
+  {
+   "id": "mesh-n3",
+   "kind": "service",
+   "label": "mesh 3",
+   "parentId": "mesh-1"
+  },
+  {
+   "id": "mesh-n4",
+   "kind": "service",
+   "label": "mesh 4",
+   "parentId": "mesh"
+  },
+  {
+   "id": "mesh-n5",
+   "kind": "service",
+   "label": "mesh 5",
+   "parentId": "mesh-3",
+   "shape": "circle"
+  },
+  {
+   "id": "mesh-n6",
+   "kind": "service",
+   "label": "mesh 6",
+   "parentId": "mesh-1"
+  },
+  {
+   "id": "mesh-n7",
+   "kind": "service",
+   "label": "mesh 7",
+   "parentId": "mesh-2"
+  },
+  {
+   "id": "mesh-n8",
+   "kind": "service",
+   "label": "mesh 8",
+   "parentId": "mesh"
+  },
+  {
+   "id": "mesh-n9",
+   "kind": "service",
+   "label": "mesh 9",
+   "parentId": "mesh-1"
+  },
+  {
+   "id": "mesh-n10",
+   "kind": "service",
+   "label": "mesh 10",
+   "parentId": "mesh-2",
+   "shape": "circle"
+  },
+  {
+   "id": "mesh-n11",
+   "kind": "service",
+   "label": "mesh 11",
+   "parentId": "mesh-3"
+  },
+  {
+   "id": "pipeline",
+   "kind": "container",
+   "label": "pipeline",
+   "parentId": null
+  },
+  {
+   "id": "pipeline-1",
+   "kind": "container",
+   "label": "pipeline-1",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "pipeline-2",
+   "kind": "container",
+   "label": "pipeline-2",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "pipeline-3",
+   "kind": "container",
+   "label": "pipeline-3",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "pipeline-n0",
+   "kind": "service",
+   "label": "pipeline 0",
+   "parentId": "pipeline",
+   "shape": "circle"
+  },
+  {
+   "id": "pipeline-n1",
+   "kind": "service",
+   "label": "pipeline 1",
+   "parentId": "pipeline-2"
+  },
+  {
+   "id": "pipeline-n2",
+   "kind": "service",
+   "label": "pipeline 2",
+   "parentId": "pipeline-3"
+  },
+  {
+   "id": "pipeline-n3",
+   "kind": "service",
+   "label": "pipeline 3",
+   "parentId": "pipeline-1"
+  },
+  {
+   "id": "pipeline-n4",
+   "kind": "service",
+   "label": "pipeline 4",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "pipeline-n5",
+   "kind": "service",
+   "label": "pipeline 5",
+   "parentId": "pipeline-3",
+   "shape": "circle"
+  },
+  {
+   "id": "pipeline-n6",
+   "kind": "service",
+   "label": "pipeline 6",
+   "parentId": "pipeline-1"
+  },
+  {
+   "id": "pipeline-n7",
+   "kind": "service",
+   "label": "pipeline 7",
+   "parentId": "pipeline-2"
+  },
+  {
+   "id": "pipeline-n8",
+   "kind": "service",
+   "label": "pipeline 8",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "pipeline-n9",
+   "kind": "service",
+   "label": "pipeline 9",
+   "parentId": "pipeline-1"
+  },
+  {
+   "id": "pipeline-n10",
+   "kind": "service",
+   "label": "pipeline 10",
+   "parentId": "pipeline-2",
+   "shape": "circle"
+  },
+  {
+   "id": "pipeline-n11",
+   "kind": "service",
+   "label": "pipeline 11",
+   "parentId": "pipeline-3"
+  },
+  {
+   "id": "pipeline-n12",
+   "kind": "service",
+   "label": "pipeline 12",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "pipeline-n13",
+   "kind": "service",
+   "label": "pipeline 13",
+   "parentId": "pipeline-2"
+  },
+  {
+   "id": "ops",
+   "kind": "container",
+   "label": "ops",
+   "parentId": null
+  },
+  {
+   "id": "ops-1",
+   "kind": "container",
+   "label": "ops-1",
+   "parentId": "ops"
+  },
+  {
+   "id": "ops-2",
+   "kind": "container",
+   "label": "ops-2",
+   "parentId": "ops"
+  },
+  {
+   "id": "ops-3",
+   "kind": "container",
+   "label": "ops-3",
+   "parentId": "ops"
+  },
+  {
+   "id": "ops-n0",
+   "kind": "service",
+   "label": "ops 0",
+   "parentId": "ops",
+   "shape": "circle"
+  },
+  {
+   "id": "ops-n1",
+   "kind": "service",
+   "label": "ops 1",
+   "parentId": "ops-2"
+  },
+  {
+   "id": "ops-n2",
+   "kind": "service",
+   "label": "ops 2",
+   "parentId": "ops-3"
+  },
+  {
+   "id": "ops-n3",
+   "kind": "service",
+   "label": "ops 3",
+   "parentId": "ops-1"
+  },
+  {
+   "id": "ops-n4",
+   "kind": "service",
+   "label": "ops 4",
+   "parentId": "ops"
+  },
+  {
+   "id": "ops-n5",
+   "kind": "service",
+   "label": "ops 5",
+   "parentId": "ops-3",
+   "shape": "circle"
+  },
+  {
+   "id": "ops-n6",
+   "kind": "service",
+   "label": "ops 6",
+   "parentId": "ops-1"
+  },
+  {
+   "id": "ops-n7",
+   "kind": "service",
+   "label": "ops 7",
+   "parentId": "ops-2"
+  },
+  {
+   "id": "ops-n8",
+   "kind": "service",
+   "label": "ops 8",
+   "parentId": "ops"
+  },
+  {
+   "id": "ops-n9",
+   "kind": "service",
+   "label": "ops 9",
+   "parentId": "ops-1"
+  },
+  {
+   "id": "ops-n10",
+   "kind": "service",
+   "label": "ops 10",
+   "parentId": "ops-2",
+   "shape": "circle"
+  },
+  {
+   "id": "ops-n11",
+   "kind": "service",
+   "label": "ops 11",
+   "parentId": "ops-3"
+  },
+  {
+   "id": "data",
+   "kind": "container",
+   "label": "data",
+   "parentId": null
+  },
+  {
+   "id": "data-1",
+   "kind": "container",
+   "label": "data-1",
+   "parentId": "data"
+  },
+  {
+   "id": "data-2",
+   "kind": "container",
+   "label": "data-2",
+   "parentId": "data"
+  },
+  {
+   "id": "data-3",
+   "kind": "container",
+   "label": "data-3",
+   "parentId": "data"
+  },
+  {
+   "id": "data-n0",
+   "kind": "service",
+   "label": "data 0",
+   "parentId": "data",
+   "shape": "circle"
+  },
+  {
+   "id": "data-n1",
+   "kind": "service",
+   "label": "data 1",
+   "parentId": "data-2"
+  },
+  {
+   "id": "data-n2",
+   "kind": "service",
+   "label": "data 2",
+   "parentId": "data-3"
+  },
+  {
+   "id": "data-n3",
+   "kind": "service",
+   "label": "data 3",
+   "parentId": "data-1"
+  },
+  {
+   "id": "data-n4",
+   "kind": "service",
+   "label": "data 4",
+   "parentId": "data"
+  },
+  {
+   "id": "data-n5",
+   "kind": "service",
+   "label": "data 5",
+   "parentId": "data-3",
+   "shape": "circle"
+  },
+  {
+   "id": "data-n6",
+   "kind": "service",
+   "label": "data 6",
+   "parentId": "data-1"
+  },
+  {
+   "id": "data-n7",
+   "kind": "service",
+   "label": "data 7",
+   "parentId": "data-2"
+  },
+  {
+   "id": "data-n8",
+   "kind": "service",
+   "label": "data 8",
+   "parentId": "data"
+  },
+  {
+   "id": "data-n9",
+   "kind": "service",
+   "label": "data 9",
+   "parentId": "data-1"
+  },
+  {
+   "id": "data-n10",
+   "kind": "service",
+   "label": "data 10",
+   "parentId": "data-2",
+   "shape": "circle"
+  },
+  {
+   "id": "data-n11",
+   "kind": "service",
+   "label": "data 11",
+   "parentId": "data-3"
+  },
+  {
+   "id": "data-n12",
+   "kind": "service",
+   "label": "data 12",
+   "parentId": "data"
+  },
+  {
+   "id": "data-n13",
+   "kind": "service",
+   "label": "data 13",
+   "parentId": "data-2"
+  },
+  {
+   "id": "edge",
+   "kind": "container",
+   "label": "edge",
+   "parentId": null
+  },
+  {
+   "id": "edge-1",
+   "kind": "container",
+   "label": "edge-1",
+   "parentId": "edge"
+  },
+  {
+   "id": "edge-2",
+   "kind": "container",
+   "label": "edge-2",
+   "parentId": "edge"
+  },
+  {
+   "id": "edge-3",
+   "kind": "container",
+   "label": "edge-3",
+   "parentId": "edge"
+  },
+  {
+   "id": "edge-n0",
+   "kind": "service",
+   "label": "edge 0",
+   "parentId": "edge",
+   "shape": "circle"
+  },
+  {
+   "id": "edge-n1",
+   "kind": "service",
+   "label": "edge 1",
+   "parentId": "edge-2"
+  },
+  {
+   "id": "edge-n2",
+   "kind": "service",
+   "label": "edge 2",
+   "parentId": "edge-3"
+  },
+  {
+   "id": "edge-n3",
+   "kind": "service",
+   "label": "edge 3",
+   "parentId": "edge-1"
+  },
+  {
+   "id": "edge-n4",
+   "kind": "service",
+   "label": "edge 4",
+   "parentId": "edge"
+  },
+  {
+   "id": "edge-n5",
+   "kind": "service",
+   "label": "edge 5",
+   "parentId": "edge-3",
+   "shape": "circle"
+  },
+  {
+   "id": "edge-n6",
+   "kind": "service",
+   "label": "edge 6",
+   "parentId": "edge-1"
+  },
+  {
+   "id": "edge-n7",
+   "kind": "service",
+   "label": "edge 7",
+   "parentId": "edge-2"
+  },
+  {
+   "id": "edge-n8",
+   "kind": "service",
+   "label": "edge 8",
+   "parentId": "edge"
+  },
+  {
+   "id": "edge-n9",
+   "kind": "service",
+   "label": "edge 9",
+   "parentId": "edge-1"
+  },
+  {
+   "id": "loose-0",
+   "kind": "actor",
+   "label": "loose 0",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "loose-1",
+   "kind": "actor",
+   "label": "loose 1",
+   "parentId": null
+  },
+  {
+   "id": "loose-2",
+   "kind": "actor",
+   "label": "loose 2",
+   "parentId": null
+  },
+  {
+   "id": "loose-3",
+   "kind": "actor",
+   "label": "loose 3",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "loose-4",
+   "kind": "actor",
+   "label": "loose 4",
+   "parentId": null
+  },
+  {
+   "id": "loose-5",
+   "kind": "actor",
+   "label": "loose 5",
+   "parentId": null
+  },
+  {
+   "id": "loose-6",
+   "kind": "actor",
+   "label": "loose 6",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "loose-7",
+   "kind": "actor",
+   "label": "loose 7",
+   "parentId": null
+  },
+  {
+   "id": "loose-8",
+   "kind": "actor",
+   "label": "loose 8",
+   "parentId": null
+  },
+  {
+   "id": "loose-9",
+   "kind": "actor",
+   "label": "loose 9",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "loose-10",
+   "kind": "actor",
+   "label": "loose 10",
+   "parentId": null
+  },
+  {
+   "id": "loose-11",
+   "kind": "actor",
+   "label": "loose 11",
+   "parentId": null
+  },
+  {
+   "id": "loose-12",
+   "kind": "actor",
+   "label": "loose 12",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "loose-13",
+   "kind": "actor",
+   "label": "loose 13",
+   "parentId": null
+  }
+ ]
+}

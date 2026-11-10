@@ -1,0 +1,490 @@
+{
+ "kind": "organic-comparison",
+ "environment": {
+  "cpu": "Apple M3",
+  "cpus": 8,
+  "load": [
+   1.97509765625,
+   4.171875,
+   5.6357421875
+  ],
+  "node": "v24.21.0",
+  "git": "603e016"
+ },
+ "settings": {
+  "d3Ticks": 300,
+  "coseIterations": 1000,
+  "seed": 42
+ },
+ "rows": [
+  {
+   "name": "organic-25",
+   "nodes": 25,
+   "edges": 29,
+   "engines": {
+    "layerweave": {
+     "overlaps": 0,
+     "crossings": 0,
+     "hits": 0,
+     "edgeLengthCv": 0.162,
+     "stress": 0.0144,
+     "angularResolution": 0.662,
+     "closestPair": 0.145,
+     "areaPerNode": 6.12,
+     "ms": 22,
+     "geometryIssues": 0
+    },
+    "layerweave sparseStress": {
+     "overlaps": 0,
+     "crossings": 0,
+     "hits": 0,
+     "edgeLengthCv": 0.162,
+     "stress": 0.0144,
+     "angularResolution": 0.662,
+     "closestPair": 0.145,
+     "areaPerNode": 6.12,
+     "ms": 8,
+     "geometryIssues": 0
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 0,
+     "hits": 0,
+     "edgeLengthCv": 0.104,
+     "stress": 0.0172,
+     "angularResolution": 0.634,
+     "closestPair": 0.052,
+     "areaPerNode": 14.85,
+     "ms": 10,
+     "geometryIssues": 0
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 0,
+     "hits": 0,
+     "edgeLengthCv": 0.224,
+     "stress": 0.0982,
+     "angularResolution": 0.663,
+     "closestPair": 0.08,
+     "areaPerNode": 23.2,
+     "ms": 16
+    },
+    "cytoscape cose": {
+     "overlaps": 2,
+     "crossings": 3,
+     "hits": 2,
+     "edgeLengthCv": 0.251,
+     "stress": 0.2527,
+     "angularResolution": 0.585,
+     "closestPair": -0.013,
+     "areaPerNode": 10.71,
+     "ms": 16
+    }
+   }
+  },
+  {
+   "name": "organic-50",
+   "nodes": 50,
+   "edges": 59,
+   "engines": {
+    "layerweave": {
+     "overlaps": 0,
+     "crossings": 1,
+     "hits": 2,
+     "edgeLengthCv": 0.247,
+     "stress": 0.0268,
+     "angularResolution": 0.674,
+     "closestPair": 0.124,
+     "areaPerNode": 7.87,
+     "ms": 40,
+     "geometryIssues": 0
+    },
+    "layerweave sparseStress": {
+     "overlaps": 0,
+     "crossings": 1,
+     "hits": 2,
+     "edgeLengthCv": 0.247,
+     "stress": 0.0268,
+     "angularResolution": 0.674,
+     "closestPair": 0.124,
+     "areaPerNode": 7.87,
+     "ms": 42,
+     "geometryIssues": 0
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 2,
+     "hits": 0,
+     "edgeLengthCv": 0.164,
+     "stress": 0.0266,
+     "angularResolution": 0.678,
+     "closestPair": 0.045,
+     "areaPerNode": 21.64,
+     "ms": 30,
+     "geometryIssues": 0
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 2,
+     "hits": 0,
+     "edgeLengthCv": 0.242,
+     "stress": 0.0792,
+     "angularResolution": 0.664,
+     "closestPair": 0.068,
+     "areaPerNode": 33.75,
+     "ms": 30
+    },
+    "cytoscape cose": {
+     "overlaps": 8,
+     "crossings": 8,
+     "hits": 18,
+     "edgeLengthCv": 0.35,
+     "stress": 0.2149,
+     "angularResolution": 0.56,
+     "closestPair": -0.085,
+     "areaPerNode": 12.78,
+     "ms": 37
+    }
+   }
+  },
+  {
+   "name": "organic-100",
+   "nodes": 100,
+   "edges": 119,
+   "engines": {
+    "layerweave": {
+     "overlaps": 0,
+     "crossings": 1,
+     "hits": 0,
+     "edgeLengthCv": 0.476,
+     "stress": 0.0237,
+     "angularResolution": 0.699,
+     "closestPair": 0.137,
+     "areaPerNode": 11.22,
+     "ms": 55,
+     "geometryIssues": 0
+    },
+    "layerweave sparseStress": {
+     "overlaps": 0,
+     "crossings": 2,
+     "hits": 2,
+     "edgeLengthCv": 0.515,
+     "stress": 0.0287,
+     "angularResolution": 0.679,
+     "closestPair": 0.111,
+     "areaPerNode": 9.34,
+     "ms": 63,
+     "geometryIssues": 0
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 3,
+     "hits": 0,
+     "edgeLengthCv": 0.149,
+     "stress": 0.0291,
+     "angularResolution": 0.68,
+     "closestPair": 0.085,
+     "areaPerNode": 26.7,
+     "ms": 47,
+     "geometryIssues": 0
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 6,
+     "hits": 4,
+     "edgeLengthCv": 0.249,
+     "stress": 0.1331,
+     "angularResolution": 0.62,
+     "closestPair": 0.052,
+     "areaPerNode": 39.09,
+     "ms": 56
+    },
+    "cytoscape cose": {
+     "overlaps": 20,
+     "crossings": 24,
+     "hits": 39,
+     "edgeLengthCv": 0.302,
+     "stress": 0.3233,
+     "angularResolution": 0.528,
+     "closestPair": -0.147,
+     "areaPerNode": 12.42,
+     "ms": 134
+    }
+   }
+  },
+  {
+   "name": "organic-200",
+   "nodes": 200,
+   "edges": 239,
+   "engines": {
+    "layerweave": {
+     "overlaps": 0,
+     "crossings": 10,
+     "hits": 7,
+     "edgeLengthCv": 0.759,
+     "stress": 0.0345,
+     "angularResolution": 0.708,
+     "closestPair": 0.063,
+     "areaPerNode": 9.26,
+     "ms": 1031,
+     "geometryIssues": 0
+    },
+    "layerweave sparseStress": {
+     "overlaps": 0,
+     "crossings": 11,
+     "hits": 10,
+     "edgeLengthCv": 0.76,
+     "stress": 0.0314,
+     "angularResolution": 0.68,
+     "closestPair": 0.064,
+     "areaPerNode": 10.13,
+     "ms": 2440,
+     "geometryIssues": 0
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 4,
+     "hits": 4,
+     "edgeLengthCv": 0.184,
+     "stress": 0.039,
+     "angularResolution": 0.706,
+     "closestPair": 0.079,
+     "areaPerNode": 25.73,
+     "ms": 167,
+     "geometryIssues": 3
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 36,
+     "hits": 26,
+     "edgeLengthCv": 0.313,
+     "stress": 0.1839,
+     "angularResolution": 0.618,
+     "closestPair": 0.048,
+     "areaPerNode": 41.4,
+     "ms": 147
+    },
+    "cytoscape cose": {
+     "overlaps": 35,
+     "crossings": 45,
+     "hits": 57,
+     "edgeLengthCv": 0.324,
+     "stress": 0.3273,
+     "angularResolution": 0.524,
+     "closestPair": -0.155,
+     "areaPerNode": 11.51,
+     "ms": 522
+    }
+   }
+  },
+  {
+   "name": "organic-300",
+   "nodes": 300,
+   "edges": 359,
+   "engines": {
+    "layerweave": {
+     "overlaps": 0,
+     "crossings": 10,
+     "hits": 9,
+     "edgeLengthCv": 0.248,
+     "stress": 0.0096,
+     "angularResolution": 0.705,
+     "closestPair": 0.072,
+     "areaPerNode": 7.54,
+     "ms": 1513,
+     "geometryIssues": 0
+    },
+    "layerweave sparseStress": {
+     "overlaps": 0,
+     "crossings": 32,
+     "hits": 173,
+     "edgeLengthCv": 0.594,
+     "stress": 0.0439,
+     "angularResolution": 0.525,
+     "closestPair": 0.035,
+     "areaPerNode": 28.03,
+     "ms": 3499,
+     "geometryIssues": 190
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 10,
+     "hits": 2,
+     "edgeLengthCv": 0.185,
+     "stress": 0.0281,
+     "angularResolution": 0.677,
+     "closestPair": 0.079,
+     "areaPerNode": 22.22,
+     "ms": 149,
+     "geometryIssues": 0
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 53,
+     "hits": 37,
+     "edgeLengthCv": 0.332,
+     "stress": 0.2261,
+     "angularResolution": 0.59,
+     "closestPair": 0.046,
+     "areaPerNode": 41.17,
+     "ms": 224
+    },
+    "cytoscape cose": {
+     "overlaps": 53,
+     "crossings": 100,
+     "hits": 127,
+     "edgeLengthCv": 0.331,
+     "stress": 0.487,
+     "angularResolution": 0.524,
+     "closestPair": -0.147,
+     "areaPerNode": 9.73,
+     "ms": 1206
+    }
+   }
+  },
+  {
+   "name": "synthetic-organic-500",
+   "nodes": 500,
+   "edges": 648,
+   "engines": {
+    "layerweave": {
+     "failed": "organic placement is bounded to 300 children per area; the root has 500"
+    },
+    "layerweave sparseStress": {
+     "overlaps": 431,
+     "crossings": 10786,
+     "hits": 14192,
+     "edgeLengthCv": 0.725,
+     "stress": 0.3655,
+     "angularResolution": 0.217,
+     "closestPair": -0.052,
+     "areaPerNode": 2.38,
+     "ms": 25892,
+     "geometryIssues": 15767
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 1367,
+     "hits": 638,
+     "edgeLengthCv": 0.523,
+     "stress": 0.1428,
+     "angularResolution": 0.571,
+     "closestPair": 0.029,
+     "areaPerNode": 18.49,
+     "ms": 729,
+     "geometryIssues": 717
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 3563,
+     "hits": 929,
+     "edgeLengthCv": 0.439,
+     "stress": 0.1898,
+     "angularResolution": 0.508,
+     "closestPair": 0.017,
+     "areaPerNode": 25.41,
+     "ms": 500
+    },
+    "cytoscape cose": {
+     "overlaps": 248,
+     "crossings": 2152,
+     "hits": 2194,
+     "edgeLengthCv": 0.316,
+     "stress": 0.2082,
+     "angularResolution": 0.47,
+     "closestPair": -0.11,
+     "areaPerNode": 3.8,
+     "ms": 4121
+    }
+   }
+  },
+  {
+   "name": "synthetic-organic-1000",
+   "nodes": 1000,
+   "edges": 1299,
+   "engines": {
+    "layerweave": {
+     "failed": "organic placement is bounded to 300 children per area; the root has 1000"
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 5170,
+     "hits": 1795,
+     "edgeLengthCv": 0.574,
+     "stress": 0.1481,
+     "angularResolution": 0.593,
+     "closestPair": 0.024,
+     "areaPerNode": 19.57,
+     "ms": 1890,
+     "geometryIssues": 2005
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 13981,
+     "hits": 2518,
+     "edgeLengthCv": 0.457,
+     "stress": 0.1934,
+     "angularResolution": 0.53,
+     "closestPair": 0.012,
+     "areaPerNode": 27.28,
+     "ms": 1101
+    },
+    "cytoscape cose": {
+     "overlaps": 820,
+     "crossings": 8309,
+     "hits": 7763,
+     "edgeLengthCv": 0.312,
+     "stress": 0.2091,
+     "angularResolution": 0.487,
+     "closestPair": -0.101,
+     "areaPerNode": 2.62,
+     "ms": 16536
+    }
+   }
+  },
+  {
+   "name": "synthetic-organic-2000",
+   "nodes": 2000,
+   "edges": 2598,
+   "engines": {
+    "layerweave": {
+     "failed": "organic placement is bounded to 300 children per area; the root has 2000"
+    },
+    "layerweave scalableStress": {
+     "overlaps": 0,
+     "crossings": 21336,
+     "hits": 5389,
+     "edgeLengthCv": 0.639,
+     "stress": 0.1638,
+     "angularResolution": 0.592,
+     "closestPair": 0.018,
+     "areaPerNode": 18.97,
+     "ms": 6986,
+     "geometryIssues": 6028
+    },
+    "d3-force": {
+     "overlaps": 0,
+     "crossings": 56686,
+     "hits": 7495,
+     "edgeLengthCv": 0.464,
+     "stress": 0.1982,
+     "angularResolution": 0.546,
+     "closestPair": 0.009,
+     "areaPerNode": 31.45,
+     "ms": 2623
+    },
+    "cytoscape cose": {
+     "overlaps": 3259,
+     "crossings": 37422,
+     "hits": 31225,
+     "edgeLengthCv": 0.302,
+     "stress": 0.2163,
+     "angularResolution": 0.485,
+     "closestPair": -0.09,
+     "areaPerNode": 2.09,
+     "ms": 67096
+    }
+   }
+  }
+ ]
+}

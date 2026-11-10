@@ -1,0 +1,60 @@
+{
+  "description": "A route through the interior of a container it does not belong to is a container traversal (rule 6: a foreign container is not a passage corridor). It is not hugging.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "box",
+        "x": 100,
+        "y": -50,
+        "width": 200,
+        "height": 200,
+        "container": true
+      },
+      {
+        "id": "inner",
+        "x": 150,
+        "y": 40,
+        "width": 20,
+        "height": 20,
+        "parentId": "box"
+      },
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 400,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 400,
+            "y": 10
+          }
+        ]
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "containerTraversals": 1,
+    "containerHugPairs": 0,
+    "lineNodeHits": 0
+  }
+}

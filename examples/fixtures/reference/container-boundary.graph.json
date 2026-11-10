@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    {"id": "p", "kind": "directory", "label": "Package", "parentId": null},
+    {"id": "x", "kind": "symbol", "label": "X", "parentId": "p"},
+    {"id": "y", "kind": "symbol", "label": "Y", "parentId": "p"},
+    {"id": "q", "kind": "directory", "label": "Inner", "parentId": "p"},
+    {"id": "z", "kind": "symbol", "label": "Z", "parentId": "q"},
+    {"id": "e", "kind": "symbol", "label": "E", "parentId": null}
+  ],
+  "edges": [
+    {"id": "x-e", "kind": "calls", "source": "x", "target": "e"},
+    {"id": "y-x", "kind": "calls", "source": "y", "target": "x"},
+    {"id": "z-e", "kind": "calls", "source": "z", "target": "e"},
+    {"id": "e-y", "kind": "calls", "source": "e", "target": "y"},
+    {"id": "x-unresolved", "kind": "calls", "source": "x", "target": null}
+  ]
+}

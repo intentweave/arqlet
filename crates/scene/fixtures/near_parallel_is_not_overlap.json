@@ -1,0 +1,72 @@
+{
+  "description": "Two tracks 4 units apart: a near-parallel conflict, never a shared line.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 300,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "c",
+        "x": 0,
+        "y": 40,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "d",
+        "x": 300,
+        "y": 40,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 300,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "id": "e2",
+        "source": "c",
+        "target": "d",
+        "points": [
+          {
+            "x": 20,
+            "y": 14
+          },
+          {
+            "x": 300,
+            "y": 14
+          }
+        ]
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "nearParallelPairs": 1,
+    "sharedLinePairs": 0
+  }
+}

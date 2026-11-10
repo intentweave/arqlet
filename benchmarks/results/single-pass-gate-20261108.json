@@ -1,0 +1,4845 @@
+{
+ "kind": "single-pass-default-gate",
+ "note": "five seeds; single pass at the commit of this file against the refined default of single-pass-gate-mixed-20261107.json (mixed) and of the default arm here (one axis)",
+ "singlePass16": {
+  "kind": "single-pass-comparison",
+  "generatedAt": "2026-11-08T11:27:37.457Z",
+  "reps": 1,
+  "environment": {
+   "cpu": "Apple M3",
+   "logicalCpus": 8,
+   "os": "darwin",
+   "arch": "arm64",
+   "node": "v24.21.0",
+   "revision": "d8749828aaf6b55d4a46a52691fbe62e34b25ed1",
+   "dirty": true,
+   "loadStart": [
+    3.02734375,
+    5.126953125,
+    5.84375
+   ],
+   "loadEnd": [
+    2.94482421875,
+    5.07470703125,
+    5.82080078125
+   ]
+  },
+  "binary": "875c0b97b20fe8f095d27c182a9e97903092f4003175bcc8916faec991292f5d",
+  "input": {
+   "corpus": true,
+   "limit": 150,
+   "raw": true
+  },
+  "note": "Public arms: import plus refine through two layout-command processes with JSON transport. elk-rs: layout() only, in-process. Shared-machine diagnostic unless stated otherwise.",
+  "cases": [
+   {
+    "name": "activity-order",
+    "nodes": 31,
+    "edges": 40,
+    "arms": {
+     "singlePass": {
+      "importMs": 5.708082999999988,
+      "pipelineMs": 9.172416999999996,
+      "initial": {
+       "totalCrossings": 86.4,
+       "crossings": 62.6,
+       "sharedEndpointCrossings": 23.8,
+       "bends": 79,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 7,
+       "area": 1997796.4,
+       "length": 21983.8
+      },
+      "refined": {
+       "totalCrossings": 86.4,
+       "crossings": 62.6,
+       "sharedEndpointCrossings": 23.8,
+       "bends": 79,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 7,
+       "area": 1997796.4,
+       "length": 21983.8
+      },
+      "diagnostic": "Single pass: 40 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 92,
+         "crossings": 69,
+         "sharedEndpointCrossings": 23,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 1939413,
+         "length": 21886
+        },
+        "refined": {
+         "totalCrossings": 92,
+         "crossings": 69,
+         "sharedEndpointCrossings": 23,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 1939413,
+         "length": 21886
+        },
+        "diagnostic": "Single pass: 40 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 83,
+         "crossings": 63,
+         "sharedEndpointCrossings": 20,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 1994752,
+         "length": 22107
+        },
+        "refined": {
+         "totalCrossings": 83,
+         "crossings": 63,
+         "sharedEndpointCrossings": 20,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 1994752,
+         "length": 22107
+        },
+        "diagnostic": "Single pass: 40 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 87,
+         "crossings": 63,
+         "sharedEndpointCrossings": 24,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 1988237,
+         "length": 21992
+        },
+        "refined": {
+         "totalCrossings": 87,
+         "crossings": 63,
+         "sharedEndpointCrossings": 24,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 1988237,
+         "length": 21992
+        },
+        "diagnostic": "Single pass: 40 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 89,
+         "crossings": 59,
+         "sharedEndpointCrossings": 30,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 2033290,
+         "length": 21937
+        },
+        "refined": {
+         "totalCrossings": 89,
+         "crossings": 59,
+         "sharedEndpointCrossings": 30,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 2033290,
+         "length": 21937
+        },
+        "diagnostic": "Single pass: 40 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 81,
+         "crossings": 59,
+         "sharedEndpointCrossings": 22,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 2033290,
+         "length": 21997
+        },
+        "refined": {
+         "totalCrossings": 81,
+         "crossings": 59,
+         "sharedEndpointCrossings": 22,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 7,
+         "area": 2033290,
+         "length": 21997
+        },
+        "diagnostic": "Single pass: 40 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "bpmn-pools",
+    "nodes": 26,
+    "edges": 24,
+    "arms": {
+     "singlePass": {
+      "importMs": 4.586207999999942,
+      "pipelineMs": 7.48112500000002,
+      "initial": {
+       "totalCrossings": 13.4,
+       "crossings": 11.2,
+       "sharedEndpointCrossings": 2.2,
+       "bends": 57.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 2005538.6,
+       "length": 13927.4
+      },
+      "refined": {
+       "totalCrossings": 13.4,
+       "crossings": 11.2,
+       "sharedEndpointCrossings": 2.2,
+       "bends": 57.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 2005538.6,
+       "length": 13927.4
+      },
+      "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 12,
+         "crossings": 10,
+         "sharedEndpointCrossings": 2,
+         "bends": 59,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1971365,
+         "length": 14609
+        },
+        "refined": {
+         "totalCrossings": 12,
+         "crossings": 10,
+         "sharedEndpointCrossings": 2,
+         "bends": 59,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1971365,
+         "length": 14609
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 15,
+         "crossings": 12,
+         "sharedEndpointCrossings": 3,
+         "bends": 52,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 2056799,
+         "length": 12920
+        },
+        "refined": {
+         "totalCrossings": 15,
+         "crossings": 12,
+         "sharedEndpointCrossings": 3,
+         "bends": 52,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 2056799,
+         "length": 12920
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 16,
+         "crossings": 14,
+         "sharedEndpointCrossings": 2,
+         "bends": 60,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 2056799,
+         "length": 12890
+        },
+        "refined": {
+         "totalCrossings": 16,
+         "crossings": 14,
+         "sharedEndpointCrossings": 2,
+         "bends": 60,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 2056799,
+         "length": 12890
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 12,
+         "crossings": 10,
+         "sharedEndpointCrossings": 2,
+         "bends": 59,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1971365,
+         "length": 14609
+        },
+        "refined": {
+         "totalCrossings": 12,
+         "crossings": 10,
+         "sharedEndpointCrossings": 2,
+         "bends": 59,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1971365,
+         "length": 14609
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 12,
+         "crossings": 10,
+         "sharedEndpointCrossings": 2,
+         "bends": 59,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1971365,
+         "length": 14609
+        },
+        "refined": {
+         "totalCrossings": 12,
+         "crossings": 10,
+         "sharedEndpointCrossings": 2,
+         "bends": 59,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1971365,
+         "length": 14609
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "cloud-architecture",
+    "nodes": 34,
+    "edges": 32,
+    "arms": {
+     "singlePass": {
+      "importMs": 7.520082999999886,
+      "pipelineMs": 11.346874999999955,
+      "initial": {
+       "totalCrossings": 30.6,
+       "crossings": 21.6,
+       "sharedEndpointCrossings": 9,
+       "bends": 113.2,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 4695631,
+       "length": 38041
+      },
+      "refined": {
+       "totalCrossings": 30.6,
+       "crossings": 21.6,
+       "sharedEndpointCrossings": 9,
+       "bends": 113.2,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 4695631,
+       "length": 38041
+      },
+      "diagnostic": "Single pass: 32 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 31,
+         "crossings": 22,
+         "sharedEndpointCrossings": 9,
+         "bends": 114,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4815813,
+         "length": 38018
+        },
+        "refined": {
+         "totalCrossings": 31,
+         "crossings": 22,
+         "sharedEndpointCrossings": 9,
+         "bends": 114,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4815813,
+         "length": 38018
+        },
+        "diagnostic": "Single pass: 32 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 31,
+         "crossings": 22,
+         "sharedEndpointCrossings": 9,
+         "bends": 114,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4815813,
+         "length": 38018
+        },
+        "refined": {
+         "totalCrossings": 31,
+         "crossings": 22,
+         "sharedEndpointCrossings": 9,
+         "bends": 114,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4815813,
+         "length": 38018
+        },
+        "diagnostic": "Single pass: 32 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 30,
+         "crossings": 21,
+         "sharedEndpointCrossings": 9,
+         "bends": 112,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4515358,
+         "length": 37891
+        },
+        "refined": {
+         "totalCrossings": 30,
+         "crossings": 21,
+         "sharedEndpointCrossings": 9,
+         "bends": 112,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4515358,
+         "length": 37891
+        },
+        "diagnostic": "Single pass: 32 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 30,
+         "crossings": 21,
+         "sharedEndpointCrossings": 9,
+         "bends": 112,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4515358,
+         "length": 37891
+        },
+        "refined": {
+         "totalCrossings": 30,
+         "crossings": 21,
+         "sharedEndpointCrossings": 9,
+         "bends": 112,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4515358,
+         "length": 37891
+        },
+        "diagnostic": "Single pass: 32 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 31,
+         "crossings": 22,
+         "sharedEndpointCrossings": 9,
+         "bends": 114,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4815813,
+         "length": 38387
+        },
+        "refined": {
+         "totalCrossings": 31,
+         "crossings": 22,
+         "sharedEndpointCrossings": 9,
+         "bends": 114,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 4815813,
+         "length": 38387
+        },
+        "diagnostic": "Single pass: 32 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "deployment-cluster",
+    "nodes": 33,
+    "edges": 56,
+    "arms": {
+     "singlePass": {
+      "importMs": 10.210874999999987,
+      "pipelineMs": 15.194542000000183,
+      "initial": {
+       "totalCrossings": 112.4,
+       "crossings": 98.2,
+       "sharedEndpointCrossings": 14.2,
+       "bends": 220.2,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.8,
+       "area": 5019490.6,
+       "length": 70792.6
+      },
+      "refined": {
+       "totalCrossings": 112.4,
+       "crossings": 98.2,
+       "sharedEndpointCrossings": 14.2,
+       "bends": 220.2,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.8,
+       "area": 5019490.6,
+       "length": 70792.6
+      },
+      "diagnostic": "Single pass: 56 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 109,
+         "crossings": 95,
+         "sharedEndpointCrossings": 14,
+         "bends": 227,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 5038425,
+         "length": 70287
+        },
+        "refined": {
+         "totalCrossings": 109,
+         "crossings": 95,
+         "sharedEndpointCrossings": 14,
+         "bends": 227,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 5038425,
+         "length": 70287
+        },
+        "diagnostic": "Single pass: 56 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 112,
+         "crossings": 101,
+         "sharedEndpointCrossings": 11,
+         "bends": 217,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 2,
+         "area": 4810234,
+         "length": 70115
+        },
+        "refined": {
+         "totalCrossings": 112,
+         "crossings": 101,
+         "sharedEndpointCrossings": 11,
+         "bends": 217,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 2,
+         "area": 4810234,
+         "length": 70115
+        },
+        "diagnostic": "Single pass: 56 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 115,
+         "crossings": 97,
+         "sharedEndpointCrossings": 18,
+         "bends": 223,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 5219280,
+         "length": 71777
+        },
+        "refined": {
+         "totalCrossings": 115,
+         "crossings": 97,
+         "sharedEndpointCrossings": 18,
+         "bends": 223,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 5219280,
+         "length": 71777
+        },
+        "diagnostic": "Single pass: 56 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 114,
+         "crossings": 97,
+         "sharedEndpointCrossings": 17,
+         "bends": 217,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 5219280,
+         "length": 71669
+        },
+        "refined": {
+         "totalCrossings": 114,
+         "crossings": 97,
+         "sharedEndpointCrossings": 17,
+         "bends": 217,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 5219280,
+         "length": 71669
+        },
+        "diagnostic": "Single pass: 56 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 112,
+         "crossings": 101,
+         "sharedEndpointCrossings": 11,
+         "bends": 217,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 2,
+         "area": 4810234,
+         "length": 70115
+        },
+        "refined": {
+         "totalCrossings": 112,
+         "crossings": 101,
+         "sharedEndpointCrossings": 11,
+         "bends": 217,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 2,
+         "area": 4810234,
+         "length": 70115
+        },
+        "diagnostic": "Single pass: 56 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "layerweave-pipeline",
+    "nodes": 32,
+    "edges": 33,
+    "arms": {
+     "singlePass": {
+      "importMs": 5.523834000000079,
+      "pipelineMs": 8.731874999999945,
+      "initial": {
+       "totalCrossings": 24.8,
+       "crossings": 21.6,
+       "sharedEndpointCrossings": 3.2,
+       "bends": 78,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.8,
+       "area": 3229129.2,
+       "length": 18118.6
+      },
+      "refined": {
+       "totalCrossings": 24.8,
+       "crossings": 21.6,
+       "sharedEndpointCrossings": 3.2,
+       "bends": 78,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.8,
+       "area": 3229129.2,
+       "length": 18118.6
+      },
+      "diagnostic": "Single pass: 33 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 25,
+         "crossings": 22,
+         "sharedEndpointCrossings": 3,
+         "bends": 80,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3535106,
+         "length": 18626
+        },
+        "refined": {
+         "totalCrossings": 25,
+         "crossings": 22,
+         "sharedEndpointCrossings": 3,
+         "bends": 80,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3535106,
+         "length": 18626
+        },
+        "diagnostic": "Single pass: 33 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 25,
+         "crossings": 22,
+         "sharedEndpointCrossings": 3,
+         "bends": 80,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3535106,
+         "length": 18626
+        },
+        "refined": {
+         "totalCrossings": 25,
+         "crossings": 22,
+         "sharedEndpointCrossings": 3,
+         "bends": 80,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3535106,
+         "length": 18626
+        },
+        "diagnostic": "Single pass: 33 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 24,
+         "crossings": 21,
+         "sharedEndpointCrossings": 3,
+         "bends": 71,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 2852658,
+         "length": 17152
+        },
+        "refined": {
+         "totalCrossings": 24,
+         "crossings": 21,
+         "sharedEndpointCrossings": 3,
+         "bends": 71,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 2852658,
+         "length": 17152
+        },
+        "diagnostic": "Single pass: 33 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 25,
+         "crossings": 22,
+         "sharedEndpointCrossings": 3,
+         "bends": 80,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3535106,
+         "length": 18626
+        },
+        "refined": {
+         "totalCrossings": 25,
+         "crossings": 22,
+         "sharedEndpointCrossings": 3,
+         "bends": 80,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3535106,
+         "length": 18626
+        },
+        "diagnostic": "Single pass: 33 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 25,
+         "crossings": 21,
+         "sharedEndpointCrossings": 4,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 2687670,
+         "length": 17563
+        },
+        "refined": {
+         "totalCrossings": 25,
+         "crossings": 21,
+         "sharedEndpointCrossings": 4,
+         "bends": 79,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 2687670,
+         "length": 17563
+        },
+        "diagnostic": "Single pass: 33 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "network-vlan",
+    "nodes": 37,
+    "edges": 47,
+    "arms": {
+     "singlePass": {
+      "importMs": 5.7799589999999625,
+      "pipelineMs": 9.287207999999964,
+      "initial": {
+       "totalCrossings": 43.4,
+       "crossings": 23.8,
+       "sharedEndpointCrossings": 19.6,
+       "bends": 106.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.4,
+       "area": 3276644.6,
+       "length": 32498.2
+      },
+      "refined": {
+       "totalCrossings": 43.4,
+       "crossings": 23.8,
+       "sharedEndpointCrossings": 19.6,
+       "bends": 106.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.4,
+       "area": 3276644.6,
+       "length": 32498.2
+      },
+      "diagnostic": "Single pass: 47 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 43,
+         "crossings": 23,
+         "sharedEndpointCrossings": 20,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3173121,
+         "length": 31989
+        },
+        "refined": {
+         "totalCrossings": 43,
+         "crossings": 23,
+         "sharedEndpointCrossings": 20,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3173121,
+         "length": 31989
+        },
+        "diagnostic": "Single pass: 47 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 44,
+         "crossings": 25,
+         "sharedEndpointCrossings": 19,
+         "bends": 108,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3431930,
+         "length": 33262
+        },
+        "refined": {
+         "totalCrossings": 44,
+         "crossings": 25,
+         "sharedEndpointCrossings": 19,
+         "bends": 108,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3431930,
+         "length": 33262
+        },
+        "diagnostic": "Single pass: 47 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 43,
+         "crossings": 23,
+         "sharedEndpointCrossings": 20,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3173121,
+         "length": 31989
+        },
+        "refined": {
+         "totalCrossings": 43,
+         "crossings": 23,
+         "sharedEndpointCrossings": 20,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3173121,
+         "length": 31989
+        },
+        "diagnostic": "Single pass: 47 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 43,
+         "crossings": 23,
+         "sharedEndpointCrossings": 20,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3173121,
+         "length": 31989
+        },
+        "refined": {
+         "totalCrossings": 43,
+         "crossings": 23,
+         "sharedEndpointCrossings": 20,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3173121,
+         "length": 31989
+        },
+        "diagnostic": "Single pass: 47 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 44,
+         "crossings": 25,
+         "sharedEndpointCrossings": 19,
+         "bends": 108,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3431930,
+         "length": 33262
+        },
+        "refined": {
+         "totalCrossings": 44,
+         "crossings": 25,
+         "sharedEndpointCrossings": 19,
+         "bends": 108,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 3431930,
+         "length": 33262
+        },
+        "diagnostic": "Single pass: 47 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "org-chart",
+    "nodes": 104,
+    "edges": 82,
+    "arms": {
+     "singlePass": {
+      "importMs": 13.619667000000163,
+      "pipelineMs": 20.62254199999984,
+      "initial": {
+       "totalCrossings": 48,
+       "crossings": 37,
+       "sharedEndpointCrossings": 11,
+       "bends": 337,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 20079514,
+       "length": 92546
+      },
+      "refined": {
+       "totalCrossings": 48,
+       "crossings": 37,
+       "sharedEndpointCrossings": 11,
+       "bends": 337,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 20079514,
+       "length": 92546
+      },
+      "diagnostic": "Single pass: 82 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "refined": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "diagnostic": "Single pass: 82 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "refined": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "diagnostic": "Single pass: 82 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "refined": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "diagnostic": "Single pass: 82 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "refined": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "diagnostic": "Single pass: 82 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "refined": {
+         "totalCrossings": 48,
+         "crossings": 37,
+         "sharedEndpointCrossings": 11,
+         "bends": 337,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 20079514,
+         "length": 92546
+        },
+        "diagnostic": "Single pass: 82 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "state-order",
+    "nodes": 11,
+    "edges": 14,
+    "arms": {
+     "singlePass": {
+      "importMs": 2.7168749999998454,
+      "pipelineMs": 4.822374999999965,
+      "initial": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 19,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 1,
+       "area": 469944,
+       "length": 2720
+      },
+      "refined": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 19,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 1,
+       "area": 469944,
+       "length": 2720
+      },
+      "diagnostic": "Single pass: 14 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "diagnostic": "Single pass: 14 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "diagnostic": "Single pass: 14 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "diagnostic": "Single pass: 14 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "diagnostic": "Single pass: 14 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 19,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 469944,
+         "length": 2720
+        },
+        "diagnostic": "Single pass: 14 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "uml-class",
+    "nodes": 43,
+    "edges": 24,
+    "arms": {
+     "singlePass": {
+      "importMs": 5.698499999999967,
+      "pipelineMs": 9.018082999999933,
+      "initial": {
+       "totalCrossings": 6.6,
+       "crossings": 3.4,
+       "sharedEndpointCrossings": 3.2,
+       "bends": 47.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 3675390,
+       "length": 12772.6
+      },
+      "refined": {
+       "totalCrossings": 6.6,
+       "crossings": 3.4,
+       "sharedEndpointCrossings": 3.2,
+       "bends": 47.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 3675390,
+       "length": 12772.6
+      },
+      "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 49,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 13953
+        },
+        "refined": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 49,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 13953
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 9,
+         "crossings": 5,
+         "sharedEndpointCrossings": 4,
+         "bends": 49,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 13745
+        },
+        "refined": {
+         "totalCrossings": 9,
+         "crossings": 5,
+         "sharedEndpointCrossings": 4,
+         "bends": 49,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 13745
+        },
+        "diagnostic": "Single pass: 23 constructed, 1 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 47,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 12055
+        },
+        "refined": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 47,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 12055
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 47,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 12055
+        },
+        "refined": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 47,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 12055
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 47,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 12055
+        },
+        "refined": {
+         "totalCrossings": 6,
+         "crossings": 3,
+         "sharedEndpointCrossings": 3,
+         "bends": 47,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 3675390,
+         "length": 12055
+        },
+        "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "workflow-dag",
+    "nodes": 72,
+    "edges": 125,
+    "arms": {
+     "singlePass": {
+      "importMs": 19.939791999999898,
+      "pipelineMs": 29.115666999999803,
+      "initial": {
+       "totalCrossings": 542.2,
+       "crossings": 421,
+       "sharedEndpointCrossings": 121.2,
+       "bends": 787.6,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0.6,
+       "hugPairs": 0,
+       "area": 10078122,
+       "length": 306799.8
+      },
+      "refined": {
+       "totalCrossings": 542.2,
+       "crossings": 421,
+       "sharedEndpointCrossings": 121.2,
+       "bends": 787.6,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0.6,
+       "hugPairs": 0,
+       "area": 10078122,
+       "length": 306799.8
+      },
+      "diagnostic": "Single pass: 122 constructed, 3 delegated drawn as seed routes, 3 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 553,
+         "crossings": 433,
+         "sharedEndpointCrossings": 120,
+         "bends": 785,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 11826879,
+         "length": 305473
+        },
+        "refined": {
+         "totalCrossings": 553,
+         "crossings": 433,
+         "sharedEndpointCrossings": 120,
+         "bends": 785,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 11826879,
+         "length": 305473
+        },
+        "diagnostic": "Single pass: 122 constructed, 3 delegated drawn as seed routes, 3 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 571,
+         "crossings": 457,
+         "sharedEndpointCrossings": 114,
+         "bends": 786,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 9291537,
+         "length": 306132
+        },
+        "refined": {
+         "totalCrossings": 571,
+         "crossings": 457,
+         "sharedEndpointCrossings": 114,
+         "bends": 786,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 9291537,
+         "length": 306132
+        },
+        "diagnostic": "Single pass: 124 constructed, 1 delegated drawn as seed routes, 4 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 529,
+         "crossings": 401,
+         "sharedEndpointCrossings": 128,
+         "bends": 795,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 8735071,
+         "length": 305531
+        },
+        "refined": {
+         "totalCrossings": 529,
+         "crossings": 401,
+         "sharedEndpointCrossings": 128,
+         "bends": 795,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 8735071,
+         "length": 305531
+        },
+        "diagnostic": "Single pass: 125 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 535,
+         "crossings": 407,
+         "sharedEndpointCrossings": 128,
+         "bends": 800,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 9522432,
+         "length": 312690
+        },
+        "refined": {
+         "totalCrossings": 535,
+         "crossings": 407,
+         "sharedEndpointCrossings": 128,
+         "bends": 800,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 9522432,
+         "length": 312690
+        },
+        "diagnostic": "Single pass: 123 constructed, 2 delegated drawn as seed routes, 7 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 523,
+         "crossings": 407,
+         "sharedEndpointCrossings": 116,
+         "bends": 772,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 11014691,
+         "length": 304173
+        },
+        "refined": {
+         "totalCrossings": 523,
+         "crossings": 407,
+         "sharedEndpointCrossings": 116,
+         "bends": 772,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 11014691,
+         "length": 304173
+        },
+        "diagnostic": "Single pass: 124 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "synthetic-2k",
+    "nodes": 231,
+    "edges": 318,
+    "arms": {
+     "singlePass": {
+      "importMs": 133.41370800000004,
+      "pipelineMs": 165.7286250000002,
+      "initial": {
+       "totalCrossings": 2944.2,
+       "crossings": 2714.2,
+       "sharedEndpointCrossings": 230,
+       "bends": 1584.4,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 9.6,
+       "hugPairs": 11.4,
+       "area": 61287727.2,
+       "length": 780041
+      },
+      "refined": {
+       "totalCrossings": 2944.2,
+       "crossings": 2714.2,
+       "sharedEndpointCrossings": 230,
+       "bends": 1584.4,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 9.6,
+       "hugPairs": 11.4,
+       "area": 61287727.2,
+       "length": 780041
+      },
+      "diagnostic": "Single pass: 289 constructed, 29 delegated drawn as seed routes, 53 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 1,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 3035,
+         "crossings": 2792,
+         "sharedEndpointCrossings": 243,
+         "bends": 1613,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 7,
+         "hugPairs": 13,
+         "area": 61420823,
+         "length": 782547
+        },
+        "refined": {
+         "totalCrossings": 3035,
+         "crossings": 2792,
+         "sharedEndpointCrossings": 243,
+         "bends": 1613,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 7,
+         "hugPairs": 13,
+         "area": 61420823,
+         "length": 782547
+        },
+        "diagnostic": "Single pass: 289 constructed, 29 delegated drawn as seed routes, 53 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 1
+       },
+       {
+        "initial": {
+         "totalCrossings": 2897,
+         "crossings": 2678,
+         "sharedEndpointCrossings": 219,
+         "bends": 1570,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 11,
+         "hugPairs": 11,
+         "area": 61405768,
+         "length": 779913
+        },
+        "refined": {
+         "totalCrossings": 2897,
+         "crossings": 2678,
+         "sharedEndpointCrossings": 219,
+         "bends": 1570,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 11,
+         "hugPairs": 11,
+         "area": 61405768,
+         "length": 779913
+        },
+        "diagnostic": "Single pass: 290 constructed, 28 delegated drawn as seed routes, 65 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 1
+       },
+       {
+        "initial": {
+         "totalCrossings": 2897,
+         "crossings": 2678,
+         "sharedEndpointCrossings": 219,
+         "bends": 1570,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 11,
+         "hugPairs": 11,
+         "area": 61405768,
+         "length": 779913
+        },
+        "refined": {
+         "totalCrossings": 2897,
+         "crossings": 2678,
+         "sharedEndpointCrossings": 219,
+         "bends": 1570,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 11,
+         "hugPairs": 11,
+         "area": 61405768,
+         "length": 779913
+        },
+        "diagnostic": "Single pass: 290 constructed, 28 delegated drawn as seed routes, 65 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 1
+       },
+       {
+        "initial": {
+         "totalCrossings": 2995,
+         "crossings": 2745,
+         "sharedEndpointCrossings": 250,
+         "bends": 1599,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 8,
+         "hugPairs": 11,
+         "area": 60800509,
+         "length": 777919
+        },
+        "refined": {
+         "totalCrossings": 2995,
+         "crossings": 2745,
+         "sharedEndpointCrossings": 250,
+         "bends": 1599,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 8,
+         "hugPairs": 11,
+         "area": 60800509,
+         "length": 777919
+        },
+        "diagnostic": "Single pass: 289 constructed, 29 delegated drawn as seed routes, 50 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 1
+       },
+       {
+        "initial": {
+         "totalCrossings": 2897,
+         "crossings": 2678,
+         "sharedEndpointCrossings": 219,
+         "bends": 1570,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 11,
+         "hugPairs": 11,
+         "area": 61405768,
+         "length": 779913
+        },
+        "refined": {
+         "totalCrossings": 2897,
+         "crossings": 2678,
+         "sharedEndpointCrossings": 219,
+         "bends": 1570,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 11,
+         "hugPairs": 11,
+         "area": 61405768,
+         "length": 779913
+        },
+        "diagnostic": "Single pass: 290 constructed, 28 delegated drawn as seed routes, 65 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 1
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "er-diagram",
+    "nodes": 44,
+    "edges": 12,
+    "arms": {
+     "singlePass": {
+      "importMs": 3.3087500000001455,
+      "pipelineMs": 5.882291999999779,
+      "initial": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 23,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1664280,
+       "length": 3084
+      },
+      "refined": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 23,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1664280,
+       "length": 3084
+      },
+      "diagnostic": "Single pass: 12 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "diagnostic": "Single pass: 12 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "diagnostic": "Single pass: 12 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "diagnostic": "Single pass: 12 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "diagnostic": "Single pass: 12 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 23,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3084
+        },
+        "diagnostic": "Single pass: 12 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "fixed-ports",
+    "nodes": 5,
+    "edges": 7,
+    "arms": {
+     "singlePass": {
+      "importMs": 2.3146660000002157,
+      "pipelineMs": 4.183083999999781,
+      "initial": {
+       "totalCrossings": 1,
+       "crossings": 0,
+       "sharedEndpointCrossings": 1,
+       "bends": 12,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 147744,
+       "length": 2216
+      },
+      "refined": {
+       "totalCrossings": 1,
+       "crossings": 0,
+       "sharedEndpointCrossings": 1,
+       "bends": 12,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 147744,
+       "length": 2216
+      },
+      "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "layerweave-code",
+    "nodes": 204,
+    "edges": 356,
+    "arms": {
+     "singlePass": {
+      "importMs": 93.85483400000021,
+      "pipelineMs": 129.87075000000004,
+      "initial": {
+       "totalCrossings": 5326.4,
+       "crossings": 2542.8,
+       "sharedEndpointCrossings": 2783.6,
+       "bends": 1773.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 1,
+       "area": 318030012,
+       "length": 2516602.8
+      },
+      "refined": {
+       "totalCrossings": 5326.4,
+       "crossings": 2542.8,
+       "sharedEndpointCrossings": 2783.6,
+       "bends": 1773.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 1,
+       "area": 318030012,
+       "length": 2516602.8
+      },
+      "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 4412,
+         "crossings": 3166,
+         "sharedEndpointCrossings": 1246,
+         "bends": 1761,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 370306440,
+         "length": 2919922
+        },
+        "refined": {
+         "totalCrossings": 4412,
+         "crossings": 3166,
+         "sharedEndpointCrossings": 1246,
+         "bends": 1761,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 370306440,
+         "length": 2919922
+        },
+        "diagnostic": "Single pass: 354 constructed, 2 delegated drawn as seed routes, 3 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "petri-net",
+    "nodes": 24,
+    "edges": 41,
+    "arms": {
+     "singlePass": {
+      "importMs": 5.752708999999413,
+      "pipelineMs": 9.068333000000166,
+      "initial": {
+       "totalCrossings": 32,
+       "crossings": 32,
+       "sharedEndpointCrossings": 0,
+       "bends": 84,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1512288,
+       "length": 26744
+      },
+      "refined": {
+       "totalCrossings": 32,
+       "crossings": 32,
+       "sharedEndpointCrossings": 0,
+       "bends": 84,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1512288,
+       "length": 26744
+      },
+      "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "state-tcp",
+    "nodes": 11,
+    "edges": 19,
+    "arms": {
+     "singlePass": {
+      "importMs": 3.062959000000774,
+      "pipelineMs": 5.353041000000303,
+      "initial": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 26,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 396480,
+       "length": 6230
+      },
+      "refined": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 26,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 396480,
+       "length": 6230
+      },
+      "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   }
+  ]
+ },
+ "oneAxisWithDefault": {
+  "kind": "single-pass-comparison",
+  "generatedAt": "2026-11-08T11:12:20.945Z",
+  "reps": 1,
+  "environment": {
+   "cpu": "Apple M3",
+   "logicalCpus": 8,
+   "os": "darwin",
+   "arch": "arm64",
+   "node": "v24.21.0",
+   "revision": "d8749828aaf6b55d4a46a52691fbe62e34b25ed1",
+   "dirty": true,
+   "loadStart": [
+    15.00341796875,
+    7.4951171875,
+    4.5673828125
+   ],
+   "loadEnd": [
+    11.4765625,
+    7.17138671875,
+    4.5185546875
+   ]
+  },
+  "binary": "a189a1f92dfea4a8d71e430143952c55056e617e3c06e4ed413e6d9f0634da9c",
+  "input": {
+   "corpus": true,
+   "limit": 150,
+   "raw": true
+  },
+  "note": "Public arms: import plus refine through two layout-command processes with JSON transport. elk-rs: layout() only, in-process. Shared-machine diagnostic unless stated otherwise.",
+  "cases": [
+   {
+    "name": "er-diagram",
+    "nodes": 44,
+    "edges": 12,
+    "arms": {
+     "default": {
+      "importMs": 3.556082999999944,
+      "pipelineMs": 16.480791000000067,
+      "initial": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 29,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1894010,
+       "length": 3363
+      },
+      "refined": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 29,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1894010,
+       "length": 3363
+      },
+      "diagnostic": null,
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 29,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1894010,
+         "length": 3363
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     },
+     "singlePass": {
+      "importMs": 3.7981250000000273,
+      "pipelineMs": 6.432541000000015,
+      "initial": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 21,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 1,
+       "hugPairs": 0,
+       "area": 1664280,
+       "length": 3263
+      },
+      "refined": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 21,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 1,
+       "hugPairs": 0,
+       "area": 1664280,
+       "length": 3263
+      },
+      "diagnostic": "Single pass: 1 constructed, 11 delegated drawn as seed routes, 1 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "diagnostic": "Single pass: 1 constructed, 11 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "diagnostic": "Single pass: 1 constructed, 11 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "diagnostic": "Single pass: 1 constructed, 11 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "diagnostic": "Single pass: 1 constructed, 11 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 21,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 0,
+         "area": 1664280,
+         "length": 3263
+        },
+        "diagnostic": "Single pass: 1 constructed, 11 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "fixed-ports",
+    "nodes": 5,
+    "edges": 7,
+    "arms": {
+     "default": {
+      "importMs": 2.187667000000033,
+      "pipelineMs": 6.115082999999913,
+      "initial": {
+       "totalCrossings": 1,
+       "crossings": 0,
+       "sharedEndpointCrossings": 1,
+       "bends": 16,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 147744,
+       "length": 2156
+      },
+      "refined": {
+       "totalCrossings": 1,
+       "crossings": 0,
+       "sharedEndpointCrossings": 1,
+       "bends": 16,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 147744,
+       "length": 2156
+      },
+      "diagnostic": null,
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 16,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2156
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     },
+     "singlePass": {
+      "importMs": 2.4347080000000005,
+      "pipelineMs": 4.43770799999993,
+      "initial": {
+       "totalCrossings": 1,
+       "crossings": 0,
+       "sharedEndpointCrossings": 1,
+       "bends": 12,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 147744,
+       "length": 2216
+      },
+      "refined": {
+       "totalCrossings": 1,
+       "crossings": 0,
+       "sharedEndpointCrossings": 1,
+       "bends": 12,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 147744,
+       "length": 2216
+      },
+      "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "refined": {
+         "totalCrossings": 1,
+         "crossings": 0,
+         "sharedEndpointCrossings": 1,
+         "bends": 12,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 147744,
+         "length": 2216
+        },
+        "diagnostic": "Single pass: 4 constructed, 3 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "layerweave-code",
+    "nodes": 204,
+    "edges": 356,
+    "arms": {
+     "default": {
+      "importMs": 449.05562499999996,
+      "pipelineMs": 3132.247833,
+      "initial": {
+       "totalCrossings": 6911.4,
+       "crossings": 3397.6,
+       "sharedEndpointCrossings": 3513.8,
+       "bends": 2233,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 43.6,
+       "hugPairs": 19.4,
+       "area": 251080804.8,
+       "length": 2590000.2
+      },
+      "refined": {
+       "totalCrossings": 7586.2,
+       "crossings": 3223.4,
+       "sharedEndpointCrossings": 4362.8,
+       "bends": 2117.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0.6,
+       "hugPairs": 12.2,
+       "area": 244983227.6,
+       "length": 2637673.8
+      },
+      "diagnostic": null,
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 6991,
+         "crossings": 4019,
+         "sharedEndpointCrossings": 2972,
+         "bends": 2207,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 60,
+         "hugPairs": 25,
+         "area": 250923842,
+         "length": 2564455
+        },
+        "refined": {
+         "totalCrossings": 7918,
+         "crossings": 3067,
+         "sharedEndpointCrossings": 4851,
+         "bends": 2087,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 1,
+         "hugPairs": 11,
+         "area": 224790316,
+         "length": 2541860
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 6629,
+         "crossings": 2467,
+         "sharedEndpointCrossings": 4162,
+         "bends": 2191,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 44,
+         "hugPairs": 16,
+         "area": 254117370,
+         "length": 2560261
+        },
+        "refined": {
+         "totalCrossings": 7554,
+         "crossings": 2922,
+         "sharedEndpointCrossings": 4632,
+         "bends": 2139,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 12,
+         "area": 282014267,
+         "length": 2719025
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 6496,
+         "crossings": 2373,
+         "sharedEndpointCrossings": 4123,
+         "bends": 2209,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 50,
+         "hugPairs": 34,
+         "area": 281589461,
+         "length": 2456643
+        },
+        "refined": {
+         "totalCrossings": 7417,
+         "crossings": 2998,
+         "sharedEndpointCrossings": 4419,
+         "bends": 2049,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 16,
+         "area": 227322855,
+         "length": 2611188
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 7405,
+         "crossings": 4195,
+         "sharedEndpointCrossings": 3210,
+         "bends": 2319,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 23,
+         "hugPairs": 7,
+         "area": 215055223,
+         "length": 2608166
+        },
+        "refined": {
+         "totalCrossings": 7979,
+         "crossings": 3192,
+         "sharedEndpointCrossings": 4787,
+         "bends": 2089,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 9,
+         "area": 237070572,
+         "length": 2556115
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 7036,
+         "crossings": 3934,
+         "sharedEndpointCrossings": 3102,
+         "bends": 2239,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 41,
+         "hugPairs": 15,
+         "area": 253718128,
+         "length": 2760476
+        },
+        "refined": {
+         "totalCrossings": 7063,
+         "crossings": 3938,
+         "sharedEndpointCrossings": 3125,
+         "bends": 2225,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 2,
+         "hugPairs": 13,
+         "area": 253718128,
+         "length": 2760181
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     },
+     "singlePass": {
+      "importMs": 95.48854199999914,
+      "pipelineMs": 132.04399999999805,
+      "initial": {
+       "totalCrossings": 5326.4,
+       "crossings": 2542.8,
+       "sharedEndpointCrossings": 2783.6,
+       "bends": 1773.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 1,
+       "area": 318030012,
+       "length": 2516602.8
+      },
+      "refined": {
+       "totalCrossings": 5326.4,
+       "crossings": 2542.8,
+       "sharedEndpointCrossings": 2783.6,
+       "bends": 1773.8,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 1,
+       "area": 318030012,
+       "length": 2516602.8
+      },
+      "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "refined": {
+         "totalCrossings": 5555,
+         "crossings": 2387,
+         "sharedEndpointCrossings": 3168,
+         "bends": 1777,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 304960905,
+         "length": 2415773
+        },
+        "diagnostic": "Single pass: 355 constructed, 1 delegated drawn as seed routes, 1 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 4412,
+         "crossings": 3166,
+         "sharedEndpointCrossings": 1246,
+         "bends": 1761,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 370306440,
+         "length": 2919922
+        },
+        "refined": {
+         "totalCrossings": 4412,
+         "crossings": 3166,
+         "sharedEndpointCrossings": 1246,
+         "bends": 1761,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 370306440,
+         "length": 2919922
+        },
+        "diagnostic": "Single pass: 354 constructed, 2 delegated drawn as seed routes, 3 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "petri-net",
+    "nodes": 24,
+    "edges": 41,
+    "arms": {
+     "default": {
+      "importMs": 4.474625000002561,
+      "pipelineMs": 16.295874999999796,
+      "initial": {
+       "totalCrossings": 49.8,
+       "crossings": 47.8,
+       "sharedEndpointCrossings": 2,
+       "bends": 101.6,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.4,
+       "area": 808105.4,
+       "length": 11920.4
+      },
+      "refined": {
+       "totalCrossings": 49.8,
+       "crossings": 47.8,
+       "sharedEndpointCrossings": 2,
+       "bends": 101.6,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0.4,
+       "area": 808119.8,
+       "length": 11920
+      },
+      "diagnostic": null,
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 49,
+         "crossings": 47,
+         "sharedEndpointCrossings": 2,
+         "bends": 98,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 925543,
+         "length": 11895
+        },
+        "refined": {
+         "totalCrossings": 49,
+         "crossings": 47,
+         "sharedEndpointCrossings": 2,
+         "bends": 98,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 925543,
+         "length": 11895
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 49,
+         "crossings": 47,
+         "sharedEndpointCrossings": 2,
+         "bends": 100,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 898347,
+         "length": 11591
+        },
+        "refined": {
+         "totalCrossings": 49,
+         "crossings": 47,
+         "sharedEndpointCrossings": 2,
+         "bends": 100,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 898347,
+         "length": 11591
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 52,
+         "crossings": 50,
+         "sharedEndpointCrossings": 2,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 647852,
+         "length": 11620
+        },
+        "refined": {
+         "totalCrossings": 52,
+         "crossings": 50,
+         "sharedEndpointCrossings": 2,
+         "bends": 106,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 647852,
+         "length": 11620
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 50,
+         "crossings": 48,
+         "sharedEndpointCrossings": 2,
+         "bends": 104,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 670438,
+         "length": 12905
+        },
+        "refined": {
+         "totalCrossings": 50,
+         "crossings": 48,
+         "sharedEndpointCrossings": 2,
+         "bends": 104,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 1,
+         "area": 670510,
+         "length": 12903
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 49,
+         "crossings": 47,
+         "sharedEndpointCrossings": 2,
+         "bends": 100,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 898347,
+         "length": 11591
+        },
+        "refined": {
+         "totalCrossings": 49,
+         "crossings": 47,
+         "sharedEndpointCrossings": 2,
+         "bends": 100,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 898347,
+         "length": 11591
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     },
+     "singlePass": {
+      "importMs": 5.672875000000204,
+      "pipelineMs": 8.90729199999987,
+      "initial": {
+       "totalCrossings": 32,
+       "crossings": 32,
+       "sharedEndpointCrossings": 0,
+       "bends": 84,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1512288,
+       "length": 26744
+      },
+      "refined": {
+       "totalCrossings": 32,
+       "crossings": 32,
+       "sharedEndpointCrossings": 0,
+       "bends": 84,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 1512288,
+       "length": 26744
+      },
+      "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "refined": {
+         "totalCrossings": 32,
+         "crossings": 32,
+         "sharedEndpointCrossings": 0,
+         "bends": 84,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 1512288,
+         "length": 26744
+        },
+        "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "name": "state-tcp",
+    "nodes": 11,
+    "edges": 19,
+    "arms": {
+     "default": {
+      "importMs": 2.8459170000023732,
+      "pipelineMs": 9.178582999997161,
+      "initial": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 44,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 465099,
+       "length": 6125
+      },
+      "refined": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 44,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 459885,
+       "length": 6118
+      },
+      "diagnostic": null,
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 465099,
+         "length": 6125
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 459885,
+         "length": 6118
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 465099,
+         "length": 6125
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 459885,
+         "length": 6118
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 465099,
+         "length": 6125
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 459885,
+         "length": 6118
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 465099,
+         "length": 6125
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 459885,
+         "length": 6118
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 465099,
+         "length": 6125
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 44,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 459885,
+         "length": 6118
+        },
+        "diagnostic": null,
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     },
+     "singlePass": {
+      "importMs": 3.1323339999980817,
+      "pipelineMs": 5.396916000001511,
+      "initial": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 26,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 396480,
+       "length": 6230
+      },
+      "refined": {
+       "totalCrossings": 0,
+       "crossings": 0,
+       "sharedEndpointCrossings": 0,
+       "bends": 26,
+       "lineNodeHits": 0,
+       "siblingOverlaps": 0,
+       "sharedLinePairs": 0,
+       "hugPairs": 0,
+       "area": 396480,
+       "length": 6230
+      },
+      "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+      "geometryIssues": 0,
+      "routingIssues": 0,
+      "perSeed": [
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       },
+       {
+        "initial": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "refined": {
+         "totalCrossings": 0,
+         "crossings": 0,
+         "sharedEndpointCrossings": 0,
+         "bends": 26,
+         "lineNodeHits": 0,
+         "siblingOverlaps": 0,
+         "sharedLinePairs": 0,
+         "hugPairs": 0,
+         "area": 396480,
+         "length": 6230
+        },
+        "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+        "geometryIssues": 0,
+        "routingIssues": 0
+       }
+      ]
+     }
+    }
+   }
+  ]
+ }
+}

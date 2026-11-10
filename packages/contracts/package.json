@@ -1,0 +1,53 @@
+{
+  "name": "@arqlet/contracts",
+  "version": "0.1.0",
+  "description": "TypeScript types of Arqlet's engine contracts (Snapshot, Scene, ConfigSet, LayoutOptions, ...), generated from the Rust types. Types only; provisional.",
+  "keywords": [
+    "graph",
+    "layout",
+    "graph-layout",
+    "diagram",
+    "wasm",
+    "typescript",
+    "types"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Benjamin Becker",
+  "homepage": "https://github.com/intentweave/arqlet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intentweave/arqlet.git",
+    "directory": "packages/contracts"
+  },
+  "bugs": {
+    "url": "https://github.com/intentweave/arqlet/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/generated/index.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts"
+      }
+    },
+    "types": "./dist/index.d.ts"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT"
+  ],
+  "scripts": {
+    "generate": "cargo run -q -p arqlet-contracts --bin export-contracts -- src/generated",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "node ../../tools/npm-prepack.mjs --types"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

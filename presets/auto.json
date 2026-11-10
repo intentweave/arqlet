@@ -1,0 +1,42 @@
+{
+  "id": "auto",
+  "version": 1,
+  "title": "Auto",
+  "description": "Direction, layout strategy and routing are all chosen by the layout (auto), with refinement.",
+  "graph": {
+    "defaultDirection": "auto",
+    "defaultStrategy": "auto",
+    "defaultRouting": "auto"
+  },
+  "refine": true,
+  "budgetMs": 5000,
+  "configSet": {
+    "schemaVersion": 1,
+    "id": "auto@1",
+    "layout": {
+      "algorithm": "hierarchical",
+      "candidates": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "hybridBy": "compact",
+      "minPortSpacing": 0,
+      "placementGrid": 8,
+      "freePlacement": false,
+      "placementSearch": 0
+    },
+    "routing": {
+      "style": "orthogonal",
+      "bundling": "none",
+      "routingCandidate": true,
+      "clearance": 0,
+      "trackSpacing": 6,
+      "corridors": false,
+      "trackSeparation": false,
+      "engine": "legacy"
+    }
+  },
+  "workBudget": 5
+}

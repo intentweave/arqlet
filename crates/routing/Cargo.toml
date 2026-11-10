@@ -1,0 +1,20 @@
+[package]
+name = "arqlet-routing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+description = "Edge routing for Arqlet: orthogonal and polyline routes, ports and bundle membership."
+
+[features]
+benchmark-timings = []
+
+[dependencies]
+arqlet-model = { workspace = true }

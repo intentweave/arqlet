@@ -1,0 +1,8 @@
+{"dataset":"petri-net","corridors":3,"tightCorridors":0,"shortageTracks":0,"demandTracks":16,"capacityTracks":30,"maxDemandPerCorridor":7}
+{"dataset":"activity-order","corridors":5,"tightCorridors":0,"shortageTracks":0,"demandTracks":20,"capacityTracks":50,"maxDemandPerCorridor":6}
+{"dataset":"network-vlan","corridors":6,"tightCorridors":0,"shortageTracks":0,"demandTracks":73,"capacityTracks":331,"maxDemandPerCorridor":55}
+{"dataset":"layerweave-pipeline","corridors":9,"tightCorridors":0,"shortageTracks":0,"demandTracks":39,"capacityTracks":90,"maxDemandPerCorridor":6}
+{"dataset":"cloud-architecture","corridors":6,"tightCorridors":0,"shortageTracks":0,"demandTracks":52,"capacityTracks":305,"maxDemandPerCorridor":35}
+{"dataset":"bpmn-pools","corridors":10,"tightCorridors":0,"shortageTracks":0,"demandTracks":24,"capacityTracks":100,"maxDemandPerCorridor":4}
+{"dataset":"state-order","corridors":6,"tightCorridors":0,"shortageTracks":0,"demandTracks":21,"capacityTracks":143,"maxDemandPerCorridor":13}
+{"dataset":"layerweave-code","corridors":17,"tightCorridors":0,"shortageTracks":0,"demandTracks":75,"capacityTracks":170,"maxDemandPerCorridor":7}

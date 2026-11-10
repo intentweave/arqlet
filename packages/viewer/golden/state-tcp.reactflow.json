@@ -1,0 +1,1404 @@
+{
+ "edges": [
+  {
+   "data": {
+    "id": "e1",
+    "invalid": false,
+    "kind": "passive open",
+    "points": [
+     {
+      "x": 204,
+      "y": 55.714285714285715
+     },
+     {
+      "x": 236,
+      "y": 55.714285714285715
+     },
+     {
+      "x": 236,
+      "y": 66
+     },
+     {
+      "x": 268,
+      "y": 66
+     }
+    ],
+    "source": "CLOSED",
+    "target": "LISTEN",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e1",
+   "source": "CLOSED",
+   "sourceHandle": "source:e1",
+   "target": "LISTEN",
+   "targetHandle": "target:e1",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e2",
+    "invalid": false,
+    "kind": "active open",
+    "points": [
+     {
+      "x": 204,
+      "y": 78.85714285714286
+     },
+     {
+      "x": 216,
+      "y": 78.85714285714286
+     },
+     {
+      "x": 216,
+      "y": 48
+     },
+     {
+      "x": 500,
+      "y": 48
+     },
+     {
+      "x": 500,
+      "y": 61.5
+     },
+     {
+      "x": 512,
+      "y": 61.5
+     }
+    ],
+    "source": "CLOSED",
+    "target": "SYN_SENT",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e2",
+   "source": "CLOSED",
+   "sourceHandle": "source:e2",
+   "target": "SYN_SENT",
+   "targetHandle": "target:e2",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e3",
+    "invalid": false,
+    "kind": "recv SYN",
+    "points": [
+     {
+      "x": 448,
+      "y": 66
+     },
+     {
+      "x": 454,
+      "y": 66
+     },
+     {
+      "x": 454,
+      "y": 42
+     },
+     {
+      "x": 750,
+      "y": 42
+     },
+     {
+      "x": 750,
+      "y": 66
+     },
+     {
+      "x": 756,
+      "y": 66
+     }
+    ],
+    "source": "LISTEN",
+    "target": "SYN_RCVD",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e3",
+   "source": "LISTEN",
+   "sourceHandle": "source:e3",
+   "target": "SYN_RCVD",
+   "targetHandle": "target:e3",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e4",
+    "invalid": false,
+    "kind": "send SYN",
+    "points": [
+     {
+      "x": 448,
+      "y": 84
+     },
+     {
+      "x": 480,
+      "y": 84
+     },
+     {
+      "x": 480,
+      "y": 75
+     },
+     {
+      "x": 512,
+      "y": 75
+     }
+    ],
+    "source": "LISTEN",
+    "target": "SYN_SENT",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e4",
+   "source": "LISTEN",
+   "sourceHandle": "source:e4",
+   "target": "SYN_SENT",
+   "targetHandle": "target:e4",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e5",
+    "invalid": false,
+    "kind": "close",
+    "points": [
+     {
+      "x": 268,
+      "y": 84
+     },
+     {
+      "x": 236,
+      "y": 84
+     },
+     {
+      "x": 236,
+      "y": 86.57142857142857
+     },
+     {
+      "x": 204,
+      "y": 86.57142857142857
+     }
+    ],
+    "source": "LISTEN",
+    "target": "CLOSED",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e5",
+   "source": "LISTEN",
+   "sourceHandle": "source:e5",
+   "target": "CLOSED",
+   "targetHandle": "target:e5",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e6",
+    "invalid": false,
+    "kind": "recv SYN",
+    "points": [
+     {
+      "x": 692,
+      "y": 66
+     },
+     {
+      "x": 724,
+      "y": 66
+     },
+     {
+      "x": 724,
+      "y": 84
+     },
+     {
+      "x": 756,
+      "y": 84
+     }
+    ],
+    "source": "SYN_SENT",
+    "target": "SYN_RCVD",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e6",
+   "source": "SYN_SENT",
+   "sourceHandle": "source:e6",
+   "target": "SYN_RCVD",
+   "targetHandle": "target:e6",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e7",
+    "invalid": false,
+    "kind": "recv SYN+ACK",
+    "points": [
+     {
+      "x": 692,
+      "y": 84
+     },
+     {
+      "x": 698,
+      "y": 84
+     },
+     {
+      "x": 698,
+      "y": 108
+     },
+     {
+      "x": 994,
+      "y": 108
+     },
+     {
+      "x": 994,
+      "y": 66
+     },
+     {
+      "x": 1000,
+      "y": 66
+     }
+    ],
+    "source": "SYN_SENT",
+    "target": "ESTABLISHED",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e7",
+   "source": "SYN_SENT",
+   "sourceHandle": "source:e7",
+   "target": "ESTABLISHED",
+   "targetHandle": "target:e7",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e8",
+    "invalid": false,
+    "kind": "close",
+    "points": [
+     {
+      "x": 512,
+      "y": 88.5
+     },
+     {
+      "x": 500,
+      "y": 88.5
+     },
+     {
+      "x": 500,
+      "y": 102
+     },
+     {
+      "x": 216,
+      "y": 102
+     },
+     {
+      "x": 216,
+      "y": 94.28571428571428
+     },
+     {
+      "x": 204,
+      "y": 94.28571428571428
+     }
+    ],
+    "source": "SYN_SENT",
+    "target": "CLOSED",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e8",
+   "source": "SYN_SENT",
+   "sourceHandle": "source:e8",
+   "target": "CLOSED",
+   "targetHandle": "target:e8",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e9",
+    "invalid": false,
+    "kind": "recv ACK",
+    "points": [
+     {
+      "x": 936,
+      "y": 84
+     },
+     {
+      "x": 1000,
+      "y": 84
+     }
+    ],
+    "source": "SYN_RCVD",
+    "target": "ESTABLISHED",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e9",
+   "source": "SYN_RCVD",
+   "sourceHandle": "source:e9",
+   "target": "ESTABLISHED",
+   "targetHandle": "target:e9",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e10",
+    "invalid": false,
+    "kind": "close",
+    "points": [
+     {
+      "x": 936,
+      "y": 66
+     },
+     {
+      "x": 942,
+      "y": 66
+     },
+     {
+      "x": 942,
+      "y": 48
+     },
+     {
+      "x": 1238,
+      "y": 48
+     },
+     {
+      "x": 1238,
+      "y": 66
+     },
+     {
+      "x": 1244,
+      "y": 66
+     }
+    ],
+    "source": "SYN_RCVD",
+    "target": "FIN_WAIT_1",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e10",
+   "source": "SYN_RCVD",
+   "sourceHandle": "source:e10",
+   "target": "FIN_WAIT_1",
+   "targetHandle": "target:e10",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e11",
+    "invalid": false,
+    "kind": "close",
+    "points": [
+     {
+      "x": 1180,
+      "y": 66
+     },
+     {
+      "x": 1212,
+      "y": 66
+     },
+     {
+      "x": 1212,
+      "y": 84
+     },
+     {
+      "x": 1244,
+      "y": 84
+     }
+    ],
+    "source": "ESTABLISHED",
+    "target": "FIN_WAIT_1",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e11",
+   "source": "ESTABLISHED",
+   "sourceHandle": "source:e11",
+   "target": "FIN_WAIT_1",
+   "targetHandle": "target:e11",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e12",
+    "invalid": false,
+    "kind": "recv FIN",
+    "points": [
+     {
+      "x": 1180,
+      "y": 84
+     },
+     {
+      "x": 1212,
+      "y": 84
+     },
+     {
+      "x": 1212,
+      "y": 153
+     },
+     {
+      "x": 1244,
+      "y": 153
+     }
+    ],
+    "source": "ESTABLISHED",
+    "target": "CLOSE_WAIT",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e12",
+   "source": "ESTABLISHED",
+   "sourceHandle": "source:e12",
+   "target": "CLOSE_WAIT",
+   "targetHandle": "target:e12",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e13",
+    "invalid": false,
+    "kind": "recv ACK",
+    "points": [
+     {
+      "x": 1424,
+      "y": 66
+     },
+     {
+      "x": 1456,
+      "y": 66
+     },
+     {
+      "x": 1456,
+      "y": 153
+     },
+     {
+      "x": 1488,
+      "y": 153
+     }
+    ],
+    "source": "FIN_WAIT_1",
+    "target": "FIN_WAIT_2",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e13",
+   "source": "FIN_WAIT_1",
+   "sourceHandle": "source:e13",
+   "target": "FIN_WAIT_2",
+   "targetHandle": "target:e13",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e14",
+    "invalid": false,
+    "kind": "recv FIN",
+    "points": [
+     {
+      "x": 1424,
+      "y": 84
+     },
+     {
+      "x": 1450,
+      "y": 84
+     },
+     {
+      "x": 1450,
+      "y": 75
+     },
+     {
+      "x": 1488,
+      "y": 75
+     }
+    ],
+    "source": "FIN_WAIT_1",
+    "target": "CLOSING",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e14",
+   "source": "FIN_WAIT_1",
+   "sourceHandle": "source:e14",
+   "target": "CLOSING",
+   "targetHandle": "target:e14",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e15",
+    "invalid": false,
+    "kind": "recv FIN",
+    "points": [
+     {
+      "x": 1668,
+      "y": 153
+     },
+     {
+      "x": 1732,
+      "y": 153
+     },
+     {
+      "x": 1732,
+      "y": 61.5
+     },
+     {
+      "x": 1726,
+      "y": 61.5
+     },
+     {
+      "x": 1732,
+      "y": 61.5
+     }
+    ],
+    "source": "FIN_WAIT_2",
+    "target": "TIME_WAIT",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e15",
+   "source": "FIN_WAIT_2",
+   "sourceHandle": "source:e15",
+   "target": "TIME_WAIT",
+   "targetHandle": "target:e15",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e16",
+    "invalid": false,
+    "kind": "recv ACK",
+    "points": [
+     {
+      "x": 1668,
+      "y": 75
+     },
+     {
+      "x": 1732,
+      "y": 75
+     }
+    ],
+    "source": "CLOSING",
+    "target": "TIME_WAIT",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e16",
+   "source": "CLOSING",
+   "sourceHandle": "source:e16",
+   "target": "TIME_WAIT",
+   "targetHandle": "target:e16",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e17",
+    "invalid": false,
+    "kind": "close",
+    "points": [
+     {
+      "x": 1424,
+      "y": 153
+     },
+     {
+      "x": 1456,
+      "y": 153
+     },
+     {
+      "x": 1456,
+      "y": 222
+     },
+     {
+      "x": 1488,
+      "y": 222
+     }
+    ],
+    "source": "CLOSE_WAIT",
+    "target": "LAST_ACK",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e17",
+   "source": "CLOSE_WAIT",
+   "sourceHandle": "source:e17",
+   "target": "LAST_ACK",
+   "targetHandle": "target:e17",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e18",
+    "invalid": false,
+    "kind": "recv ACK",
+    "points": [
+     {
+      "x": 1488,
+      "y": 240
+     },
+     {
+      "x": 204,
+      "y": 240
+     },
+     {
+      "x": 204,
+      "y": 63.42857142857143
+     },
+     {
+      "x": 210,
+      "y": 63.42857142857143
+     },
+     {
+      "x": 204,
+      "y": 63.42857142857143
+     }
+    ],
+    "source": "LAST_ACK",
+    "target": "CLOSED",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e18",
+   "source": "LAST_ACK",
+   "sourceHandle": "source:e18",
+   "target": "CLOSED",
+   "targetHandle": "target:e18",
+   "type": "arqlet",
+   "zIndex": 1
+  },
+  {
+   "data": {
+    "id": "e19",
+    "invalid": false,
+    "kind": "timeout",
+    "points": [
+     {
+      "x": 1732,
+      "y": 88.5
+     },
+     {
+      "x": 1726,
+      "y": 88.5
+     },
+     {
+      "x": 1726,
+      "y": 36
+     },
+     {
+      "x": 210,
+      "y": 36
+     },
+     {
+      "x": 210,
+      "y": 71.14285714285714
+     },
+     {
+      "x": 204,
+      "y": 71.14285714285714
+     }
+    ],
+    "source": "TIME_WAIT",
+    "target": "CLOSED",
+    "weight": 1
+   },
+   "deletable": false,
+   "id": "e19",
+   "source": "TIME_WAIT",
+   "sourceHandle": "source:e19",
+   "target": "CLOSED",
+   "targetHandle": "target:e19",
+   "type": "arqlet",
+   "zIndex": 1
+  }
+ ],
+ "labels": [],
+ "nodes": [
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 24,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "source:e1",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 7.714285714285715
+     },
+     {
+      "id": "source:e2",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 30.85714285714286
+     },
+     {
+      "id": "target:e5",
+      "side": "right",
+      "type": "target",
+      "x": 180,
+      "y": 38.57142857142857
+     },
+     {
+      "id": "target:e8",
+      "side": "right",
+      "type": "target",
+      "x": 180,
+      "y": 46.28571428571428
+     },
+     {
+      "id": "target:e18",
+      "side": "right",
+      "type": "target",
+      "x": 180,
+      "y": 15.42857142857143
+     },
+     {
+      "id": "target:e19",
+      "side": "right",
+      "type": "target",
+      "x": 180,
+      "y": 23.14285714285714
+     }
+    ],
+    "id": "CLOSED",
+    "invalid": false,
+    "kind": "state",
+    "label": "CLOSED",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "CLOSED",
+   "position": {
+    "x": 24,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 268,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e1",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 18
+     },
+     {
+      "id": "source:e3",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 18
+     },
+     {
+      "id": "source:e4",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 36
+     },
+     {
+      "id": "source:e5",
+      "side": "left",
+      "type": "source",
+      "x": 0,
+      "y": 36
+     }
+    ],
+    "id": "LISTEN",
+    "invalid": false,
+    "kind": "state",
+    "label": "LISTEN",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "LISTEN",
+   "position": {
+    "x": 268,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 512,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e2",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 13.5
+     },
+     {
+      "id": "target:e4",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 27
+     },
+     {
+      "id": "source:e6",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 18
+     },
+     {
+      "id": "source:e7",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 36
+     },
+     {
+      "id": "source:e8",
+      "side": "left",
+      "type": "source",
+      "x": 0,
+      "y": 40.5
+     }
+    ],
+    "id": "SYN_SENT",
+    "invalid": false,
+    "kind": "state",
+    "label": "SYN_SENT",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "SYN_SENT",
+   "position": {
+    "x": 512,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 756,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e3",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 18
+     },
+     {
+      "id": "target:e6",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 36
+     },
+     {
+      "id": "source:e9",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 36
+     },
+     {
+      "id": "source:e10",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 18
+     }
+    ],
+    "id": "SYN_RCVD",
+    "invalid": false,
+    "kind": "state",
+    "label": "SYN_RCVD",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "SYN_RCVD",
+   "position": {
+    "x": 756,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 1000,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e7",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 18
+     },
+     {
+      "id": "target:e9",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 36
+     },
+     {
+      "id": "source:e11",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 18
+     },
+     {
+      "id": "source:e12",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 36
+     }
+    ],
+    "id": "ESTABLISHED",
+    "invalid": false,
+    "kind": "state",
+    "label": "ESTABLISHED",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "ESTABLISHED",
+   "position": {
+    "x": 1000,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 1244,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e10",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 18
+     },
+     {
+      "id": "target:e11",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 36
+     },
+     {
+      "id": "source:e13",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 18
+     },
+     {
+      "id": "source:e14",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 36
+     }
+    ],
+    "id": "FIN_WAIT_1",
+    "invalid": false,
+    "kind": "state",
+    "label": "FIN_WAIT_1",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "FIN_WAIT_1",
+   "position": {
+    "x": 1244,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 1488,
+     "y": 126
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e13",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 27
+     },
+     {
+      "id": "source:e15",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 27
+     }
+    ],
+    "id": "FIN_WAIT_2",
+    "invalid": false,
+    "kind": "state",
+    "label": "FIN_WAIT_2",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "FIN_WAIT_2",
+   "position": {
+    "x": 1488,
+    "y": 126
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 1244,
+     "y": 126
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e12",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 27
+     },
+     {
+      "id": "source:e17",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 27
+     }
+    ],
+    "id": "CLOSE_WAIT",
+    "invalid": false,
+    "kind": "state",
+    "label": "CLOSE_WAIT",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "CLOSE_WAIT",
+   "position": {
+    "x": 1244,
+    "y": 126
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 1488,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e14",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 27
+     },
+     {
+      "id": "source:e16",
+      "side": "right",
+      "type": "source",
+      "x": 180,
+      "y": 27
+     }
+    ],
+    "id": "CLOSING",
+    "invalid": false,
+    "kind": "state",
+    "label": "CLOSING",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "CLOSING",
+   "position": {
+    "x": 1488,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 1488,
+     "y": 204
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e17",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 18
+     },
+     {
+      "id": "source:e18",
+      "side": "left",
+      "type": "source",
+      "x": 0,
+      "y": 36
+     }
+    ],
+    "id": "LAST_ACK",
+    "invalid": false,
+    "kind": "state",
+    "label": "LAST_ACK",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "LAST_ACK",
+   "position": {
+    "x": 1488,
+    "y": 204
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  },
+  {
+   "connectable": false,
+   "data": {
+    "aggregate": false,
+    "bounds": {
+     "height": 54,
+     "width": 180,
+     "x": 1732,
+     "y": 48
+    },
+    "collapsed": false,
+    "container": false,
+    "handles": [
+     {
+      "id": "target:e15",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 13.5
+     },
+     {
+      "id": "target:e16",
+      "side": "left",
+      "type": "target",
+      "x": 0,
+      "y": 27
+     },
+     {
+      "id": "source:e19",
+      "side": "left",
+      "type": "source",
+      "x": 0,
+      "y": 40.5
+     }
+    ],
+    "id": "TIME_WAIT",
+    "invalid": false,
+    "kind": "state",
+    "label": "TIME_WAIT",
+    "parentId": null,
+    "showPorts": true
+   },
+   "deletable": false,
+   "draggable": false,
+   "height": 54,
+   "id": "TIME_WAIT",
+   "position": {
+    "x": 1732,
+    "y": 48
+   },
+   "style": {
+    "height": 54,
+    "width": 180
+   },
+   "type": "arqlet",
+   "width": 180,
+   "zIndex": 2
+  }
+ ]
+}

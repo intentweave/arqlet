@@ -1,0 +1,149 @@
+{
+  "containerDirections": {
+    "ring": "auto"
+  },
+  "containerStrategies": {
+    "ring": "radial"
+  },
+  "defaultDirection": "lr",
+  "defaultStrategy": "tree",
+  "edges": [
+    {
+      "id": "rl",
+      "kind": "flow",
+      "source": "root",
+      "target": "left"
+    },
+    {
+      "id": "rr",
+      "kind": "flow",
+      "source": "root",
+      "target": "right"
+    },
+    {
+      "id": "ll0",
+      "kind": "flow",
+      "source": "left",
+      "target": "l0"
+    },
+    {
+      "id": "ll1",
+      "kind": "flow",
+      "source": "left",
+      "target": "l1"
+    },
+    {
+      "id": "ll2",
+      "kind": "flow",
+      "source": "left",
+      "target": "l2"
+    },
+    {
+      "id": "rr0",
+      "kind": "flow",
+      "source": "right",
+      "target": "r0"
+    },
+    {
+      "id": "rr1",
+      "kind": "flow",
+      "source": "r0",
+      "target": "r1"
+    },
+    {
+      "id": "rr2",
+      "kind": "flow",
+      "source": "r1",
+      "target": "r2"
+    },
+    {
+      "id": "rr3",
+      "kind": "flow",
+      "source": "r2",
+      "target": "r3"
+    },
+    {
+      "id": "rr4",
+      "kind": "flow",
+      "source": "r3",
+      "target": "r4"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "root",
+      "kind": "node",
+      "label": "Root",
+      "parentId": null
+    },
+    {
+      "id": "left",
+      "kind": "node",
+      "label": "Left",
+      "parentId": null
+    },
+    {
+      "id": "right",
+      "kind": "node",
+      "label": "Right",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "l0",
+      "kind": "node",
+      "label": "Leaf 0",
+      "parentId": null
+    },
+    {
+      "id": "l1",
+      "kind": "node",
+      "label": "Leaf 1",
+      "parentId": null
+    },
+    {
+      "id": "l2",
+      "kind": "node",
+      "label": "Leaf 2",
+      "parentId": null
+    },
+    {
+      "id": "ring",
+      "kind": "group",
+      "label": "Ring",
+      "parentId": null
+    },
+    {
+      "id": "r0",
+      "kind": "node",
+      "label": "Ring 0",
+      "parentId": "ring"
+    },
+    {
+      "id": "r1",
+      "kind": "node",
+      "label": "Ring 1",
+      "parentId": "ring",
+      "shape": "circle"
+    },
+    {
+      "id": "r2",
+      "kind": "node",
+      "label": "Ring 2",
+      "parentId": "ring"
+    },
+    {
+      "id": "r3",
+      "kind": "node",
+      "label": "Ring 3",
+      "parentId": "ring",
+      "shape": "circle"
+    },
+    {
+      "id": "r4",
+      "kind": "node",
+      "label": "Ring 4",
+      "parentId": "ring"
+    }
+  ]
+}

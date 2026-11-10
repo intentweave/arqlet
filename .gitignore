@@ -1,0 +1,21 @@
+/target/
+.DS_Store
+node_modules/
+dist/
+
+/exports/
+
+/apps/playground/generated/
+
+__pycache__/
+*.pyc
+
+/benchmarks/datasets/
+
+/benchmarks/results/*.log
+/.claude/worktrees
+
+# npm packaging copies (tools/npm-prepack.mjs)
+/packages/*/LICENSE-APACHE
+/packages/*/LICENSE-MIT
+/packages/engine-client/arqlet.wasm

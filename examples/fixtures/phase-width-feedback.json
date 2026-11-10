@@ -1,0 +1,3286 @@
+{
+  "containerDirections": {},
+  "defaultDirection": "lr",
+  "edgePorts": [],
+  "edges": [
+    {
+      "id": "e4",
+      "kind": "depends",
+      "source": "crate:layout",
+      "target": "crate:model"
+    },
+    {
+      "id": "e5",
+      "kind": "depends",
+      "source": "crate:layout",
+      "target": "crate:routing"
+    },
+    {
+      "id": "e6",
+      "kind": "depends",
+      "source": "crate:layout",
+      "target": "crate:scene"
+    },
+    {
+      "id": "e7",
+      "kind": "depends",
+      "source": "crate:layout",
+      "target": "crate:topology"
+    },
+    {
+      "id": "e8",
+      "kind": "depends",
+      "source": "crate:reference",
+      "target": "crate:model"
+    },
+    {
+      "id": "e9",
+      "kind": "depends",
+      "source": "crate:reference",
+      "target": "crate:scene"
+    },
+    {
+      "id": "e10",
+      "kind": "depends",
+      "source": "crate:reference",
+      "target": "crate:routing"
+    },
+    {
+      "id": "e11",
+      "kind": "depends",
+      "source": "crate:routing",
+      "target": "crate:model"
+    },
+    {
+      "id": "e12",
+      "kind": "depends",
+      "source": "crate:runtime",
+      "target": "crate:model"
+    },
+    {
+      "id": "e13",
+      "kind": "depends",
+      "source": "crate:runtime",
+      "target": "crate:layout"
+    },
+    {
+      "id": "e14",
+      "kind": "depends",
+      "source": "crate:runtime",
+      "target": "crate:scene"
+    },
+    {
+      "id": "e16",
+      "kind": "depends",
+      "source": "crate:runtime",
+      "target": "crate:reference"
+    },
+    {
+      "id": "e17",
+      "kind": "depends",
+      "source": "crate:runtime",
+      "target": "crate:routing"
+    },
+    {
+      "id": "e18",
+      "kind": "depends",
+      "source": "crate:scene",
+      "target": "crate:model"
+    },
+    {
+      "id": "e34",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::segments_of"
+    },
+    {
+      "id": "e36",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::centres"
+    },
+    {
+      "id": "e38",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::new"
+    },
+    {
+      "id": "e39",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::lane_changes"
+    },
+    {
+      "id": "e40",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/routing/src/lib.rs::side"
+    },
+    {
+      "id": "e41",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::to_point"
+    },
+    {
+      "id": "e42",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::gap_key"
+    },
+    {
+      "id": "e43",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::corridor_order"
+    },
+    {
+      "id": "e47",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/constructive.rs::build_edge"
+    },
+    {
+      "id": "e49",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::construct_with",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e60",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::section_routes",
+      "target": "fn:crates/layout/src/constructive.rs::new"
+    },
+    {
+      "id": "e62",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::section_routes",
+      "target": "fn:crates/layout/src/global.rs::path"
+    },
+    {
+      "id": "e64",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::section_routes",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e66",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::section_routes",
+      "target": "fn:crates/routing/src/channel.rs::set"
+    },
+    {
+      "id": "e67",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::section_routes",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e69",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::section_routes",
+      "target": "fn:crates/layout/src/constructive.rs::dependent_order"
+    },
+    {
+      "id": "e70",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::section_routes",
+      "target": "fn:crates/layout/src/constructive.rs::corridor_order"
+    },
+    {
+      "id": "e87",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/constructive.rs::monotone_path"
+    },
+    {
+      "id": "e88",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e89",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/constructive.rs::to_point"
+    },
+    {
+      "id": "e90",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/constructive.rs::segments_of"
+    },
+    {
+      "id": "e91",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e92",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/constructive.rs::conflicts"
+    },
+    {
+      "id": "e93",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/constructive.rs::straighten"
+    },
+    {
+      "id": "e94",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::build_edge",
+      "target": "fn:crates/layout/src/constructive.rs::new"
+    },
+    {
+      "id": "e99",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::lane_changes",
+      "target": "fn:crates/layout/src/constructive.rs::search_gaps"
+    },
+    {
+      "id": "e100",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::lane_changes",
+      "target": "fn:crates/layout/src/constructive.rs::new"
+    },
+    {
+      "id": "e101",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::lane_changes",
+      "target": "fn:crates/layout/src/constructive.rs::search_on"
+    },
+    {
+      "id": "e102",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::lane_changes",
+      "target": "fn:crates/layout/src/constructive.rs::centres"
+    },
+    {
+      "id": "e103",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::lane_changes",
+      "target": "fn:crates/layout/src/constructive.rs::gap_of"
+    },
+    {
+      "id": "e104",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::corridor_order",
+      "target": "fn:crates/routing/src/lib.rs::inside"
+    },
+    {
+      "id": "e105",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::dependent_order",
+      "target": "fn:crates/routing/src/lib.rs::inside"
+    },
+    {
+      "id": "e106",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::dependent_order",
+      "target": "fn:crates/layout/src/constructive.rs::corridor_order"
+    },
+    {
+      "id": "e107",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::dependent_order",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e109",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::search_gaps"
+    },
+    {
+      "id": "e110",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::segment_box"
+    },
+    {
+      "id": "e111",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::new"
+    },
+    {
+      "id": "e112",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::search_on"
+    },
+    {
+      "id": "e113",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::centres"
+    },
+    {
+      "id": "e114",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::gap_of"
+    },
+    {
+      "id": "e115",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::gap_key"
+    },
+    {
+      "id": "e116",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/constructive.rs::gap_tracks"
+    },
+    {
+      "id": "e117",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e118",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::search_on",
+      "target": "fn:crates/layout/src/constructive.rs::to_point"
+    },
+    {
+      "id": "e119",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::search_on",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e120",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::search_on",
+      "target": "fn:crates/layout/src/constructive.rs::segment_hits"
+    },
+    {
+      "id": "e121",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::search_on",
+      "target": "fn:crates/layout/src/constructive.rs::segments_of"
+    },
+    {
+      "id": "e122",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::search_on",
+      "target": "fn:crates/layout/src/constructive.rs::conflicts"
+    },
+    {
+      "id": "e123",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::search_on",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e124",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/constructive.rs::search_on",
+      "target": "fn:crates/layout/src/constructive.rs::new"
+    },
+    {
+      "id": "e132",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::improve",
+      "target": "fn:crates/layout/src/engine_choice.rs::other_engine"
+    },
+    {
+      "id": "e133",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::improve",
+      "target": "fn:crates/layout/src/engine_choice.rs::routed"
+    },
+    {
+      "id": "e134",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::improve",
+      "target": "fn:crates/layout/src/engine_choice.rs::key"
+    },
+    {
+      "id": "e135",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::improve",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e136",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::improve",
+      "target": "fn:crates/layout/src/engine_choice.rs::side_search"
+    },
+    {
+      "id": "e139",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::relieve",
+      "target": "fn:crates/layout/src/engine_choice.rs::side_search"
+    },
+    {
+      "id": "e140",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/engine_choice.rs::crossing_edges"
+    },
+    {
+      "id": "e141",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/engine_choice.rs::endpoints"
+    },
+    {
+      "id": "e142",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/engine_choice.rs::shared_side_endpoints"
+    },
+    {
+      "id": "e143",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e144",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/routing/src/channel.rs::set"
+    },
+    {
+      "id": "e145",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/engine_choice.rs::with_ports"
+    },
+    {
+      "id": "e146",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/lib.rs::route_all"
+    },
+    {
+      "id": "e147",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e148",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/labels.rs::decorate"
+    },
+    {
+      "id": "e149",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/lib.rs::uninterrupted"
+    },
+    {
+      "id": "e150",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/lib.rs::compute_mode"
+    },
+    {
+      "id": "e151",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/engine_choice.rs::key"
+    },
+    {
+      "id": "e152",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/lib.rs::node"
+    },
+    {
+      "id": "e153",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/routing/src/lib.rs::side"
+    },
+    {
+      "id": "e154",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "target": "fn:crates/layout/src/engine_choice.rs::finalised"
+    },
+    {
+      "id": "e155",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::shared_side_endpoints",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e156",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::with_ports",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e157",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/engine_choice.rs::routed",
+      "target": "fn:crates/layout/src/labels.rs::decorate"
+    },
+    {
+      "id": "e160",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::of",
+      "target": "fn:crates/model/src/lib.rs::direction_for"
+    },
+    {
+      "id": "e161",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::of",
+      "target": "fn:crates/model/src/lib.rs::reversed"
+    },
+    {
+      "id": "e162",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::of",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e163",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::of",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e164",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::of",
+      "target": "fn:crates/layout/src/lib.rs::node"
+    },
+    {
+      "id": "e165",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::is_empty",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e168",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::depth",
+      "target": "fn:crates/layout/src/global.rs::path"
+    },
+    {
+      "id": "e178",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::frames",
+      "target": "fn:crates/layout/src/global.rs::depth"
+    },
+    {
+      "id": "e179",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/global.rs::frames",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e180",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::ports_of",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e181",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::ports_of",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e182",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::ports_of",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::child_of"
+    },
+    {
+      "id": "e183",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::ports_of",
+      "target": "fn:crates/routing/src/lib.rs::inside"
+    },
+    {
+      "id": "e185",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::sub_place",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e186",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::edge_places",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e187",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::place",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::sub_place"
+    },
+    {
+      "id": "e188",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::sweep",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::descend"
+    },
+    {
+      "id": "e189",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::sweep",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::place"
+    },
+    {
+      "id": "e190",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::sweep",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e191",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::sweep",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::set_rank"
+    },
+    {
+      "id": "e192",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::descend",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::place"
+    },
+    {
+      "id": "e193",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::descend",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::edge_places"
+    },
+    {
+      "id": "e194",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::descend",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e195",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::descend",
+      "target": "fn:crates/routing/src/channel.rs::index"
+    },
+    {
+      "id": "e196",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::descend",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::set_rank"
+    },
+    {
+      "id": "e197",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::descend",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::sweep"
+    },
+    {
+      "id": "e199",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::pair_crossings",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::edge_places"
+    },
+    {
+      "id": "e200",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::pair_crossings",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::place"
+    },
+    {
+      "id": "e205",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::hierarchical_sweep",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::ports_of"
+    },
+    {
+      "id": "e208",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::hierarchical_sweep",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::set_rank"
+    },
+    {
+      "id": "e210",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/hierarchy_order.rs::hierarchical_sweep",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::sweep"
+    },
+    {
+      "id": "e211",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::route_node_conflicts",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e212",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::decorate",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e213",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::decorate",
+      "target": "fn:crates/layout/src/lib.rs::pin_diagnostics"
+    },
+    {
+      "id": "e214",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::decorate",
+      "target": "fn:crates/layout/src/styles.rs::capability_diagnostics"
+    },
+    {
+      "id": "e215",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::decorate",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e216",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::decorate",
+      "target": "fn:crates/layout/src/labels.rs::route_node_conflicts"
+    },
+    {
+      "id": "e217",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::decorate",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e218",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/labels.rs::decorate",
+      "target": "fn:crates/layout/src/labels.rs::overlaps"
+    },
+    {
+      "id": "e222",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::order_crossings",
+      "target": "fn:crates/layout/src/layered_plan.rs::inversions"
+    },
+    {
+      "id": "e223",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::improve_order",
+      "target": "fn:crates/layout/src/layered_plan.rs::inversions"
+    },
+    {
+      "id": "e224",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::improve_order",
+      "target": "fn:crates/layout/src/layered_plan.rs::order_crossings"
+    },
+    {
+      "id": "e225",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::improve_order",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e226",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::improve_order",
+      "target": "fn:crates/layout/src/layered_plan.rs::transpose"
+    },
+    {
+      "id": "e227",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::improve_order",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e228",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::compare",
+      "target": "fn:crates/layout/src/global.rs::path"
+    },
+    {
+      "id": "e229",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::hierarchical_order",
+      "target": "fn:crates/layout/src/global.rs::path"
+    },
+    {
+      "id": "e230",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::hierarchical_order",
+      "target": "fn:crates/layout/src/layered_plan.rs::compare"
+    },
+    {
+      "id": "e231",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::hierarchical_order",
+      "target": "fn:crates/layout/src/layered_plan.rs::order_crossings"
+    },
+    {
+      "id": "e232",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::hierarchical_order",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e233",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/layered_plan.rs::transpose",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e236",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::new",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e240",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::check_rows",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e241",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::check_rows",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e242",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::check_rows",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e243",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::check_rows",
+      "target": "fn:crates/routing/src/lib.rs::side"
+    },
+    {
+      "id": "e244",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute",
+      "target": "fn:crates/layout/src/lib.rs::compute_counted"
+    },
+    {
+      "id": "e245",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/lib.rs::check_rows"
+    },
+    {
+      "id": "e248",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e249",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/lib.rs::uninterrupted"
+    },
+    {
+      "id": "e250",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/lib.rs::compute_mode"
+    },
+    {
+      "id": "e251",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/routing/src/lib.rs::routes_hitting_nodes"
+    },
+    {
+      "id": "e252",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e254",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e255",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/labels.rs::decorate"
+    },
+    {
+      "id": "e256",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_counted",
+      "target": "fn:crates/layout/src/lib.rs::finish"
+    },
+    {
+      "id": "e257",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::finish",
+      "target": "fn:crates/layout/src/styles.rs::plan_straight_edges"
+    },
+    {
+      "id": "e258",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::finish",
+      "target": "fn:crates/layout/src/styles.rs::apply_straight_edges"
+    },
+    {
+      "id": "e259",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::finish",
+      "target": "fn:crates/layout/src/styles.rs::route_orthogonal_around"
+    },
+    {
+      "id": "e260",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::finish",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e261",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::finish",
+      "target": "fn:crates/layout/src/labels.rs::decorate"
+    },
+    {
+      "id": "e262",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::finish",
+      "target": "fn:crates/layout/src/styles.rs::capability_diagnostics"
+    },
+    {
+      "id": "e267",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_mode",
+      "target": "fn:crates/layout/src/lib.rs::select_pipeline"
+    },
+    {
+      "id": "e280",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::plan_port_offsets",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e281",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::plan_port_offsets",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e291",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::widen_channels_by_edges",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e292",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::widen_channels_by_edges",
+      "target": "fn:crates/layout/src/constructive.rs::dependent_order"
+    },
+    {
+      "id": "e296",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::chain_slots",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e297",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::chain_slots",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e298",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::align_lanes",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e299",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::align_lanes",
+      "target": "fn:crates/layout/src/lib.rs::node"
+    },
+    {
+      "id": "e300",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::align_lanes",
+      "target": "fn:crates/scene/src/geom.rs::offset"
+    },
+    {
+      "id": "e301",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::align_lanes",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e302",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::align_lanes",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e307",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::slide_free",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e372",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::repair_and_replace",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e374",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::repair_and_replace",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e376",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::repair_and_replace",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e378",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::repair_and_replace",
+      "target": "fn:crates/layout/src/lib.rs::place"
+    },
+    {
+      "id": "e380",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::published_drawing",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e387",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::pin_diagnostics",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e402",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::route_all",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e407",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::route_all",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e410",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::local_routes",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e411",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::local_routes",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e413",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::local_routes",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e415",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::local_routes",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e422",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e426",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/lib.rs::place"
+    },
+    {
+      "id": "e427",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e429",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/hierarchy_order.rs::hierarchical_sweep"
+    },
+    {
+      "id": "e433",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e434",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/lib.rs::repair_and_replace"
+    },
+    {
+      "id": "e439",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/lib.rs::local_routes"
+    },
+    {
+      "id": "e440",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/lib.rs::route_all"
+    },
+    {
+      "id": "e442",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/styles.rs::all_edges_straight"
+    },
+    {
+      "id": "e443",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/lib.rs::node"
+    },
+    {
+      "id": "e445",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/lib.rs::pin_diagnostics"
+    },
+    {
+      "id": "e447",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::compute_once",
+      "target": "fn:crates/layout/src/labels.rs::decorate"
+    },
+    {
+      "id": "e448",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::select_pipeline",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e449",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::select_pipeline",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e450",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::select_pipeline",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e460",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e462",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::node"
+    },
+    {
+      "id": "e463",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e466",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::new"
+    },
+    {
+      "id": "e467",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::place"
+    },
+    {
+      "id": "e471",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e474",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/model/src/lib.rs::direction_for"
+    },
+    {
+      "id": "e475",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/model/src/lib.rs::reversed"
+    },
+    {
+      "id": "e480",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/global.rs::path"
+    },
+    {
+      "id": "e483",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/layered_plan.rs::hierarchical_order"
+    },
+    {
+      "id": "e485",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/layered_plan.rs::order_crossings"
+    },
+    {
+      "id": "e486",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/layered_plan.rs::improve_order"
+    },
+    {
+      "id": "e490",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::slide_free"
+    },
+    {
+      "id": "e491",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::plan_port_offsets"
+    },
+    {
+      "id": "e492",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::chain_slots"
+    },
+    {
+      "id": "e493",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::align_lanes"
+    },
+    {
+      "id": "e495",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::widen_channels_by_edges"
+    },
+    {
+      "id": "e498",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/tree.rs::tree_arrange"
+    },
+    {
+      "id": "e501",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/tree.rs::radial_arrange"
+    },
+    {
+      "id": "e504",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/lib.rs::fit_disc"
+    },
+    {
+      "id": "e507",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::place",
+      "target": "fn:crates/layout/src/global.rs::frames"
+    },
+    {
+      "id": "e510",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/lib.rs::fit_disc",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e545",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/ports.rs::resolve_nodes_into",
+      "target": "fn:crates/model/src/lib.rs::direction_for"
+    },
+    {
+      "id": "e548",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/ports.rs::resolve_nodes_into",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e549",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/ports.rs::resolve_nodes_into",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e550",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/ports.rs::resolve_nodes_into",
+      "target": "fn:crates/routing/src/lib.rs::side"
+    },
+    {
+      "id": "e571",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/ranking.rs::solve",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e573",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/ranking.rs::solve",
+      "target": "fn:crates/layout/src/lib.rs::node"
+    },
+    {
+      "id": "e586",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/repair.rs::settle_with_constraints",
+      "target": "fn:crates/layout/src/repair.rs::constraint_start"
+    },
+    {
+      "id": "e587",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/repair.rs::settle_with_constraints",
+      "target": "fn:crates/layout/src/repair.rs::greedy"
+    },
+    {
+      "id": "e588",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/repair.rs::settle_with_constraints",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e589",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/repair.rs::settle_with_constraints",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e597",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/repair.rs::constraint_start",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e599",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/repair.rs::constraint_start",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e605",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/repair.rs::greedy",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e623",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/spatial.rs::update",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e625",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/spatial.rs::query_bounds",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e632",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::candidates",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e636",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::route_orthogonal_around",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e637",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::route_orthogonal_around",
+      "target": "fn:crates/layout/src/styles.rs::apply_straight_edges"
+    },
+    {
+      "id": "e638",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::route_orthogonal_around",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e646",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::edge_choices",
+      "target": "fn:crates/layout/src/styles.rs::candidates"
+    },
+    {
+      "id": "e647",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::edge_choices",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e648",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::all_edges_straight",
+      "target": "fn:crates/layout/src/styles.rs::edge_choices"
+    },
+    {
+      "id": "e649",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::all_edges_straight",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e651",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::plan_straight_edges",
+      "target": "fn:crates/layout/src/styles.rs::edge_choices"
+    },
+    {
+      "id": "e652",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::plan_straight_edges",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e654",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::plan_straight_edges",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e655",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::capability_diagnostics",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e656",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::capability_diagnostics",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e657",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::apply_straight_edges",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e659",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::apply_straight_edges",
+      "target": "fn:crates/layout/src/lib.rs::absolute_all"
+    },
+    {
+      "id": "e661",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/styles.rs::apply_straight_edges",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e670",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::lr_tree",
+      "target": "fn:crates/layout/src/tree.rs::width"
+    },
+    {
+      "id": "e671",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::lr_tree",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e672",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::lr_tree",
+      "target": "fn:crates/layout/src/tree.rs::place"
+    },
+    {
+      "id": "e674",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::width",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e675",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::width",
+      "target": "fn:crates/layout/src/tree.rs::width"
+    },
+    {
+      "id": "e676",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::place",
+      "target": "fn:crates/layout/src/tree.rs::width"
+    },
+    {
+      "id": "e677",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::place",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e678",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::place",
+      "target": "fn:crates/layout/src/tree.rs::place"
+    },
+    {
+      "id": "e679",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::tree_arrange",
+      "target": "fn:crates/layout/src/tree.rs::lr_tree"
+    },
+    {
+      "id": "e680",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::tree_arrange",
+      "target": "fn:crates/model/src/lib.rs::reversed"
+    },
+    {
+      "id": "e681",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::tree_arrange",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e684",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::radial_arrange",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e685",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::radial_arrange",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e687",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::radial_arrange",
+      "target": "fn:crates/scene/src/geom.rs::offset"
+    },
+    {
+      "id": "e689",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::count",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e690",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/tree.rs::count",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e696",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/vpsc.rs::project_axis",
+      "target": "fn:crates/layout/src/vpsc.rs::inequality"
+    },
+    {
+      "id": "e697",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/vpsc.rs::project_axis",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e698",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/vpsc.rs::project_axis",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e699",
+      "kind": "calls",
+      "source": "fn:crates/layout/src/vpsc.rs::inequality",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e704",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::try_from",
+      "target": "fn:crates/model/src/lib.rs::parse_strategy"
+    },
+    {
+      "id": "e706",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::try_from",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e707",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::try_from",
+      "target": "fn:crates/model/src/lib.rs::parse_routing"
+    },
+    {
+      "id": "e717",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::validate",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e721",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::is_ineligible_geometry",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e722",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::is_ineligible_geometry",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e727",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::parse_routing",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e730",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::parse_direction",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e732",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::parse_strategy",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e764",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::apply_values",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e765",
+      "kind": "calls",
+      "source": "fn:crates/model/src/lib.rs::apply_values",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e773",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/document.rs::create",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e786",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/document.rs::refresh",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e790",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/document.rs::reroute",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e794",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/document.rs::reroute",
+      "target": "fn:crates/reference/src/document.rs::reroute"
+    },
+    {
+      "id": "e804",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/document.rs::validate",
+      "target": "fn:crates/reference/src/document.rs::check_labels_and_notes"
+    },
+    {
+      "id": "e805",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/document.rs::validate",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e816",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/document.rs::check_labels_and_notes",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e846",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/svg.rs::export",
+      "target": "fn:crates/reference/src/svg.rs::bounds"
+    },
+    {
+      "id": "e848",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/svg.rs::export",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e860",
+      "kind": "calls",
+      "source": "fn:crates/reference/src/svg.rs::bounds",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e873",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/channel.rs::route_channels_raw",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e876",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/channel.rs::route_channels_raw",
+      "target": "fn:crates/routing/src/lib.rs::inside"
+    },
+    {
+      "id": "e879",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/channel.rs::route_channels_raw",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e884",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/channel.rs::route_channels_raw",
+      "target": "fn:crates/routing/src/channel.rs::index"
+    },
+    {
+      "id": "e1018",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/lib.rs::best_route",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1021",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/lib.rs::best_route",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e1039",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/lib.rs::routes_hitting_nodes",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1041",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/lib.rs::routes_hitting_nodes",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1045",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/lib.rs::routes_hitting_nodes",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e1056",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/lib.rs::new#3",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1059",
+      "kind": "calls",
+      "source": "fn:crates/routing/src/lib.rs::any_near",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1074",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::parse",
+      "target": "fn:crates/runtime/src/bin/bench.rs::parse"
+    },
+    {
+      "id": "e1075",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::parse",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1088",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::environment",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1112",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::run",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1115",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::run",
+      "target": "fn:crates/runtime/src/bin/bench.rs::write_candidate_log"
+    },
+    {
+      "id": "e1118",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::run",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e1123",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::run",
+      "target": "fn:crates/runtime/src/bin/bench.rs::environment"
+    },
+    {
+      "id": "e1124",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::run",
+      "target": "fn:crates/runtime/src/lib.rs::refine_snapshot_progressive"
+    },
+    {
+      "id": "e1126",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::run",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1145",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::write_candidate_log",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e1146",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/bin/bench.rs::write_candidate_log",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1157",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/components.rs::refine_by_components",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1158",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/components.rs::refine_by_components",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1160",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/components.rs::refine_by_components",
+      "target": "fn:crates/layout/src/lib.rs::compute"
+    },
+    {
+      "id": "e1167",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/containers.rs::refine_by_fixed_boundary",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1168",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/containers.rs::refine_by_fixed_boundary",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1169",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/containers.rs::refine_by_fixed_boundary",
+      "target": "fn:crates/layout/src/lib.rs::compute"
+    },
+    {
+      "id": "e1176",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/containers.rs::refine_by_fixed_boundary",
+      "target": "fn:crates/runtime/src/lib.rs::fixed_size_conflicts"
+    },
+    {
+      "id": "e1183",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/coordinator.rs::refine_structured",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1185",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/coordinator.rs::refine_structured",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1186",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/coordinator.rs::refine_structured",
+      "target": "fn:crates/runtime/src/components.rs::refine_by_components"
+    },
+    {
+      "id": "e1188",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/coordinator.rs::refine_structured",
+      "target": "fn:crates/runtime/src/containers.rs::refine_by_fixed_boundary"
+    },
+    {
+      "id": "e1189",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/coordinator.rs::refine_structured",
+      "target": "fn:crates/runtime/src/hierarchy.rs::refine_hierarchical"
+    },
+    {
+      "id": "e1190",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/coordinator.rs::refine_structured",
+      "target": "fn:crates/layout/src/lib.rs::compute"
+    },
+    {
+      "id": "e1193",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/hierarchy.rs::refine_hierarchical",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1194",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/hierarchy.rs::refine_hierarchical",
+      "target": "fn:crates/layout/src/lib.rs::compute"
+    },
+    {
+      "id": "e1195",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/hierarchy.rs::refine_hierarchical",
+      "target": "fn:crates/runtime/src/hierarchy.rs::compose"
+    },
+    {
+      "id": "e1212",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/hierarchy.rs::compose",
+      "target": "fn:crates/runtime/src/lib.rs::fixed_size_conflicts"
+    },
+    {
+      "id": "e1213",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/hierarchy.rs::compose",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1214",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/hierarchy.rs::compose",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1266",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::fixed_size_conflicts",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1270",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::local_dirty",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1293",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::measure_contours",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1301",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refine_snapshot_progressive",
+      "target": "fn:crates/runtime/src/lib.rs::refinement_core"
+    },
+    {
+      "id": "e1302",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refine_snapshot_progressive",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1307",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refinement_core",
+      "target": "fn:crates/runtime/src/lib.rs::refine_logged"
+    },
+    {
+      "id": "e1308",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refinement_core",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1309",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refinement_core",
+      "target": "fn:crates/layout/src/styles.rs::apply_straight_edges"
+    },
+    {
+      "id": "e1312",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refine_logged",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1314",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refine_logged",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1323",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/lib.rs::refine_logged",
+      "target": "fn:crates/layout/src/tree.rs::count"
+    },
+    {
+      "id": "e1419",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/reproduce.rs::repair",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1420",
+      "kind": "calls",
+      "source": "fn:crates/runtime/src/reproduce.rs::repair",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1454",
+      "kind": "calls",
+      "source": "fn:crates/scene/src/metrics.rs::measure_variants",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1459",
+      "kind": "calls",
+      "source": "fn:crates/scene/src/metrics.rs::measure_variants",
+      "target": "fn:crates/scene/src/metrics.rs::mean"
+    },
+    {
+      "id": "e1511",
+      "kind": "calls",
+      "source": "fn:crates/scene/src/metrics.rs::cut_front",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1513",
+      "kind": "calls",
+      "source": "fn:crates/scene/src/metrics.rs::mean",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1554",
+      "kind": "calls",
+      "source": "fn:crates/topology/src/ordering.rs::canonical_order",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1555",
+      "kind": "calls",
+      "source": "fn:crates/topology/src/ordering.rs::canonical_order",
+      "target": "fn:crates/layout/src/constructive.rs::any"
+    },
+    {
+      "id": "e1563",
+      "kind": "calls",
+      "source": "fn:crates/topology/src/planarity.rs::embed",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1564",
+      "kind": "calls",
+      "source": "fn:crates/topology/src/planarity.rs::embed",
+      "target": "fn:crates/topology/src/planarity.rs::fragment_path"
+    },
+    {
+      "id": "e1572",
+      "kind": "calls",
+      "source": "fn:crates/topology/src/planarity.rs::fragment_path",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    },
+    {
+      "id": "e1576",
+      "kind": "calls",
+      "source": "fn:crates/topology/src/rotation.rs::same_cycle",
+      "target": "fn:crates/layout/src/global.rs::is_empty"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "crate:layout",
+      "kind": "container",
+      "label": "layerweave-layout",
+      "parentId": null
+    },
+    {
+      "id": "crate:model",
+      "kind": "container",
+      "label": "layerweave-model",
+      "parentId": null
+    },
+    {
+      "id": "crate:reference",
+      "kind": "container",
+      "label": "layerweave-reference",
+      "parentId": null
+    },
+    {
+      "id": "crate:routing",
+      "kind": "container",
+      "label": "layerweave-routing",
+      "parentId": null
+    },
+    {
+      "id": "crate:runtime",
+      "kind": "container",
+      "label": "layerweave-runtime",
+      "parentId": null
+    },
+    {
+      "id": "crate:scene",
+      "kind": "container",
+      "label": "layerweave-scene",
+      "parentId": null
+    },
+    {
+      "id": "crate:topology",
+      "kind": "container",
+      "label": "layerweave-topology",
+      "parentId": null
+    },
+    {
+      "id": "mod:crates/layout/src/constructive.rs",
+      "kind": "container",
+      "label": "constructive.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::construct_with",
+      "kind": "function",
+      "label": "construct_with",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::section_routes",
+      "kind": "function",
+      "label": "section_routes",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::segments_of",
+      "kind": "function",
+      "label": "segments_of",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::build_edge",
+      "kind": "function",
+      "label": "build_edge",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::search_gaps",
+      "kind": "function",
+      "label": "search_gaps",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::centres",
+      "kind": "function",
+      "label": "centres",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::gap_of",
+      "kind": "function",
+      "label": "gap_of",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::gap_key",
+      "kind": "function",
+      "label": "gap_key",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::lane_changes",
+      "kind": "function",
+      "label": "lane_changes",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::corridor_order",
+      "kind": "function",
+      "label": "corridor_order",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::dependent_order",
+      "kind": "function",
+      "label": "dependent_order",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::monotone_path",
+      "kind": "function",
+      "label": "monotone_path",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::segment_box",
+      "kind": "function",
+      "label": "segment_box",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::new",
+      "kind": "function",
+      "label": "new",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::any",
+      "kind": "function",
+      "label": "any",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::search_on",
+      "kind": "function",
+      "label": "search_on",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::conflicts",
+      "kind": "function",
+      "label": "conflicts",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::straighten",
+      "kind": "function",
+      "label": "straighten",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::to_point",
+      "kind": "function",
+      "label": "to_point",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::gap_tracks",
+      "kind": "function",
+      "label": "gap_tracks",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/constructive.rs::segment_hits",
+      "kind": "function",
+      "label": "segment_hits",
+      "parentId": "mod:crates/layout/src/constructive.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/engine_choice.rs",
+      "kind": "container",
+      "label": "engine_choice.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::improve",
+      "kind": "function",
+      "label": "improve",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::relieve",
+      "kind": "function",
+      "label": "relieve",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::crossing_edges",
+      "kind": "function",
+      "label": "crossing_edges",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::side_search",
+      "kind": "function",
+      "label": "side_search",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::finalised",
+      "kind": "function",
+      "label": "finalised",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::shared_side_endpoints",
+      "kind": "function",
+      "label": "shared_side_endpoints",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::endpoints",
+      "kind": "function",
+      "label": "endpoints",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::with_ports",
+      "kind": "function",
+      "label": "with_ports",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::routed",
+      "kind": "function",
+      "label": "routed",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::key",
+      "kind": "function",
+      "label": "key",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/engine_choice.rs::other_engine",
+      "kind": "function",
+      "label": "other_engine",
+      "parentId": "mod:crates/layout/src/engine_choice.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/global.rs",
+      "kind": "container",
+      "label": "global.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/global.rs::of",
+      "kind": "function",
+      "label": "of",
+      "parentId": "mod:crates/layout/src/global.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/global.rs::is_empty",
+      "kind": "function",
+      "label": "is_empty",
+      "parentId": "mod:crates/layout/src/global.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/global.rs::path",
+      "kind": "function",
+      "label": "path",
+      "parentId": "mod:crates/layout/src/global.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/global.rs::depth",
+      "kind": "function",
+      "label": "depth",
+      "parentId": "mod:crates/layout/src/global.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/global.rs::frames",
+      "kind": "function",
+      "label": "frames",
+      "parentId": "mod:crates/layout/src/global.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/hierarchy_order.rs",
+      "kind": "container",
+      "label": "hierarchy_order.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::ports_of",
+      "kind": "function",
+      "label": "ports_of",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::child_of",
+      "kind": "function",
+      "label": "child_of",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::set_rank",
+      "kind": "function",
+      "label": "set_rank",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::sub_place",
+      "kind": "function",
+      "label": "sub_place",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::edge_places",
+      "kind": "function",
+      "label": "edge_places",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::place",
+      "kind": "function",
+      "label": "place",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::sweep",
+      "kind": "function",
+      "label": "sweep",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::descend",
+      "kind": "function",
+      "label": "descend",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::pair_crossings",
+      "kind": "function",
+      "label": "pair_crossings",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/hierarchy_order.rs::hierarchical_sweep",
+      "kind": "function",
+      "label": "hierarchical_sweep",
+      "parentId": "mod:crates/layout/src/hierarchy_order.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/labels.rs",
+      "kind": "container",
+      "label": "labels.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/labels.rs::overlaps",
+      "kind": "function",
+      "label": "overlaps",
+      "parentId": "mod:crates/layout/src/labels.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/labels.rs::route_node_conflicts",
+      "kind": "function",
+      "label": "route_node_conflicts",
+      "parentId": "mod:crates/layout/src/labels.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/labels.rs::decorate",
+      "kind": "function",
+      "label": "decorate",
+      "parentId": "mod:crates/layout/src/labels.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/layered_plan.rs",
+      "kind": "container",
+      "label": "layered_plan.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/layered_plan.rs::order_crossings",
+      "kind": "function",
+      "label": "order_crossings",
+      "parentId": "mod:crates/layout/src/layered_plan.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/layered_plan.rs::inversions",
+      "kind": "function",
+      "label": "inversions",
+      "parentId": "mod:crates/layout/src/layered_plan.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/layered_plan.rs::improve_order",
+      "kind": "function",
+      "label": "improve_order",
+      "parentId": "mod:crates/layout/src/layered_plan.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/layered_plan.rs::compare",
+      "kind": "function",
+      "label": "compare",
+      "parentId": "mod:crates/layout/src/layered_plan.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/layered_plan.rs::hierarchical_order",
+      "kind": "function",
+      "label": "hierarchical_order",
+      "parentId": "mod:crates/layout/src/layered_plan.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/layered_plan.rs::transpose",
+      "kind": "function",
+      "label": "transpose",
+      "parentId": "mod:crates/layout/src/layered_plan.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/lib.rs",
+      "kind": "container",
+      "label": "lib.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::new",
+      "kind": "function",
+      "label": "new",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::node",
+      "kind": "function",
+      "label": "node",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::uninterrupted",
+      "kind": "function",
+      "label": "uninterrupted",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::check_rows",
+      "kind": "function",
+      "label": "check_rows",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::compute",
+      "kind": "function",
+      "label": "compute",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::compute_counted",
+      "kind": "function",
+      "label": "compute_counted",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::finish",
+      "kind": "function",
+      "label": "finish",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::compute_mode",
+      "kind": "function",
+      "label": "compute_mode",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::plan_port_offsets",
+      "kind": "function",
+      "label": "plan_port_offsets",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::widen_channels_by_edges",
+      "kind": "function",
+      "label": "widen_channels_by_edges",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::chain_slots",
+      "kind": "function",
+      "label": "chain_slots",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::align_lanes",
+      "kind": "function",
+      "label": "align_lanes",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::slide_free",
+      "kind": "function",
+      "label": "slide_free",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::repair_and_replace",
+      "kind": "function",
+      "label": "repair_and_replace",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::published_drawing",
+      "kind": "function",
+      "label": "published_drawing",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::pin_diagnostics",
+      "kind": "function",
+      "label": "pin_diagnostics",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::route_all",
+      "kind": "function",
+      "label": "route_all",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::local_routes",
+      "kind": "function",
+      "label": "local_routes",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::compute_once",
+      "kind": "function",
+      "label": "compute_once",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::select_pipeline",
+      "kind": "function",
+      "label": "select_pipeline",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::place",
+      "kind": "function",
+      "label": "place",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::fit_disc",
+      "kind": "function",
+      "label": "fit_disc",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/lib.rs::absolute_all",
+      "kind": "function",
+      "label": "absolute_all",
+      "parentId": "mod:crates/layout/src/lib.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/ports.rs",
+      "kind": "container",
+      "label": "ports.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/ports.rs::resolve_nodes_into",
+      "kind": "function",
+      "label": "resolve_nodes_into",
+      "parentId": "mod:crates/layout/src/ports.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/ranking.rs",
+      "kind": "container",
+      "label": "ranking.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/ranking.rs::solve",
+      "kind": "function",
+      "label": "solve",
+      "parentId": "mod:crates/layout/src/ranking.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/repair.rs",
+      "kind": "container",
+      "label": "repair.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/repair.rs::settle_with_constraints",
+      "kind": "function",
+      "label": "settle_with_constraints",
+      "parentId": "mod:crates/layout/src/repair.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/repair.rs::constraint_start",
+      "kind": "function",
+      "label": "constraint_start",
+      "parentId": "mod:crates/layout/src/repair.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/repair.rs::greedy",
+      "kind": "function",
+      "label": "greedy",
+      "parentId": "mod:crates/layout/src/repair.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/spatial.rs",
+      "kind": "container",
+      "label": "spatial.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/spatial.rs::update",
+      "kind": "function",
+      "label": "update",
+      "parentId": "mod:crates/layout/src/spatial.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/spatial.rs::query_bounds",
+      "kind": "function",
+      "label": "query_bounds",
+      "parentId": "mod:crates/layout/src/spatial.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/styles.rs",
+      "kind": "container",
+      "label": "styles.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/styles.rs::candidates",
+      "kind": "function",
+      "label": "candidates",
+      "parentId": "mod:crates/layout/src/styles.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/styles.rs::route_orthogonal_around",
+      "kind": "function",
+      "label": "route_orthogonal_around",
+      "parentId": "mod:crates/layout/src/styles.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/styles.rs::edge_choices",
+      "kind": "function",
+      "label": "edge_choices",
+      "parentId": "mod:crates/layout/src/styles.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/styles.rs::all_edges_straight",
+      "kind": "function",
+      "label": "all_edges_straight",
+      "parentId": "mod:crates/layout/src/styles.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/styles.rs::plan_straight_edges",
+      "kind": "function",
+      "label": "plan_straight_edges",
+      "parentId": "mod:crates/layout/src/styles.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/styles.rs::capability_diagnostics",
+      "kind": "function",
+      "label": "capability_diagnostics",
+      "parentId": "mod:crates/layout/src/styles.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/styles.rs::apply_straight_edges",
+      "kind": "function",
+      "label": "apply_straight_edges",
+      "parentId": "mod:crates/layout/src/styles.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/tree.rs",
+      "kind": "container",
+      "label": "tree.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/tree.rs::lr_tree",
+      "kind": "function",
+      "label": "lr_tree",
+      "parentId": "mod:crates/layout/src/tree.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/tree.rs::width",
+      "kind": "function",
+      "label": "width",
+      "parentId": "mod:crates/layout/src/tree.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/tree.rs::place",
+      "kind": "function",
+      "label": "place",
+      "parentId": "mod:crates/layout/src/tree.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/tree.rs::tree_arrange",
+      "kind": "function",
+      "label": "tree_arrange",
+      "parentId": "mod:crates/layout/src/tree.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/tree.rs::radial_arrange",
+      "kind": "function",
+      "label": "radial_arrange",
+      "parentId": "mod:crates/layout/src/tree.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/tree.rs::count",
+      "kind": "function",
+      "label": "count",
+      "parentId": "mod:crates/layout/src/tree.rs"
+    },
+    {
+      "id": "mod:crates/layout/src/vpsc.rs",
+      "kind": "container",
+      "label": "vpsc.rs",
+      "parentId": "crate:layout"
+    },
+    {
+      "id": "fn:crates/layout/src/vpsc.rs::project_axis",
+      "kind": "function",
+      "label": "project_axis",
+      "parentId": "mod:crates/layout/src/vpsc.rs"
+    },
+    {
+      "id": "fn:crates/layout/src/vpsc.rs::inequality",
+      "kind": "function",
+      "label": "inequality",
+      "parentId": "mod:crates/layout/src/vpsc.rs"
+    },
+    {
+      "id": "mod:crates/model/src/lib.rs",
+      "kind": "container",
+      "label": "lib.rs",
+      "parentId": "crate:model"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::try_from",
+      "kind": "function",
+      "label": "try_from",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::validate",
+      "kind": "function",
+      "label": "validate",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::is_ineligible_geometry",
+      "kind": "function",
+      "label": "is_ineligible_geometry",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::reversed",
+      "kind": "function",
+      "label": "reversed",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::parse_routing",
+      "kind": "function",
+      "label": "parse_routing",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::parse_direction",
+      "kind": "function",
+      "label": "parse_direction",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::parse_strategy",
+      "kind": "function",
+      "label": "parse_strategy",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::direction_for",
+      "kind": "function",
+      "label": "direction_for",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/model/src/lib.rs::apply_values",
+      "kind": "function",
+      "label": "apply_values",
+      "parentId": "mod:crates/model/src/lib.rs"
+    },
+    {
+      "id": "mod:crates/reference/src/document.rs",
+      "kind": "container",
+      "label": "document.rs",
+      "parentId": "crate:reference"
+    },
+    {
+      "id": "fn:crates/reference/src/document.rs::create",
+      "kind": "function",
+      "label": "create",
+      "parentId": "mod:crates/reference/src/document.rs"
+    },
+    {
+      "id": "fn:crates/reference/src/document.rs::refresh",
+      "kind": "function",
+      "label": "refresh",
+      "parentId": "mod:crates/reference/src/document.rs"
+    },
+    {
+      "id": "fn:crates/reference/src/document.rs::reroute",
+      "kind": "function",
+      "label": "reroute",
+      "parentId": "mod:crates/reference/src/document.rs"
+    },
+    {
+      "id": "fn:crates/reference/src/document.rs::validate",
+      "kind": "function",
+      "label": "validate",
+      "parentId": "mod:crates/reference/src/document.rs"
+    },
+    {
+      "id": "fn:crates/reference/src/document.rs::check_labels_and_notes",
+      "kind": "function",
+      "label": "check_labels_and_notes",
+      "parentId": "mod:crates/reference/src/document.rs"
+    },
+    {
+      "id": "mod:crates/reference/src/svg.rs",
+      "kind": "container",
+      "label": "svg.rs",
+      "parentId": "crate:reference"
+    },
+    {
+      "id": "fn:crates/reference/src/svg.rs::export",
+      "kind": "function",
+      "label": "export",
+      "parentId": "mod:crates/reference/src/svg.rs"
+    },
+    {
+      "id": "fn:crates/reference/src/svg.rs::bounds",
+      "kind": "function",
+      "label": "bounds",
+      "parentId": "mod:crates/reference/src/svg.rs"
+    },
+    {
+      "id": "mod:crates/routing/src/channel.rs",
+      "kind": "container",
+      "label": "channel.rs",
+      "parentId": "crate:routing"
+    },
+    {
+      "id": "fn:crates/routing/src/channel.rs::index",
+      "kind": "function",
+      "label": "index",
+      "parentId": "mod:crates/routing/src/channel.rs"
+    },
+    {
+      "id": "fn:crates/routing/src/channel.rs::set",
+      "kind": "function",
+      "label": "set",
+      "parentId": "mod:crates/routing/src/channel.rs"
+    },
+    {
+      "id": "fn:crates/routing/src/channel.rs::route_channels_raw",
+      "kind": "function",
+      "label": "route_channels_raw",
+      "parentId": "mod:crates/routing/src/channel.rs"
+    },
+    {
+      "id": "mod:crates/routing/src/lib.rs",
+      "kind": "container",
+      "label": "lib.rs",
+      "parentId": "crate:routing"
+    },
+    {
+      "id": "fn:crates/routing/src/lib.rs::inside",
+      "kind": "function",
+      "label": "inside",
+      "parentId": "mod:crates/routing/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/routing/src/lib.rs::side",
+      "kind": "function",
+      "label": "side",
+      "parentId": "mod:crates/routing/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/routing/src/lib.rs::best_route",
+      "kind": "function",
+      "label": "best_route",
+      "parentId": "mod:crates/routing/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/routing/src/lib.rs::routes_hitting_nodes",
+      "kind": "function",
+      "label": "routes_hitting_nodes",
+      "parentId": "mod:crates/routing/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/routing/src/lib.rs::new#3",
+      "kind": "function",
+      "label": "new",
+      "parentId": "mod:crates/routing/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/routing/src/lib.rs::any_near",
+      "kind": "function",
+      "label": "any_near",
+      "parentId": "mod:crates/routing/src/lib.rs"
+    },
+    {
+      "id": "mod:crates/runtime/src/bin/bench.rs",
+      "kind": "container",
+      "label": "bin/bench.rs",
+      "parentId": "crate:runtime"
+    },
+    {
+      "id": "fn:crates/runtime/src/bin/bench.rs::parse",
+      "kind": "function",
+      "label": "parse",
+      "parentId": "mod:crates/runtime/src/bin/bench.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/bin/bench.rs::environment",
+      "kind": "function",
+      "label": "environment",
+      "parentId": "mod:crates/runtime/src/bin/bench.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/bin/bench.rs::run",
+      "kind": "function",
+      "label": "run",
+      "parentId": "mod:crates/runtime/src/bin/bench.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/bin/bench.rs::write_candidate_log",
+      "kind": "function",
+      "label": "write_candidate_log",
+      "parentId": "mod:crates/runtime/src/bin/bench.rs"
+    },
+    {
+      "id": "mod:crates/runtime/src/components.rs",
+      "kind": "container",
+      "label": "components.rs",
+      "parentId": "crate:runtime"
+    },
+    {
+      "id": "fn:crates/runtime/src/components.rs::refine_by_components",
+      "kind": "function",
+      "label": "refine_by_components",
+      "parentId": "mod:crates/runtime/src/components.rs"
+    },
+    {
+      "id": "mod:crates/runtime/src/containers.rs",
+      "kind": "container",
+      "label": "containers.rs",
+      "parentId": "crate:runtime"
+    },
+    {
+      "id": "fn:crates/runtime/src/containers.rs::refine_by_fixed_boundary",
+      "kind": "function",
+      "label": "refine_by_fixed_boundary",
+      "parentId": "mod:crates/runtime/src/containers.rs"
+    },
+    {
+      "id": "mod:crates/runtime/src/coordinator.rs",
+      "kind": "container",
+      "label": "coordinator.rs",
+      "parentId": "crate:runtime"
+    },
+    {
+      "id": "fn:crates/runtime/src/coordinator.rs::refine_structured",
+      "kind": "function",
+      "label": "refine_structured",
+      "parentId": "mod:crates/runtime/src/coordinator.rs"
+    },
+    {
+      "id": "mod:crates/runtime/src/hierarchy.rs",
+      "kind": "container",
+      "label": "hierarchy.rs",
+      "parentId": "crate:runtime"
+    },
+    {
+      "id": "fn:crates/runtime/src/hierarchy.rs::refine_hierarchical",
+      "kind": "function",
+      "label": "refine_hierarchical",
+      "parentId": "mod:crates/runtime/src/hierarchy.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/hierarchy.rs::compose",
+      "kind": "function",
+      "label": "compose",
+      "parentId": "mod:crates/runtime/src/hierarchy.rs"
+    },
+    {
+      "id": "mod:crates/runtime/src/lib.rs",
+      "kind": "container",
+      "label": "lib.rs",
+      "parentId": "crate:runtime"
+    },
+    {
+      "id": "fn:crates/runtime/src/lib.rs::fixed_size_conflicts",
+      "kind": "function",
+      "label": "fixed_size_conflicts",
+      "parentId": "mod:crates/runtime/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/lib.rs::local_dirty",
+      "kind": "function",
+      "label": "local_dirty",
+      "parentId": "mod:crates/runtime/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/lib.rs::measure_contours",
+      "kind": "function",
+      "label": "measure_contours",
+      "parentId": "mod:crates/runtime/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/lib.rs::refine_snapshot_progressive",
+      "kind": "function",
+      "label": "refine_snapshot_progressive",
+      "parentId": "mod:crates/runtime/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/lib.rs::refinement_core",
+      "kind": "function",
+      "label": "refinement_core",
+      "parentId": "mod:crates/runtime/src/lib.rs"
+    },
+    {
+      "id": "fn:crates/runtime/src/lib.rs::refine_logged",
+      "kind": "function",
+      "label": "refine_logged",
+      "parentId": "mod:crates/runtime/src/lib.rs"
+    },
+    {
+      "id": "mod:crates/runtime/src/reproduce.rs",
+      "kind": "container",
+      "label": "reproduce.rs",
+      "parentId": "crate:runtime"
+    },
+    {
+      "id": "fn:crates/runtime/src/reproduce.rs::repair",
+      "kind": "function",
+      "label": "repair",
+      "parentId": "mod:crates/runtime/src/reproduce.rs"
+    },
+    {
+      "id": "mod:crates/scene/src/geom.rs",
+      "kind": "container",
+      "label": "geom.rs",
+      "parentId": "crate:scene"
+    },
+    {
+      "id": "fn:crates/scene/src/geom.rs::offset",
+      "kind": "function",
+      "label": "offset",
+      "parentId": "mod:crates/scene/src/geom.rs"
+    },
+    {
+      "id": "mod:crates/scene/src/metrics.rs",
+      "kind": "container",
+      "label": "metrics.rs",
+      "parentId": "crate:scene"
+    },
+    {
+      "id": "fn:crates/scene/src/metrics.rs::measure_variants",
+      "kind": "function",
+      "label": "measure_variants",
+      "parentId": "mod:crates/scene/src/metrics.rs"
+    },
+    {
+      "id": "fn:crates/scene/src/metrics.rs::cut_front",
+      "kind": "function",
+      "label": "cut_front",
+      "parentId": "mod:crates/scene/src/metrics.rs"
+    },
+    {
+      "id": "fn:crates/scene/src/metrics.rs::mean",
+      "kind": "function",
+      "label": "mean",
+      "parentId": "mod:crates/scene/src/metrics.rs"
+    },
+    {
+      "id": "mod:crates/topology/src/ordering.rs",
+      "kind": "container",
+      "label": "ordering.rs",
+      "parentId": "crate:topology"
+    },
+    {
+      "id": "fn:crates/topology/src/ordering.rs::canonical_order",
+      "kind": "function",
+      "label": "canonical_order",
+      "parentId": "mod:crates/topology/src/ordering.rs"
+    },
+    {
+      "id": "mod:crates/topology/src/planarity.rs",
+      "kind": "container",
+      "label": "planarity.rs",
+      "parentId": "crate:topology"
+    },
+    {
+      "id": "fn:crates/topology/src/planarity.rs::embed",
+      "kind": "function",
+      "label": "embed",
+      "parentId": "mod:crates/topology/src/planarity.rs"
+    },
+    {
+      "id": "fn:crates/topology/src/planarity.rs::fragment_path",
+      "kind": "function",
+      "label": "fragment_path",
+      "parentId": "mod:crates/topology/src/planarity.rs"
+    },
+    {
+      "id": "mod:crates/topology/src/rotation.rs",
+      "kind": "container",
+      "label": "rotation.rs",
+      "parentId": "crate:topology"
+    },
+    {
+      "id": "fn:crates/topology/src/rotation.rs::same_cycle",
+      "kind": "function",
+      "label": "same_cycle",
+      "parentId": "mod:crates/topology/src/rotation.rs"
+    }
+  ],
+  "ports": []
+}

@@ -1,0 +1,40 @@
+{
+ "kind": "elk-port-sides",
+ "command": "node benchmarks/eval/elk-side-ports.mjs --elk --options {\"portSides\":false} target/release/layout-command",
+ "graphs": 40,
+ "arms": {
+  "portSides": {
+   "graphs": 40,
+   "constructed": 687,
+   "delegated": 0,
+   "crossings": 88,
+   "lineNodeHits": 0,
+   "sharedLinePairs": 0,
+   "hugPairs": 34,
+   "siblingOverlaps": 0,
+   "bends": 2522
+  },
+  "fallback": {
+   "graphs": 40,
+   "constructed": 38,
+   "delegated": 649,
+   "crossings": 241,
+   "lineNodeHits": 0,
+   "sharedLinePairs": 25,
+   "hugPairs": 161,
+   "siblingOverlaps": 0,
+   "bends": 2296
+  },
+  "elkRs": {
+   "graphs": 40,
+   "constructed": 0,
+   "delegated": 0,
+   "crossings": 140,
+   "lineNodeHits": 0,
+   "sharedLinePairs": 0,
+   "hugPairs": 272,
+   "siblingOverlaps": 0,
+   "bends": 1610
+  }
+ }
+}

@@ -1,0 +1,82 @@
+{
+  "description": "Two routes leave one explicit port together and separate at a bend: the shared stub is intended, the rejoin is not.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 300,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "c",
+        "x": 300,
+        "y": 60,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 300,
+            "y": 10
+          }
+        ],
+        "sourcePort": "out"
+      },
+      {
+        "id": "e2",
+        "source": "a",
+        "target": "c",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 100,
+            "y": 10
+          },
+          {
+            "x": 100,
+            "y": 40
+          },
+          {
+            "x": 200,
+            "y": 40
+          },
+          {
+            "x": 200,
+            "y": 10
+          },
+          {
+            "x": 300,
+            "y": 10
+          }
+        ],
+        "sourcePort": "out"
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "sharedLinePairs": 1
+  }
+}

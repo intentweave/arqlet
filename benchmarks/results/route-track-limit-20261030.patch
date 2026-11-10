@@ -1,0 +1,200 @@
+diff --git a/crates/layout/src/lib.rs b/crates/layout/src/lib.rs
+index 696b4dc..9c8b6ae 100644
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -1196,6 +1196,9 @@ fn routing_params(options: &LayoutOptions) -> layerweave_routing::Params {
+         } else {
+             12.
+         },
++        track_limit: options
++            .route_track_limit
++            .map_or(48, |n| (n as usize).clamp(1, 48)),
+         own_clearance: options
+             .required_clearance
+             .map_or(0., |c| c + options.track_spacing),
+diff --git a/crates/model/src/lib.rs b/crates/model/src/lib.rs
+index 7050d68..be85096 100644
+--- a/crates/model/src/lib.rs
++++ b/crates/model/src/lib.rs
+@@ -1527,6 +1527,11 @@ pub struct LayoutOptions {
+     /// Omitted when unset.
+     #[serde(default, skip_serializing_if = "Option::is_none")]
+     pub max_extent: Option<f64>,
++    /// Experimental (plan section 3.7). Limits the candidate tracks per axis that the router scores for each edge,
++    /// to the nearest N by distance to the endpoints. Values are 1–48; larger values act as 48, the engine default, which
++    /// is what an absent field means. Omitted when unset.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub route_track_limit: Option<u32>,
+     /// Experimental. Re-routes every ordering candidate before the key compares it, so an ordering's layout competes with
+     /// its own routing. Off by default; on the benchmark corpus the effect is mixed (see
+     /// `benchmarks/results/portfolio-coordinator-20261023.md`), so it is not a recommended setting.
+@@ -1604,6 +1609,7 @@ impl Default for LayoutOptions {
+             sparse_stress: false,
+             size_aware_stress: false,
+             max_extent: None,
++            route_track_limit: None,
+             routed_candidates: false,
+             container_sizing: BTreeMap::new(),
+             archive_refinement: 0,
+@@ -2507,6 +2513,19 @@ mod container_sizing_tests {
+         );
+     }
+ 
++    #[test]
++    fn route_track_limit_is_opt_in_and_round_trips() {
++        let defaults = serde_json::to_value(LayoutOptions::default()).unwrap();
++        assert!(defaults.get("routeTrackLimit").is_none(), "{defaults}");
++        let options: LayoutOptions =
++            serde_json::from_value(serde_json::json!({"routeTrackLimit": 12})).unwrap();
++        assert_eq!(options.route_track_limit, Some(12));
++        assert_eq!(
++            serde_json::to_value(options).unwrap()["routeTrackLimit"],
++            12
++        );
++    }
++
+     #[test]
+     fn size_aware_stress_is_opt_in_and_round_trips() {
+         let defaults = serde_json::to_value(LayoutOptions::default()).unwrap();
+diff --git a/crates/routing/src/lib.rs b/crates/routing/src/lib.rs
+index cf2ef4d..caa8691 100644
+--- a/crates/routing/src/lib.rs
++++ b/crates/routing/src/lib.rs
+@@ -340,6 +340,9 @@ pub struct Params {
+     /// rails at the prototype's distances. With a value, the stub leaves the port at least this far and the rails
+     /// beside an own node lie beyond it.
+     pub own_clearance: f64,
++    /// The candidate tracks kept per axis, nearest first (1–48). The prototype keeps 48. Provisional: set from
++    /// `LayoutOptions::route_track_limit`.
++    pub track_limit: usize,
+ }
+ impl Default for Params {
+     fn default() -> Self {
+@@ -350,6 +353,7 @@ impl Default for Params {
+             spread: false,
+             rail_offset: 12.,
+             own_clearance: 0.,
++            track_limit: 48,
+         }
+     }
+ }
+@@ -1305,7 +1309,7 @@ fn best_route(
+                 .then_with(|| ((x - (a + b) / 2.).abs()).total_cmp(&(y - (a + b) / 2.).abs()))
+                 .then_with(|| x.total_cmp(y))
+         });
+-        values.truncate(48);
++        values.truncate(params.track_limit);
+         values
+     };
+     let xs = rails(true);
+@@ -2139,6 +2143,81 @@ mod tests {
+     }
+     /// Own clearance (ADR 0005): beyond its stubs, a route keeps the clearance from its own nodes too. A loop under
+     /// its node, whose cheapest track lies on the node's border because a foreign node sits just below, is moved away.
++    #[test]
++    fn a_track_limit_of_48_is_the_default_and_a_smaller_limit_still_routes_around_a_node() {
++        let node = |id: &str| Node {
++            id: id.into(),
++            label: id.into(),
++            kind: "symbol".into(),
++            parent_id: None,
++            shape: Default::default(),
++        };
++        let graph = Graph {
++            default_direction: DirectionConstraint::Fixed(Orientation::Lr),
++            container_directions: BTreeMap::new(),
++            default_strategy: Default::default(),
++            container_strategies: Default::default(),
++            default_routing: Default::default(),
++            container_routing: Default::default(),
++            ports: vec![],
++            edge_ports: vec![],
++            nodes: vec![node("a"), node("c"), node("b")],
++            edges: vec![Edge {
++                id: "e".into(),
++                kind: "calls".into(),
++                source: "a".into(),
++                target: Some("b".into()),
++            }],
++        };
++        let rect = |x: f64, y: f64, width: f64, height: f64| Rect {
++            x,
++            y,
++            width,
++            height,
++        };
++        let rects = BTreeMap::from([
++            ("a".into(), rect(0., 0., 40., 40.)),
++            ("c".into(), rect(100., -20., 40., 80.)),
++            ("b".into(), rect(200., 0., 40., 40.)),
++        ]);
++        let straight = Route::new(
++            "e",
++            vec![Point { x: 40., y: 20. }, Point { x: 200., y: 20. }],
++        );
++        let routes = std::slice::from_ref(&straight);
++        let prototype = improve_with(&graph, &rects, routes, Params::default());
++        let all = improve_with(
++            &graph,
++            &rects,
++            routes,
++            Params {
++                track_limit: 48,
++                ..Params::default()
++            },
++        );
++        assert_eq!(all[0].points, prototype[0].points);
++        let limited = improve_with(
++            &graph,
++            &rects,
++            routes,
++            Params {
++                track_limit: 1,
++                ..Params::default()
++            },
++        );
++        let route = &limited[0];
++        assert!(route.points.len() >= 2);
++        let blocker = Outline::Rect(rects["c"].clone());
++        assert!(
++            !route.points.windows(2).any(|w| {
++                let segment = Route::new("", vec![w[0].clone(), w[1].clone()]);
++                hits_outline(&segment, &blocker)
++            }),
++            "{:?} runs through the node",
++            route.points
++        );
++    }
++
+     #[test]
+     fn a_loop_keeps_the_own_clearance_beyond_its_stubs() {
+         let node = |id: &str| Node {
+diff --git a/docs/configuration.md b/docs/configuration.md
+index e5875d3..e67086d 100644
+--- a/docs/configuration.md
++++ b/docs/configuration.md
+@@ -18,6 +18,7 @@ The historical execution options below live in `LayoutOptions`. Authored regiona
+ | `nodeEdgeRepulsion` | bool | `false` | experimental; after organic stress, move free nodes off projected edge chords found by the spatial broad phase, with a bounded step. Repair stays authoritative. |
+ | `sparseStress` | bool | `false` | experimental; organic stress uses graph neighbours and 50 pivots instead of the full distance matrix, and an area may hold up to 500 children (default bound 300). The repair stage still keeps an n² pair table. |
+ | `sizeAwareStress` | bool | `false` | experimental; organic stress targets add both children's half-extents to the pair length. Measured on the organic ladder (25–200): larger areas, mixed routed crossings. Not recommended. |
++| `routeTrackLimit` | integer 1–48 | absent (48) | experimental; keeps the nearest N candidate tracks per axis when the router scores an edge's routes. Measured (plan 3.7): candidates fall in proportion, but crossings rise on 7–8 datasets at every value below 48 and layerweave-code refine time does not fall (its time is in the repair grid). Not recommended. |
+ | `directedRepair` | bool | `false` | experimental; organic repair tries overlap translations and perpendicular moves away from through-conflicts first, and runs the exhaustive search only when they do not improve the drawing |
+ | `incrementalClearanceWidening` | bool | `false` | experimental; re-layout only widened areas and re-route affected edges during clearance widening. This can change the candidate geometry; common validation and published-key selection still apply. |
+ | direction | `lr`, `tb`, `hybrid`, `shortest` | per graph | `shortest` picks, per area, the direction with the smallest endpoint-distance sum |
+diff --git a/packages/contracts/src/generated/LayoutOptions.ts b/packages/contracts/src/generated/LayoutOptions.ts
+index c316d74..2453019 100644
+--- a/packages/contracts/src/generated/LayoutOptions.ts
++++ b/packages/contracts/src/generated/LayoutOptions.ts
+@@ -139,6 +139,12 @@ sizeAwareStress?: boolean,
+  * Omitted when unset.
+  */
+ maxExtent?: number | null,
++/**
++ * Experimental (plan section 3.7). Limits the candidate tracks per axis that the router scores for each edge,
++ * to the nearest N by distance to the endpoints. Values are 1–48; larger values act as 48, the engine default, which
++ * is what an absent field means. Omitted when unset.
++ */
++routeTrackLimit?: number | null,
+ /**
+  * Experimental. Re-routes every ordering candidate before the key compares it, so an ordering's layout competes with
+  * its own routing. Off by default; on the benchmark corpus the effect is mixed (see

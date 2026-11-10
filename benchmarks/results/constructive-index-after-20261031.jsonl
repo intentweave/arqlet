@@ -1,0 +1,9 @@
+{"dataset": "petri-net", "geometry": "75dd05466e3f24af", "input": "b701f3cabaa3399e", "refineMs": 133.177, "importMs": 18.748, "gridPops": 3216}
+{"dataset": "activity-order", "geometry": "702d40f54ba88336", "input": "694f8b6c120c0804", "refineMs": 113.76, "importMs": 9.798, "gridPops": 27694}
+{"dataset": "network-vlan", "geometry": "8872ea0d93cd5e91", "input": "dec49a2da7efedb9", "refineMs": 139.048, "importMs": 11.117, "gridPops": 24310}
+{"dataset": "layerweave-pipeline", "geometry": "732c1b5b7850787d", "input": "5ae587a4bd0c4821", "refineMs": 77.92, "importMs": 10.063, "gridPops": 11066}
+{"dataset": "cloud-architecture", "geometry": "6aa28dcd0f22c238", "input": "2df5656c1e6e25d5", "refineMs": 52.535, "importMs": 4.141, "gridPops": 18126}
+{"dataset": "bpmn-pools", "geometry": "f54e688b6fc04ed8", "input": "6a06fa2367bdf3e3", "refineMs": 39.148, "importMs": 6.876, "gridPops": 0}
+{"dataset": "state-order", "geometry": "dd66880a6af2ef77", "input": "a59ea963c44d5e2d", "refineMs": 67.617, "importMs": 1.308, "gridPops": 0}
+{"dataset": "tree-100", "geometry": "f1910c38f809cd14", "input": "f1910c38f809cd14", "refineMs": 218.523, "importMs": 45.62, "gridPops": 0}
+{"dataset": "layerweave-code", "geometry": "7405eb74d89a30eb", "input": "723175003da3c7f7", "refineMs": 2268.682, "importMs": 494.731, "gridPops": 690073}

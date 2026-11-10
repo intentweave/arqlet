@@ -1,0 +1,160 @@
+{
+ "containerDirections": {
+  "active": "tb"
+ },
+ "defaultDirection": "lr",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "place",
+   "source": "initial",
+   "target": "created"
+  },
+  {
+   "id": "e2",
+   "kind": "pay",
+   "source": "created",
+   "target": "paid"
+  },
+  {
+   "id": "e3",
+   "kind": "timeout",
+   "source": "created",
+   "target": "cancelled"
+  },
+  {
+   "id": "e4",
+   "kind": "start fulfilment",
+   "source": "paid",
+   "target": "active"
+  },
+  {
+   "id": "e5",
+   "kind": "picked",
+   "source": "picking",
+   "target": "packing"
+  },
+  {
+   "id": "e6",
+   "kind": "defect",
+   "source": "packing",
+   "target": "picking"
+  },
+  {
+   "id": "e7",
+   "kind": "retry",
+   "source": "picking",
+   "target": "picking"
+  },
+  {
+   "id": "e8",
+   "kind": "packed",
+   "source": "packing",
+   "target": "shipping"
+  },
+  {
+   "id": "e9",
+   "kind": "delivered",
+   "source": "shipping",
+   "target": "completed"
+  },
+  {
+   "id": "e10",
+   "kind": "user cancel",
+   "source": "active",
+   "target": "cancelled"
+  },
+  {
+   "id": "e11",
+   "kind": "admin cancel",
+   "source": "active",
+   "target": "cancelled"
+  },
+  {
+   "id": "e12",
+   "kind": "refund",
+   "source": "cancelled",
+   "target": "refunded"
+  },
+  {
+   "id": "e13",
+   "kind": "settled",
+   "source": "refunded",
+   "target": "final"
+  },
+  {
+   "id": "e14",
+   "kind": "close",
+   "source": "completed",
+   "target": "final"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "initial",
+   "kind": "initial",
+   "label": "",
+   "parentId": null
+  },
+  {
+   "id": "final",
+   "kind": "final",
+   "label": "",
+   "parentId": null
+  },
+  {
+   "id": "created",
+   "kind": "state",
+   "label": "Created",
+   "parentId": null
+  },
+  {
+   "id": "paid",
+   "kind": "state",
+   "label": "Paid",
+   "parentId": null
+  },
+  {
+   "id": "cancelled",
+   "kind": "state",
+   "label": "Cancelled",
+   "parentId": null
+  },
+  {
+   "id": "refunded",
+   "kind": "state",
+   "label": "Refunded",
+   "parentId": null
+  },
+  {
+   "id": "completed",
+   "kind": "state",
+   "label": "Completed",
+   "parentId": null
+  },
+  {
+   "id": "active",
+   "kind": "container",
+   "label": "Active",
+   "parentId": null
+  },
+  {
+   "id": "picking",
+   "kind": "state",
+   "label": "Picking",
+   "parentId": "active"
+  },
+  {
+   "id": "packing",
+   "kind": "state",
+   "label": "Packing",
+   "parentId": "active"
+  },
+  {
+   "id": "shipping",
+   "kind": "state",
+   "label": "Shipping",
+   "parentId": "active"
+  }
+ ]
+}

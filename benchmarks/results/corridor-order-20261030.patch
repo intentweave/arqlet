@@ -1,0 +1,402 @@
+--- constructive_before_order.rs	2026-10-30 23:31:22
++++ constructive_order.rs	2026-10-30 23:34:16
+@@ -148,27 +148,65 @@
+             });
+         }
+     }
+-    for index in indices {
+-        let edge = &graph.edges[index];
+-        let Some(target) = edge.target.as_deref() else {
+-            continue;
+-        };
+-        let outcome = if edge.source == target {
+-            Err(Delegation::SelfLoop)
+-        } else {
+-            construct_edge(
+-                graph,
+-                boxes,
+-                ports,
+-                &parents,
+-                &containers,
++    // Every edge is checked first, then its way is planned on the gaps' centres. The lane changes of all edges in one corridor
++    // are ordered so that they cross least, and each edge's lane change is drawn towards its place in that order.
++    let prepared: Vec<(usize, Result<Prepared, Delegation>)> = indices
++        .into_iter()
++        .filter_map(|index| {
++            let edge = &graph.edges[index];
++            let target = edge.target.as_deref()?;
++            let outcome = if edge.source == target {
++                Err(Delegation::SelfLoop)
++            } else {
++                prepare_edge(
++                    graph,
++                    boxes,
++                    ports,
++                    &parents,
++                    &containers,
++                    spacing,
++                    orientations,
++                    &edge.id,
++                    &edge.source,
++                    target,
++                )
++            };
++            Some((index, outcome))
++        })
++        .collect();
++    let mut corridors: BTreeMap<(bool, (i64, i64)), Vec<(usize, (f64, f64), f64, f64)>> =
++        BTreeMap::new();
++    for (slot, (_, outcome)) in prepared.iter().enumerate() {
++        if let Ok(p) = outcome {
++            for (gap, before, after) in lane_changes(p, spacing.track) {
++                corridors
++                    .entry((p.vertical, gap_key(gap)))
++                    .or_default()
++                    .push((slot, gap, before, after));
++            }
++        }
++    }
++    let mut desired: BTreeMap<usize, Desired> = BTreeMap::new();
++    for ((_, key), changes) in &corridors {
++        let order = corridor_order(&changes.iter().map(|c| (c.2, c.3)).collect::<Vec<_>>());
++        let count = order.len() as f64;
++        for (place, &i) in order.iter().enumerate() {
++            let (slot, (lo, hi), _, _) = changes[i];
++            let at = lo + (hi - lo) * (place as f64 + 1.) / (count + 1.);
++            desired.entry(slot).or_default().insert(*key, at);
++        }
++    }
++    let empty = Desired::new();
++    for (slot, (index, outcome)) in prepared.iter().enumerate() {
++        let edge = &graph.edges[*index];
++        let outcome = match outcome {
++            Ok(p) => build_edge(
++                p,
+                 &mut assigned,
+-                spacing,
+-                orientations,
+-                &edge.id,
+-                &edge.source,
+-                target,
+-            )
++                spacing.track,
++                desired.get(&slot).unwrap_or(&empty),
++            ),
++            Err(reason) => Err(*reason),
+         };
+         match outcome {
+             Ok((route, lane_changes)) => {
+@@ -216,20 +254,35 @@
+         .collect()
+ }
+ 
++/// An edge that passed every check, with what its search needs: the flow, its two ends in the flow's frame, the band the
++/// lane changes lie in, and the inflated obstacles.
++struct Prepared {
++    edge_id: String,
++    vertical: bool,
++    from: (f64, f64),
++    to: (f64, f64),
++    band: (f64, f64),
++    obstacles: Vec<Rect>,
++    start: Point,
++    end: Point,
++}
++
++/// The desired position of an edge's lane change in a corridor, keyed by the corridor (`gap_key`).
++type Desired = BTreeMap<(i64, i64), f64>;
++
+ #[allow(clippy::too_many_arguments)]
+-fn construct_edge(
++fn prepare_edge(
+     graph: &Graph,
+     boxes: &BTreeMap<String, Rect>,
+     ports: &[ResolvedPort],
+     parents: &BTreeMap<&str, Option<&str>>,
+     containers: &BTreeSet<&str>,
+-    assigned: &mut Vec<Segment>,
+     spacing: Spacing,
+     orientations: &BTreeMap<String, Orientation>,
+     edge_id: &str,
+     source: &str,
+     target: &str,
+-) -> Result<(Route, usize), Delegation> {
++) -> Result<Prepared, Delegation> {
+     let _ = containers;
+     if !boxes.contains_key(source) || !boxes.contains_key(target) {
+         return Err(Delegation::Unresolved);
+@@ -316,15 +369,37 @@
+         .filter(|(id, _)| !skip.contains(id.as_str()))
+         .map(|(_, r)| inflate(r, spacing.margin))
+         .collect();
++    Ok(Prepared {
++        edge_id: edge_id.to_string(),
++        vertical,
++        from: (s_main, s_across),
++        to: (t_main, t_across),
++        band,
++        obstacles,
++        start: source_port.position.clone(),
++        end: target_port.position.clone(),
++    })
++}
++
++/// The route of a prepared edge, its tracks kept apart from `assigned` and, where `desired` names a corridor, its lane change
++/// drawn towards the desired position there.
++fn build_edge(
++    p: &Prepared,
++    assigned: &mut Vec<Segment>,
++    track: f64,
++    desired: &Desired,
++) -> Result<(Route, usize), Delegation> {
++    let (vertical, edge_id) = (p.vertical, p.edge_id.as_str());
+     let search = |taken: &[Segment]| {
+         monotone_path(
+-            &obstacles,
++            &p.obstacles,
+             taken,
+             vertical,
+-            (s_main, s_across),
+-            (t_main, t_across),
+-            band,
+-            spacing.track,
++            p.from,
++            p.to,
++            p.band,
++            track,
++            desired,
+         )
+     };
+     let corners = match search(assigned) {
+@@ -333,17 +408,14 @@
+         None if search(&[]).is_some() => return Err(Delegation::TrackTaken),
+         None => return Err(Delegation::NoFreeTrack),
+     };
+-    let mut polyline = vec![(s_main, s_across)];
+-    polyline.extend(corners.iter().copied());
+-    polyline.push((t_main, t_across));
+-    let mut points = vec![source_port.position.clone()];
++    let mut points = vec![p.start.clone()];
+     points.extend(corners.iter().map(|&c| to_point(vertical, c)));
+-    points.push(target_port.position.clone());
++    points.push(p.end.clone());
+     let segments = segments_of(&points);
+     // The search already keeps its steps clear of the assigned segments; this final check keeps the record consistent.
+     if segments
+         .iter()
+-        .any(|s| assigned.iter().any(|a| conflicts(a, s, spacing.track)))
++        .any(|s| assigned.iter().any(|a| conflicts(a, s, track)))
+     {
+         return Err(Delegation::NoFreeTrack);
+     }
+@@ -358,6 +430,7 @@
+ ///
+ /// `arrive[k][j]` is the cost of reaching corridor `k` on lane `j` from the left. `depart[k][j]` is the cost of leaving
+ /// it on lane `j`, after its one change of lane. The lanes are the free gaps across the flow, and both port lanes.
++#[allow(clippy::too_many_arguments)]
+ fn monotone_path(
+     obstacles: &[Rect],
+     assigned: &[Segment],
+@@ -366,28 +439,10 @@
+     to: (f64, f64),
+     band: (f64, f64),
+     track: f64,
++    desired: &Desired,
+ ) -> Option<Vec<(f64, f64)>> {
+-    let x_gaps: Vec<(f64, f64)> = free_gaps(obstacles, vertical, band.0, band.1, track)
+-        .into_iter()
+-        .filter(|(lo, hi)| (lo + hi) / 2. > from.0 + EPS && (lo + hi) / 2. < to.0 - EPS)
+-        .collect();
+-    let (lo_across, hi_across) = obstacles.iter().fold((f64::MAX, f64::MIN), |(lo, hi), r| {
+-        let (a, b) = across_extent(r, vertical);
+-        (lo.min(a), hi.max(b))
+-    });
+-    // The lanes reach three tracks beyond the outermost box, so a route can pass on either side of a row of boxes.
+-    let y_gaps = free_gaps(
+-        obstacles,
+-        !vertical,
+-        lo_across - 3. * track,
+-        hi_across + 3. * track,
+-        track,
+-    );
+-    let centres = |gaps: &[(f64, f64)]| {
+-        gaps.iter()
+-            .map(|(lo, hi)| (lo + hi) / 2.)
+-            .collect::<Vec<_>>()
+-    };
++    let (x_gaps, y_gaps) = search_gaps(obstacles, vertical, from, to, band, track);
++    let none = |_: f64| 0.;
+     // First the way: which gaps the route passes, on the gaps' centres and regardless of the routes already built.
+     let topology = search_on(
+         obstacles,
+@@ -398,13 +453,9 @@
+         centres(&x_gaps),
+         centres(&y_gaps),
+         track,
++        &none,
+     )?;
+     // Then the tracks: every track of the gaps on that way, now kept apart from the routes already built.
+-    let gap_of = |gaps: &[(f64, f64)], v: f64| {
+-        gaps.iter()
+-            .copied()
+-            .find(|(lo, hi)| v > lo - EPS && v < hi + EPS)
+-    };
+     let mut used_x: Vec<(f64, f64)> = topology
+         .iter()
+         .filter_map(|c| gap_of(&x_gaps, c.0))
+@@ -424,9 +475,122 @@
+         .iter()
+         .flat_map(|(lo, hi)| gap_tracks(*lo, *hi, track))
+         .collect();
+-    search_on(obstacles, assigned, vertical, from, to, xs, ys, track)
++    // A lane change away from the position the corridor's order gives this edge costs extra, so the tracks follow the order.
++    let penalty = |x: f64| {
++        gap_of(&used_x, x)
++            .and_then(|gap| desired.get(&gap_key(gap)))
++            .map_or(0., |d| DESIRED_WEIGHT * (x - d).abs())
++    };
++    search_on(
++        obstacles, assigned, vertical, from, to, xs, ys, track, &penalty,
++    )
++}
++
++/// The weight of a lane change's distance from its desired position, per unit (against one unit of length).
++const DESIRED_WEIGHT: f64 = 2.;
++
++/// The gap that holds `v`.
++fn gap_of(gaps: &[(f64, f64)], v: f64) -> Option<(f64, f64)> {
++    gaps.iter()
++        .copied()
++        .find(|(lo, hi)| v > lo - EPS && v < hi + EPS)
++}
++
++/// The key of a corridor: its free interval along the flow, at half-unit resolution, so that the edges that change lane in
++/// the same corridor find the same key.
++fn gap_key((lo, hi): (f64, f64)) -> (i64, i64) {
++    ((lo * 2.).round() as i64, (hi * 2.).round() as i64)
++}
++
++fn centres(gaps: &[(f64, f64)]) -> Vec<f64> {
++    gaps.iter().map(|(lo, hi)| (lo + hi) / 2.).collect()
++}
++
++/// The free gaps of a search: along the flow (where the route may change lane) and across it (its lanes).
++fn search_gaps(
++    obstacles: &[Rect],
++    vertical: bool,
++    from: (f64, f64),
++    to: (f64, f64),
++    band: (f64, f64),
++    track: f64,
++) -> (Vec<(f64, f64)>, Vec<(f64, f64)>) {
++    let x_gaps: Vec<(f64, f64)> = free_gaps(obstacles, vertical, band.0, band.1, track)
++        .into_iter()
++        .filter(|(lo, hi)| (lo + hi) / 2. > from.0 + EPS && (lo + hi) / 2. < to.0 - EPS)
++        .collect();
++    let (lo_across, hi_across) = obstacles.iter().fold((f64::MAX, f64::MIN), |(lo, hi), r| {
++        let (a, b) = across_extent(r, vertical);
++        (lo.min(a), hi.max(b))
++    });
++    // The lanes reach three tracks beyond the outermost box, so a route can pass on either side of a row of boxes.
++    let y_gaps = free_gaps(
++        obstacles,
++        !vertical,
++        lo_across - 3. * track,
++        hi_across + 3. * track,
++        track,
++    );
++    (x_gaps, y_gaps)
+ }
+ 
++/// The way of a prepared edge over the gaps' centres, regardless of the routes already built: its lane changes as
++/// (corridor, lane before, lane after) in the flow's frame.
++fn lane_changes(p: &Prepared, track: f64) -> Vec<((f64, f64), f64, f64)> {
++    let (x_gaps, y_gaps) = search_gaps(&p.obstacles, p.vertical, p.from, p.to, p.band, track);
++    let none = |_: f64| 0.;
++    let Some(corners) = search_on(
++        &p.obstacles,
++        &[],
++        p.vertical,
++        p.from,
++        p.to,
++        centres(&x_gaps),
++        centres(&y_gaps),
++        track,
++        &none,
++    ) else {
++        return Vec::new();
++    };
++    corners
++        .chunks(2)
++        .filter_map(|pair| {
++            let (x, before) = pair[0];
++            let after = pair.get(1)?.1;
++            Some((gap_of(&x_gaps, x)?, before, after))
++        })
++        .collect()
++}
++
++/// The order of the lane changes in one corridor that crosses least. A change is (lane before, lane after); when change `a`
++/// lies before `b` along the flow, `a`'s outgoing lane crosses `b`'s change if it lies inside `b`'s span, and `b`'s incoming
++/// lane crosses `a`'s change if it lies inside `a`'s span. Neighbours are swapped while a swap lowers the crossings (greedy
++/// switch), starting from the order of the lanes' midpoints.
++fn corridor_order(changes: &[(f64, f64)]) -> Vec<usize> {
++    let inside = |v: f64, (a, b): (f64, f64)| v > a.min(b) + EPS && v < a.max(b) - EPS;
++    let cost =
++        |a: (f64, f64), b: (f64, f64)| usize::from(inside(a.1, b)) + usize::from(inside(b.0, a));
++    let mut order: Vec<usize> = (0..changes.len()).collect();
++    order.sort_by(|&i, &j| {
++        let (a, b) = (changes[i], changes[j]);
++        (a.0 + a.1).total_cmp(&(b.0 + b.1)).then(i.cmp(&j))
++    });
++    let mut improved = true;
++    let mut rounds = 0;
++    while improved && rounds < changes.len() * changes.len() + 1 {
++        improved = false;
++        rounds += 1;
++        for k in 0..order.len().saturating_sub(1) {
++            let (a, b) = (changes[order[k]], changes[order[k + 1]]);
++            if cost(b, a) < cost(a, b) {
++                order.swap(k, k + 1);
++                improved = true;
++            }
++        }
++    }
++    order
++}
++
+ /// The cheapest monotone path from `from` to `to` over the given tracks along the flow (`xs`) and across it (`ys`; the two
+ /// port lanes are added). See `monotone_path`.
+ #[allow(clippy::too_many_arguments)]
+@@ -439,6 +603,7 @@
+     mut xs: Vec<f64>,
+     mut ys: Vec<f64>,
+     track: f64,
++    penalty: &dyn Fn(f64) -> f64,
+ ) -> Option<Vec<(f64, f64)>> {
+     // A step is clear when it misses every obstacle and keeps the track spacing from every assigned segment.
+     let clear = |a: (f64, f64), b: (f64, f64)| {
+@@ -496,7 +661,7 @@
+                     if !clear((xs[k], ys[i]), (xs[k], ys[lane])) {
+                         break;
+                     }
+-                    let cost = arrive[k][i] + (ys[lane] - ys[i]).abs() + BEND;
++                    let cost = arrive[k][i] + (ys[lane] - ys[i]).abs() + BEND + penalty(xs[k]);
+                     if cost < depart[k][lane] {
+                         depart[k][lane] = cost;
+                         entered[k][lane] = i;
+@@ -745,14 +910,6 @@
+     }
+ }
+ 
+-/// The lanes between `from` and `to` on the flow axis: the tracks of the free gaps between the boxes' edges (see `gap_tracks`).
+-fn corridor_lanes(obstacles: &[Rect], vertical: bool, from: f64, to: f64, track: f64) -> Vec<f64> {
+-    free_gaps(obstacles, vertical, from, to, track)
+-        .into_iter()
+-        .map(|(lo, hi)| (lo + hi) / 2.)
+-        .collect()
+-}
+-
+ /// The free gaps between `from` and `to` on one axis: the intervals between the boxes' edges that are wide enough for a track.
+ fn free_gaps(
+     obstacles: &[Rect],

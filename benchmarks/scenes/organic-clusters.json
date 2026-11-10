@@ -1,0 +1,230 @@
+{
+  "defaultDirection": "auto",
+  "defaultStrategy": "organic",
+  "edges": [
+    {
+      "id": "Ae1",
+      "kind": "flow",
+      "source": "A0",
+      "target": "A1"
+    },
+    {
+      "id": "Ae2",
+      "kind": "flow",
+      "source": "A1",
+      "target": "A2"
+    },
+    {
+      "id": "Ae3",
+      "kind": "flow",
+      "source": "A2",
+      "target": "A3"
+    },
+    {
+      "id": "Ae4",
+      "kind": "flow",
+      "source": "A3",
+      "target": "A4"
+    },
+    {
+      "id": "Aloop",
+      "kind": "flow",
+      "source": "A1",
+      "target": "A4"
+    },
+    {
+      "id": "Be1",
+      "kind": "flow",
+      "source": "B0",
+      "target": "B1"
+    },
+    {
+      "id": "Be2",
+      "kind": "flow",
+      "source": "B1",
+      "target": "B2"
+    },
+    {
+      "id": "Be3",
+      "kind": "flow",
+      "source": "B2",
+      "target": "B3"
+    },
+    {
+      "id": "Bloop",
+      "kind": "flow",
+      "source": "B1",
+      "target": "B3"
+    },
+    {
+      "id": "Ce1",
+      "kind": "flow",
+      "source": "C0",
+      "target": "C1"
+    },
+    {
+      "id": "Ce2",
+      "kind": "flow",
+      "source": "C1",
+      "target": "C2"
+    },
+    {
+      "id": "Ce3",
+      "kind": "flow",
+      "source": "C2",
+      "target": "C3"
+    },
+    {
+      "id": "Ce4",
+      "kind": "flow",
+      "source": "C3",
+      "target": "C4"
+    },
+    {
+      "id": "Ce5",
+      "kind": "flow",
+      "source": "C4",
+      "target": "C5"
+    },
+    {
+      "id": "Cloop",
+      "kind": "flow",
+      "source": "C1",
+      "target": "C5"
+    },
+    {
+      "id": "ab",
+      "kind": "flow",
+      "source": "A2",
+      "target": "B1"
+    },
+    {
+      "id": "bc",
+      "kind": "flow",
+      "source": "B2",
+      "target": "C3"
+    },
+    {
+      "id": "ca",
+      "kind": "flow",
+      "source": "C0",
+      "target": "A4"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "A",
+      "kind": "group",
+      "label": "Cluster A",
+      "parentId": null
+    },
+    {
+      "id": "A0",
+      "kind": "node",
+      "label": "A 0",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "A1",
+      "kind": "node",
+      "label": "A 1",
+      "parentId": null
+    },
+    {
+      "id": "A2",
+      "kind": "node",
+      "label": "A 2",
+      "parentId": null
+    },
+    {
+      "id": "A3",
+      "kind": "node",
+      "label": "A 3",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "A4",
+      "kind": "node",
+      "label": "A 4",
+      "parentId": null
+    },
+    {
+      "id": "B",
+      "kind": "group",
+      "label": "Cluster B",
+      "parentId": null
+    },
+    {
+      "id": "B0",
+      "kind": "node",
+      "label": "B 0",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "B1",
+      "kind": "node",
+      "label": "B 1",
+      "parentId": null
+    },
+    {
+      "id": "B2",
+      "kind": "node",
+      "label": "B 2",
+      "parentId": null
+    },
+    {
+      "id": "B3",
+      "kind": "node",
+      "label": "B 3",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "C",
+      "kind": "group",
+      "label": "Cluster C",
+      "parentId": null
+    },
+    {
+      "id": "C0",
+      "kind": "node",
+      "label": "C 0",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "C1",
+      "kind": "node",
+      "label": "C 1",
+      "parentId": null
+    },
+    {
+      "id": "C2",
+      "kind": "node",
+      "label": "C 2",
+      "parentId": null
+    },
+    {
+      "id": "C3",
+      "kind": "node",
+      "label": "C 3",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "C4",
+      "kind": "node",
+      "label": "C 4",
+      "parentId": null
+    },
+    {
+      "id": "C5",
+      "kind": "node",
+      "label": "C 5",
+      "parentId": null
+    }
+  ]
+}

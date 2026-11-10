@@ -1,0 +1,50 @@
+{
+  "description": "A segment 8 units from a foreign node's border: one hugging pair, with the length inside the 12-unit band.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 300,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "x",
+        "x": 100,
+        "y": 18,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 300,
+            "y": 10
+          }
+        ]
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "hugPairs": 1,
+    "lineNodeHits": 0
+  }
+}

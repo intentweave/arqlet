@@ -1,0 +1,314 @@
+{
+ "containerDirections": {
+  "lane:fulfilment": "tb",
+  "lane:sales": "tb",
+  "pool:customer": "tb",
+  "pool:logistics": "tb",
+  "pool:shop": "lr"
+ },
+ "defaultDirection": "lr",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "sequence",
+   "source": "c-start",
+   "target": "c-place"
+  },
+  {
+   "id": "e2",
+   "kind": "message: order",
+   "source": "c-place",
+   "target": "s-msg"
+  },
+  {
+   "id": "e3",
+   "kind": "sequence",
+   "source": "s-msg",
+   "target": "s-validate"
+  },
+  {
+   "id": "e4",
+   "kind": "sequence",
+   "source": "s-validate",
+   "target": "s-stock"
+  },
+  {
+   "id": "e5",
+   "kind": "no",
+   "source": "s-stock",
+   "target": "s-cancel"
+  },
+  {
+   "id": "e6",
+   "kind": "yes",
+   "source": "s-stock",
+   "target": "s-reserve"
+  },
+  {
+   "id": "e7",
+   "kind": "sequence",
+   "source": "s-reserve",
+   "target": "s-split"
+  },
+  {
+   "id": "e8",
+   "kind": "sequence",
+   "source": "s-split",
+   "target": "s-request"
+  },
+  {
+   "id": "e9",
+   "kind": "sequence",
+   "source": "s-split",
+   "target": "f-pick"
+  },
+  {
+   "id": "e10",
+   "kind": "sequence",
+   "source": "s-request",
+   "target": "s-paid"
+  },
+  {
+   "id": "e11",
+   "kind": "boundary",
+   "source": "s-request",
+   "target": "s-timeout"
+  },
+  {
+   "id": "e12",
+   "kind": "sequence",
+   "source": "s-timeout",
+   "target": "s-cancel"
+  },
+  {
+   "id": "e13",
+   "kind": "retry",
+   "source": "s-paid",
+   "target": "s-request"
+  },
+  {
+   "id": "e14",
+   "kind": "yes",
+   "source": "s-paid",
+   "target": "s-join"
+  },
+  {
+   "id": "e15",
+   "kind": "sequence",
+   "source": "f-pick",
+   "target": "s-join"
+  },
+  {
+   "id": "e16",
+   "kind": "sequence",
+   "source": "s-join",
+   "target": "f-handover"
+  },
+  {
+   "id": "e17",
+   "kind": "message: shipment",
+   "source": "f-handover",
+   "target": "l-start"
+  },
+  {
+   "id": "e18",
+   "kind": "sequence",
+   "source": "l-start",
+   "target": "l-deliver"
+  },
+  {
+   "id": "e19",
+   "kind": "sequence",
+   "source": "l-deliver",
+   "target": "l-end"
+  },
+  {
+   "id": "e20",
+   "kind": "message: delivered",
+   "source": "l-end",
+   "target": "f-notify"
+  },
+  {
+   "id": "e21",
+   "kind": "message: notification",
+   "source": "f-notify",
+   "target": "c-wait"
+  },
+  {
+   "id": "e22",
+   "kind": "sequence",
+   "source": "c-wait",
+   "target": "c-receive"
+  },
+  {
+   "id": "e23",
+   "kind": "sequence",
+   "source": "c-receive",
+   "target": "c-end"
+  },
+  {
+   "id": "e24",
+   "kind": "message: cancelled",
+   "source": "s-cancel",
+   "target": "c-wait"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "pool:customer",
+   "kind": "container",
+   "label": "Customer",
+   "parentId": null
+  },
+  {
+   "id": "pool:shop",
+   "kind": "container",
+   "label": "Online shop",
+   "parentId": null
+  },
+  {
+   "id": "lane:sales",
+   "kind": "container",
+   "label": "Sales",
+   "parentId": "pool:shop"
+  },
+  {
+   "id": "lane:fulfilment",
+   "kind": "container",
+   "label": "Fulfilment",
+   "parentId": "pool:shop"
+  },
+  {
+   "id": "pool:logistics",
+   "kind": "container",
+   "label": "Logistics provider",
+   "parentId": null
+  },
+  {
+   "id": "c-start",
+   "kind": "start",
+   "label": "Order needed",
+   "parentId": "pool:customer"
+  },
+  {
+   "id": "c-place",
+   "kind": "task",
+   "label": "Place order",
+   "parentId": "pool:customer"
+  },
+  {
+   "id": "c-wait",
+   "kind": "task",
+   "label": "Wait for payment",
+   "parentId": "pool:customer"
+  },
+  {
+   "id": "c-receive",
+   "kind": "task",
+   "label": "Receive goods",
+   "parentId": "pool:customer"
+  },
+  {
+   "id": "c-end",
+   "kind": "end",
+   "label": "Goods received",
+   "parentId": "pool:customer"
+  },
+  {
+   "id": "s-msg",
+   "kind": "message-start",
+   "label": "Order received",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-validate",
+   "kind": "task",
+   "label": "Validate order",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-stock",
+   "kind": "gateway",
+   "label": "In stock?",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-reserve",
+   "kind": "task",
+   "label": "Reserve items",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-request",
+   "kind": "task",
+   "label": "Request payment",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-timeout",
+   "kind": "timer",
+   "label": "Payment timeout",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-split",
+   "kind": "parallel-gateway",
+   "label": "Split",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-join",
+   "kind": "parallel-gateway",
+   "label": "Join",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-paid",
+   "kind": "gateway",
+   "label": "Payment ok?",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "s-cancel",
+   "kind": "end",
+   "label": "Order cancelled",
+   "parentId": "lane:sales"
+  },
+  {
+   "id": "f-pick",
+   "kind": "task",
+   "label": "Pick and pack",
+   "parentId": "lane:fulfilment"
+  },
+  {
+   "id": "f-handover",
+   "kind": "task",
+   "label": "Hand over",
+   "parentId": "lane:fulfilment"
+  },
+  {
+   "id": "f-notify",
+   "kind": "task",
+   "label": "Notify customer",
+   "parentId": "lane:fulfilment"
+  },
+  {
+   "id": "l-start",
+   "kind": "message-start",
+   "label": "Shipment request",
+   "parentId": "pool:logistics"
+  },
+  {
+   "id": "l-deliver",
+   "kind": "task",
+   "label": "Deliver",
+   "parentId": "pool:logistics"
+  },
+  {
+   "id": "l-end",
+   "kind": "message-end",
+   "label": "Delivered",
+   "parentId": "pool:logistics"
+  }
+ ]
+}

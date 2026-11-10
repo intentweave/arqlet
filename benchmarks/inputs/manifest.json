@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "frozenFrom": "benchmarks/datasets",
+  "frozenAt": "90993a7",
+  "inputs": [
+    {
+      "name": "network-vlan",
+      "file": "network-vlan.json",
+      "viewLimit": 150,
+      "why": "dense infrastructure view, containers",
+      "sha256": "95178273bb9a74512ff20fb2978721aa643297b03f0e83a74af6f3f6585538c8",
+      "bytes": 7909,
+      "nodes": 37,
+      "edges": 47
+    },
+    {
+      "name": "state-tcp",
+      "file": "state-tcp.json",
+      "viewLimit": 100,
+      "why": "cyclic state machine, back edges",
+      "sha256": "9daf3c2e98b9b5f18b0159c56b62ae2378b40565aaccd6035750fc0bb62b991d",
+      "bytes": 2970,
+      "nodes": 11,
+      "edges": 19
+    },
+    {
+      "name": "workflow-dag",
+      "file": "workflow-dag.json",
+      "viewLimit": 100,
+      "why": "layered DAG with many edges",
+      "sha256": "7be68d4b8f833df33da86ae7d3eacf6094a16cca24043896623ab9f6d02ad54e",
+      "bytes": 19242,
+      "nodes": 72,
+      "edges": 125
+    },
+    {
+      "name": "synthetic-2k",
+      "file": "synthetic-2k.json",
+      "viewLimit": 50,
+      "why": "generated view, many shared stubs",
+      "sha256": "7eeac300e66d7f51a108419689473a99470cc49e81a7c604b75a4fa8fa7d39f2",
+      "bytes": 762154,
+      "nodes": 2286,
+      "edges": 6125
+    },
+    {
+      "name": "org-chart",
+      "file": "org-chart.json",
+      "viewLimit": 100,
+      "why": "tree with a container",
+      "sha256": "a91e81c36b395272f00f936488bbf7591b0a9137ddf4df15cc496facab81abb4",
+      "bytes": 20112,
+      "nodes": 104,
+      "edges": 82
+    },
+    {
+      "name": "bpmn-pools",
+      "file": "bpmn-pools.json",
+      "viewLimit": 100,
+      "why": "pools and lanes",
+      "sha256": "61cc7d3faa7846e3d4a8c3eda442202d7d079cc6b95f9e34c59bed357a17e396",
+      "bytes": 5354,
+      "nodes": 26,
+      "edges": 24
+    },
+    {
+      "name": "uml-class",
+      "file": "uml-class.json",
+      "viewLimit": 100,
+      "why": "inheritance and association",
+      "sha256": "468be1a253caec754862cd2aecad4a3c19803c8b0ebe3981623b9b246dc5ef08",
+      "bytes": 8115,
+      "nodes": 43,
+      "edges": 24
+    },
+    {
+      "name": "layerweave-code",
+      "file": "layerweave-code.json",
+      "viewLimit": 100,
+      "why": "this repository's own call graph (frozen at its generation)",
+      "sha256": "2642c8700cad9782fd16024e4d9cbcb9e312031ed1e3c225132f5964a3334353",
+      "bytes": 60739,
+      "nodes": 148,
+      "edges": 239
+    }
+  ]
+}

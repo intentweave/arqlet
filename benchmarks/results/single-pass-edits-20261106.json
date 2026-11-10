@@ -1,0 +1,696 @@
+{
+ "kind": "single-pass-edits",
+ "generatedAt": "2026-11-06T21:57:39.977Z",
+ "environment": {
+  "cpu": "Apple M3",
+  "logicalCpus": 8,
+  "os": "darwin",
+  "arch": "arm64",
+  "node": "v24.21.0",
+  "revision": "5c2431e30ee33540a28bd7de0ff9f132d255f746",
+  "load": [
+   5.529296875,
+   3.4443359375,
+   3.0673828125
+  ]
+ },
+ "note": "One import per view and arm; each operation starts from that import.",
+ "cases": [
+  {
+   "name": "layerweave-code",
+   "nodes": 80,
+   "edges": 116,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 77,
+      "moved": 4,
+      "median": 0,
+      "max": 232
+     },
+     "shape": {
+      "nodes": 77,
+      "moved": 4,
+      "median": 0,
+      "max": 108
+     },
+     "measure": {
+      "nodes": 77,
+      "moved": 4,
+      "median": 0,
+      "max": 62
+     },
+     "move": {
+      "nodes": 77,
+      "moved": 75,
+      "median": 1369,
+      "max": 2502
+     },
+     "pin": {
+      "nodes": 77,
+      "moved": 75,
+      "median": 1909,
+      "max": 2598
+     },
+     "settle": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "toggle": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "direction": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "routingStraight": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of crate:layout refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 77,
+      "moved": 51,
+      "median": 2,
+      "max": 246
+     },
+     "shape": {
+      "nodes": 77,
+      "moved": 66,
+      "median": 96,
+      "max": 240
+     },
+     "measure": {
+      "nodes": 77,
+      "moved": 25,
+      "median": 0,
+      "max": 82
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "toggle": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "direction": {
+      "error": "Fixed-order channel growth requires one positive flow axis"
+     },
+     "routingStraight": {
+      "error": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of crate:layout refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    }
+   }
+  },
+  {
+   "name": "petri-net",
+   "nodes": 24,
+   "edges": 41,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 23,
+      "moved": 21,
+      "median": 30,
+      "max": 106
+     },
+     "shape": {
+      "nodes": 23,
+      "moved": 22,
+      "median": 3,
+      "max": 16
+     },
+     "measure": {
+      "nodes": 23,
+      "moved": 22,
+      "median": 7,
+      "max": 96
+     },
+     "move": {
+      "nodes": 23,
+      "moved": 23,
+      "median": 258,
+      "max": 801
+     },
+     "pin": {
+      "nodes": 23,
+      "moved": 23,
+      "median": 386,
+      "max": 937
+     },
+     "settle": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 23,
+      "moved": 16,
+      "median": 2,
+      "max": 48
+     },
+     "shape": {
+      "nodes": 23,
+      "moved": 19,
+      "median": 5,
+      "max": 108
+     },
+     "measure": {
+      "nodes": 23,
+      "moved": 19,
+      "median": 9,
+      "max": 82
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "state-tcp",
+   "nodes": 11,
+   "edges": 19,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 99,
+      "max": 148
+     },
+     "shape": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 108,
+      "max": 108
+     },
+     "measure": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 80,
+      "max": 80
+     },
+     "move": {
+      "nodes": 10,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "pin": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 117,
+      "max": 217
+     },
+     "settle": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 11,
+      "moved": 11,
+      "median": 44,
+      "max": 45
+     },
+     "structuredRefine": {
+      "nodes": 11,
+      "moved": 11,
+      "median": 44,
+      "max": 45
+     },
+     "restore": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 10,
+      "moved": 9,
+      "median": 15,
+      "max": 29
+     },
+     "shape": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 108,
+      "max": 108
+     },
+     "measure": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 80,
+      "max": 80
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-dag, uniform",
+   "nodes": 72,
+   "edges": 125,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 298,
+      "max": 488
+     },
+     "shape": {
+      "nodes": 70,
+      "moved": 14,
+      "median": 0,
+      "max": 37
+     },
+     "measure": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 80,
+      "max": 86
+     },
+     "move": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 77,
+      "max": 508
+     },
+     "pin": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 115,
+      "max": 450
+     },
+     "settle": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "toggle": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 103,
+      "max": 306
+     },
+     "direction": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 1453,
+      "max": 1497
+     },
+     "routingStraight": {
+      "nodes": 63,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "strategyTree": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 95,
+      "max": 309
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 292,
+      "max": 557
+     },
+     "shape": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 30,
+      "max": 76
+     },
+     "measure": {
+      "nodes": 70,
+      "moved": 64,
+      "median": 98,
+      "max": 104
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "toggle": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 199,
+      "max": 665
+     },
+     "direction": {
+      "error": "Fixed-order channel growth requires one positive flow axis"
+     },
+     "routingStraight": {
+      "error": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+     },
+     "strategyTree": {
+      "error": "Fixed-order channel growth requires every node in its parent plan"
+     }
+    }
+   }
+  },
+  {
+   "name": "org-chart, uniform",
+   "nodes": 104,
+   "edges": 82,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 103,
+      "moved": 103,
+      "median": 937,
+      "max": 937
+     },
+     "shape": {
+      "nodes": 103,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "measure": {
+      "nodes": 103,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "move": {
+      "nodes": 103,
+      "moved": 103,
+      "median": 1654,
+      "max": 5485
+     },
+     "pin": {
+      "nodes": 103,
+      "moved": 103,
+      "median": 3693,
+      "max": 6747
+     },
+     "settle": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 104,
+      "moved": 104,
+      "median": 971,
+      "max": 1303
+     },
+     "structuredRefine": {
+      "nodes": 104,
+      "moved": 104,
+      "median": 971,
+      "max": 1303
+     },
+     "restore": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "toggle": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 1223,
+      "max": 1677
+     },
+     "direction": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 2312,
+      "max": 4885
+     },
+     "routingStraight": {
+      "nodes": 65,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of div-0 refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 103,
+      "moved": 48,
+      "median": 0,
+      "max": 204
+     },
+     "shape": {
+      "nodes": 103,
+      "moved": 83,
+      "median": 18,
+      "max": 18
+     },
+     "measure": {
+      "nodes": 103,
+      "moved": 83,
+      "median": 36,
+      "max": 36
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "refine": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "structuredRefine": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "restore": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0
+     },
+     "toggle": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 2465,
+      "max": 5292
+     },
+     "direction": {
+      "error": "Fixed-order channel growth requires one positive flow axis"
+     },
+     "routingStraight": {
+      "error": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of div-0 refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    }
+   }
+  }
+ ]
+}

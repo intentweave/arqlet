@@ -1,0 +1,2151 @@
+{
+ "baseRevision": 0,
+ "boundaryCrossings": [
+  {
+   "containerId": "lane:sales",
+   "derived": true,
+   "edgeId": "e2",
+   "ordinal": 0,
+   "position": {
+    "x": 1244,
+    "y": 138
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "pool:customer",
+   "derived": true,
+   "edgeId": "e2",
+   "ordinal": 0,
+   "position": {
+    "x": 456,
+    "y": 138
+   },
+   "side": "right"
+  },
+  {
+   "containerId": "pool:shop",
+   "derived": true,
+   "edgeId": "e2",
+   "ordinal": 0,
+   "position": {
+    "x": 520,
+    "y": 138
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "lane:fulfilment",
+   "derived": true,
+   "edgeId": "e9",
+   "ordinal": 0,
+   "position": {
+    "x": 1180,
+    "y": 525
+   },
+   "side": "right"
+  },
+  {
+   "containerId": "lane:sales",
+   "derived": true,
+   "edgeId": "e9",
+   "ordinal": 0,
+   "position": {
+    "x": 1244,
+    "y": 525
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "lane:fulfilment",
+   "derived": true,
+   "edgeId": "e15",
+   "ordinal": 0,
+   "position": {
+    "x": 1066,
+    "y": 450
+   },
+   "side": "top"
+  },
+  {
+   "containerId": "lane:sales",
+   "derived": true,
+   "edgeId": "e15",
+   "ordinal": 0,
+   "position": {
+    "x": 1244,
+    "y": 348
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "lane:fulfilment",
+   "derived": true,
+   "edgeId": "e16",
+   "ordinal": 0,
+   "position": {
+    "x": 760,
+    "y": 450
+   },
+   "side": "top"
+  },
+  {
+   "containerId": "lane:sales",
+   "derived": true,
+   "edgeId": "e16",
+   "ordinal": 0,
+   "position": {
+    "x": 1244,
+    "y": 171
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "lane:fulfilment",
+   "derived": true,
+   "edgeId": "e17",
+   "ordinal": 0,
+   "position": {
+    "x": 544,
+    "y": 525
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "pool:logistics",
+   "derived": true,
+   "edgeId": "e17",
+   "ordinal": 0,
+   "position": {
+    "x": 252,
+    "y": 588
+   },
+   "side": "right"
+  },
+  {
+   "containerId": "pool:shop",
+   "derived": true,
+   "edgeId": "e17",
+   "ordinal": 0,
+   "position": {
+    "x": 520,
+    "y": 525
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "lane:fulfilment",
+   "derived": true,
+   "edgeId": "e20",
+   "ordinal": 0,
+   "position": {
+    "x": 766,
+    "y": 576
+   },
+   "side": "bottom"
+  },
+  {
+   "containerId": "pool:logistics",
+   "derived": true,
+   "edgeId": "e20",
+   "ordinal": 0,
+   "position": {
+    "x": 252,
+    "y": 824
+   },
+   "side": "right"
+  },
+  {
+   "containerId": "pool:shop",
+   "derived": true,
+   "edgeId": "e20",
+   "ordinal": 0,
+   "position": {
+    "x": 520,
+    "y": 824
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "lane:fulfilment",
+   "derived": true,
+   "edgeId": "e21",
+   "ordinal": 0,
+   "position": {
+    "x": 772,
+    "y": 450
+   },
+   "side": "top"
+  },
+  {
+   "containerId": "pool:customer",
+   "derived": true,
+   "edgeId": "e21",
+   "ordinal": 0,
+   "position": {
+    "x": 456,
+    "y": 193
+   },
+   "side": "right"
+  },
+  {
+   "containerId": "pool:shop",
+   "derived": true,
+   "edgeId": "e21",
+   "ordinal": 0,
+   "position": {
+    "x": 520,
+    "y": 193
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "lane:sales",
+   "derived": true,
+   "edgeId": "e24",
+   "ordinal": 0,
+   "position": {
+    "x": 1244,
+    "y": 198
+   },
+   "side": "left"
+  },
+  {
+   "containerId": "pool:customer",
+   "derived": true,
+   "edgeId": "e24",
+   "ordinal": 0,
+   "position": {
+    "x": 456,
+    "y": 198
+   },
+   "side": "right"
+  },
+  {
+   "containerId": "pool:shop",
+   "derived": true,
+   "edgeId": "e24",
+   "ordinal": 0,
+   "position": {
+    "x": 520,
+    "y": 198
+   },
+   "side": "left"
+  }
+ ],
+ "boxes": {
+  "c-end": {
+   "height": 54,
+   "width": 180,
+   "x": 126,
+   "y": 284
+  },
+  "c-place": {
+   "height": 54,
+   "width": 180,
+   "x": 24,
+   "y": 166
+  },
+  "c-receive": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 166
+  },
+  "c-start": {
+   "height": 54,
+   "width": 180,
+   "x": 24,
+   "y": 48
+  },
+  "c-wait": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 48
+  },
+  "f-handover": {
+   "height": 54,
+   "width": 180,
+   "x": 24,
+   "y": 48
+  },
+  "f-notify": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 48
+  },
+  "f-pick": {
+   "height": 54,
+   "width": 180,
+   "x": 432,
+   "y": 48
+  },
+  "l-deliver": {
+   "height": 54,
+   "width": 180,
+   "x": 24,
+   "y": 166
+  },
+  "l-end": {
+   "height": 54,
+   "width": 180,
+   "x": 24,
+   "y": 284
+  },
+  "l-start": {
+   "height": 54,
+   "width": 180,
+   "x": 24,
+   "y": 48
+  },
+  "lane:fulfilment": {
+   "height": 126,
+   "width": 636,
+   "x": 24,
+   "y": 402
+  },
+  "lane:sales": {
+   "height": 834,
+   "width": 636,
+   "x": 724,
+   "y": 48
+  },
+  "pool:customer": {
+   "height": 362,
+   "width": 432,
+   "x": 24,
+   "y": 127
+  },
+  "pool:logistics": {
+   "height": 362,
+   "width": 228,
+   "x": 24,
+   "y": 513
+  },
+  "pool:shop": {
+   "height": 906,
+   "width": 1384,
+   "x": 520,
+   "y": 48
+  },
+  "s-cancel": {
+   "height": 54,
+   "width": 180,
+   "x": 126,
+   "y": 402
+  },
+  "s-join": {
+   "height": 54,
+   "width": 180,
+   "x": 24,
+   "y": 48
+  },
+  "s-msg": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 48
+  },
+  "s-paid": {
+   "height": 54,
+   "width": 180,
+   "x": 432,
+   "y": 48
+  },
+  "s-request": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 638
+  },
+  "s-reserve": {
+   "height": 54,
+   "width": 180,
+   "x": 330,
+   "y": 402
+  },
+  "s-split": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 520
+  },
+  "s-stock": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 284
+  },
+  "s-timeout": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 756
+  },
+  "s-validate": {
+   "height": 54,
+   "width": 180,
+   "x": 228,
+   "y": 166
+  }
+ },
+ "collapsedIds": [],
+ "engineVersion": "0.1.0-prototype",
+ "geometryIssues": [],
+ "graph": {
+  "containerDirections": {
+   "lane:fulfilment": "tb",
+   "lane:sales": "tb",
+   "pool:customer": "tb",
+   "pool:logistics": "tb",
+   "pool:shop": "lr"
+  },
+  "defaultDirection": "lr",
+  "edgePorts": [],
+  "edges": [
+   {
+    "id": "e1",
+    "kind": "sequence",
+    "source": "c-start",
+    "target": "c-place"
+   },
+   {
+    "id": "e2",
+    "kind": "message: order",
+    "source": "c-place",
+    "target": "s-msg"
+   },
+   {
+    "id": "e3",
+    "kind": "sequence",
+    "source": "s-msg",
+    "target": "s-validate"
+   },
+   {
+    "id": "e4",
+    "kind": "sequence",
+    "source": "s-validate",
+    "target": "s-stock"
+   },
+   {
+    "id": "e5",
+    "kind": "no",
+    "source": "s-stock",
+    "target": "s-cancel"
+   },
+   {
+    "id": "e6",
+    "kind": "yes",
+    "source": "s-stock",
+    "target": "s-reserve"
+   },
+   {
+    "id": "e7",
+    "kind": "sequence",
+    "source": "s-reserve",
+    "target": "s-split"
+   },
+   {
+    "id": "e8",
+    "kind": "sequence",
+    "source": "s-split",
+    "target": "s-request"
+   },
+   {
+    "id": "e9",
+    "kind": "sequence",
+    "source": "s-split",
+    "target": "f-pick"
+   },
+   {
+    "id": "e10",
+    "kind": "sequence",
+    "source": "s-request",
+    "target": "s-paid"
+   },
+   {
+    "id": "e11",
+    "kind": "boundary",
+    "source": "s-request",
+    "target": "s-timeout"
+   },
+   {
+    "id": "e12",
+    "kind": "sequence",
+    "source": "s-timeout",
+    "target": "s-cancel"
+   },
+   {
+    "id": "e13",
+    "kind": "retry",
+    "source": "s-paid",
+    "target": "s-request"
+   },
+   {
+    "id": "e14",
+    "kind": "yes",
+    "source": "s-paid",
+    "target": "s-join"
+   },
+   {
+    "id": "e15",
+    "kind": "sequence",
+    "source": "f-pick",
+    "target": "s-join"
+   },
+   {
+    "id": "e16",
+    "kind": "sequence",
+    "source": "s-join",
+    "target": "f-handover"
+   },
+   {
+    "id": "e17",
+    "kind": "message: shipment",
+    "source": "f-handover",
+    "target": "l-start"
+   },
+   {
+    "id": "e18",
+    "kind": "sequence",
+    "source": "l-start",
+    "target": "l-deliver"
+   },
+   {
+    "id": "e19",
+    "kind": "sequence",
+    "source": "l-deliver",
+    "target": "l-end"
+   },
+   {
+    "id": "e20",
+    "kind": "message: delivered",
+    "source": "l-end",
+    "target": "f-notify"
+   },
+   {
+    "id": "e21",
+    "kind": "message: notification",
+    "source": "f-notify",
+    "target": "c-wait"
+   },
+   {
+    "id": "e22",
+    "kind": "sequence",
+    "source": "c-wait",
+    "target": "c-receive"
+   },
+   {
+    "id": "e23",
+    "kind": "sequence",
+    "source": "c-receive",
+    "target": "c-end"
+   },
+   {
+    "id": "e24",
+    "kind": "message: cancelled",
+    "source": "s-cancel",
+    "target": "c-wait"
+   }
+  ],
+  "nodes": [
+   {
+    "id": "pool:customer",
+    "kind": "container",
+    "label": "Customer",
+    "parentId": null
+   },
+   {
+    "id": "pool:shop",
+    "kind": "container",
+    "label": "Online shop",
+    "parentId": null
+   },
+   {
+    "id": "lane:sales",
+    "kind": "container",
+    "label": "Sales",
+    "parentId": "pool:shop"
+   },
+   {
+    "id": "lane:fulfilment",
+    "kind": "container",
+    "label": "Fulfilment",
+    "parentId": "pool:shop"
+   },
+   {
+    "id": "pool:logistics",
+    "kind": "container",
+    "label": "Logistics provider",
+    "parentId": null
+   },
+   {
+    "id": "c-start",
+    "kind": "start",
+    "label": "Order needed",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-place",
+    "kind": "task",
+    "label": "Place order",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-wait",
+    "kind": "task",
+    "label": "Wait for payment",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-receive",
+    "kind": "task",
+    "label": "Receive goods",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-end",
+    "kind": "end",
+    "label": "Goods received",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "s-msg",
+    "kind": "message-start",
+    "label": "Order received",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-validate",
+    "kind": "task",
+    "label": "Validate order",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-stock",
+    "kind": "gateway",
+    "label": "In stock?",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-reserve",
+    "kind": "task",
+    "label": "Reserve items",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-request",
+    "kind": "task",
+    "label": "Request payment",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-timeout",
+    "kind": "timer",
+    "label": "Payment timeout",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-split",
+    "kind": "parallel-gateway",
+    "label": "Split",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-join",
+    "kind": "parallel-gateway",
+    "label": "Join",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-paid",
+    "kind": "gateway",
+    "label": "Payment ok?",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-cancel",
+    "kind": "end",
+    "label": "Order cancelled",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "f-pick",
+    "kind": "task",
+    "label": "Pick and pack",
+    "parentId": "lane:fulfilment"
+   },
+   {
+    "id": "f-handover",
+    "kind": "task",
+    "label": "Hand over",
+    "parentId": "lane:fulfilment"
+   },
+   {
+    "id": "f-notify",
+    "kind": "task",
+    "label": "Notify customer",
+    "parentId": "lane:fulfilment"
+   },
+   {
+    "id": "l-start",
+    "kind": "message-start",
+    "label": "Shipment request",
+    "parentId": "pool:logistics"
+   },
+   {
+    "id": "l-deliver",
+    "kind": "task",
+    "label": "Deliver",
+    "parentId": "pool:logistics"
+   },
+   {
+    "id": "l-end",
+    "kind": "message-end",
+    "label": "Delivered",
+    "parentId": "pool:logistics"
+   }
+  ],
+  "ports": []
+ },
+ "labels": [],
+ "layoutVersion": 1,
+ "omittedUnresolvedEdges": 0,
+ "optimization": {
+  "after": {
+   "area": 1816416,
+   "edgeNodeHits": 0,
+   "movement": 3532,
+   "projectedCrossings": 11,
+   "routeLength": 10075,
+   "routedCrossings": 5,
+   "sharedRoutePairs": 0,
+   "siblingOverlaps": 0
+  },
+  "before": {
+   "area": 1816416,
+   "edgeNodeHits": 0,
+   "movement": 0,
+   "projectedCrossings": 10,
+   "routeLength": 10610,
+   "routedCrossings": 20,
+   "sharedRoutePairs": 12,
+   "siblingOverlaps": 0
+  },
+  "candidatesEvaluated": 6,
+  "strategy": "forward-median-centered"
+ },
+ "recomputedContainers": [
+  "<root>",
+  "pool:customer",
+  "pool:logistics",
+  "pool:shop",
+  "lane:fulfilment",
+  "lane:sales"
+ ],
+ "resolvedPorts": [
+  {
+   "edgeId": "e1",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e1:source",
+   "nodeId": "c-start",
+   "position": {
+    "x": 138,
+    "y": 229
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e1",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e1:target",
+   "nodeId": "c-place",
+   "position": {
+    "x": 138,
+    "y": 293
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e10",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e10:source",
+   "nodeId": "s-request",
+   "position": {
+    "x": 1517,
+    "y": 734
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e10",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e10:target",
+   "nodeId": "s-paid",
+   "position": {
+    "x": 1736,
+    "y": 198
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e11",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e11:source",
+   "nodeId": "s-request",
+   "position": {
+    "x": 1562,
+    "y": 788
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e11",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e11:target",
+   "nodeId": "s-timeout",
+   "position": {
+    "x": 1532,
+    "y": 852
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e12",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e12:source",
+   "nodeId": "s-timeout",
+   "position": {
+    "x": 1592,
+    "y": 852
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e12",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e12:target",
+   "nodeId": "s-cancel",
+   "position": {
+    "x": 1460,
+    "y": 552
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e13",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e13:source",
+   "nodeId": "s-paid",
+   "position": {
+    "x": 1796,
+    "y": 198
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e13",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e13:target",
+   "nodeId": "s-request",
+   "position": {
+    "x": 1562,
+    "y": 734
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e14",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e14:source",
+   "nodeId": "s-paid",
+   "position": {
+    "x": 1676,
+    "y": 171
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e14",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e14:target",
+   "nodeId": "s-join",
+   "position": {
+    "x": 1448,
+    "y": 171
+   },
+   "side": "right"
+  },
+  {
+   "edgeId": "e15",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e15:source",
+   "nodeId": "f-pick",
+   "position": {
+    "x": 1066,
+    "y": 498
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e15",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e15:target",
+   "nodeId": "s-join",
+   "position": {
+    "x": 1358,
+    "y": 198
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e16",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e16:source",
+   "nodeId": "s-join",
+   "position": {
+    "x": 1268,
+    "y": 171
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e16",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e16:target",
+   "nodeId": "f-handover",
+   "position": {
+    "x": 748,
+    "y": 525
+   },
+   "side": "right"
+  },
+  {
+   "edgeId": "e17",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e17:source",
+   "nodeId": "f-handover",
+   "position": {
+    "x": 568,
+    "y": 525
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e17",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e17:target",
+   "nodeId": "l-start",
+   "position": {
+    "x": 228,
+    "y": 588
+   },
+   "side": "right"
+  },
+  {
+   "edgeId": "e18",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e18:source",
+   "nodeId": "l-start",
+   "position": {
+    "x": 138,
+    "y": 615
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e18",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e18:target",
+   "nodeId": "l-deliver",
+   "position": {
+    "x": 138,
+    "y": 679
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e19",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e19:source",
+   "nodeId": "l-deliver",
+   "position": {
+    "x": 138,
+    "y": 733
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e19",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e19:target",
+   "nodeId": "l-end",
+   "position": {
+    "x": 138,
+    "y": 797
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e2",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e2:source",
+   "nodeId": "c-place",
+   "position": {
+    "x": 228,
+    "y": 320
+   },
+   "side": "right"
+  },
+  {
+   "edgeId": "e2",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e2:target",
+   "nodeId": "s-msg",
+   "position": {
+    "x": 1472,
+    "y": 171
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e20",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e20:source",
+   "nodeId": "l-end",
+   "position": {
+    "x": 228,
+    "y": 824
+   },
+   "side": "right"
+  },
+  {
+   "edgeId": "e20",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e20:target",
+   "nodeId": "f-notify",
+   "position": {
+    "x": 772,
+    "y": 516
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e21",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e21:source",
+   "nodeId": "f-notify",
+   "position": {
+    "x": 772,
+    "y": 534
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e21",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e21:target",
+   "nodeId": "c-wait",
+   "position": {
+    "x": 432,
+    "y": 193
+   },
+   "side": "right"
+  },
+  {
+   "edgeId": "e22",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e22:source",
+   "nodeId": "c-wait",
+   "position": {
+    "x": 342,
+    "y": 229
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e22",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e22:target",
+   "nodeId": "c-receive",
+   "position": {
+    "x": 342,
+    "y": 293
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e23",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e23:source",
+   "nodeId": "c-receive",
+   "position": {
+    "x": 342,
+    "y": 347
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e23",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e23:target",
+   "nodeId": "c-end",
+   "position": {
+    "x": 240,
+    "y": 411
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e24",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e24:source",
+   "nodeId": "s-cancel",
+   "position": {
+    "x": 1370,
+    "y": 525
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e24",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e24:target",
+   "nodeId": "c-wait",
+   "position": {
+    "x": 432,
+    "y": 211
+   },
+   "side": "right"
+  },
+  {
+   "edgeId": "e3",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e3:source",
+   "nodeId": "s-msg",
+   "position": {
+    "x": 1562,
+    "y": 198
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e3",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e3:target",
+   "nodeId": "s-validate",
+   "position": {
+    "x": 1562,
+    "y": 262
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e4",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e4:source",
+   "nodeId": "s-validate",
+   "position": {
+    "x": 1562,
+    "y": 316
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e4",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e4:target",
+   "nodeId": "s-stock",
+   "position": {
+    "x": 1562,
+    "y": 380
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e5",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e5:source",
+   "nodeId": "s-stock",
+   "position": {
+    "x": 1532,
+    "y": 434
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e5",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e5:target",
+   "nodeId": "s-cancel",
+   "position": {
+    "x": 1460,
+    "y": 498
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e6",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e6:source",
+   "nodeId": "s-stock",
+   "position": {
+    "x": 1592,
+    "y": 434
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e6",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e6:target",
+   "nodeId": "s-reserve",
+   "position": {
+    "x": 1664,
+    "y": 498
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e7",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e7:source",
+   "nodeId": "s-reserve",
+   "position": {
+    "x": 1664,
+    "y": 552
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e7",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e7:target",
+   "nodeId": "s-split",
+   "position": {
+    "x": 1562,
+    "y": 616
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e8",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e8:source",
+   "nodeId": "s-split",
+   "position": {
+    "x": 1562,
+    "y": 670
+   },
+   "side": "bottom"
+  },
+  {
+   "edgeId": "e8",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e8:target",
+   "nodeId": "s-request",
+   "position": {
+    "x": 1607,
+    "y": 734
+   },
+   "side": "top"
+  },
+  {
+   "edgeId": "e9",
+   "endpoint": "source",
+   "explicit": false,
+   "id": "auto:e9:source",
+   "nodeId": "s-split",
+   "position": {
+    "x": 1472,
+    "y": 643
+   },
+   "side": "left"
+  },
+  {
+   "edgeId": "e9",
+   "endpoint": "target",
+   "explicit": false,
+   "id": "auto:e9:target",
+   "nodeId": "f-pick",
+   "position": {
+    "x": 1156,
+    "y": 525
+   },
+   "side": "right"
+  }
+ ],
+ "revision": 0,
+ "routes": [
+  {
+   "id": "e1",
+   "points": [
+    {
+     "x": 138,
+     "y": 229
+    },
+    {
+     "x": 138,
+     "y": 293
+    }
+   ]
+  },
+  {
+   "id": "e2",
+   "points": [
+    {
+     "x": 228,
+     "y": 320
+    },
+    {
+     "x": 234,
+     "y": 320
+    },
+    {
+     "x": 234,
+     "y": 138
+    },
+    {
+     "x": 1466,
+     "y": 138
+    },
+    {
+     "x": 1466,
+     "y": 171
+    },
+    {
+     "x": 1472,
+     "y": 171
+    }
+   ]
+  },
+  {
+   "id": "e3",
+   "points": [
+    {
+     "x": 1562,
+     "y": 198
+    },
+    {
+     "x": 1562,
+     "y": 262
+    }
+   ]
+  },
+  {
+   "id": "e4",
+   "points": [
+    {
+     "x": 1562,
+     "y": 316
+    },
+    {
+     "x": 1562,
+     "y": 380
+    }
+   ]
+  },
+  {
+   "id": "e5",
+   "points": [
+    {
+     "x": 1532,
+     "y": 434
+    },
+    {
+     "x": 1532,
+     "y": 466
+    },
+    {
+     "x": 1460,
+     "y": 466
+    },
+    {
+     "x": 1460,
+     "y": 498
+    }
+   ]
+  },
+  {
+   "id": "e6",
+   "points": [
+    {
+     "x": 1592,
+     "y": 434
+    },
+    {
+     "x": 1592,
+     "y": 466
+    },
+    {
+     "x": 1664,
+     "y": 466
+    },
+    {
+     "x": 1664,
+     "y": 498
+    }
+   ]
+  },
+  {
+   "id": "e7",
+   "points": [
+    {
+     "x": 1664,
+     "y": 552
+    },
+    {
+     "x": 1664,
+     "y": 584
+    },
+    {
+     "x": 1562,
+     "y": 584
+    },
+    {
+     "x": 1562,
+     "y": 616
+    }
+   ]
+  },
+  {
+   "id": "e8",
+   "points": [
+    {
+     "x": 1562,
+     "y": 670
+    },
+    {
+     "x": 1562,
+     "y": 702
+    },
+    {
+     "x": 1607,
+     "y": 702
+    },
+    {
+     "x": 1607,
+     "y": 734
+    }
+   ]
+  },
+  {
+   "id": "e9",
+   "points": [
+    {
+     "x": 1472,
+     "y": 643
+    },
+    {
+     "x": 1314,
+     "y": 643
+    },
+    {
+     "x": 1314,
+     "y": 525
+    },
+    {
+     "x": 1156,
+     "y": 525
+    }
+   ]
+  },
+  {
+   "id": "e10",
+   "points": [
+    {
+     "x": 1517,
+     "y": 734
+    },
+    {
+     "x": 1517,
+     "y": 728
+    },
+    {
+     "x": 1760,
+     "y": 728
+    },
+    {
+     "x": 1760,
+     "y": 204
+    },
+    {
+     "x": 1736,
+     "y": 204
+    },
+    {
+     "x": 1736,
+     "y": 198
+    }
+   ]
+  },
+  {
+   "id": "e11",
+   "points": [
+    {
+     "x": 1562,
+     "y": 788
+    },
+    {
+     "x": 1562,
+     "y": 820
+    },
+    {
+     "x": 1532,
+     "y": 820
+    },
+    {
+     "x": 1532,
+     "y": 852
+    }
+   ]
+  },
+  {
+   "id": "e12",
+   "points": [
+    {
+     "x": 1592,
+     "y": 852
+    },
+    {
+     "x": 1592,
+     "y": 846
+    },
+    {
+     "x": 1472,
+     "y": 846
+    },
+    {
+     "x": 1472,
+     "y": 558
+    },
+    {
+     "x": 1460,
+     "y": 558
+    },
+    {
+     "x": 1460,
+     "y": 552
+    }
+   ]
+  },
+  {
+   "id": "e13",
+   "points": [
+    {
+     "x": 1796,
+     "y": 198
+    },
+    {
+     "x": 1796,
+     "y": 734
+    },
+    {
+     "x": 1562,
+     "y": 734
+    },
+    {
+     "x": 1562,
+     "y": 728
+    },
+    {
+     "x": 1562,
+     "y": 734
+    }
+   ]
+  },
+  {
+   "id": "e14",
+   "points": [
+    {
+     "x": 1676,
+     "y": 171
+    },
+    {
+     "x": 1670,
+     "y": 171
+    },
+    {
+     "x": 1670,
+     "y": 198
+    },
+    {
+     "x": 1454,
+     "y": 198
+    },
+    {
+     "x": 1454,
+     "y": 171
+    },
+    {
+     "x": 1448,
+     "y": 171
+    }
+   ]
+  },
+  {
+   "id": "e15",
+   "points": [
+    {
+     "x": 1066,
+     "y": 498
+    },
+    {
+     "x": 1066,
+     "y": 348
+    },
+    {
+     "x": 1358,
+     "y": 348
+    },
+    {
+     "x": 1358,
+     "y": 198
+    }
+   ]
+  },
+  {
+   "id": "e16",
+   "points": [
+    {
+     "x": 1268,
+     "y": 171
+    },
+    {
+     "x": 760,
+     "y": 171
+    },
+    {
+     "x": 760,
+     "y": 525
+    },
+    {
+     "x": 748,
+     "y": 525
+    }
+   ]
+  },
+  {
+   "id": "e17",
+   "points": [
+    {
+     "x": 568,
+     "y": 525
+    },
+    {
+     "x": 398,
+     "y": 525
+    },
+    {
+     "x": 398,
+     "y": 588
+    },
+    {
+     "x": 228,
+     "y": 588
+    }
+   ]
+  },
+  {
+   "id": "e18",
+   "points": [
+    {
+     "x": 138,
+     "y": 615
+    },
+    {
+     "x": 138,
+     "y": 679
+    }
+   ]
+  },
+  {
+   "id": "e19",
+   "points": [
+    {
+     "x": 138,
+     "y": 733
+    },
+    {
+     "x": 138,
+     "y": 797
+    }
+   ]
+  },
+  {
+   "id": "e20",
+   "points": [
+    {
+     "x": 228,
+     "y": 824
+    },
+    {
+     "x": 766,
+     "y": 824
+    },
+    {
+     "x": 766,
+     "y": 516
+    },
+    {
+     "x": 772,
+     "y": 516
+    }
+   ]
+  },
+  {
+   "id": "e21",
+   "points": [
+    {
+     "x": 772,
+     "y": 534
+    },
+    {
+     "x": 766,
+     "y": 534
+    },
+    {
+     "x": 772,
+     "y": 534
+    },
+    {
+     "x": 772,
+     "y": 193
+    },
+    {
+     "x": 432,
+     "y": 193
+    }
+   ]
+  },
+  {
+   "id": "e22",
+   "points": [
+    {
+     "x": 342,
+     "y": 229
+    },
+    {
+     "x": 342,
+     "y": 293
+    }
+   ]
+  },
+  {
+   "id": "e23",
+   "points": [
+    {
+     "x": 342,
+     "y": 347
+    },
+    {
+     "x": 342,
+     "y": 379
+    },
+    {
+     "x": 240,
+     "y": 379
+    },
+    {
+     "x": 240,
+     "y": 411
+    }
+   ]
+  },
+  {
+   "id": "e24",
+   "points": [
+    {
+     "x": 1370,
+     "y": 525
+    },
+    {
+     "x": 1364,
+     "y": 525
+    },
+    {
+     "x": 1364,
+     "y": 198
+    },
+    {
+     "x": 438,
+     "y": 198
+    },
+    {
+     "x": 438,
+     "y": 211
+    },
+    {
+     "x": 432,
+     "y": 211
+    }
+   ]
+  }
+ ],
+ "routingIssues": [],
+ "schemaVersion": 1,
+ "sourceGraph": {
+  "containerDirections": {
+   "lane:fulfilment": "tb",
+   "lane:sales": "tb",
+   "pool:customer": "tb",
+   "pool:logistics": "tb",
+   "pool:shop": "lr"
+  },
+  "defaultDirection": "lr",
+  "edgePorts": [],
+  "edges": [
+   {
+    "id": "e1",
+    "kind": "sequence",
+    "source": "c-start",
+    "target": "c-place"
+   },
+   {
+    "id": "e2",
+    "kind": "message: order",
+    "source": "c-place",
+    "target": "s-msg"
+   },
+   {
+    "id": "e3",
+    "kind": "sequence",
+    "source": "s-msg",
+    "target": "s-validate"
+   },
+   {
+    "id": "e4",
+    "kind": "sequence",
+    "source": "s-validate",
+    "target": "s-stock"
+   },
+   {
+    "id": "e5",
+    "kind": "no",
+    "source": "s-stock",
+    "target": "s-cancel"
+   },
+   {
+    "id": "e6",
+    "kind": "yes",
+    "source": "s-stock",
+    "target": "s-reserve"
+   },
+   {
+    "id": "e7",
+    "kind": "sequence",
+    "source": "s-reserve",
+    "target": "s-split"
+   },
+   {
+    "id": "e8",
+    "kind": "sequence",
+    "source": "s-split",
+    "target": "s-request"
+   },
+   {
+    "id": "e9",
+    "kind": "sequence",
+    "source": "s-split",
+    "target": "f-pick"
+   },
+   {
+    "id": "e10",
+    "kind": "sequence",
+    "source": "s-request",
+    "target": "s-paid"
+   },
+   {
+    "id": "e11",
+    "kind": "boundary",
+    "source": "s-request",
+    "target": "s-timeout"
+   },
+   {
+    "id": "e12",
+    "kind": "sequence",
+    "source": "s-timeout",
+    "target": "s-cancel"
+   },
+   {
+    "id": "e13",
+    "kind": "retry",
+    "source": "s-paid",
+    "target": "s-request"
+   },
+   {
+    "id": "e14",
+    "kind": "yes",
+    "source": "s-paid",
+    "target": "s-join"
+   },
+   {
+    "id": "e15",
+    "kind": "sequence",
+    "source": "f-pick",
+    "target": "s-join"
+   },
+   {
+    "id": "e16",
+    "kind": "sequence",
+    "source": "s-join",
+    "target": "f-handover"
+   },
+   {
+    "id": "e17",
+    "kind": "message: shipment",
+    "source": "f-handover",
+    "target": "l-start"
+   },
+   {
+    "id": "e18",
+    "kind": "sequence",
+    "source": "l-start",
+    "target": "l-deliver"
+   },
+   {
+    "id": "e19",
+    "kind": "sequence",
+    "source": "l-deliver",
+    "target": "l-end"
+   },
+   {
+    "id": "e20",
+    "kind": "message: delivered",
+    "source": "l-end",
+    "target": "f-notify"
+   },
+   {
+    "id": "e21",
+    "kind": "message: notification",
+    "source": "f-notify",
+    "target": "c-wait"
+   },
+   {
+    "id": "e22",
+    "kind": "sequence",
+    "source": "c-wait",
+    "target": "c-receive"
+   },
+   {
+    "id": "e23",
+    "kind": "sequence",
+    "source": "c-receive",
+    "target": "c-end"
+   },
+   {
+    "id": "e24",
+    "kind": "message: cancelled",
+    "source": "s-cancel",
+    "target": "c-wait"
+   }
+  ],
+  "nodes": [
+   {
+    "id": "pool:customer",
+    "kind": "container",
+    "label": "Customer",
+    "parentId": null
+   },
+   {
+    "id": "pool:shop",
+    "kind": "container",
+    "label": "Online shop",
+    "parentId": null
+   },
+   {
+    "id": "lane:sales",
+    "kind": "container",
+    "label": "Sales",
+    "parentId": "pool:shop"
+   },
+   {
+    "id": "lane:fulfilment",
+    "kind": "container",
+    "label": "Fulfilment",
+    "parentId": "pool:shop"
+   },
+   {
+    "id": "pool:logistics",
+    "kind": "container",
+    "label": "Logistics provider",
+    "parentId": null
+   },
+   {
+    "id": "c-start",
+    "kind": "start",
+    "label": "Order needed",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-place",
+    "kind": "task",
+    "label": "Place order",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-wait",
+    "kind": "task",
+    "label": "Wait for payment",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-receive",
+    "kind": "task",
+    "label": "Receive goods",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "c-end",
+    "kind": "end",
+    "label": "Goods received",
+    "parentId": "pool:customer"
+   },
+   {
+    "id": "s-msg",
+    "kind": "message-start",
+    "label": "Order received",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-validate",
+    "kind": "task",
+    "label": "Validate order",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-stock",
+    "kind": "gateway",
+    "label": "In stock?",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-reserve",
+    "kind": "task",
+    "label": "Reserve items",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-request",
+    "kind": "task",
+    "label": "Request payment",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-timeout",
+    "kind": "timer",
+    "label": "Payment timeout",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-split",
+    "kind": "parallel-gateway",
+    "label": "Split",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-join",
+    "kind": "parallel-gateway",
+    "label": "Join",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-paid",
+    "kind": "gateway",
+    "label": "Payment ok?",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "s-cancel",
+    "kind": "end",
+    "label": "Order cancelled",
+    "parentId": "lane:sales"
+   },
+   {
+    "id": "f-pick",
+    "kind": "task",
+    "label": "Pick and pack",
+    "parentId": "lane:fulfilment"
+   },
+   {
+    "id": "f-handover",
+    "kind": "task",
+    "label": "Hand over",
+    "parentId": "lane:fulfilment"
+   },
+   {
+    "id": "f-notify",
+    "kind": "task",
+    "label": "Notify customer",
+    "parentId": "lane:fulfilment"
+   },
+   {
+    "id": "l-start",
+    "kind": "message-start",
+    "label": "Shipment request",
+    "parentId": "pool:logistics"
+   },
+   {
+    "id": "l-deliver",
+    "kind": "task",
+    "label": "Deliver",
+    "parentId": "pool:logistics"
+   },
+   {
+    "id": "l-end",
+    "kind": "message-end",
+    "label": "Delivered",
+    "parentId": "pool:logistics"
+   }
+  ],
+  "ports": []
+ }
+}

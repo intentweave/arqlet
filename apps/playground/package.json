@@ -1,0 +1,19 @@
+{
+  "name": "@arqlet/playground",
+  "version": "0.0.0",
+  "private": true,
+  "license": "(MIT OR Apache-2.0)",
+  "type": "module",
+  "description": "Demo UI, comparison view and the curation editor (TypeScript, compiled to generated/editor).",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test editor/*.test.mjs"
+  },
+  "dependencies": {
+    "@arqlet/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

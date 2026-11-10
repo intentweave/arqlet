@@ -1,0 +1,374 @@
+<svg height="1014" viewBox="-30 -30 1964 1014" width="1964">
+  <defs>
+    <marker id="lw-arrow-N" markerHeight="8" markerUnits="userSpaceOnUse" markerWidth="8" orient="auto-start-reverse" refX="9" refY="5" viewBox="0 0 10 10">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#73bba7"/>
+    </marker>
+  </defs>
+  <rect data-container-id="pool:customer" fill="#142133" height="362" rx="10" stroke="#344961" width="432" x="24" y="127"/>
+  <rect data-container-id="pool:shop" fill="#142133" height="906" rx="10" stroke="#344961" width="1384" x="520" y="48"/>
+  <rect data-container-id="pool:logistics" fill="#142133" height="362" rx="10" stroke="#344961" width="228" x="24" y="513"/>
+  <rect data-container-id="lane:sales" fill="#142133" height="834" rx="10" stroke="#344961" width="636" x="1244" y="96"/>
+  <rect data-container-id="lane:fulfilment" fill="#142133" height="126" rx="10" stroke="#344961" width="636" x="544" y="450"/>
+  <polyline data-route-id="e1" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="138,229 138,293" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e2" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="228,320 234,320 234,138 1466,138 1466,171 1472,171" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e3" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1562,198 1562,262" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e4" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1562,316 1562,380" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e5" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1532,434 1532,466 1460,466 1460,498" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e6" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1592,434 1592,466 1664,466 1664,498" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e7" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1664,552 1664,584 1562,584 1562,616" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e8" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1562,670 1562,702 1607,702 1607,734" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e9" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1472,643 1314,643 1314,525 1156,525" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e10" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1517,734 1517,728 1760,728 1760,204 1736,204 1736,198" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e11" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1562,788 1562,820 1532,820 1532,852" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e12" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1592,852 1592,846 1472,846 1472,558 1460,558 1460,552" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e13" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1796,198 1796,734 1562,734 1562,728 1562,734" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e14" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1676,171 1670,171 1670,198 1454,198 1454,171 1448,171" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e15" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1066,498 1066,348 1358,348 1358,198" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e16" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1268,171 760,171 760,525 748,525" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e17" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="568,525 398,525 398,588 228,588" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e18" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="138,615 138,679" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e19" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="138,733 138,797" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e20" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="228,824 766,824 766,516 772,516" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e21" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="772,534 766,534 772,534 772,193 432,193" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e22" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="342,229 342,293" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e23" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="342,347 342,379 240,379 240,411" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <polyline data-route-id="e24" fill="none" marker-end="url(#lw-arrow-N)" pointer-events="none" points="1370,525 1364,525 1364,198 438,198 438,211 432,211" stroke="#73bba7" stroke-opacity="0.75" stroke-width="1.6"/>
+  <text data-container-id="pool:customer" fill="#9eb8d1" font-size="14" role="button" style="cursor:pointer" tabindex="0" x="36" y="152">▾ Customer</text>
+  <text data-container-id="pool:shop" fill="#9eb8d1" font-size="14" role="button" style="cursor:pointer" tabindex="0" x="532" y="73">▾ Online shop</text>
+  <text data-container-id="pool:logistics" fill="#9eb8d1" font-size="14" role="button" style="cursor:pointer" tabindex="0" x="36" y="538">▾ Logistics provider</text>
+  <text data-container-id="lane:sales" fill="#9eb8d1" font-size="14" role="button" style="cursor:pointer" tabindex="0" x="1256" y="121">▾ Sales</text>
+  <text data-container-id="lane:fulfilment" fill="#9eb8d1" font-size="14" role="button" style="cursor:pointer" tabindex="0" x="556" y="475">▾ Fulfilment</text>
+  <g aria-label="Order needed" class="node" data-node-id="c-start" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="48" y="175"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="48" y="175"/>
+    <text fill="#edf5ff" font-size="13" x="58" y="207">Order needed</text>
+    <title>c-start</title>
+  </g>
+  <g aria-label="Place order" class="node" data-node-id="c-place" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="48" y="293"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="48" y="293"/>
+    <text fill="#edf5ff" font-size="13" x="58" y="325">Place order</text>
+    <title>c-place</title>
+  </g>
+  <g aria-label="Wait for payment" class="node" data-node-id="c-wait" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="252" y="175"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="252" y="175"/>
+    <text fill="#edf5ff" font-size="13" x="262" y="207">Wait for payment</text>
+    <title>c-wait</title>
+  </g>
+  <g aria-label="Receive goods" class="node" data-node-id="c-receive" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="252" y="293"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="252" y="293"/>
+    <text fill="#edf5ff" font-size="13" x="262" y="325">Receive goods</text>
+    <title>c-receive</title>
+  </g>
+  <g aria-label="Goods received" class="node" data-node-id="c-end" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="150" y="411"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="150" y="411"/>
+    <text fill="#edf5ff" font-size="13" x="160" y="443">Goods received</text>
+    <title>c-end</title>
+  </g>
+  <g aria-label="Order received" class="node" data-node-id="s-msg" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1472" y="144"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1472" y="144"/>
+    <text fill="#edf5ff" font-size="13" x="1482" y="176">Order received</text>
+    <title>s-msg</title>
+  </g>
+  <g aria-label="Validate order" class="node" data-node-id="s-validate" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1472" y="262"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1472" y="262"/>
+    <text fill="#edf5ff" font-size="13" x="1482" y="294">Validate order</text>
+    <title>s-validate</title>
+  </g>
+  <g aria-label="In stock?" class="node" data-node-id="s-stock" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1472" y="380"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1472" y="380"/>
+    <text fill="#edf5ff" font-size="13" x="1482" y="412">In stock?</text>
+    <title>s-stock</title>
+  </g>
+  <g aria-label="Reserve items" class="node" data-node-id="s-reserve" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1574" y="498"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1574" y="498"/>
+    <text fill="#edf5ff" font-size="13" x="1584" y="530">Reserve items</text>
+    <title>s-reserve</title>
+  </g>
+  <g aria-label="Request payment" class="node" data-node-id="s-request" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1472" y="734"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1472" y="734"/>
+    <text fill="#edf5ff" font-size="13" x="1482" y="766">Request payment</text>
+    <title>s-request</title>
+  </g>
+  <g aria-label="Payment timeout" class="node" data-node-id="s-timeout" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1472" y="852"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1472" y="852"/>
+    <text fill="#edf5ff" font-size="13" x="1482" y="884">Payment timeout</text>
+    <title>s-timeout</title>
+  </g>
+  <g aria-label="Split" class="node" data-node-id="s-split" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1472" y="616"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1472" y="616"/>
+    <text fill="#edf5ff" font-size="13" x="1482" y="648">Split</text>
+    <title>s-split</title>
+  </g>
+  <g aria-label="Join" class="node" data-node-id="s-join" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1268" y="144"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1268" y="144"/>
+    <text fill="#edf5ff" font-size="13" x="1278" y="176">Join</text>
+    <title>s-join</title>
+  </g>
+  <g aria-label="Payment ok?" class="node" data-node-id="s-paid" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1676" y="144"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1676" y="144"/>
+    <text fill="#edf5ff" font-size="13" x="1686" y="176">Payment ok?</text>
+    <title>s-paid</title>
+  </g>
+  <g aria-label="Order cancelled" class="node" data-node-id="s-cancel" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="1370" y="498"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="1370" y="498"/>
+    <text fill="#edf5ff" font-size="13" x="1380" y="530">Order cancelled</text>
+    <title>s-cancel</title>
+  </g>
+  <g aria-label="Pick and pack" class="node" data-node-id="f-pick" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="976" y="498"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="976" y="498"/>
+    <text fill="#edf5ff" font-size="13" x="986" y="530">Pick and pack</text>
+    <title>f-pick</title>
+  </g>
+  <g aria-label="Hand over" class="node" data-node-id="f-handover" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="568" y="498"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="568" y="498"/>
+    <text fill="#edf5ff" font-size="13" x="578" y="530">Hand over</text>
+    <title>f-handover</title>
+  </g>
+  <g aria-label="Notify customer" class="node" data-node-id="f-notify" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="772" y="498"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="772" y="498"/>
+    <text fill="#edf5ff" font-size="13" x="782" y="530">Notify customer</text>
+    <title>f-notify</title>
+  </g>
+  <g aria-label="Shipment request" class="node" data-node-id="l-start" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="48" y="561"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="48" y="561"/>
+    <text fill="#edf5ff" font-size="13" x="58" y="593">Shipment request</text>
+    <title>l-start</title>
+  </g>
+  <g aria-label="Deliver" class="node" data-node-id="l-deliver" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="48" y="679"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="48" y="679"/>
+    <text fill="#edf5ff" font-size="13" x="58" y="711">Deliver</text>
+    <title>l-deliver</title>
+  </g>
+  <g aria-label="Delivered" class="node" data-node-id="l-end" role="button" tabindex="0">
+    <rect class="lw-hit" fill="transparent" height="54" width="180" x="48" y="797"/>
+    <rect fill="#24364b" height="54" rx="7" stroke="#4c6682" width="180" x="48" y="797"/>
+    <text fill="#edf5ff" font-size="13" x="58" y="829">Delivered</text>
+    <title>l-end</title>
+  </g>
+  <circle cx="138" cy="229" data-port-id="auto:e1:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e1:source · bottom</title>
+  </circle>
+  <circle cx="138" cy="293" data-port-id="auto:e1:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e1:target · top</title>
+  </circle>
+  <circle cx="1517" cy="734" data-port-id="auto:e10:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e10:source · top</title>
+  </circle>
+  <circle cx="1736" cy="198" data-port-id="auto:e10:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e10:target · bottom</title>
+  </circle>
+  <circle cx="1562" cy="788" data-port-id="auto:e11:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e11:source · bottom</title>
+  </circle>
+  <circle cx="1532" cy="852" data-port-id="auto:e11:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e11:target · top</title>
+  </circle>
+  <circle cx="1592" cy="852" data-port-id="auto:e12:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e12:source · top</title>
+  </circle>
+  <circle cx="1460" cy="552" data-port-id="auto:e12:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e12:target · bottom</title>
+  </circle>
+  <circle cx="1796" cy="198" data-port-id="auto:e13:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e13:source · bottom</title>
+  </circle>
+  <circle cx="1562" cy="734" data-port-id="auto:e13:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e13:target · top</title>
+  </circle>
+  <circle cx="1676" cy="171" data-port-id="auto:e14:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e14:source · left</title>
+  </circle>
+  <circle cx="1448" cy="171" data-port-id="auto:e14:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e14:target · right</title>
+  </circle>
+  <circle cx="1066" cy="498" data-port-id="auto:e15:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e15:source · top</title>
+  </circle>
+  <circle cx="1358" cy="198" data-port-id="auto:e15:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e15:target · bottom</title>
+  </circle>
+  <circle cx="1268" cy="171" data-port-id="auto:e16:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e16:source · left</title>
+  </circle>
+  <circle cx="748" cy="525" data-port-id="auto:e16:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e16:target · right</title>
+  </circle>
+  <circle cx="568" cy="525" data-port-id="auto:e17:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e17:source · left</title>
+  </circle>
+  <circle cx="228" cy="588" data-port-id="auto:e17:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e17:target · right</title>
+  </circle>
+  <circle cx="138" cy="615" data-port-id="auto:e18:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e18:source · bottom</title>
+  </circle>
+  <circle cx="138" cy="679" data-port-id="auto:e18:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e18:target · top</title>
+  </circle>
+  <circle cx="138" cy="733" data-port-id="auto:e19:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e19:source · bottom</title>
+  </circle>
+  <circle cx="138" cy="797" data-port-id="auto:e19:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e19:target · top</title>
+  </circle>
+  <circle cx="228" cy="320" data-port-id="auto:e2:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e2:source · right</title>
+  </circle>
+  <circle cx="1472" cy="171" data-port-id="auto:e2:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e2:target · left</title>
+  </circle>
+  <circle cx="228" cy="824" data-port-id="auto:e20:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e20:source · right</title>
+  </circle>
+  <circle cx="772" cy="516" data-port-id="auto:e20:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e20:target · left</title>
+  </circle>
+  <circle cx="772" cy="534" data-port-id="auto:e21:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e21:source · left</title>
+  </circle>
+  <circle cx="432" cy="193" data-port-id="auto:e21:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e21:target · right</title>
+  </circle>
+  <circle cx="342" cy="229" data-port-id="auto:e22:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e22:source · bottom</title>
+  </circle>
+  <circle cx="342" cy="293" data-port-id="auto:e22:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e22:target · top</title>
+  </circle>
+  <circle cx="342" cy="347" data-port-id="auto:e23:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e23:source · bottom</title>
+  </circle>
+  <circle cx="240" cy="411" data-port-id="auto:e23:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e23:target · top</title>
+  </circle>
+  <circle cx="1370" cy="525" data-port-id="auto:e24:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e24:source · left</title>
+  </circle>
+  <circle cx="432" cy="211" data-port-id="auto:e24:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e24:target · right</title>
+  </circle>
+  <circle cx="1562" cy="198" data-port-id="auto:e3:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e3:source · bottom</title>
+  </circle>
+  <circle cx="1562" cy="262" data-port-id="auto:e3:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e3:target · top</title>
+  </circle>
+  <circle cx="1562" cy="316" data-port-id="auto:e4:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e4:source · bottom</title>
+  </circle>
+  <circle cx="1562" cy="380" data-port-id="auto:e4:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e4:target · top</title>
+  </circle>
+  <circle cx="1532" cy="434" data-port-id="auto:e5:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e5:source · bottom</title>
+  </circle>
+  <circle cx="1460" cy="498" data-port-id="auto:e5:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e5:target · top</title>
+  </circle>
+  <circle cx="1592" cy="434" data-port-id="auto:e6:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e6:source · bottom</title>
+  </circle>
+  <circle cx="1664" cy="498" data-port-id="auto:e6:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e6:target · top</title>
+  </circle>
+  <circle cx="1664" cy="552" data-port-id="auto:e7:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e7:source · bottom</title>
+  </circle>
+  <circle cx="1562" cy="616" data-port-id="auto:e7:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e7:target · top</title>
+  </circle>
+  <circle cx="1562" cy="670" data-port-id="auto:e8:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e8:source · bottom</title>
+  </circle>
+  <circle cx="1607" cy="734" data-port-id="auto:e8:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e8:target · top</title>
+  </circle>
+  <circle cx="1472" cy="643" data-port-id="auto:e9:source" fill="#7ee1bc" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e9:source · left</title>
+  </circle>
+  <circle cx="1156" cy="525" data-port-id="auto:e9:target" fill="#9dbaff" pointer-events="none" r="3" stroke="#142133" stroke-width="1">
+    <title>auto:e9:target · right</title>
+  </circle>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="1241" y="135">
+    <title>e2 → lane:sales</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="453" y="135">
+    <title>e2 → pool:customer</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="517" y="135">
+    <title>e2 → pool:shop</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="1177" y="522">
+    <title>e9 → lane:fulfilment</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="1241" y="522">
+    <title>e9 → lane:sales</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="1063" y="447">
+    <title>e15 → lane:fulfilment</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="1241" y="345">
+    <title>e15 → lane:sales</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="757" y="447">
+    <title>e16 → lane:fulfilment</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="1241" y="168">
+    <title>e16 → lane:sales</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="541" y="522">
+    <title>e17 → lane:fulfilment</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="249" y="585">
+    <title>e17 → pool:logistics</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="517" y="522">
+    <title>e17 → pool:shop</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="763" y="573">
+    <title>e20 → lane:fulfilment</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="249" y="821">
+    <title>e20 → pool:logistics</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="517" y="821">
+    <title>e20 → pool:shop</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="769" y="447">
+    <title>e21 → lane:fulfilment</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="453" y="190">
+    <title>e21 → pool:customer</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="517" y="190">
+    <title>e21 → pool:shop</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="1241" y="195">
+    <title>e24 → lane:sales</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="453" y="195">
+    <title>e24 → pool:customer</title>
+  </rect>
+  <rect fill="#edc477" height="6" pointer-events="none" width="6" x="517" y="195">
+    <title>e24 → pool:shop</title>
+  </rect>
+</svg>

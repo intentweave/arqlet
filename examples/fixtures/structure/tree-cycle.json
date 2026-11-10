@@ -1,0 +1,44 @@
+{
+  "containerDirections": {},
+  "nodes": [
+    {
+      "id": "a",
+      "kind": "symbol",
+      "label": "a",
+      "parentId": null
+    },
+    {
+      "id": "b",
+      "kind": "symbol",
+      "label": "b",
+      "parentId": null
+    },
+    {
+      "id": "c",
+      "kind": "symbol",
+      "label": "c",
+      "parentId": null
+    }
+  ],
+  "edges": [
+    {
+      "id": "1",
+      "kind": "flow",
+      "source": "a",
+      "target": "b"
+    },
+    {
+      "id": "2",
+      "kind": "flow",
+      "source": "b",
+      "target": "c"
+    },
+    {
+      "id": "3",
+      "kind": "flow",
+      "source": "c",
+      "target": "a"
+    }
+  ],
+  "defaultStrategy": "tree"
+}

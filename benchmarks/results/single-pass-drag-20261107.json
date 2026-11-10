@@ -1,0 +1,1285 @@
+{
+ "kind": "single-pass-edits",
+ "generatedAt": "2026-11-07T11:26:22.604Z",
+ "environment": {
+  "cpu": "Apple M3",
+  "logicalCpus": 8,
+  "os": "darwin",
+  "arch": "arm64",
+  "node": "v24.21.0",
+  "revision": "b77ca748abac1922e14e7898935c22d6f2c3220d",
+  "load": [
+   3.11669921875,
+   3.5625,
+   3.24267578125
+  ]
+ },
+ "note": "One import per view and arm; each operation starts from that import.",
+ "cases": [
+  {
+   "name": "layerweave-code",
+   "nodes": 80,
+   "edges": 116,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 77,
+      "moved": 4,
+      "median": 0,
+      "max": 232,
+      "singlePass": false
+     },
+     "shape": {
+      "nodes": 77,
+      "moved": 4,
+      "median": 0,
+      "max": 108,
+      "singlePass": false
+     },
+     "measure": {
+      "nodes": 77,
+      "moved": 4,
+      "median": 0,
+      "max": 62,
+      "singlePass": false
+     },
+     "move": {
+      "nodes": 77,
+      "moved": 75,
+      "median": 1369,
+      "max": 2502,
+      "singlePass": false
+     },
+     "dragRelease": {
+      "nodes": 80,
+      "moved": 4,
+      "median": 0,
+      "max": 18,
+      "singlePass": false,
+      "orderHeld": false
+     },
+     "pin": {
+      "nodes": 77,
+      "moved": 75,
+      "median": 1909,
+      "max": 2598,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "refine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "structuredRefine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "restore": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "toggle": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "direction": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "routingStraight": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of crate:layout refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 77,
+      "moved": 51,
+      "median": 2,
+      "max": 246,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 77,
+      "moved": 66,
+      "median": 96,
+      "max": 240,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 77,
+      "moved": 25,
+      "median": 0,
+      "max": 82,
+      "singlePass": true
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "dragRelease": {
+      "error": "Fixed-order channel growth does not support pinned nodes"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "toggle": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "direction": {
+      "error": "Fixed-order channel growth requires one positive flow axis"
+     },
+     "routingStraight": {
+      "error": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of crate:layout refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    },
+    "auto": {
+     "add": {
+      "nodes": 77,
+      "moved": 51,
+      "median": 2,
+      "max": 246,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 77,
+      "moved": 66,
+      "median": 96,
+      "max": 240,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 77,
+      "moved": 25,
+      "median": 0,
+      "max": 82,
+      "singlePass": true
+     },
+     "move": {
+      "nodes": 77,
+      "moved": 25,
+      "median": 0,
+      "max": 22,
+      "singlePass": true
+     },
+     "dragRelease": {
+      "nodes": 80,
+      "moved": 79,
+      "median": 196,
+      "max": 3330,
+      "singlePass": true,
+      "orderHeld": true
+     },
+     "pin": {
+      "nodes": 77,
+      "moved": 75,
+      "median": 1802,
+      "max": 3090,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 80,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "toggle": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "direction": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "routingStraight": {
+      "nodes": 0,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of crate:layout refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    }
+   }
+  },
+  {
+   "name": "petri-net",
+   "nodes": 24,
+   "edges": 41,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 23,
+      "moved": 21,
+      "median": 30,
+      "max": 106,
+      "singlePass": false
+     },
+     "shape": {
+      "nodes": 23,
+      "moved": 22,
+      "median": 3,
+      "max": 16,
+      "singlePass": false
+     },
+     "measure": {
+      "nodes": 23,
+      "moved": 22,
+      "median": 7,
+      "max": 96,
+      "singlePass": false
+     },
+     "move": {
+      "nodes": 23,
+      "moved": 23,
+      "median": 258,
+      "max": 801,
+      "singlePass": false
+     },
+     "dragRelease": {
+      "nodes": 24,
+      "moved": 24,
+      "median": 258,
+      "max": 801,
+      "singlePass": false,
+      "orderHeld": true
+     },
+     "pin": {
+      "nodes": 23,
+      "moved": 23,
+      "median": 386,
+      "max": 937,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "refine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "structuredRefine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "restore": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 23,
+      "moved": 16,
+      "median": 2,
+      "max": 48,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 23,
+      "moved": 19,
+      "median": 5,
+      "max": 108,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 23,
+      "moved": 19,
+      "median": 9,
+      "max": 82,
+      "singlePass": true
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "dragRelease": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     }
+    },
+    "auto": {
+     "add": {
+      "nodes": 23,
+      "moved": 16,
+      "median": 2,
+      "max": 48,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 23,
+      "moved": 19,
+      "median": 5,
+      "max": 108,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 23,
+      "moved": 19,
+      "median": 9,
+      "max": 82,
+      "singlePass": true
+     },
+     "move": {
+      "nodes": 23,
+      "moved": 23,
+      "median": 50,
+      "max": 75,
+      "singlePass": true
+     },
+     "dragRelease": {
+      "nodes": 24,
+      "moved": 24,
+      "median": 72,
+      "max": 567,
+      "singlePass": true,
+      "orderHeld": true
+     },
+     "pin": {
+      "nodes": 23,
+      "moved": 23,
+      "median": 395,
+      "max": 1057,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 24,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     }
+    }
+   }
+  },
+  {
+   "name": "state-tcp",
+   "nodes": 11,
+   "edges": 19,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 99,
+      "max": 148,
+      "singlePass": false
+     },
+     "shape": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 108,
+      "max": 108,
+      "singlePass": false
+     },
+     "measure": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 80,
+      "max": 80,
+      "singlePass": false
+     },
+     "move": {
+      "nodes": 10,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "dragRelease": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false,
+      "orderHeld": false
+     },
+     "pin": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 117,
+      "max": 217,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "refine": {
+      "nodes": 11,
+      "moved": 11,
+      "median": 44,
+      "max": 45,
+      "singlePass": false
+     },
+     "structuredRefine": {
+      "nodes": 11,
+      "moved": 11,
+      "median": 44,
+      "max": 45,
+      "singlePass": false
+     },
+     "restore": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 10,
+      "moved": 9,
+      "median": 15,
+      "max": 29,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 108,
+      "max": 108,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 80,
+      "max": 80,
+      "singlePass": true
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "dragRelease": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     }
+    },
+    "auto": {
+     "add": {
+      "nodes": 10,
+      "moved": 9,
+      "median": 15,
+      "max": 29,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 108,
+      "max": 108,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 10,
+      "moved": 10,
+      "median": 80,
+      "max": 80,
+      "singlePass": true
+     },
+     "move": {
+      "nodes": 10,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "dragRelease": {
+      "nodes": 11,
+      "moved": 8,
+      "median": 63,
+      "max": 129,
+      "singlePass": true,
+      "orderHeld": true
+     },
+     "pin": {
+      "nodes": 10,
+      "moved": 7,
+      "median": 44,
+      "max": 153,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 11,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     }
+    }
+   }
+  },
+  {
+   "name": "workflow-dag, uniform",
+   "nodes": 72,
+   "edges": 125,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 298,
+      "max": 488,
+      "singlePass": false
+     },
+     "shape": {
+      "nodes": 70,
+      "moved": 14,
+      "median": 0,
+      "max": 37,
+      "singlePass": false
+     },
+     "measure": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 80,
+      "max": 86,
+      "singlePass": false
+     },
+     "move": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 77,
+      "max": 508,
+      "singlePass": false
+     },
+     "dragRelease": {
+      "nodes": 72,
+      "moved": 72,
+      "median": 77,
+      "max": 508,
+      "singlePass": false,
+      "orderHeld": true
+     },
+     "pin": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 115,
+      "max": 450,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "refine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "structuredRefine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "restore": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "toggle": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 103,
+      "max": 306,
+      "singlePass": false
+     },
+     "direction": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 1453,
+      "max": 1497,
+      "singlePass": false
+     },
+     "routingStraight": {
+      "nodes": 63,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "strategyTree": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 95,
+      "max": 309,
+      "singlePass": false
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 292,
+      "max": 557,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 30,
+      "max": 76,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 70,
+      "moved": 64,
+      "median": 98,
+      "max": 104,
+      "singlePass": true
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "dragRelease": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "toggle": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 199,
+      "max": 665,
+      "singlePass": true
+     },
+     "direction": {
+      "error": "Fixed-order channel growth requires one positive flow axis"
+     },
+     "routingStraight": {
+      "error": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+     },
+     "strategyTree": {
+      "error": "Fixed-order channel growth requires every node in its parent plan"
+     }
+    },
+    "auto": {
+     "add": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 292,
+      "max": 557,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 30,
+      "max": 76,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 70,
+      "moved": 64,
+      "median": 98,
+      "max": 104,
+      "singlePass": true
+     },
+     "move": {
+      "nodes": 70,
+      "moved": 62,
+      "median": 12,
+      "max": 18,
+      "singlePass": true
+     },
+     "dragRelease": {
+      "nodes": 72,
+      "moved": 72,
+      "median": 389,
+      "max": 995,
+      "singlePass": true,
+      "orderHeld": true
+     },
+     "pin": {
+      "nodes": 70,
+      "moved": 70,
+      "median": 266,
+      "max": 644,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 72,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "toggle": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 199,
+      "max": 665,
+      "singlePass": true
+     },
+     "direction": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 1461,
+      "max": 1581,
+      "singlePass": false
+     },
+     "routingStraight": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 138,
+      "max": 635,
+      "singlePass": false
+     },
+     "strategyTree": {
+      "nodes": 63,
+      "moved": 63,
+      "median": 184,
+      "max": 619,
+      "singlePass": false
+     }
+    }
+   }
+  },
+  {
+   "name": "org-chart, uniform",
+   "nodes": 104,
+   "edges": 82,
+   "arms": {
+    "default": {
+     "add": {
+      "nodes": 103,
+      "moved": 103,
+      "median": 937,
+      "max": 937,
+      "singlePass": false
+     },
+     "shape": {
+      "nodes": 103,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "measure": {
+      "nodes": 103,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "move": {
+      "nodes": 103,
+      "moved": 103,
+      "median": 1654,
+      "max": 5485,
+      "singlePass": false
+     },
+     "dragRelease": {
+      "nodes": 104,
+      "moved": 104,
+      "median": 2146,
+      "max": 3870,
+      "singlePass": false,
+      "orderHeld": false
+     },
+     "pin": {
+      "nodes": 103,
+      "moved": 103,
+      "median": 3693,
+      "max": 6747,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "refine": {
+      "nodes": 104,
+      "moved": 104,
+      "median": 971,
+      "max": 1303,
+      "singlePass": false
+     },
+     "structuredRefine": {
+      "nodes": 104,
+      "moved": 104,
+      "median": 971,
+      "max": 1303,
+      "singlePass": false
+     },
+     "restore": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "toggle": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 1223,
+      "max": 1677,
+      "singlePass": false
+     },
+     "direction": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 2312,
+      "max": 4885,
+      "singlePass": false
+     },
+     "routingStraight": {
+      "nodes": 65,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": false
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of div-0 refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    },
+    "singlePass": {
+     "add": {
+      "nodes": 103,
+      "moved": 48,
+      "median": 0,
+      "max": 204,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 103,
+      "moved": 83,
+      "median": 18,
+      "max": 18,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 103,
+      "moved": 83,
+      "median": 36,
+      "max": 36,
+      "singlePass": true
+     },
+     "move": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "dragRelease": {
+      "error": "Fixed-order channel growth does not support pinned nodes"
+     },
+     "pin": {
+      "error": "Abstract routing requires unflattened hierarchical placement and default orthogonal routing without a view budget"
+     },
+     "settle": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "toggle": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 2465,
+      "max": 5292,
+      "singlePass": true
+     },
+     "direction": {
+      "error": "Fixed-order channel growth requires one positive flow axis"
+     },
+     "routingStraight": {
+      "error": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of div-0 refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    },
+    "auto": {
+     "add": {
+      "nodes": 103,
+      "moved": 48,
+      "median": 0,
+      "max": 204,
+      "singlePass": true
+     },
+     "shape": {
+      "nodes": 103,
+      "moved": 83,
+      "median": 18,
+      "max": 18,
+      "singlePass": true
+     },
+     "measure": {
+      "nodes": 103,
+      "moved": 83,
+      "median": 36,
+      "max": 36,
+      "singlePass": true
+     },
+     "move": {
+      "nodes": 103,
+      "moved": 20,
+      "median": 0,
+      "max": 951,
+      "singlePass": true
+     },
+     "dragRelease": {
+      "nodes": 104,
+      "moved": 103,
+      "median": 298,
+      "max": 1287,
+      "singlePass": true,
+      "orderHeld": true
+     },
+     "pin": {
+      "nodes": 103,
+      "moved": 103,
+      "median": 603,
+      "max": 3669,
+      "singlePass": false
+     },
+     "settle": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "refine": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "structuredRefine": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "restore": {
+      "nodes": 104,
+      "moved": 0,
+      "median": 0,
+      "max": 0,
+      "singlePass": true
+     },
+     "toggle": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 2465,
+      "max": 5292,
+      "singlePass": true
+     },
+     "direction": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 1334,
+      "max": 3921,
+      "singlePass": false
+     },
+     "routingStraight": {
+      "nodes": 65,
+      "moved": 65,
+      "median": 1613,
+      "max": 5745,
+      "singlePass": false
+     },
+     "strategyTree": {
+      "error": "the tree arrangement of div-0 refuses parallel or antiparallel links: the children do not form a tree"
+     }
+    }
+   }
+  }
+ ]
+}

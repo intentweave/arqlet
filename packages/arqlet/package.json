@@ -1,0 +1,57 @@
+{
+  "name": "arqlet",
+  "version": "0.1.0",
+  "description": "Incremental graph layout for nested graphs with ports, in the browser and Node via WebAssembly: one entry point for the Arqlet engine, its ELK-style call and the SVG and React Flow viewers. Prototype; the API is provisional.",
+  "keywords": [
+    "graph",
+    "layout",
+    "graph-layout",
+    "diagram",
+    "wasm",
+    "elk",
+    "incremental",
+    "react-flow"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Benjamin Becker",
+  "homepage": "https://github.com/intentweave/arqlet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intentweave/arqlet.git",
+    "directory": "packages/arqlet"
+  },
+  "bugs": {
+    "url": "https://github.com/intentweave/arqlet/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepack": "node ../../tools/npm-prepack.mjs",
+    "test": "node --test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@arqlet/contracts": "workspace:^",
+    "@arqlet/engine-client": "workspace:^",
+    "@arqlet/viewer": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

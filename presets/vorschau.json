@@ -1,0 +1,40 @@
+{
+  "id": "vorschau",
+  "version": 1,
+  "title": "Preview",
+  "description": "First arrangement with the necessary obstacle repair; no refinement. TB, grid 8.",
+  "graph": {
+    "defaultDirection": "tb"
+  },
+  "refine": false,
+  "budgetMs": 2000,
+  "configSet": {
+    "schemaVersion": 1,
+    "id": "vorschau@1",
+    "layout": {
+      "algorithm": "hierarchical",
+      "candidates": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "hybridBy": "compact",
+      "minPortSpacing": 0,
+      "placementGrid": 8,
+      "freePlacement": false,
+      "placementSearch": 0
+    },
+    "routing": {
+      "style": "orthogonal",
+      "bundling": "none",
+      "routingCandidate": true,
+      "clearance": 0,
+      "trackSpacing": 6,
+      "corridors": false,
+      "trackSeparation": false,
+      "engine": "legacy"
+    }
+  },
+  "workBudget": 1
+}

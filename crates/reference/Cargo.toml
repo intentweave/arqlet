@@ -1,0 +1,26 @@
+[package]
+name = "arqlet-reference"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+description = "Curated diagram reference document: canonical JSON, SHA-256 identities and validation. Provisional; see docs/curated-references.md."
+
+[dependencies]
+ts-rs = { version = "=12.0.1", optional = true }
+arqlet-model = { workspace = true }
+arqlet-scene = { workspace = true }
+arqlet-routing = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+sha2 = "=0.11.1"
+
+[features]
+ts = ["dep:ts-rs", "arqlet-model/ts", "arqlet-scene/ts"]

@@ -1,0 +1,85 @@
+import importlib.util
+import json
+from pathlib import Path
+import threading
+import unittest
+import urllib.request
+import urllib.error
+from http.server import ThreadingHTTPServer
+
+ROOT=Path(__file__).resolve().parent
+spec=importlib.util.spec_from_file_location("demo_server",ROOT/"server.py")
+module=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+class StaticTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server=ThreadingHTTPServer(("127.0.0.1",0),module.Handler)
+        cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True)
+        cls.thread.start()
+        cls.base=f"http://127.0.0.1:{cls.server.server_port}"
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown();cls.server.server_close();cls.thread.join()
+    def test_packages_are_served(self):
+        with urllib.request.urlopen(f"{self.base}/packages/viewer/svg.js",timeout=10) as response:
+            self.assertEqual(response.status,200)
+            self.assertIn(b"export",response.read())
+    def test_packages_do_not_escape_their_root(self):
+        for path in ["/packages/../apps/playground/server.py","/packages/%2e%2e/apps/playground/server.py","/packages/viewer/"]:
+            with self.subTest(path=path),self.assertRaises(urllib.error.HTTPError) as caught:
+                urllib.request.urlopen(f"{self.base}{path}",timeout=10)
+            self.assertEqual(caught.exception.code,404)
+
+class BackendTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server=ThreadingHTTPServer(("127.0.0.1",0),module.Handler)
+        cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True)
+        cls.thread.start()
+        cls.url=f"http://127.0.0.1:{cls.server.server_port}/api/op"
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown();cls.server.server_close();cls.thread.join()
+    def request(self,payload,origin=None):
+        headers={"Content-Type":"application/json"}
+        if origin: headers["Origin"]=origin
+        request=urllib.request.Request(self.url,json.dumps(payload).encode(),headers)
+        return urllib.request.urlopen(request,timeout=20)
+    def test_native_refinement(self):
+        snapshot=json.loads((ROOT/"generated/snapshot.json").read_text())
+        with self.request({"op":"refine","snapshot":snapshot,"expectedRevision":snapshot["revision"],"expectedLayoutVersion":snapshot.get("layoutVersion",0)}) as response:
+            result=json.load(response)["snapshot"]
+        self.assertEqual(result["graph"],snapshot["graph"])
+        self.assertEqual(result["revision"],snapshot["revision"])
+        self.assertEqual(result["layoutVersion"],snapshot.get("layoutVersion",0)+1)
+    def test_threaded_refinement_matches_serial(self):
+        snapshot=json.loads((ROOT/"generated/snapshot.json").read_text())
+        base={"op":"refine","snapshot":snapshot,"expectedRevision":snapshot["revision"],"expectedLayoutVersion":snapshot.get("layoutVersion",0)}
+        with self.request(base) as response:serial=json.load(response)
+        with self.request({**base,"threads":4}) as response:threaded=json.load(response)
+        self.assertEqual(threaded,serial)
+    def test_edit_operation_runs_at_backend(self):
+        snapshot=json.loads((ROOT/"generated/snapshot.json").read_text())
+        source=snapshot["graph"]["nodes"][0]["id"]
+        with self.request({"op":"add","snapshot":snapshot,"expectedRevision":snapshot["revision"],"sourceId":source,"label":"Backend node"}) as response:
+            result=json.load(response)["snapshot"]
+        self.assertEqual(result["revision"],snapshot["revision"]+1)
+    def test_the_allowlist_covers_every_operation_the_dispatcher_knows(self):
+        import re
+        source=(ROOT/"../../crates/runtime/src/lib.rs").read_text()
+        start=source.index("pub fn dispatch(input: &str)")
+        body=source[start:source.index("#[cfg(test)]",start)]
+        known=set(re.findall(r'Some\("([A-Za-z]+)"\)',body))|set(re.findall(r'"(reference[A-Za-z]+)"',body))
+        known.add("refineProgressive")
+        self.assertTrue({"move","intent","restore","import"}<=known,known)
+        self.assertEqual(sorted(known-module.OPERATIONS),[],"operations the dispatcher knows but the backend refuses")
+    def test_cross_origin_is_rejected(self):
+        with self.assertRaises(urllib.error.HTTPError) as error:self.request({"op":"refine"},"https://example.org")
+        self.assertEqual(error.exception.code,403)
+    def test_unsupported_operation(self):
+        with self.assertRaises(urllib.error.HTTPError) as error:self.request({"op":"shell"})
+        self.assertEqual(error.exception.code,400)
+
+if __name__=='__main__':unittest.main()

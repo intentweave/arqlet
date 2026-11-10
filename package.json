@@ -1,0 +1,10 @@
+{
+  "name": "arqlet-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "devDependencies": {
+    "@arqlet/engine-client": "workspace:*",
+    "@arqlet/viewer": "workspace:*"
+  }
+}

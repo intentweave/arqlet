@@ -1,0 +1,18 @@
+[package]
+name = "arqlet-elk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+description = "Provisional adapter for graphs in the JSON form ELK uses (children, ports, edges with sources and targets, layoutOptions): translated into an Arqlet graph and options, and the layout written back. No ELK code or dependency."
+
+[dependencies]
+arqlet-model = { workspace = true }
+serde_json = { version = "1", features = ["float_roundtrip"] }

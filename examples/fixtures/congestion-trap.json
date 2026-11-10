@@ -1,0 +1,67 @@
+{
+  "nodes": [
+    {
+      "id": "root",
+      "kind": "directory",
+      "label": "Trap",
+      "parentId": null
+    },
+    {
+      "id": "s",
+      "kind": "symbol",
+      "label": "Source",
+      "parentId": "root"
+    },
+    {
+      "id": "wall",
+      "kind": "symbol",
+      "label": "Wall",
+      "parentId": "root"
+    },
+    {
+      "id": "t",
+      "kind": "symbol",
+      "label": "Target",
+      "parentId": "root"
+    },
+    {
+      "id": "x",
+      "kind": "symbol",
+      "label": "Other",
+      "parentId": "root"
+    }
+  ],
+  "edges": [
+    {
+      "id": "p1",
+      "kind": "calls",
+      "source": "s",
+      "target": "t"
+    },
+    {
+      "id": "p2",
+      "kind": "calls",
+      "source": "s",
+      "target": "t"
+    },
+    {
+      "id": "p3",
+      "kind": "calls",
+      "source": "s",
+      "target": "t"
+    },
+    {
+      "id": "w",
+      "kind": "calls",
+      "source": "s",
+      "target": "x"
+    },
+    {
+      "id": "v",
+      "kind": "calls",
+      "source": "x",
+      "target": "t"
+    }
+  ],
+  "description": "Three parallel edges from one source to one target past a wall: routing congestion. Under Lesbar it shows hugging and shared-endpoint crossings, not shared lines."
+}

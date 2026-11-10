@@ -1,0 +1,91 @@
+{
+  "comment": "The rules of the publication policy as steps and expected answers. apps/playground/session.js and crates/runtime/src/session.rs both run every case (session.test.mjs and the test `shared_cases` in session.rs), so the two implementations cannot drift apart. Identities: `base` is graph revision 2, base layout version 3, options key `k`; `newer` is graph revision 3. Answers: start {refused, superseded}, offer {verdict}, take {sequence}, edit {cancelled}, finish {outcome, improved, resultSequence}, fail {outcome, shown}, state {activeJob, shown}.",
+  "cases": [
+    {
+      "name": "a user edit between publications makes the job stale",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "take", "expect": {"sequence": 1}},
+        {"do": "edit", "base": "newer", "expect": {"cancelled": "job-a"}},
+        {"do": "offer", "job": "job-a", "sequence": 2, "base": "base", "expect": {"verdict": "stale"}},
+        {"do": "finish", "job": "job-a", "expect": {"outcome": "ignored", "improved": null, "resultSequence": null}}
+      ]
+    },
+    {
+      "name": "late, duplicate and superseded publications are discarded",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "base", "expect": {"verdict": "duplicate"}},
+        {"do": "start", "job": "job-b", "base": "base", "expect": {"refused": false, "superseded": "job-a"}},
+        {"do": "offer", "job": "job-a", "sequence": 2, "base": "base", "expect": {"verdict": "stale"}},
+        {"do": "state", "expect": {"activeJob": "job-b", "shown": null}}
+      ]
+    },
+    {
+      "name": "several valid intermediate states show only the newest",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "offer", "job": "job-a", "sequence": 2, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "offer", "job": "job-a", "sequence": 3, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "take", "expect": {"sequence": 3}},
+        {"do": "take", "expect": {"sequence": null}},
+        {"do": "state", "expect": {"activeJob": "job-a", "shown": 3}}
+      ]
+    },
+    {
+      "name": "completion without improvement is reported",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "finish", "job": "job-a", "expect": {"outcome": "completed", "improved": false, "resultSequence": null}},
+        {"do": "finish", "job": "job-a", "expect": {"outcome": "ignored", "improved": null, "resultSequence": null}}
+      ]
+    },
+    {
+      "name": "completion hands over an unshown result",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "offer", "job": "job-a", "sequence": 2, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "finish", "job": "job-a", "expect": {"outcome": "completed", "improved": true, "resultSequence": 2}}
+      ]
+    },
+    {
+      "name": "failure keeps the last shown state and drops pending work",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "take", "expect": {"sequence": 1}},
+        {"do": "offer", "job": "job-a", "sequence": 2, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "fail", "job": "job-a", "expect": {"outcome": "failed", "shown": 1}},
+        {"do": "fail", "job": "job-a", "expect": {"outcome": "ignored", "shown": null}},
+        {"do": "state", "expect": {"activeJob": null, "shown": null}}
+      ]
+    },
+    {
+      "name": "a job cannot start from an outdated base",
+      "steps": [
+        {"do": "edit", "base": "newer", "expect": {"cancelled": null}},
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": true, "superseded": null}}
+      ]
+    },
+    {
+      "name": "a publication of another input is stale even from the active job",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "newer", "expect": {"verdict": "stale"}},
+        {"do": "offer", "job": "job-a", "sequence": 1, "base": "base", "expect": {"verdict": "accepted"}}
+      ]
+    },
+    {
+      "name": "a sequence that does not rise is a duplicate",
+      "steps": [
+        {"do": "start", "job": "job-a", "base": "base", "expect": {"refused": false, "superseded": null}},
+        {"do": "offer", "job": "job-a", "sequence": 3, "base": "base", "expect": {"verdict": "accepted"}},
+        {"do": "offer", "job": "job-a", "sequence": 2, "base": "base", "expect": {"verdict": "duplicate"}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "name": "@arqlet/viewer",
+  "version": "0.1.0",
+  "description": "Rendering helpers for Arqlet scenes: an SVG renderer, pan and zoom, route details and a React Flow mapping. No layout of its own. Provisional.",
+  "keywords": [
+    "graph",
+    "layout",
+    "graph-layout",
+    "diagram",
+    "wasm",
+    "svg",
+    "react-flow"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Benjamin Becker",
+  "homepage": "https://github.com/intentweave/arqlet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intentweave/arqlet.git",
+    "directory": "packages/viewer"
+  },
+  "bugs": {
+    "url": "https://github.com/intentweave/arqlet/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./svg.js": {
+      "types": "./svg.d.ts",
+      "default": "./svg.js"
+    },
+    "./navigation.js": {
+      "types": "./navigation.d.ts",
+      "default": "./navigation.js"
+    },
+    "./scene.js": {
+      "types": "./scene.d.ts",
+      "default": "./scene.js"
+    },
+    "./react-flow.js": {
+      "types": "./react-flow.d.ts",
+      "default": "./react-flow.js"
+    },
+    "./routes.js": {
+      "types": "./routes.d.ts",
+      "default": "./routes.js"
+    }
+  },
+  "files": [
+    "svg.js",
+    "navigation.js",
+    "scene.js",
+    "react-flow.js",
+    "routes.js",
+    "svg.d.ts",
+    "navigation.d.ts",
+    "scene.d.ts",
+    "react-flow.d.ts",
+    "routes.d.ts",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepack": "node ../../tools/npm-prepack.mjs"
+  },
+  "dependencies": {
+    "@arqlet/contracts": "workspace:^"
+  }
+}

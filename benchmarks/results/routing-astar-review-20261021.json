@@ -1,0 +1,237 @@
+{
+  "input": "state-tcp",
+  "inputSha256": "9daf3c2e98b9b5f18b0159c56b62ae2378b40565aaccd6035750fc0bb62b991d",
+  "profile": {
+    "id": "readable",
+    "title": "Lesbar",
+    "version": 1,
+    "description": "Hybrid, freie Layerpositionierung, vier Ordering-Varianten, Kanalrouting, Spurentrennung, Platzierungssuche 200.",
+    "graph": {
+      "defaultDirection": "hybrid"
+    },
+    "options": {
+      "freePlacement": true,
+      "candidates": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "routingEngine": "channel",
+      "routingTrackSeparation": true,
+      "placementSearch": 0
+    },
+    "refine": true,
+    "budgetMs": 30000,
+    "sha256": "b07a9861770f5bf6e688347c849ac123bf52b9c8c471933b8ac69441f15f1643"
+  },
+  "metricVersion": 2,
+  "beforeBinarySha256": "da9d59a5bca18fffcca4decdf0dbfd0d2ae708c38c9750b5bed5612c7552e8b6",
+  "afterBinarySha256": "6346cba10fe0ce12121a9d3895ccfdf4ecdaa59b28a4431dc3edbd94f72bf575",
+  "runs": [
+    {
+      "variant": "before",
+      "rep": 0,
+      "timings": {
+        "importMs": 294.4314999040216,
+        "configureMs": 34.423874923959374,
+        "refineMs": 81.00891602225602
+      },
+      "metrics": {
+        "area": 517440.0,
+        "bends": 54,
+        "bendsMax": 8,
+        "bendsMean": 2.8421052631578947,
+        "crossBranchOverlaps": 0,
+        "crossings": 2,
+        "edges": 19,
+        "height": 880.0,
+        "hugLength": 805.9622161596121,
+        "hugPairs": 10,
+        "length": 4728.967311140505,
+        "lengthMax": 943.7646568195179,
+        "lengthMean": 248.89301637581607,
+        "lineNodeHits": 0,
+        "nodes": 11,
+        "sharedEndpointCrossings": 11,
+        "sharedLineLength": 0.0,
+        "sharedLinePairs": 0,
+        "siblingOverlaps": 0,
+        "touches": 0,
+        "version": 2,
+        "width": 588.0
+      },
+      "snapshotSha256": "33f3828fa09544814aad0614d60ed2cd256ad739866ecc2a192697fae6e2717b"
+    },
+    {
+      "variant": "after",
+      "rep": 0,
+      "timings": {
+        "importMs": 5.093083018437028,
+        "configureMs": 9.650165913626552,
+        "refineMs": 26.60487499088049
+      },
+      "metrics": {
+        "area": 517440.0,
+        "bends": 54,
+        "bendsMax": 8,
+        "bendsMean": 2.8421052631578947,
+        "crossBranchOverlaps": 0,
+        "crossings": 2,
+        "edges": 19,
+        "height": 880.0,
+        "hugLength": 805.9622161596121,
+        "hugPairs": 10,
+        "length": 4728.967311140505,
+        "lengthMax": 943.7646568195179,
+        "lengthMean": 248.89301637581607,
+        "lineNodeHits": 0,
+        "nodes": 11,
+        "sharedEndpointCrossings": 11,
+        "sharedLineLength": 0.0,
+        "sharedLinePairs": 0,
+        "siblingOverlaps": 0,
+        "touches": 0,
+        "version": 2,
+        "width": 588.0
+      },
+      "snapshotSha256": "33f3828fa09544814aad0614d60ed2cd256ad739866ecc2a192697fae6e2717b"
+    },
+    {
+      "variant": "before",
+      "rep": 1,
+      "timings": {
+        "importMs": 3.987459000200033,
+        "configureMs": 17.76299998164177,
+        "refineMs": 82.53716700710356
+      },
+      "metrics": {
+        "area": 517440.0,
+        "bends": 54,
+        "bendsMax": 8,
+        "bendsMean": 2.8421052631578947,
+        "crossBranchOverlaps": 0,
+        "crossings": 2,
+        "edges": 19,
+        "height": 880.0,
+        "hugLength": 805.9622161596121,
+        "hugPairs": 10,
+        "length": 4728.967311140505,
+        "lengthMax": 943.7646568195179,
+        "lengthMean": 248.89301637581607,
+        "lineNodeHits": 0,
+        "nodes": 11,
+        "sharedEndpointCrossings": 11,
+        "sharedLineLength": 0.0,
+        "sharedLinePairs": 0,
+        "siblingOverlaps": 0,
+        "touches": 0,
+        "version": 2,
+        "width": 588.0
+      },
+      "snapshotSha256": "33f3828fa09544814aad0614d60ed2cd256ad739866ecc2a192697fae6e2717b"
+    },
+    {
+      "variant": "after",
+      "rep": 1,
+      "timings": {
+        "importMs": 4.301875131204724,
+        "configureMs": 7.923624943941832,
+        "refineMs": 27.375292032957077
+      },
+      "metrics": {
+        "area": 517440.0,
+        "bends": 54,
+        "bendsMax": 8,
+        "bendsMean": 2.8421052631578947,
+        "crossBranchOverlaps": 0,
+        "crossings": 2,
+        "edges": 19,
+        "height": 880.0,
+        "hugLength": 805.9622161596121,
+        "hugPairs": 10,
+        "length": 4728.967311140505,
+        "lengthMax": 943.7646568195179,
+        "lengthMean": 248.89301637581607,
+        "lineNodeHits": 0,
+        "nodes": 11,
+        "sharedEndpointCrossings": 11,
+        "sharedLineLength": 0.0,
+        "sharedLinePairs": 0,
+        "siblingOverlaps": 0,
+        "touches": 0,
+        "version": 2,
+        "width": 588.0
+      },
+      "snapshotSha256": "33f3828fa09544814aad0614d60ed2cd256ad739866ecc2a192697fae6e2717b"
+    },
+    {
+      "variant": "before",
+      "rep": 2,
+      "timings": {
+        "importMs": 5.547333974391222,
+        "configureMs": 17.5267921295017,
+        "refineMs": 81.34270901791751
+      },
+      "metrics": {
+        "area": 517440.0,
+        "bends": 54,
+        "bendsMax": 8,
+        "bendsMean": 2.8421052631578947,
+        "crossBranchOverlaps": 0,
+        "crossings": 2,
+        "edges": 19,
+        "height": 880.0,
+        "hugLength": 805.9622161596121,
+        "hugPairs": 10,
+        "length": 4728.967311140505,
+        "lengthMax": 943.7646568195179,
+        "lengthMean": 248.89301637581607,
+        "lineNodeHits": 0,
+        "nodes": 11,
+        "sharedEndpointCrossings": 11,
+        "sharedLineLength": 0.0,
+        "sharedLinePairs": 0,
+        "siblingOverlaps": 0,
+        "touches": 0,
+        "version": 2,
+        "width": 588.0
+      },
+      "snapshotSha256": "33f3828fa09544814aad0614d60ed2cd256ad739866ecc2a192697fae6e2717b"
+    },
+    {
+      "variant": "after",
+      "rep": 2,
+      "timings": {
+        "importMs": 5.252000177279115,
+        "configureMs": 10.113083058968186,
+        "refineMs": 29.000667156651616
+      },
+      "metrics": {
+        "area": 517440.0,
+        "bends": 54,
+        "bendsMax": 8,
+        "bendsMean": 2.8421052631578947,
+        "crossBranchOverlaps": 0,
+        "crossings": 2,
+        "edges": 19,
+        "height": 880.0,
+        "hugLength": 805.9622161596121,
+        "hugPairs": 10,
+        "length": 4728.967311140505,
+        "lengthMax": 943.7646568195179,
+        "lengthMean": 248.89301637581607,
+        "lineNodeHits": 0,
+        "nodes": 11,
+        "sharedEndpointCrossings": 11,
+        "sharedLineLength": 0.0,
+        "sharedLinePairs": 0,
+        "siblingOverlaps": 0,
+        "touches": 0,
+        "version": 2,
+        "width": 588.0
+      },
+      "snapshotSha256": "33f3828fa09544814aad0614d60ed2cd256ad739866ecc2a192697fae6e2717b"
+    }
+  ]
+}

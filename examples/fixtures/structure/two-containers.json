@@ -1,0 +1,92 @@
+{
+  "containerDirections": {},
+  "defaultDirection": "lr",
+  "nodes": [
+    {
+      "id": "P",
+      "kind": "container",
+      "label": "P",
+      "parentId": null
+    },
+    {
+      "id": "Q",
+      "kind": "container",
+      "label": "Q",
+      "parentId": null
+    },
+    {
+      "id": "p1",
+      "kind": "symbol",
+      "label": "p1",
+      "parentId": "P"
+    },
+    {
+      "id": "p2",
+      "kind": "symbol",
+      "label": "p2",
+      "parentId": "P"
+    },
+    {
+      "id": "q1",
+      "kind": "symbol",
+      "label": "q1",
+      "parentId": "Q"
+    },
+    {
+      "id": "q2",
+      "kind": "symbol",
+      "label": "q2",
+      "parentId": "Q"
+    },
+    {
+      "id": "s",
+      "kind": "symbol",
+      "label": "s",
+      "parentId": null
+    }
+  ],
+  "edges": [
+    {
+      "id": "1",
+      "kind": "flow",
+      "source": "p1",
+      "target": "p2"
+    },
+    {
+      "id": "2",
+      "kind": "flow",
+      "source": "p2",
+      "target": "q1"
+    },
+    {
+      "id": "3",
+      "kind": "flow",
+      "source": "p2",
+      "target": "q1"
+    },
+    {
+      "id": "4",
+      "kind": "flow",
+      "source": "q1",
+      "target": "q2"
+    },
+    {
+      "id": "5",
+      "kind": "flow",
+      "source": "s",
+      "target": "p1"
+    },
+    {
+      "id": "6",
+      "kind": "flow",
+      "source": "q2",
+      "target": "s"
+    },
+    {
+      "id": "7",
+      "kind": "flow",
+      "source": "q1",
+      "target": "q1"
+    }
+  ]
+}

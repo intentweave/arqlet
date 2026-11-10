@@ -1,0 +1,10 @@
+org-chart            default     import 13.7 refine 142.5 total 156.2
+org-chart            singlePass  import 14.0 refine 1.6 total 15.6
+workflow-dag         default     import 11.0 refine 1620.8 total 1631.9
+workflow-dag         singlePass  import 21.8 refine 2.4 total 24.2
+cloud-architecture   default     import 5.3 refine 26.4 total 31.7
+cloud-architecture   singlePass  import 5.9 refine 0.4 total 6.4
+network-vlan         default     import 5.5 refine 29.9 total 35.5
+network-vlan         singlePass  import 3.7 refine 0.4 total 4.1
+synthetic-2k         default     import 413.2 refine 4815.6 total 5228.7
+synthetic-2k         singlePass  import 470.9 refine 18.6 total 489.5

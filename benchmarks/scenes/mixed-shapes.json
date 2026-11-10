@@ -1,0 +1,135 @@
+{
+  "defaultDirection": "auto",
+  "edges": [
+    {
+      "id": "h0",
+      "kind": "flow",
+      "source": "hub",
+      "target": "n0"
+    },
+    {
+      "id": "h1",
+      "kind": "flow",
+      "source": "hub",
+      "target": "n1"
+    },
+    {
+      "id": "h2",
+      "kind": "flow",
+      "source": "hub",
+      "target": "n2"
+    },
+    {
+      "id": "h3",
+      "kind": "flow",
+      "source": "hub",
+      "target": "n3"
+    },
+    {
+      "id": "h4",
+      "kind": "flow",
+      "source": "hub",
+      "target": "n4"
+    },
+    {
+      "id": "h5",
+      "kind": "flow",
+      "source": "hub",
+      "target": "n5"
+    },
+    {
+      "id": "s1",
+      "kind": "flow",
+      "source": "n1",
+      "target": "sink"
+    },
+    {
+      "id": "s2",
+      "kind": "flow",
+      "source": "n3",
+      "target": "sink"
+    },
+    {
+      "id": "t1",
+      "kind": "flow",
+      "source": "sink",
+      "target": "tail"
+    },
+    {
+      "id": "c1",
+      "kind": "flow",
+      "source": "n0",
+      "target": "n2"
+    },
+    {
+      "id": "c2",
+      "kind": "flow",
+      "source": "n4",
+      "target": "n5"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "hub",
+      "kind": "node",
+      "label": "Hub",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "n0",
+      "kind": "node",
+      "label": "Item 0",
+      "parentId": null,
+      "shape": "rect"
+    },
+    {
+      "id": "n1",
+      "kind": "node",
+      "label": "Item 1",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "n2",
+      "kind": "node",
+      "label": "Item 2",
+      "parentId": null,
+      "shape": "square"
+    },
+    {
+      "id": "n3",
+      "kind": "node",
+      "label": "Item 3",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "n4",
+      "kind": "node",
+      "label": "Item 4",
+      "parentId": null,
+      "shape": "rect"
+    },
+    {
+      "id": "n5",
+      "kind": "node",
+      "label": "Item 5",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "sink",
+      "kind": "node",
+      "label": "Sink",
+      "parentId": null,
+      "shape": "circle"
+    },
+    {
+      "id": "tail",
+      "kind": "node",
+      "label": "Tail",
+      "parentId": null
+    }
+  ]
+}

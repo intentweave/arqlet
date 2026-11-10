@@ -1,0 +1,25 @@
+[package]
+name = "arqlet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+description = "Incremental graph-layout engine for nested graphs with ports: layered, tree, radial and organic layouts, edge routing, and a JSON dispatcher shared by native and WASM hosts. Prototype; the API is provisional."
+
+[dependencies]
+arqlet-model = { workspace = true }
+arqlet-view = { workspace = true }
+arqlet-layout = { workspace = true }
+arqlet-routing = { workspace = true }
+arqlet-scene = { workspace = true }
+arqlet-topology = { workspace = true }
+arqlet-reference = { workspace = true }
+arqlet-elk = { workspace = true }
+arqlet-runtime = { workspace = true }

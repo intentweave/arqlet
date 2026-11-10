@@ -1,0 +1,264 @@
+diff --git a/crates/layout/src/constructive.rs b/crates/layout/src/constructive.rs
+index 3799527..22b4281 100644
+--- a/crates/layout/src/constructive.rs
++++ b/crates/layout/src/constructive.rs
+@@ -263,6 +263,7 @@ fn construct_with(
+             Some((index, outcome))
+         })
+         .collect();
++    let prepared = approach_tracks(prepared, spacing.track);
+     // The routes from the sections of the plans (step 5), by slot, as corners in the flow's frame.
+     let (sections, cross_sections): (BTreeMap<usize, Vec<(f64, f64)>>, BTreeSet<usize>) = plans
+         .map(|plans| section_routes(graph, boxes, &prepared, plans, spacing))
+@@ -305,14 +306,18 @@ fn construct_with(
+                 let changes = &first_ways[slot];
+                 let leaving = changes.first().map_or(p.to.1, |c| c.2);
+                 let entering = changes.last().map_or(p.from.1, |c| c.1);
+-                sides
+-                    .entry((p.from_node.clone(), true, p.vertical))
+-                    .or_default()
+-                    .push((slot, leaving));
+-                sides
+-                    .entry((p.to_node.clone(), false, p.vertical))
+-                    .or_default()
+-                    .push((slot, entering));
++                if p.start_port.is_none() {
++                    sides
++                        .entry((p.from_node.clone(), true, p.vertical))
++                        .or_default()
++                        .push((slot, leaving));
++                }
++                if p.end_port.is_none() {
++                    sides
++                        .entry((p.to_node.clone(), false, p.vertical))
++                        .or_default()
++                        .push((slot, entering));
++                }
+             }
+         }
+         for ((_, at_start, _), mut members) in sides {
+@@ -455,9 +460,9 @@ fn construct_with(
+             .map(|outcome| {
+                 outcome.as_ref().ok().map(|p| {
+                     if p.reversed {
+-                        (p.end.clone(), p.start.clone())
++                        (p.last_point().clone(), p.first_point().clone())
+                     } else {
+-                        (p.start.clone(), p.end.clone())
++                        (p.first_point().clone(), p.last_point().clone())
+                     }
+                 })
+             })
+@@ -493,9 +498,9 @@ fn construct_with(
+         if outcome.is_err() && moved.contains(&slot) {
+             if let (Ok(p), Some((source, target))) = (original, &ends[slot]) {
+                 let (old_source, old_target) = if p.reversed {
+-                    (&p.end, &p.start)
++                    (p.last_point(), p.first_point())
+                 } else {
+-                    (&p.start, &p.end)
++                    (p.first_point(), p.last_point())
+                 };
+                 let differs =
+                     |a: &Point, b: &Point| (a.x - b.x).abs() > EPS || (a.y - b.y).abs() > EPS;
+@@ -970,9 +975,7 @@ fn build_planned(
+     assigned: &mut Vec<Segment>,
+     track: f64,
+ ) -> Option<(Route, usize)> {
+-    let mut points = vec![p.start.clone()];
+-    points.extend(corners.iter().map(|&c| to_point(p.vertical, c)));
+-    points.push(p.end.clone());
++    let points = p.route_points(corners);
+     let clear = points.windows(2).all(|w| {
+         !p.obstacles
+             .iter()
+@@ -1049,6 +1052,37 @@ struct Prepared {
+     obstacle_index: std::rc::Rc<BoxIndex>,
+     start: Point,
+     end: Point,
++    /// A port on a side across the flow (plan section 4a, step 6: an end in a container of the other flow axis): the port,
++    /// and the direction (+1 or −1 on the cross axis) away from its node. `start` or `end` is then the point where the route
++    /// meets the port's height on its track beside the node (`approach_tracks`), and the port is joined to it by a stub.
++    start_port: Option<(Point, f64)>,
++    end_port: Option<(Point, f64)>,
++}
++
++impl Prepared {
++    /// The points of a route over `corners` (in the flow's frame), from port to port.
++    fn route_points(&self, corners: &[(f64, f64)]) -> Vec<Point> {
++        let mut points = Vec::with_capacity(corners.len() + 4);
++        if let Some((port, _)) = &self.start_port {
++            points.push(port.clone());
++        }
++        points.push(self.start.clone());
++        points.extend(corners.iter().map(|&c| to_point(self.vertical, c)));
++        points.push(self.end.clone());
++        if let Some((port, _)) = &self.end_port {
++            points.push(port.clone());
++        }
++        points
++    }
++
++    /// The route's first and last points: the ports.
++    fn first_point(&self) -> &Point {
++        self.start_port.as_ref().map_or(&self.start, |(p, _)| p)
++    }
++
++    fn last_point(&self) -> &Point {
++        self.end_port.as_ref().map_or(&self.end, |(p, _)| p)
++    }
+ }
+ 
+ /// The track an edge must take in a corridor, by the corridor's key (`gap_key`): its place in the corridor's order.
+@@ -1141,10 +1175,37 @@ fn prepare_edge(
+     if t_main <= s_main + EPS {
+         return Err(Delegation::NotForward);
+     }
+-    // The direction is checked first, so that an edge running backwards is reported as such and not by its port side.
+-    if first.side != out_side || last.side != in_side {
++    // The direction is checked first, so that an edge running backwards is reported as such and not by its port side. A port
++    // on a side across the flow (an end in a container of the other axis) is met on a track beside its node.
++    let across_sides = if vertical {
++        [PortSide::Left, PortSide::Right]
++    } else {
++        [PortSide::Top, PortSide::Bottom]
++    };
++    let away = |side: PortSide| {
++        if matches!(side, PortSide::Left | PortSide::Top) {
++            -1.
++        } else {
++            1.
++        }
++    };
++    let start_port = (!reversed && across_sides.contains(&first.side))
++        .then(|| (first.position.clone(), away(first.side)));
++    let end_port = (!reversed && across_sides.contains(&last.side))
++        .then(|| (last.position.clone(), away(last.side)));
++    if (first.side != out_side && start_port.is_none())
++        || (last.side != in_side && end_port.is_none())
++    {
+         return Err(Delegation::PortSide);
+     }
++    let (s_across, t_across) = (
++        start_port
++            .as_ref()
++            .map_or(s_across, |(_, d)| s_across + d * spacing.margin),
++        end_port
++            .as_ref()
++            .map_or(t_across, |(_, d)| t_across + d * spacing.margin),
++    );
+     let (s_box, t_box) = (&boxes[from_node], &boxes[to_node]);
+     let (s_far, t_near) = if vertical {
+         (s_box.y + s_box.height, t_box.y)
+@@ -1182,11 +1243,66 @@ fn prepare_edge(
+                 .collect::<Vec<_>>(),
+         )),
+         obstacles,
+-        start: first.position.clone(),
+-        end: last.position.clone(),
++        start: to_point(vertical, (s_main, s_across)),
++        end: to_point(vertical, (t_main, t_across)),
++        start_port,
++        end_port,
+     })
+ }
+ 
++/// The tracks beside a node on which the routes to its ports across the flow meet the ports' heights (plan section 4a, step
++/// 6). The stubs of one side of a node (and of the nodes in line with it on the same flow coordinate) take a track each,
++/// a track apart: at a route's end, the stub later in the flow takes the track farther from the node, so that the route
++/// coming down to it passes outside the earlier stubs; at its start, the stub earlier in the flow takes the farther track.
++fn approach_tracks(
++    mut prepared: Vec<(usize, Result<Prepared, Delegation>)>,
++    track: f64,
++) -> Vec<(usize, Result<Prepared, Delegation>)> {
++    // By (vertical, at the end, side's cross coordinate, direction), the slots with their port's flow coordinate.
++    let mut groups: BTreeMap<(bool, bool, i64, i64), Vec<(usize, f64)>> = BTreeMap::new();
++    for (slot, (_, outcome)) in prepared.iter().enumerate() {
++        let Ok(p) = outcome else { continue };
++        for (at_end, port) in [(false, &p.start_port), (true, &p.end_port)] {
++            if let Some((point, away)) = port {
++                let (main, across) = frame(p.vertical, point);
++                groups
++                    .entry((
++                        p.vertical,
++                        at_end,
++                        (across * 2.).round() as i64,
++                        *away as i64,
++                    ))
++                    .or_default()
++                    .push((slot, main));
++            }
++        }
++    }
++    for ((_, at_end, _, _), mut members) in groups {
++        // Farthest first: the latest at an end, the earliest at a start.
++        members.sort_by(|a, b| {
++            let order = a.1.total_cmp(&b.1);
++            (if at_end { order.reverse() } else { order }).then(a.0.cmp(&b.0))
++        });
++        let count = members.len();
++        for (place, (slot, _)) in members.into_iter().enumerate() {
++            let Ok(p) = prepared[slot].1.as_mut() else {
++                continue;
++            };
++            let extra = (count - 1 - place) as f64 * track;
++            if at_end {
++                let away = p.end_port.as_ref().map_or(0., |(_, d)| *d);
++                p.to.1 += away * extra;
++                p.end = to_point(p.vertical, p.to);
++            } else {
++                let away = p.start_port.as_ref().map_or(0., |(_, d)| *d);
++                p.from.1 += away * extra;
++                p.start = to_point(p.vertical, p.from);
++            }
++        }
++    }
++    prepared
++}
++
+ /// The route of a prepared edge: its tracks kept apart from `assigned`, and, where `desired` names a corridor, on the track
+ /// of its place in that corridor's order (or on any free track when that one is not free).
+ fn build_edge(
+@@ -1216,9 +1332,7 @@ fn build_edge(
+         None if !assigned.is_empty() => return Err(Delegation::TrackTaken),
+         None => return Err(Delegation::NoFreeTrack),
+     };
+-    let mut points = vec![p.start.clone()];
+-    points.extend(corners.iter().map(|&c| to_point(vertical, c)));
+-    points.push(p.end.clone());
++    let points = p.route_points(&corners);
+     let segments = segments_of(&points);
+     // The search already keeps its steps clear of the assigned segments; this final check keeps the record consistent.
+     if segments
+diff --git a/crates/layout/src/ports.rs b/crates/layout/src/ports.rs
+index ed2c776..e591221 100644
+--- a/crates/layout/src/ports.rs
++++ b/crates/layout/src/ports.rs
+@@ -809,7 +809,26 @@ fn flow_side_pair(
+         (PortSide::Right, PortSide::Left)
+     };
+     if forward {
+-        Some((out_side, in_side))
++        // An end in a container of the other flow axis takes the side of its own area's flow (it leaves on the out side,
++        // it is entered on the in side), and the route meets it on a track beside the node; the side of the common flow
++        // would face the nodes in line with it in its own rank.
++        let own = |end: &str| axis(parents.get(end).copied().flatten());
++        let sides = |axis: bool| {
++            if axis {
++                (PortSide::Bottom, PortSide::Top)
++            } else {
++                (PortSide::Right, PortSide::Left)
++            }
++        };
++        let source_side = match own(source) {
++            Some(a) if a != vertical => sides(a).0,
++            _ => out_side,
++        };
++        let target_side = match own(target) {
++            Some(a) if a != vertical => sides(a).1,
++            _ => in_side,
++        };
++        Some((source_side, target_side))
+     } else if backward {
+         Some((in_side, out_side))
+     } else {

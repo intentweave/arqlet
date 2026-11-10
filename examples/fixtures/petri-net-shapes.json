@@ -1,0 +1,414 @@
+{
+ "containerDirections": {},
+ "defaultDirection": "auto",
+ "defaultRouting": "straight",
+ "defaultStrategy": "organic",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "arc",
+   "source": "p0-idle",
+   "target": "p0-start"
+  },
+  {
+   "id": "e2",
+   "kind": "arc",
+   "source": "lock",
+   "target": "p0-start"
+  },
+  {
+   "id": "e3",
+   "kind": "arc",
+   "source": "slots",
+   "target": "p0-start"
+  },
+  {
+   "id": "e4",
+   "kind": "arc",
+   "source": "p0-start",
+   "target": "p0-busy"
+  },
+  {
+   "id": "e5",
+   "kind": "arc",
+   "source": "p0-busy",
+   "target": "p0-done"
+  },
+  {
+   "id": "e6",
+   "kind": "arc",
+   "source": "p0-done",
+   "target": "p0-idle"
+  },
+  {
+   "id": "e7",
+   "kind": "arc",
+   "source": "p0-done",
+   "target": "buffer"
+  },
+  {
+   "id": "e8",
+   "kind": "arc",
+   "source": "p0-done",
+   "target": "lock"
+  },
+  {
+   "id": "e9",
+   "kind": "arc",
+   "source": "p1-idle",
+   "target": "p1-start"
+  },
+  {
+   "id": "e10",
+   "kind": "arc",
+   "source": "lock",
+   "target": "p1-start"
+  },
+  {
+   "id": "e11",
+   "kind": "arc",
+   "source": "slots",
+   "target": "p1-start"
+  },
+  {
+   "id": "e12",
+   "kind": "arc",
+   "source": "p1-start",
+   "target": "p1-busy"
+  },
+  {
+   "id": "e13",
+   "kind": "arc",
+   "source": "p1-busy",
+   "target": "p1-done"
+  },
+  {
+   "id": "e14",
+   "kind": "arc",
+   "source": "p1-done",
+   "target": "p1-idle"
+  },
+  {
+   "id": "e15",
+   "kind": "arc",
+   "source": "p1-done",
+   "target": "buffer"
+  },
+  {
+   "id": "e16",
+   "kind": "arc",
+   "source": "p1-done",
+   "target": "lock"
+  },
+  {
+   "id": "e17",
+   "kind": "arc",
+   "source": "p2-idle",
+   "target": "p2-start"
+  },
+  {
+   "id": "e18",
+   "kind": "arc",
+   "source": "lock",
+   "target": "p2-start"
+  },
+  {
+   "id": "e19",
+   "kind": "arc",
+   "source": "slots",
+   "target": "p2-start"
+  },
+  {
+   "id": "e20",
+   "kind": "arc",
+   "source": "p2-start",
+   "target": "p2-busy"
+  },
+  {
+   "id": "e21",
+   "kind": "arc",
+   "source": "p2-busy",
+   "target": "p2-done"
+  },
+  {
+   "id": "e22",
+   "kind": "arc",
+   "source": "p2-done",
+   "target": "p2-idle"
+  },
+  {
+   "id": "e23",
+   "kind": "arc",
+   "source": "p2-done",
+   "target": "buffer"
+  },
+  {
+   "id": "e24",
+   "kind": "arc",
+   "source": "p2-done",
+   "target": "lock"
+  },
+  {
+   "id": "e25",
+   "kind": "inhibit",
+   "source": "maintenance",
+   "target": "p0-start"
+  },
+  {
+   "id": "e26",
+   "kind": "arc",
+   "source": "buffer",
+   "target": "c0-take"
+  },
+  {
+   "id": "e27",
+   "kind": "arc",
+   "source": "c0-idle",
+   "target": "c0-take"
+  },
+  {
+   "id": "e28",
+   "kind": "arc",
+   "source": "lock",
+   "target": "c0-take"
+  },
+  {
+   "id": "e29",
+   "kind": "arc",
+   "source": "c0-take",
+   "target": "c0-busy"
+  },
+  {
+   "id": "e30",
+   "kind": "arc",
+   "source": "c0-busy",
+   "target": "c0-finish"
+  },
+  {
+   "id": "e31",
+   "kind": "arc",
+   "source": "c0-finish",
+   "target": "c0-idle"
+  },
+  {
+   "id": "e32",
+   "kind": "arc",
+   "source": "c0-finish",
+   "target": "slots"
+  },
+  {
+   "id": "e33",
+   "kind": "arc",
+   "source": "c0-finish",
+   "target": "lock"
+  },
+  {
+   "id": "e34",
+   "kind": "arc",
+   "source": "buffer",
+   "target": "c1-take"
+  },
+  {
+   "id": "e35",
+   "kind": "arc",
+   "source": "c1-idle",
+   "target": "c1-take"
+  },
+  {
+   "id": "e36",
+   "kind": "arc",
+   "source": "lock",
+   "target": "c1-take"
+  },
+  {
+   "id": "e37",
+   "kind": "arc",
+   "source": "c1-take",
+   "target": "c1-busy"
+  },
+  {
+   "id": "e38",
+   "kind": "arc",
+   "source": "c1-busy",
+   "target": "c1-finish"
+  },
+  {
+   "id": "e39",
+   "kind": "arc",
+   "source": "c1-finish",
+   "target": "c1-idle"
+  },
+  {
+   "id": "e40",
+   "kind": "arc",
+   "source": "c1-finish",
+   "target": "slots"
+  },
+  {
+   "id": "e41",
+   "kind": "arc",
+   "source": "c1-finish",
+   "target": "lock"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "lock",
+   "kind": "place",
+   "label": "lock",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "buffer",
+   "kind": "place",
+   "label": "buffer",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "slots",
+   "kind": "place",
+   "label": "slots",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "maintenance",
+   "kind": "place",
+   "label": "maintenance",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "p0-idle",
+   "kind": "place",
+   "label": "producer 0 idle",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "p0-start",
+   "kind": "transition",
+   "label": "start produce 0",
+   "parentId": null
+  },
+  {
+   "id": "p0-busy",
+   "kind": "place",
+   "label": "producer 0 busy",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "p0-done",
+   "kind": "transition",
+   "label": "finish produce 0",
+   "parentId": null
+  },
+  {
+   "id": "p1-idle",
+   "kind": "place",
+   "label": "producer 1 idle",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "p1-start",
+   "kind": "transition",
+   "label": "start produce 1",
+   "parentId": null
+  },
+  {
+   "id": "p1-busy",
+   "kind": "place",
+   "label": "producer 1 busy",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "p1-done",
+   "kind": "transition",
+   "label": "finish produce 1",
+   "parentId": null
+  },
+  {
+   "id": "p2-idle",
+   "kind": "place",
+   "label": "producer 2 idle",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "p2-start",
+   "kind": "transition",
+   "label": "start produce 2",
+   "parentId": null
+  },
+  {
+   "id": "p2-busy",
+   "kind": "place",
+   "label": "producer 2 busy",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "p2-done",
+   "kind": "transition",
+   "label": "finish produce 2",
+   "parentId": null
+  },
+  {
+   "id": "c0-idle",
+   "kind": "place",
+   "label": "consumer 0 idle",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "c0-take",
+   "kind": "transition",
+   "label": "take item 0",
+   "parentId": null
+  },
+  {
+   "id": "c0-busy",
+   "kind": "place",
+   "label": "consumer 0 busy",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "c0-finish",
+   "kind": "transition",
+   "label": "finish consume 0",
+   "parentId": null
+  },
+  {
+   "id": "c1-idle",
+   "kind": "place",
+   "label": "consumer 1 idle",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "c1-take",
+   "kind": "transition",
+   "label": "take item 1",
+   "parentId": null
+  },
+  {
+   "id": "c1-busy",
+   "kind": "place",
+   "label": "consumer 1 busy",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "c1-finish",
+   "kind": "transition",
+   "label": "finish consume 1",
+   "parentId": null
+  }
+ ]
+}

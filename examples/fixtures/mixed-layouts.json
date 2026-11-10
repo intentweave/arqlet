@@ -1,0 +1,228 @@
+{
+ "containerDirections": {
+  "mesh": "auto",
+  "ops": "tb",
+  "pipeline": "lr"
+ },
+ "containerStrategies": {
+  "ops": "none",
+  "pipeline": "none"
+ },
+ "defaultDirection": "auto",
+ "defaultRouting": "straight",
+ "defaultStrategy": "organic",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "calls",
+   "source": "users",
+   "target": "gateway"
+  },
+  {
+   "id": "e2",
+   "kind": "calls",
+   "source": "gateway",
+   "target": "auth"
+  },
+  {
+   "id": "e3",
+   "kind": "calls",
+   "source": "gateway",
+   "target": "orders"
+  },
+  {
+   "id": "e4",
+   "kind": "calls",
+   "source": "orders",
+   "target": "billing"
+  },
+  {
+   "id": "e5",
+   "kind": "calls",
+   "source": "orders",
+   "target": "cache"
+  },
+  {
+   "id": "e6",
+   "kind": "calls",
+   "source": "search",
+   "target": "cache"
+  },
+  {
+   "id": "e7",
+   "kind": "calls",
+   "source": "billing",
+   "target": "db"
+  },
+  {
+   "id": "e8",
+   "kind": "calls",
+   "source": "orders",
+   "target": "db"
+  },
+  {
+   "id": "e9",
+   "kind": "calls",
+   "source": "checkout",
+   "target": "compile"
+  },
+  {
+   "id": "e10",
+   "kind": "calls",
+   "source": "compile",
+   "target": "test"
+  },
+  {
+   "id": "e11",
+   "kind": "calls",
+   "source": "test",
+   "target": "package"
+  },
+  {
+   "id": "e12",
+   "kind": "calls",
+   "source": "package",
+   "target": "gateway"
+  },
+  {
+   "id": "e13",
+   "kind": "calls",
+   "source": "alerts",
+   "target": "pager"
+  },
+  {
+   "id": "e14",
+   "kind": "calls",
+   "source": "pager",
+   "target": "runbook"
+  },
+  {
+   "id": "e15",
+   "kind": "calls",
+   "source": "alerts",
+   "target": "orders"
+  },
+  {
+   "id": "e16",
+   "kind": "calls",
+   "source": "auth",
+   "target": "search"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "users",
+   "kind": "actor",
+   "label": "users",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "gateway",
+   "kind": "service",
+   "label": "gateway",
+   "parentId": null
+  },
+  {
+   "id": "db",
+   "kind": "store",
+   "label": "database",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "mesh",
+   "kind": "container",
+   "label": "service mesh",
+   "parentId": null,
+   "shape": "circle"
+  },
+  {
+   "id": "auth",
+   "kind": "service",
+   "label": "auth",
+   "parentId": "mesh",
+   "shape": "circle"
+  },
+  {
+   "id": "orders",
+   "kind": "service",
+   "label": "orders",
+   "parentId": "mesh"
+  },
+  {
+   "id": "billing",
+   "kind": "service",
+   "label": "billing",
+   "parentId": "mesh"
+  },
+  {
+   "id": "search",
+   "kind": "service",
+   "label": "search",
+   "parentId": "mesh",
+   "shape": "circle"
+  },
+  {
+   "id": "cache",
+   "kind": "service",
+   "label": "cache",
+   "parentId": "mesh"
+  },
+  {
+   "id": "pipeline",
+   "kind": "container",
+   "label": "build pipeline",
+   "parentId": null
+  },
+  {
+   "id": "checkout",
+   "kind": "step",
+   "label": "checkout",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "compile",
+   "kind": "step",
+   "label": "compile",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "test",
+   "kind": "step",
+   "label": "test",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "package",
+   "kind": "step",
+   "label": "package",
+   "parentId": "pipeline"
+  },
+  {
+   "id": "ops",
+   "kind": "container",
+   "label": "operations",
+   "parentId": null
+  },
+  {
+   "id": "alerts",
+   "kind": "tool",
+   "label": "alerts",
+   "parentId": "ops",
+   "shape": "circle"
+  },
+  {
+   "id": "pager",
+   "kind": "tool",
+   "label": "pager",
+   "parentId": "ops"
+  },
+  {
+   "id": "runbook",
+   "kind": "tool",
+   "label": "runbook",
+   "parentId": "ops"
+  }
+ ]
+}

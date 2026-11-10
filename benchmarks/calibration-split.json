@@ -1,0 +1,27 @@
+{
+  "rule": "Views of one graph stay on one side. Singleton graphs sorted by name: the first four are tune, the rest judge. layerweave-code and synthetic-2k (three views each) are tune. Fixed before any candidate comparison.",
+  "tune": [
+    "cloud-architecture 100",
+    "activity-order 100",
+    "deployment-cluster 100",
+    "bpmn-pools 100",
+    "layerweave-code 25",
+    "layerweave-code 50",
+    "layerweave-code 100",
+    "synthetic-2k 25",
+    "synthetic-2k 50",
+    "synthetic-2k 100"
+  ],
+  "judge": [
+    "state-order 100",
+    "state-tcp 100",
+    "workflow-dag 100",
+    "arqlet-pipeline 100",
+    "org-chart 100",
+    "uml-class 100",
+    "er-diagram 100",
+    "network-vlan 100",
+    "petri-net 100",
+    "intentweave-export 100"
+  ]
+}

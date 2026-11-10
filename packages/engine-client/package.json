@@ -1,0 +1,74 @@
+{
+  "name": "@arqlet/engine-client",
+  "version": "0.1.0",
+  "description": "The Arqlet graph-layout engine as WebAssembly, with a loader, a worker protocol, an ELK-style layout call and preset sequencing. Provisional.",
+  "keywords": [
+    "graph",
+    "layout",
+    "graph-layout",
+    "diagram",
+    "wasm",
+    "elk",
+    "worker"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Benjamin Becker",
+  "homepage": "https://github.com/intentweave/arqlet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intentweave/arqlet.git",
+    "directory": "packages/engine-client"
+  },
+  "bugs": {
+    "url": "https://github.com/intentweave/arqlet/issues"
+  },
+  "type": "module",
+  "sideEffects": [
+    "./worker.js"
+  ],
+  "exports": {
+    "./engine.js": {
+      "types": "./engine.d.ts",
+      "default": "./engine.js"
+    },
+    "./wasm-client.js": {
+      "types": "./wasm-client.d.ts",
+      "default": "./wasm-client.js"
+    },
+    "./presets.js": {
+      "types": "./presets.d.ts",
+      "default": "./presets.js"
+    },
+    "./elk.js": {
+      "types": "./elk.d.ts",
+      "default": "./elk.js"
+    },
+    "./worker.js": "./worker.js",
+    "./arqlet.wasm": "./arqlet.wasm"
+  },
+  "files": [
+    "engine.js",
+    "wasm-client.js",
+    "presets.js",
+    "elk.js",
+    "engine.d.ts",
+    "wasm-client.d.ts",
+    "presets.d.ts",
+    "elk.d.ts",
+    "worker.js",
+    "arqlet.wasm",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepack": "node ../../tools/npm-prepack.mjs --wasm"
+  },
+  "dependencies": {
+    "@arqlet/contracts": "workspace:^"
+  }
+}

@@ -1,0 +1,1027 @@
+{
+ "kind": "single-pass-comparison",
+ "generatedAt": "2026-11-06T18:53:11.670Z",
+ "reps": 1,
+ "environment": {
+  "cpu": "Apple M3",
+  "logicalCpus": 8,
+  "os": "darwin",
+  "arch": "arm64",
+  "node": "v24.21.0",
+  "revision": "d14db4513e7364102032306d560785d3927aef21",
+  "dirty": true,
+  "loadStart": [
+   21.5341796875,
+   10.93603515625,
+   7.791015625
+  ],
+  "loadEnd": [
+   21.5341796875,
+   10.93603515625,
+   7.791015625
+  ]
+ },
+ "binary": "d4fa320d9ce8d80b818f4b57a85f94a134b10666775c97095ace12f6dedd62b7",
+ "input": {
+  "corpus": true,
+  "limit": 150,
+  "uniformDirection": true,
+  "orthogonal": true,
+  "autoDirection": "lr"
+ },
+ "note": "Public arms: import plus refine through two layout-command processes with JSON transport. elk-rs: layout() only, in-process. Shared-machine diagnostic unless stated otherwise.",
+ "cases": [
+  {
+   "name": "activity-order",
+   "nodes": 31,
+   "edges": 40,
+   "arms": {
+    "singlePass": {
+     "importMs": 5.921499999999924,
+     "pipelineMs": 9.500082999999904,
+     "initial": {
+      "totalCrossings": 14,
+      "crossings": 14,
+      "sharedEndpointCrossings": 0,
+      "bends": 90,
+      "lineNodeHits": 0,
+      "area": 1885680,
+      "length": 15665
+     },
+     "refined": {
+      "totalCrossings": 14,
+      "crossings": 14,
+      "sharedEndpointCrossings": 0,
+      "bends": 90,
+      "lineNodeHits": 0,
+      "area": 1885680,
+      "length": 15665
+     },
+     "diagnostic": "Single pass: 40 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "bpmn-pools",
+   "nodes": 26,
+   "edges": 24,
+   "arms": {
+    "singlePass": {
+     "importMs": 4.826332999999977,
+     "pipelineMs": 8.162374999999884,
+     "initial": {
+      "totalCrossings": 1,
+      "crossings": 1,
+      "sharedEndpointCrossings": 0,
+      "bends": 32,
+      "lineNodeHits": 0,
+      "area": 1517556,
+      "length": 9647
+     },
+     "refined": {
+      "totalCrossings": 1,
+      "crossings": 1,
+      "sharedEndpointCrossings": 0,
+      "bends": 32,
+      "lineNodeHits": 0,
+      "area": 1517556,
+      "length": 9647
+     },
+     "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "cloud-architecture",
+   "nodes": 34,
+   "edges": 32,
+   "arms": {
+    "singlePass": {
+     "importMs": 7.754666999999927,
+     "pipelineMs": 11.763790999999856,
+     "initial": {
+      "totalCrossings": 15,
+      "crossings": 13,
+      "sharedEndpointCrossings": 2,
+      "bends": 110,
+      "lineNodeHits": 0,
+      "area": 4546620,
+      "length": 35831
+     },
+     "refined": {
+      "totalCrossings": 15,
+      "crossings": 13,
+      "sharedEndpointCrossings": 2,
+      "bends": 110,
+      "lineNodeHits": 0,
+      "area": 4546620,
+      "length": 35831
+     },
+     "diagnostic": "Single pass: 32 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "deployment-cluster",
+   "nodes": 33,
+   "edges": 56,
+   "arms": {
+    "singlePass": {
+     "importMs": 11.020540999999866,
+     "pipelineMs": 16.79858399999989,
+     "initial": {
+      "totalCrossings": 114,
+      "crossings": 82,
+      "sharedEndpointCrossings": 32,
+      "bends": 250,
+      "lineNodeHits": 0,
+      "area": 4260354,
+      "length": 59901
+     },
+     "refined": {
+      "totalCrossings": 114,
+      "crossings": 82,
+      "sharedEndpointCrossings": 32,
+      "bends": 250,
+      "lineNodeHits": 0,
+      "area": 4260354,
+      "length": 59901
+     },
+     "diagnostic": "Single pass: 56 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "er-diagram",
+   "nodes": 44,
+   "edges": 12,
+   "arms": {
+    "singlePass": {
+     "importMs": 4.1207090000000335,
+     "pipelineMs": 7.413540999999896,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 15,
+      "lineNodeHits": 0,
+      "area": 1828827,
+      "length": 3313
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 15,
+      "lineNodeHits": 0,
+      "area": 1828827,
+      "length": 3313
+     },
+     "diagnostic": "Single pass: 11 constructed, 1 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "fixed-ports",
+   "nodes": 5,
+   "edges": 7,
+   "arms": {
+    "singlePass": {
+     "importMs": 2.353125000000091,
+     "pipelineMs": 4.776708000000099,
+     "initial": {
+      "totalCrossings": 1,
+      "crossings": 0,
+      "sharedEndpointCrossings": 1,
+      "bends": 12,
+      "lineNodeHits": 0,
+      "area": 147744,
+      "length": 2216
+     },
+     "refined": {
+      "totalCrossings": 1,
+      "crossings": 0,
+      "sharedEndpointCrossings": 1,
+      "bends": 12,
+      "lineNodeHits": 0,
+      "area": 147744,
+      "length": 2216
+     },
+     "diagnostic": "Single pass: 3 constructed, 4 delegated drawn as seed routes, 1 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "layerweave-code",
+   "nodes": 198,
+   "edges": 336,
+   "arms": {
+    "singlePass": {
+     "importMs": 145.34020799999985,
+     "pipelineMs": 176.82899999999995,
+     "initial": {
+      "totalCrossings": 2432,
+      "crossings": 2173,
+      "sharedEndpointCrossings": 259,
+      "bends": 1533,
+      "lineNodeHits": 0,
+      "area": 291188826,
+      "length": 1794944
+     },
+     "refined": {
+      "totalCrossings": 2432,
+      "crossings": 2173,
+      "sharedEndpointCrossings": 259,
+      "bends": 1533,
+      "lineNodeHits": 0,
+      "area": 291188826,
+      "length": 1794944
+     },
+     "diagnostic": "Single pass: 325 constructed, 11 delegated drawn as seed routes, 7 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "layerweave-pipeline",
+   "nodes": 32,
+   "edges": 33,
+   "arms": {
+    "singlePass": {
+     "importMs": 6.718832999999904,
+     "pipelineMs": 10.410624999999982,
+     "initial": {
+      "totalCrossings": 5,
+      "crossings": 5,
+      "sharedEndpointCrossings": 0,
+      "bends": 66,
+      "lineNodeHits": 0,
+      "area": 4015800,
+      "length": 18061
+     },
+     "refined": {
+      "totalCrossings": 5,
+      "crossings": 5,
+      "sharedEndpointCrossings": 0,
+      "bends": 66,
+      "lineNodeHits": 0,
+      "area": 4015800,
+      "length": 18061
+     },
+     "diagnostic": "Single pass: 33 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "mixed-large",
+   "nodes": 96,
+   "edges": 95,
+   "arms": {
+    "singlePass": {
+     "importMs": 32.837582999999995,
+     "pipelineMs": 42.67745799999989,
+     "initial": {
+      "totalCrossings": 533,
+      "crossings": 499,
+      "sharedEndpointCrossings": 34,
+      "bends": 475,
+      "lineNodeHits": 46,
+      "area": 28554336,
+      "length": 278705
+     },
+     "refined": {
+      "totalCrossings": 533,
+      "crossings": 499,
+      "sharedEndpointCrossings": 34,
+      "bends": 475,
+      "lineNodeHits": 46,
+      "area": 28554336,
+      "length": 278705
+     },
+     "diagnostic": "Single pass: 79 constructed, 16 delegated drawn as seed routes, 13 unresolved strict track pairs",
+     "geometryIssues": 3,
+     "routingIssues": 2
+    }
+   }
+  },
+  {
+   "name": "mixed-layouts",
+   "nodes": 18,
+   "edges": 16,
+   "arms": {
+    "singlePass": {
+     "importMs": 3.864332999999988,
+     "pipelineMs": 6.807375000000093,
+     "initial": {
+      "totalCrossings": 6,
+      "crossings": 4,
+      "sharedEndpointCrossings": 2,
+      "bends": 32,
+      "lineNodeHits": 7,
+      "area": 1565280,
+      "length": 6045
+     },
+     "refined": {
+      "totalCrossings": 6,
+      "crossings": 4,
+      "sharedEndpointCrossings": 2,
+      "bends": 32,
+      "lineNodeHits": 7,
+      "area": 1565280,
+      "length": 6045
+     },
+     "diagnostic": "Single pass: 15 constructed, 1 delegated drawn as seed routes, 2 unresolved strict track pairs",
+     "geometryIssues": 1,
+     "routingIssues": 1
+    }
+   }
+  },
+  {
+   "name": "nested-tree-radial",
+   "nodes": 160,
+   "edges": 121,
+   "arms": {
+    "singlePass": {
+     "importMs": 12.48679100000004,
+     "pipelineMs": 20.397249999999985,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 72,
+      "lineNodeHits": 0,
+      "area": 15519300,
+      "length": 12345
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 72,
+      "lineNodeHits": 0,
+      "area": 15519300,
+      "length": 12345
+     },
+     "diagnostic": "Single pass: 121 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "network-vlan",
+   "nodes": 37,
+   "edges": 47,
+   "arms": {
+    "singlePass": {
+     "importMs": 6.236417000000074,
+     "pipelineMs": 10.255541999999878,
+     "initial": {
+      "totalCrossings": 24,
+      "crossings": 23,
+      "sharedEndpointCrossings": 1,
+      "bends": 124,
+      "lineNodeHits": 0,
+      "area": 4729536,
+      "length": 54335
+     },
+     "refined": {
+      "totalCrossings": 24,
+      "crossings": 23,
+      "sharedEndpointCrossings": 1,
+      "bends": 124,
+      "lineNodeHits": 0,
+      "area": 4729536,
+      "length": 54335
+     },
+     "diagnostic": "Single pass: 47 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "org-chart",
+   "nodes": 104,
+   "edges": 82,
+   "arms": {
+    "singlePass": {
+     "importMs": 13.924417000000176,
+     "pipelineMs": 21.921708000000308,
+     "initial": {
+      "totalCrossings": 31,
+      "crossings": 21,
+      "sharedEndpointCrossings": 10,
+      "bends": 184,
+      "lineNodeHits": 0,
+      "area": 21825000,
+      "length": 78582
+     },
+     "refined": {
+      "totalCrossings": 31,
+      "crossings": 21,
+      "sharedEndpointCrossings": 10,
+      "bends": 184,
+      "lineNodeHits": 0,
+      "area": 21825000,
+      "length": 78582
+     },
+     "diagnostic": "Single pass: 82 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "organic-100",
+   "nodes": 100,
+   "edges": 119,
+   "arms": {
+    "singlePass": {
+     "importMs": 13.584499999999935,
+     "pipelineMs": 20.114665999999943,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 124,
+      "lineNodeHits": 0,
+      "area": 3321864,
+      "length": 27216
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 124,
+      "lineNodeHits": 0,
+      "area": 3321864,
+      "length": 27216
+     },
+     "diagnostic": "Single pass: 119 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "organic-200",
+   "nodes": 150,
+   "edges": 177,
+   "arms": {
+    "singlePass": {
+     "importMs": 21.554791000000023,
+     "pipelineMs": 30.59100000000035,
+     "initial": {
+      "totalCrossings": 2,
+      "crossings": 2,
+      "sharedEndpointCrossings": 0,
+      "bends": 180,
+      "lineNodeHits": 0,
+      "area": 7787640,
+      "length": 49258
+     },
+     "refined": {
+      "totalCrossings": 2,
+      "crossings": 2,
+      "sharedEndpointCrossings": 0,
+      "bends": 180,
+      "lineNodeHits": 0,
+      "area": 7787640,
+      "length": 49258
+     },
+     "diagnostic": "Single pass: 177 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "organic-25",
+   "nodes": 25,
+   "edges": 29,
+   "arms": {
+    "singlePass": {
+     "importMs": 3.7756249999997635,
+     "pipelineMs": 6.556374999999662,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 34,
+      "lineNodeHits": 0,
+      "area": 805806,
+      "length": 5830
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 34,
+      "lineNodeHits": 0,
+      "area": 805806,
+      "length": 5830
+     },
+     "diagnostic": "Single pass: 29 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "organic-300",
+   "nodes": 150,
+   "edges": 178,
+   "arms": {
+    "singlePass": {
+     "importMs": 26.421542000000045,
+     "pipelineMs": 36.39429199999995,
+     "initial": {
+      "totalCrossings": 4,
+      "crossings": 4,
+      "sharedEndpointCrossings": 0,
+      "bends": 182,
+      "lineNodeHits": 0,
+      "area": 9974580,
+      "length": 115330
+     },
+     "refined": {
+      "totalCrossings": 4,
+      "crossings": 4,
+      "sharedEndpointCrossings": 0,
+      "bends": 182,
+      "lineNodeHits": 0,
+      "area": 9974580,
+      "length": 115330
+     },
+     "diagnostic": "Single pass: 178 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "organic-50",
+   "nodes": 50,
+   "edges": 59,
+   "arms": {
+    "singlePass": {
+     "importMs": 6.513958000000002,
+     "pipelineMs": 10.79320800000005,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 66,
+      "lineNodeHits": 0,
+      "area": 1383504,
+      "length": 14390
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 66,
+      "lineNodeHits": 0,
+      "area": 1383504,
+      "length": 14390
+     },
+     "diagnostic": "Single pass: 59 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "petri-net",
+   "nodes": 24,
+   "edges": 41,
+   "arms": {
+    "singlePass": {
+     "importMs": 6.151791999999659,
+     "pipelineMs": 9.53604200000018,
+     "initial": {
+      "totalCrossings": 32,
+      "crossings": 32,
+      "sharedEndpointCrossings": 0,
+      "bends": 84,
+      "lineNodeHits": 0,
+      "area": 1512288,
+      "length": 26744
+     },
+     "refined": {
+      "totalCrossings": 32,
+      "crossings": 32,
+      "sharedEndpointCrossings": 0,
+      "bends": 84,
+      "lineNodeHits": 0,
+      "area": 1512288,
+      "length": 26744
+     },
+     "diagnostic": "Single pass: 41 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "petri-net-shapes",
+   "nodes": 24,
+   "edges": 41,
+   "arms": {
+    "singlePass": {
+     "importMs": 7.524832999999944,
+     "pipelineMs": 11.35891700000002,
+     "initial": {
+      "totalCrossings": 44,
+      "crossings": 32,
+      "sharedEndpointCrossings": 12,
+      "bends": 102,
+      "lineNodeHits": 35,
+      "area": 2020429,
+      "length": 27092
+     },
+     "refined": {
+      "totalCrossings": 44,
+      "crossings": 32,
+      "sharedEndpointCrossings": 12,
+      "bends": 102,
+      "lineNodeHits": 35,
+      "area": 2020429,
+      "length": 27092
+     },
+     "diagnostic": "Single pass: 30 constructed, 11 delegated drawn as seed routes, 9 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "self-loops",
+   "nodes": 9,
+   "edges": 20,
+   "arms": {
+    "singlePass": {
+     "importMs": 2.493916999999783,
+     "pipelineMs": 4.832791999999699,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 42,
+      "lineNodeHits": 7,
+      "area": 258672,
+      "length": 2680
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 42,
+      "lineNodeHits": 7,
+      "area": 258672,
+      "length": 2680
+     },
+     "diagnostic": "Single pass: 10 constructed, 10 delegated drawn as seed routes, 5 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "state-order",
+   "nodes": 11,
+   "edges": 14,
+   "arms": {
+    "singlePass": {
+     "importMs": 2.686583000000155,
+     "pipelineMs": 4.7731659999999465,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 19,
+      "lineNodeHits": 0,
+      "area": 444150,
+      "length": 2492
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 19,
+      "lineNodeHits": 0,
+      "area": 444150,
+      "length": 2492
+     },
+     "diagnostic": "Single pass: 13 constructed, 1 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "state-tcp",
+   "nodes": 11,
+   "edges": 19,
+   "arms": {
+    "singlePass": {
+     "importMs": 2.982792000000245,
+     "pipelineMs": 5.310542000000169,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 26,
+      "lineNodeHits": 0,
+      "area": 396480,
+      "length": 6230
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 26,
+      "lineNodeHits": 0,
+      "area": 396480,
+      "length": 6230
+     },
+     "diagnostic": "Single pass: 19 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "synthetic-2k",
+   "nodes": 231,
+   "edges": 318,
+   "arms": {
+    "singlePass": {
+     "importMs": 146.58295799999996,
+     "pipelineMs": 179.11466599999994,
+     "initial": {
+      "totalCrossings": 1817,
+      "crossings": 1708,
+      "sharedEndpointCrossings": 109,
+      "bends": 1512,
+      "lineNodeHits": 0,
+      "area": 97290081,
+      "length": 856055
+     },
+     "refined": {
+      "totalCrossings": 1817,
+      "crossings": 1708,
+      "sharedEndpointCrossings": 109,
+      "bends": 1512,
+      "lineNodeHits": 0,
+      "area": 97290081,
+      "length": 856055
+     },
+     "diagnostic": "Single pass: 306 constructed, 12 delegated drawn as seed routes, 3 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "tree-100",
+   "nodes": 100,
+   "edges": 99,
+   "arms": {
+    "singlePass": {
+     "importMs": 10.16274999999996,
+     "pipelineMs": 15.896708000000217,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 130,
+      "lineNodeHits": 0,
+      "area": 7754112,
+      "length": 31692
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 130,
+      "lineNodeHits": 0,
+      "area": 7754112,
+      "length": 31692
+     },
+     "diagnostic": "Single pass: 99 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "tree-200",
+   "nodes": 150,
+   "edges": 149,
+   "arms": {
+    "singlePass": {
+     "importMs": 17.731292000000394,
+     "pipelineMs": 25.683583,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 198,
+      "lineNodeHits": 0,
+      "area": 13353120,
+      "length": 53941
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 198,
+      "lineNodeHits": 0,
+      "area": 13353120,
+      "length": 53941
+     },
+     "diagnostic": "Single pass: 149 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "tree-25",
+   "nodes": 25,
+   "edges": 24,
+   "arms": {
+    "singlePass": {
+     "importMs": 3.201416999999765,
+     "pipelineMs": 5.617874999999913,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 30,
+      "lineNodeHits": 0,
+      "area": 1328676,
+      "length": 5760
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 30,
+      "lineNodeHits": 0,
+      "area": 1328676,
+      "length": 5760
+     },
+     "diagnostic": "Single pass: 24 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "tree-300",
+   "nodes": 150,
+   "edges": 149,
+   "arms": {
+    "singlePass": {
+     "importMs": 17.727374999999938,
+     "pipelineMs": 25.505791000000045,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 198,
+      "lineNodeHits": 0,
+      "area": 13353120,
+      "length": 53941
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 198,
+      "lineNodeHits": 0,
+      "area": 13353120,
+      "length": 53941
+     },
+     "diagnostic": "Single pass: 149 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "tree-50",
+   "nodes": 50,
+   "edges": 49,
+   "arms": {
+    "singlePass": {
+     "importMs": 4.940707999999631,
+     "pipelineMs": 8.443291000000045,
+     "initial": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 64,
+      "lineNodeHits": 0,
+      "area": 3268944,
+      "length": 13723
+     },
+     "refined": {
+      "totalCrossings": 0,
+      "crossings": 0,
+      "sharedEndpointCrossings": 0,
+      "bends": 64,
+      "lineNodeHits": 0,
+      "area": 3268944,
+      "length": 13723
+     },
+     "diagnostic": "Single pass: 49 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "uml-class",
+   "nodes": 43,
+   "edges": 24,
+   "arms": {
+    "singlePass": {
+     "importMs": 5.707625000000007,
+     "pipelineMs": 9.133791000000201,
+     "initial": {
+      "totalCrossings": 1,
+      "crossings": 0,
+      "sharedEndpointCrossings": 1,
+      "bends": 37,
+      "lineNodeHits": 0,
+      "area": 2898642,
+      "length": 9452
+     },
+     "refined": {
+      "totalCrossings": 1,
+      "crossings": 0,
+      "sharedEndpointCrossings": 1,
+      "bends": 37,
+      "lineNodeHits": 0,
+      "area": 2898642,
+      "length": 9452
+     },
+     "diagnostic": "Single pass: 23 constructed, 1 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "nodes": 72,
+   "edges": 125,
+   "arms": {
+    "singlePass": {
+     "importMs": 16.100750000000062,
+     "pipelineMs": 24.20074999999997,
+     "initial": {
+      "totalCrossings": 234,
+      "crossings": 200,
+      "sharedEndpointCrossings": 34,
+      "bends": 448,
+      "lineNodeHits": 0,
+      "area": 3030480,
+      "length": 44583
+     },
+     "refined": {
+      "totalCrossings": 234,
+      "crossings": 200,
+      "sharedEndpointCrossings": 34,
+      "bends": 448,
+      "lineNodeHits": 0,
+      "area": 3030480,
+      "length": 44583
+     },
+     "diagnostic": "Single pass: 125 constructed, 0 delegated drawn as seed routes, 0 unresolved strict track pairs",
+     "geometryIssues": 0,
+     "routingIssues": 0
+    }
+   }
+  }
+ ]
+}

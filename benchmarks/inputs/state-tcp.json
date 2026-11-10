@@ -1,0 +1,188 @@
+{
+ "containerDirections": {},
+ "defaultDirection": "lr",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "passive open",
+   "source": "CLOSED",
+   "target": "LISTEN"
+  },
+  {
+   "id": "e2",
+   "kind": "active open",
+   "source": "CLOSED",
+   "target": "SYN_SENT"
+  },
+  {
+   "id": "e3",
+   "kind": "recv SYN",
+   "source": "LISTEN",
+   "target": "SYN_RCVD"
+  },
+  {
+   "id": "e4",
+   "kind": "send SYN",
+   "source": "LISTEN",
+   "target": "SYN_SENT"
+  },
+  {
+   "id": "e5",
+   "kind": "close",
+   "source": "LISTEN",
+   "target": "CLOSED"
+  },
+  {
+   "id": "e6",
+   "kind": "recv SYN",
+   "source": "SYN_SENT",
+   "target": "SYN_RCVD"
+  },
+  {
+   "id": "e7",
+   "kind": "recv SYN+ACK",
+   "source": "SYN_SENT",
+   "target": "ESTABLISHED"
+  },
+  {
+   "id": "e8",
+   "kind": "close",
+   "source": "SYN_SENT",
+   "target": "CLOSED"
+  },
+  {
+   "id": "e9",
+   "kind": "recv ACK",
+   "source": "SYN_RCVD",
+   "target": "ESTABLISHED"
+  },
+  {
+   "id": "e10",
+   "kind": "close",
+   "source": "SYN_RCVD",
+   "target": "FIN_WAIT_1"
+  },
+  {
+   "id": "e11",
+   "kind": "close",
+   "source": "ESTABLISHED",
+   "target": "FIN_WAIT_1"
+  },
+  {
+   "id": "e12",
+   "kind": "recv FIN",
+   "source": "ESTABLISHED",
+   "target": "CLOSE_WAIT"
+  },
+  {
+   "id": "e13",
+   "kind": "recv ACK",
+   "source": "FIN_WAIT_1",
+   "target": "FIN_WAIT_2"
+  },
+  {
+   "id": "e14",
+   "kind": "recv FIN",
+   "source": "FIN_WAIT_1",
+   "target": "CLOSING"
+  },
+  {
+   "id": "e15",
+   "kind": "recv FIN",
+   "source": "FIN_WAIT_2",
+   "target": "TIME_WAIT"
+  },
+  {
+   "id": "e16",
+   "kind": "recv ACK",
+   "source": "CLOSING",
+   "target": "TIME_WAIT"
+  },
+  {
+   "id": "e17",
+   "kind": "close",
+   "source": "CLOSE_WAIT",
+   "target": "LAST_ACK"
+  },
+  {
+   "id": "e18",
+   "kind": "recv ACK",
+   "source": "LAST_ACK",
+   "target": "CLOSED"
+  },
+  {
+   "id": "e19",
+   "kind": "timeout",
+   "source": "TIME_WAIT",
+   "target": "CLOSED"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "CLOSED",
+   "kind": "state",
+   "label": "CLOSED",
+   "parentId": null
+  },
+  {
+   "id": "LISTEN",
+   "kind": "state",
+   "label": "LISTEN",
+   "parentId": null
+  },
+  {
+   "id": "SYN_SENT",
+   "kind": "state",
+   "label": "SYN_SENT",
+   "parentId": null
+  },
+  {
+   "id": "SYN_RCVD",
+   "kind": "state",
+   "label": "SYN_RCVD",
+   "parentId": null
+  },
+  {
+   "id": "ESTABLISHED",
+   "kind": "state",
+   "label": "ESTABLISHED",
+   "parentId": null
+  },
+  {
+   "id": "FIN_WAIT_1",
+   "kind": "state",
+   "label": "FIN_WAIT_1",
+   "parentId": null
+  },
+  {
+   "id": "FIN_WAIT_2",
+   "kind": "state",
+   "label": "FIN_WAIT_2",
+   "parentId": null
+  },
+  {
+   "id": "CLOSE_WAIT",
+   "kind": "state",
+   "label": "CLOSE_WAIT",
+   "parentId": null
+  },
+  {
+   "id": "CLOSING",
+   "kind": "state",
+   "label": "CLOSING",
+   "parentId": null
+  },
+  {
+   "id": "LAST_ACK",
+   "kind": "state",
+   "label": "LAST_ACK",
+   "parentId": null
+  },
+  {
+   "id": "TIME_WAIT",
+   "kind": "state",
+   "label": "TIME_WAIT",
+   "parentId": null
+  }
+ ]
+}

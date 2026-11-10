@@ -1,0 +1,234 @@
+diff --git a/crates/layout/src/constructive.rs b/crates/layout/src/constructive.rs
+index 8c15f50..dfbe3de 100644
+--- a/crates/layout/src/constructive.rs
++++ b/crates/layout/src/constructive.rs
+@@ -223,6 +223,10 @@ fn construct_with(
+     let (sections, cross_sections): (BTreeMap<usize, Vec<(f64, f64)>>, BTreeSet<usize>) = plans
+         .map(|plans| section_routes(graph, boxes, &prepared, plans, spacing))
+         .unwrap_or_default();
++    // Edges that cross the borders of containers with border nodes are routed in pieces, joined at the border points.
++    let splits: BTreeMap<usize, Vec<Piece>> = plans
++        .map(|plans| split_pieces(graph, boxes, &prepared, plans))
++        .unwrap_or_default();
+     // One construction with the port slots of the `eligible` edges reordered (see below). An edge whose slot was reordered must
+     // be constructed: the general routing would draw it from its own slot, which another edge may hold by then.
+     // The ports follow the ways: on each node side, the constructed edges keep the port slots they have, but take them in the
+@@ -346,6 +350,19 @@ fn construct_with(
+             .map(|(slot, outcome)| match (built[slot].take(), outcome) {
+                 (Some(route), _) => route,
+                 (None, _) if cross_sections.contains(&slot) => Err(Delegation::NoFreeTrack),
++                // A port the reordering moved no longer starts the pieces; the edge is searched as a whole.
++                (None, Ok(p)) if splits.contains_key(&slot) && !moved.contains(&slot) => {
++                    build_split(p, &splits[&slot], &mut assigned, spacing)
++                        .map(Ok)
++                        .unwrap_or_else(|| {
++                            build_edge(
++                                p,
++                                &mut assigned,
++                                spacing.track,
++                                desired.get(&slot).unwrap_or(&unbound),
++                            )
++                        })
++                }
+                 (None, Ok(p)) => build_edge(
+                     p,
+                     &mut assigned,
+@@ -911,6 +928,198 @@ fn section_routes(
+     (out, cross)
+ }
+ 
++/// One piece of an edge routed separately per area (step 6): from `from` to `to` (points in the flow's frame), searched in the
++/// band from `band.0` to `band.1` along the flow, and kept inside `inside` (the container it runs in) when given.
++#[derive(Clone, Debug)]
++struct Piece {
++    from: (f64, f64),
++    to: (f64, f64),
++    band: (f64, f64),
++    inside: Option<Rect>,
++    /// The margin the band keeps from its ends: the routing margin from a node, a track from a border point (the borders of
++    /// nested containers lie closer together than two margins).
++    margins: (bool, bool),
++}
++
++/// The pieces of the edges that cross the borders of containers with border nodes (plan section 4a, step 6): from the start
++/// port to the border point of each container it leaves, through the common area, and from the border point of each
++/// container it enters to the end port. A border point lies on the container's border, on the lane of the edge's border
++/// node. Backward edges and edges without such containers get none.
++fn split_pieces(
++    graph: &Graph,
++    boxes: &BTreeMap<String, Rect>,
++    prepared: &[(usize, Result<Prepared, Delegation>)],
++    plans: &LayeredPlans,
++) -> BTreeMap<usize, Vec<Piece>> {
++    let parent: BTreeMap<&str, &str> = graph
++        .nodes
++        .iter()
++        .map(|n| (n.id.as_str(), n.parent_id.as_deref().unwrap_or("<root>")))
++        .collect();
++    let mut out = BTreeMap::new();
++    for (slot, (index, outcome)) in prepared.iter().enumerate() {
++        let Ok(p) = outcome else { continue };
++        if p.reversed {
++            continue;
++        }
++        let edge = &graph.edges[*index];
++        let Some(target) = edge.target.as_deref() else {
++            continue;
++        };
++        let main = |r: &Rect| {
++            if p.vertical {
++                (r.y, r.y + r.height)
++            } else {
++                (r.x, r.x + r.width)
++            }
++        };
++        // The border point of `area` for this edge: on its far border when leaving, its near border when entering.
++        let border_point = |area: &str, leaving: bool| -> Option<((f64, f64), Rect)> {
++            let plan = plans.get(area)?;
++            let node = plan.borders.get(&edge.id)?;
++            let d = plan.dummies.get(node)?;
++            let r = boxes.get(area)?;
++            let across = if p.vertical {
++                r.x + d.x + d.width / 2.
++            } else {
++                r.y + d.y + d.height / 2.
++            };
++            let (near, far) = main(r);
++            Some(((if leaving { far } else { near }, across), r.clone()))
++        };
++        // The containers from an end up to (not including) the smallest area that holds both ends.
++        let ancestors = |id: &str| -> Vec<String> {
++            let mut out = Vec::new();
++            let mut at = parent.get(id).copied();
++            while let Some(a) = at {
++                out.push(a.to_string());
++                if a == "<root>" {
++                    break;
++                }
++                at = parent.get(a).copied();
++            }
++            out
++        };
++        let (up, down) = (ancestors(&edge.source), ancestors(target));
++        let Some(common) = up.iter().find(|a| down.contains(a)).cloned() else {
++            continue;
++        };
++        let leaving: Vec<&String> = up.iter().take_while(|a| **a != common).collect();
++        let entering: Vec<&String> = down.iter().take_while(|a| **a != common).collect();
++        if leaving.is_empty() && entering.is_empty() {
++            continue;
++        }
++        // The waypoints in order: the start port, the border point of every container left (inner first), of every
++        // container entered (outer first), and the end port; each with the container a piece must stay in.
++        let mut points: Vec<(f64, f64)> = vec![p.from];
++        let mut inside: Vec<Option<Rect>> = Vec::new();
++        let mut complete = true;
++        for area in &leaving {
++            match border_point(area, true) {
++                Some((point, rect)) => {
++                    points.push(point);
++                    // The piece that ends here runs inside the container it leaves.
++                    inside.push(Some(rect));
++                }
++                None => complete = false,
++            }
++        }
++        // The piece through the common area.
++        inside.push(None);
++        for area in entering.iter().rev() {
++            match border_point(area, false) {
++                Some((point, rect)) => {
++                    points.push(point);
++                    // The piece that starts here runs inside the container it enters.
++                    inside.push(Some(rect));
++                }
++                None => complete = false,
++            }
++        }
++        points.push(p.to);
++        if !complete || inside.len() != points.len() - 1 {
++            continue;
++        }
++        let last = points.len() - 2;
++        let pieces: Vec<Piece> = points
++            .windows(2)
++            .zip(inside)
++            .enumerate()
++            .map(|(k, (w, inside))| Piece {
++                from: w[0],
++                to: w[1],
++                band: (w[0].0, w[1].0),
++                inside,
++                margins: (k == 0, k == last),
++            })
++            .collect();
++        out.insert(slot, pieces);
++    }
++    out
++}
++
++/// The route of an edge built in pieces (step 6): each piece is searched like a whole edge, kept apart from the routes
++/// built, and must stay inside its container; `None` when a piece fails (the routes of its earlier pieces are taken back).
++fn build_split(
++    p: &Prepared,
++    pieces: &[Piece],
++    assigned: &mut Vec<Segment>,
++    spacing: Spacing,
++) -> Option<(Route, usize)> {
++    let before = assigned.len();
++    let mut points: Vec<Point> = Vec::new();
++    let mut changes = 0;
++    for piece in pieces {
++        let part = Prepared {
++            edge_id: p.edge_id.clone(),
++            from_node: p.from_node.clone(),
++            to_node: p.to_node.clone(),
++            reversed: false,
++            vertical: p.vertical,
++            from: piece.from,
++            to: piece.to,
++            band: (
++                piece.band.0
++                    + if piece.margins.0 {
++                        spacing.margin
++                    } else {
++                        spacing.track
++                    },
++                piece.band.1
++                    - if piece.margins.1 {
++                        spacing.margin
++                    } else {
++                        spacing.track
++                    },
++            ),
++            obstacles: p.obstacles.clone(),
++            start: to_point(p.vertical, piece.from),
++            end: to_point(p.vertical, piece.to),
++        };
++        let built = (part.band.1 > part.band.0 + EPS && part.to.0 > part.from.0 + EPS)
++            .then(|| build_edge(&part, assigned, spacing.track, &Desired::new()).ok())
++            .flatten()
++            .filter(|(route, _)| {
++                piece.inside.as_ref().is_none_or(|r| {
++                    route.points.iter().all(|q| {
++                        q.x >= r.x - EPS
++                            && q.x <= r.x + r.width + EPS
++                            && q.y >= r.y - EPS
++                            && q.y <= r.y + r.height + EPS
++                    })
++                })
++            });
++        let Some((route, n)) = built else {
++            assigned.truncate(before);
++            return None;
++        };
++        changes += n;
++        let skip = usize::from(!points.is_empty());
++        points.extend(route.points.into_iter().skip(skip));
++    }
++    Some((Route::new(p.edge_id.as_str(), straighten(points)), changes))
++}
++
+ /// The planned route of a prepared edge, when it misses every obstacle and keeps the track spacing from the routes already
+ /// built; it is then recorded like a constructed one.
+ fn build_planned(

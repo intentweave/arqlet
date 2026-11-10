@@ -1,0 +1,73 @@
+{
+  "description": "Two routes from one node cross each other: a shared-endpoint crossing, not a crossing.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 300,
+        "y": 40,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "c",
+        "x": 140,
+        "y": 90,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 50
+          },
+          {
+            "x": 300,
+            "y": 50
+          }
+        ]
+      },
+      {
+        "id": "e2",
+        "source": "a",
+        "target": "c",
+        "points": [
+          {
+            "x": 20,
+            "y": 30
+          },
+          {
+            "x": 150,
+            "y": 30
+          },
+          {
+            "x": 150,
+            "y": 80
+          },
+          {
+            "x": 140,
+            "y": 80
+          }
+        ]
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "crossings": 0,
+    "sharedEndpointCrossings": 1
+  }
+}

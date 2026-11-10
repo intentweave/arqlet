@@ -1,0 +1,150 @@
+{
+ "format": "layerweave-corpus-manifest",
+ "schemaVersion": 1,
+ "cases": [
+  {
+   "id": "state-tcp",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/state-tcp.json",
+   "sha256": "9daf3c2e98b9b5f18b0159c56b62ae2378b40565aaccd6035750fc0bb62b991d",
+   "targets": "cycles, back edges, compact state graph",
+   "status": "present"
+  },
+  {
+   "id": "workflow-dag",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/workflow-dag.json",
+   "sha256": "7be68d4b8f833df33da86ae7d3eacf6094a16cca24043896623ab9f6d02ad54e",
+   "targets": "layering, long connections, varying path lengths",
+   "status": "present"
+  },
+  {
+   "id": "network-vlan",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/network-vlan.json",
+   "sha256": "95178273bb9a74512ff20fb2978721aa643297b03f0e83a74af6f3f6585538c8",
+   "targets": "dense connections, shared channels",
+   "status": "present"
+  },
+  {
+   "id": "uml-class",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/uml-class.json",
+   "sha256": "468be1a253caec754862cd2aecad4a3c19803c8b0ebe3981623b9b246dc5ef08",
+   "targets": "varied relationship kinds and port constellations",
+   "status": "present"
+  },
+  {
+   "id": "bpmn-pools",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/bpmn-pools.json",
+   "sha256": "61cc7d3faa7846e3d4a8c3eda442202d7d079cc6b95f9e34c59bed357a17e396",
+   "targets": "container boundaries (pools are not swimlane support)",
+   "status": "present"
+  },
+  {
+   "id": "org-chart",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/org-chart.json",
+   "sha256": "a91e81c36b395272f00f936488bbf7591b0a9137ddf4df15cc496facab81abb4",
+   "targets": "plain tree, control case: no needless worsening",
+   "status": "present"
+  },
+  {
+   "id": "layerweave-code",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/layerweave-code.json",
+   "sha256": "2642c8700cad9782fd16024e4d9cbcb9e312031ed1e3c225132f5964a3334353",
+   "targets": "real nesting, uneven port counts",
+   "status": "present"
+  },
+  {
+   "id": "synthetic-2k",
+   "role": "benchmark",
+   "file": "benchmarks/inputs/synthetic-2k.json",
+   "sha256": "7eeac300e66d7f51a108419689473a99470cc49e81a7c604b75a4fa8fa7d39f2",
+   "targets": "effort and size growth; visible projection reported separately",
+   "status": "present"
+  },
+  {
+   "id": "ports-fanout",
+   "role": "reference-fixture",
+   "file": "examples/fixtures/reference/ports-fanout.graph.json",
+   "sha256": "0495e08bd18b2c8294e9c9780068ccd9864cbc3493bc81ddfabefd7e2858c796",
+   "targets": "parallel fan-out and port order",
+   "status": "present"
+  },
+  {
+   "id": "cycle-selfloop",
+   "role": "reference-fixture",
+   "file": "examples/fixtures/reference/cycle-selfloop.graph.json",
+   "sha256": "3e6b20e99557ecc4879b18dce183d2f98c37a060994ba5ea8c0d2ebd9a0f918d",
+   "targets": "cycles and self-loops",
+   "status": "present"
+  },
+  {
+   "id": "container-boundary",
+   "role": "reference-fixture",
+   "file": "examples/fixtures/reference/container-boundary.graph.json",
+   "sha256": "2cc9074c2a4f1d472c53300483d9f15897dcf348c70a4f92179ed2d31c26f342",
+   "targets": "container boundary attachments",
+   "status": "present"
+  },
+  {
+   "id": "state-tcp-moved",
+   "role": "reference-fixture",
+   "file": "examples/fixtures/reference/state-tcp-moved.lwref.json",
+   "sha256": "d2910e49b754e2ca5edb34f5907ecdca0cf4138aeaf0d49a3959267aeac0d772",
+   "targets": "hand-edited curated reference (round-trip)",
+   "status": "present"
+  },
+  {
+   "id": "diagnostic-port-density",
+   "role": "planned",
+   "file": null,
+   "sha256": null,
+   "targets": "high port density on one side",
+   "status": "planned"
+  },
+  {
+   "id": "diagnostic-narrow-channel",
+   "role": "planned",
+   "file": null,
+   "sha256": null,
+   "targets": "narrow channels between nodes",
+   "status": "planned"
+  },
+  {
+   "id": "diagnostic-explicit-ports",
+   "role": "planned",
+   "file": null,
+   "sha256": null,
+   "targets": "explicit ports fixed among automatic ones",
+   "status": "planned"
+  },
+  {
+   "id": "diagnostic-pins",
+   "role": "planned",
+   "file": null,
+   "sha256": null,
+   "targets": "pinned nodes",
+   "status": "planned"
+  },
+  {
+   "id": "diagnostic-labels",
+   "role": "planned",
+   "file": null,
+   "sha256": null,
+   "targets": "labels reserving space",
+   "status": "planned"
+  },
+  {
+   "id": "real-excerpt",
+   "role": "planned",
+   "file": null,
+   "sha256": null,
+   "targets": "frozen real Intentweave excerpt with its boundary context (no export in this checkout)",
+   "status": "planned"
+  }
+ ]
+}

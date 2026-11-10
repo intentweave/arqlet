@@ -1,0 +1,10 @@
+{"dataset":"petri-net","areas":1,"adjacentEdges":33,"longEdges":8,"bilayerCrossingsCurrentOrder":30,"bilayerCrossingsBarycenter":23,"routedCrossings":52,"routedAtSharedEndpoints":15}
+{"dataset":"activity-order","areas":4,"adjacentEdges":20,"longEdges":0,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":35,"routedAtSharedEndpoints":35}
+{"dataset":"network-vlan","areas":6,"adjacentEdges":25,"longEdges":0,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":31,"routedAtSharedEndpoints":40}
+{"dataset":"layerweave-pipeline","areas":5,"adjacentEdges":16,"longEdges":4,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":16,"routedAtSharedEndpoints":4}
+{"dataset":"cloud-architecture","areas":5,"adjacentEdges":8,"longEdges":0,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":29,"routedAtSharedEndpoints":6}
+{"dataset":"bpmn-pools","areas":4,"adjacentEdges":12,"longEdges":3,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":7,"routedAtSharedEndpoints":1}
+{"dataset":"uml-class","areas":5,"adjacentEdges":0,"longEdges":0,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":6,"routedAtSharedEndpoints":2}
+{"dataset":"state-order","areas":2,"adjacentEdges":7,"longEdges":2,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":0,"routedAtSharedEndpoints":1}
+{"dataset":"er-diagram","areas":0,"adjacentEdges":0,"longEdges":0,"bilayerCrossingsCurrentOrder":0,"bilayerCrossingsBarycenter":0,"routedCrossings":1,"routedAtSharedEndpoints":3}
+{"dataset":"layerweave-code","areas":11,"adjacentEdges":71,"longEdges":24,"bilayerCrossingsCurrentOrder":12,"bilayerCrossingsBarycenter":10,"routedCrossings":1058,"routedAtSharedEndpoints":269}

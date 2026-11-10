@@ -1,0 +1,270 @@
+{
+ "machine": "Darwin arm64, revision 9e8b292",
+ "date": "2026-10-21",
+ "input": "benchmarks/inputs/state-tcp.json",
+ "profile": "lesbar",
+ "baseline": {
+  "rows": [
+   {
+    "edge": "e1",
+    "manhattan": 56.21913580246911,
+    "routed": 56.21913580246911,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e2",
+    "manhattan": 403.52627314814816,
+    "routed": 403.52627314814816,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e3",
+    "manhattan": 584.219135802469,
+    "routed": 584.219135802469,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e4",
+    "manhattan": 314.007137345679,
+    "routed": 314.007137345679,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e5",
+    "manhattan": 56.21913580246911,
+    "routed": 56.21913580246911,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e6",
+    "manhattan": 79.72627314814815,
+    "routed": 79.72627314814815,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e7",
+    "manhattan": 308.0,
+    "routed": 308.0,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e8",
+    "manhattan": 400.8262731481482,
+    "routed": 400.8262731481482,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e9",
+    "manhattan": 79.72627314814815,
+    "routed": 79.72627314814815,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e10",
+    "manhattan": 308.0,
+    "routed": 308.0,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e11",
+    "manhattan": 79.72627314814815,
+    "routed": 79.72627314814815,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e12",
+    "manhattan": 99.27372685185186,
+    "routed": 99.27372685185186,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e13",
+    "manhattan": 73.0,
+    "routed": 73.0,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e14",
+    "manhattan": 133.0,
+    "routed": 133.0,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e15",
+    "manhattan": 64.0,
+    "routed": 64.0,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e16",
+    "manhattan": 128.5,
+    "routed": 128.5,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e17",
+    "manhattan": 102.0,
+    "routed": 306.0,
+    "ratio": 3.0
+   },
+   {
+    "edge": "e18",
+    "manhattan": 1056.2,
+    "routed": 1056.2,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e19",
+    "manhattan": 1597.9,
+    "routed": 1665.1,
+    "ratio": 1.0420551974466485
+   }
+  ],
+  "width": 1888.0,
+  "height": 210.0,
+  "largest_x_gaps": [
+   308.0,
+   64.0,
+   64.0,
+   64.0,
+   64.0
+  ],
+  "largest_y_gaps": [
+   24.0
+  ],
+  "total_routed": 6195.3,
+  "total_manhattan": 5924.1
+ },
+ "flat": {
+  "rows": [
+   {
+    "edge": "e1",
+    "manhattan": 926.075390625,
+    "routed": 926.075390625,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e2",
+    "manhattan": 1331.2740234375,
+    "routed": 1331.2740234375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e3",
+    "manhattan": 204.609375,
+    "routed": 204.609375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e4",
+    "manhattan": 221.5986328125,
+    "routed": 221.5986328125,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e5",
+    "manhattan": 918.875390625,
+    "routed": 918.875390625,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e6",
+    "manhattan": 331.9892578125,
+    "routed": 331.9892578125,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e7",
+    "manhattan": 1558.0986328125,
+    "routed": 1558.0986328125,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e8",
+    "manhattan": 1333.0740234375,
+    "routed": 1333.0740234375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e9",
+    "manhattan": 1149.609375,
+    "routed": 1149.609375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e10",
+    "manhattan": 265.21875,
+    "routed": 265.21875,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e11",
+    "manhattan": 830.109375,
+    "routed": 830.109375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e12",
+    "manhattan": 361.21875,
+    "routed": 361.21875,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e13",
+    "manhattan": 60.609375,
+    "routed": 60.609375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e14",
+    "manhattan": 303.609375,
+    "routed": 303.609375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e15",
+    "manhattan": 373.21875,
+    "routed": 373.21875,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e16",
+    "manhattan": 225.0,
+    "routed": 225.0,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e17",
+    "manhattan": 144.609375,
+    "routed": 144.609375,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e18",
+    "manhattan": 560.666015625,
+    "routed": 560.666015625,
+    "ratio": 1.0
+   },
+   {
+    "edge": "e19",
+    "manhattan": 113.056640625,
+    "routed": 113.056640625,
+    "ratio": 1.0
+   }
+  ],
+  "width": 1913.6,
+  "height": 555.3,
+  "largest_x_gaps": [
+   89.0,
+   24.6
+  ],
+  "largest_y_gaps": [
+   83.1,
+   45.0,
+   24.6,
+   24.6
+  ],
+  "total_routed": 11212.5,
+  "total_manhattan": 11212.5
+ }
+}

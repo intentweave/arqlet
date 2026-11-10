@@ -1,0 +1,750 @@
+{
+ "kind": "elk-format-comparison",
+ "limit": 150,
+ "rows": [
+  {
+   "name": "activity-order",
+   "nodes": 31,
+   "edges": 40,
+   "elkRs": {
+    "crossings": 36,
+    "bends": 90,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 14,
+    "ms": 18.7
+   },
+   "layerweave": {
+    "crossings": 14,
+    "bends": 82,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 5.9
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "bpmn-pools",
+   "nodes": 26,
+   "edges": 24,
+   "elkRs": {
+    "crossings": 4,
+    "bends": 32,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 7,
+    "ms": 2.3
+   },
+   "layerweave": {
+    "crossings": 1,
+    "bends": 30,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 4.4
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "cloud-architecture",
+   "nodes": 34,
+   "edges": 32,
+   "elkRs": {
+    "crossings": 18,
+    "bends": 106,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 11,
+    "ms": 4.1
+   },
+   "layerweave": {
+    "crossings": 14,
+    "bends": 98,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 6.8
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "deployment-cluster",
+   "nodes": 33,
+   "edges": 56,
+   "elkRs": {
+    "crossings": 71,
+    "bends": 162,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 9,
+    "ms": 6.2
+   },
+   "layerweave": {
+    "crossings": 96,
+    "bends": 212,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 2,
+    "ms": 9.6
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "er-diagram",
+   "nodes": 44,
+   "edges": 12,
+   "elkRs": {
+    "crossings": 1,
+    "bends": 14,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 2.2
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 15,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 3.5
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "fixed-ports",
+   "nodes": 5,
+   "edges": 7,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 12,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 3,
+    "ms": 0.4
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 12,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 2
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "layerweave-code",
+   "nodes": 203,
+   "edges": 294,
+   "elkRs": {
+    "crossings": 1193,
+    "bends": 1492,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 101,
+    "ms": 41.4
+   },
+   "layerweave": {
+    "crossings": 1111,
+    "bends": 1259,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 63.1
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "layerweave-pipeline",
+   "nodes": 32,
+   "edges": 33,
+   "elkRs": {
+    "crossings": 5,
+    "bends": 56,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 8,
+    "ms": 3.2
+   },
+   "layerweave": {
+    "crossings": 5,
+    "bends": 64,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 5.8
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "mixed-large",
+   "nodes": 96,
+   "edges": 95,
+   "elkRs": {
+    "crossings": 625,
+    "bends": 368,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 30,
+    "ms": 11.4
+   },
+   "layerweave": {
+    "crossings": 437,
+    "bends": 346,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 1,
+    "ms": 19
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "mixed-layouts",
+   "nodes": 18,
+   "edges": 16,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 14,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 4,
+    "ms": 1.2
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 18,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 3.2
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "nested-tree-radial",
+   "nodes": 160,
+   "edges": 121,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 62,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 24,
+    "ms": 4.6
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 72,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 11.3
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "network-vlan",
+   "nodes": 37,
+   "edges": 47,
+   "elkRs": {
+    "crossings": 28,
+    "bends": 94,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 10,
+    "ms": 2.7
+   },
+   "layerweave": {
+    "crossings": 24,
+    "bends": 110,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 5.7
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "org-chart",
+   "nodes": 104,
+   "edges": 82,
+   "elkRs": {
+    "crossings": 23,
+    "bends": 148,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 6.9
+   },
+   "layerweave": {
+    "crossings": 29,
+    "bends": 172,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 12.2
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "organic-100",
+   "nodes": 100,
+   "edges": 119,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 72,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 50,
+    "ms": 3.4
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 124,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 12.4
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "organic-200",
+   "nodes": 150,
+   "edges": 177,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 108,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 82,
+    "ms": 5.9
+   },
+   "layerweave": {
+    "crossings": 2,
+    "bends": 180,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 18.7
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "organic-25",
+   "nodes": 25,
+   "edges": 29,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 20,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 9,
+    "ms": 1
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 34,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 3.6
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "organic-300",
+   "nodes": 150,
+   "edges": 178,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 112,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 76,
+    "ms": 5
+   },
+   "layerweave": {
+    "crossings": 4,
+    "bends": 182,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 23.1
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "organic-50",
+   "nodes": 50,
+   "edges": 59,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 40,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 22,
+    "ms": 1.7
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 66,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 6
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "petri-net",
+   "nodes": 24,
+   "edges": 41,
+   "elkRs": {
+    "crossings": 58,
+    "bends": 66,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 19,
+    "ms": 1.5
+   },
+   "layerweave": {
+    "crossings": 32,
+    "bends": 84,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 5.2
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "petri-net-shapes",
+   "nodes": 24,
+   "edges": 41,
+   "elkRs": {
+    "crossings": 58,
+    "bends": 66,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 19,
+    "ms": 1.3
+   },
+   "layerweave": {
+    "crossings": 32,
+    "bends": 84,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 5.1
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "self-loops",
+   "nodes": 9,
+   "edges": 20,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 24,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 1,
+    "ms": 0.7
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 40,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 2.5
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "state-order",
+   "nodes": 11,
+   "edges": 14,
+   "elkRs": {
+    "crossings": 1,
+    "bends": 16,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 4,
+    "ms": 0.7
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 19,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 2.5
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "state-tcp",
+   "nodes": 11,
+   "edges": 19,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 30,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 9,
+    "ms": 0.7
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 26,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 2.7
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "synthetic-2k",
+   "nodes": 231,
+   "edges": 318,
+   "elkRs": {
+    "crossings": 3660,
+    "bends": 1558,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 121,
+    "ms": 35.2
+   },
+   "layerweave": {
+    "crossings": 1791,
+    "bends": 1358,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 4,
+    "ms": 126.1
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "tree-100",
+   "nodes": 100,
+   "edges": 99,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 98,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 51,
+    "ms": 3.5
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 130,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 10
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "tree-200",
+   "nodes": 150,
+   "edges": 149,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 148,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 76,
+    "ms": 3.8
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 198,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 16.1
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "tree-25",
+   "nodes": 25,
+   "edges": 24,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 24,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 13,
+    "ms": 0.8
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 30,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 3
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "tree-300",
+   "nodes": 150,
+   "edges": 149,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 148,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 76,
+    "ms": 3.7
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 198,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 16.1
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "tree-50",
+   "nodes": 50,
+   "edges": 49,
+   "elkRs": {
+    "crossings": 0,
+    "bends": 48,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 25,
+    "ms": 1.5
+   },
+   "layerweave": {
+    "crossings": 0,
+    "bends": 64,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 4.8
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "uml-class",
+   "nodes": 43,
+   "edges": 24,
+   "elkRs": {
+    "crossings": 2,
+    "bends": 38,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 2.3
+   },
+   "layerweave": {
+    "crossings": 1,
+    "bends": 37,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 5.3
+   },
+   "diagnostics": []
+  },
+  {
+   "name": "workflow-dag",
+   "nodes": 72,
+   "edges": 125,
+   "elkRs": {
+    "crossings": 278,
+    "bends": 434,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 16,
+    "ms": 8.8
+   },
+   "layerweave": {
+    "crossings": 230,
+    "bends": 300,
+    "hits": 0,
+    "shared": 0,
+    "overlaps": 0,
+    "hug": 0,
+    "ms": 14.2
+   },
+   "diagnostics": []
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+{"dataset":"layerweave-code","elkRsMs":28.8}
+{"dataset":"deployment-cluster","elkRsMs":4.8}
+{"dataset":"workflow-dag","elkRsMs":8.5}
+{"dataset":"org-chart","elkRsMs":6.9}
+{"dataset":"cloud-architecture","elkRsMs":3.6}
+{"dataset":"network-vlan","elkRsMs":2.3}
+{"dataset":"petri-net","elkRsMs":1.2}
+{"dataset":"uml-class","elkRsMs":2}
+{"dataset":"layerweave-pipeline","elkRsMs":2.3}

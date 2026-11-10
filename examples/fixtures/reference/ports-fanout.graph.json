@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    {"id": "hub", "kind": "symbol", "label": "Hub", "parentId": null},
+    {"id": "a", "kind": "symbol", "label": "A", "parentId": null},
+    {"id": "b", "kind": "symbol", "label": "B", "parentId": null},
+    {"id": "c", "kind": "symbol", "label": "C", "parentId": null},
+    {"id": "d", "kind": "symbol", "label": "D", "parentId": null}
+  ],
+  "edges": [
+    {"id": "h-a", "kind": "calls", "source": "hub", "target": "a"},
+    {"id": "h-a2", "kind": "calls", "source": "hub", "target": "a"},
+    {"id": "h-b", "kind": "calls", "source": "hub", "target": "b"},
+    {"id": "h-c", "kind": "calls", "source": "hub", "target": "c"},
+    {"id": "h-d", "kind": "calls", "source": "hub", "target": "d"},
+    {"id": "a-d", "kind": "calls", "source": "a", "target": "d"}
+  ],
+  "ports": [
+    {"id": "hub-east", "nodeId": "hub", "side": "right", "offset": 0}
+  ],
+  "edgePorts": [
+    {"edgeId": "h-a", "sourcePort": "hub-east", "targetPort": null}
+  ]
+}

@@ -1,0 +1,17 @@
+tune: pairs 124, agree 119, disagree 5
+judge: pairs 122, agree 114, disagree 8
+
+disagreements (side, view, candidate pair, deciding key objective, key order, tier order):
+tune  activity-order 100       0 forward-barycenter vs   5 routing-only  key decided by nearNodeSegments  key +1  tier -1  total 10047274 vs 9966890  geometry activity-order-100/geometry/0.json / activity-order-100/geometry/5.json
+tune  activity-order 100       1 alternating-barycenter vs   4 routing-only  key decided by nearNodeSegments  key +1  tier -1  total 10104226 vs 10087201  geometry activity-order-100/geometry/1.json / activity-order-100/geometry/4.json
+tune  activity-order 100       1 alternating-barycenter vs   5 routing-only  key decided by nearNodeSegments  key +1  tier -1  total 10104226 vs 9966890  geometry activity-order-100/geometry/1.json / activity-order-100/geometry/5.json
+judge er-diagram 100           0 forward-barycenter vs   1 alternating-barycenter  key decided by nearNodeSegments  key +1  tier -1  total 47270464 vs 38058322  geometry er-diagram-100/geometry/0.json / er-diagram-100/geometry/1.json
+judge layerweave-pipeline 100   0 forward-barycenter vs   4 routing-only  key decided by nearNodeSegments  key -1  tier +1  total 27228686 vs 27317272  geometry layerweave-pipeline-100/geometry/0.json / layerweave-pipeline-100/geometry/4.json
+judge petri-net 100            0 forward-barycenter vs   4 routing-only  key decided by nearNodeSegments  key -1  tier +1  total 26771348 vs 26773981  geometry petri-net-100/geometry/0.json / petri-net-100/geometry/4.json
+judge petri-net 100            1 alternating-barycenter vs   2 forward-median-centered  key decided by nearNodeSegments  key -1  tier +1  total 14320848 vs 14712791  geometry petri-net-100/geometry/1.json / petri-net-100/geometry/2.json
+judge petri-net 100            4 routing-only vs   5 routing-only  key decided by nearNodeSegments  key +1  tier -1  total 26773981 vs 26763373  geometry petri-net-100/geometry/4.json / petri-net-100/geometry/5.json
+judge state-tcp 100            1 alternating-barycenter vs   2 forward-median-centered  key decided by nearNodeSegments  key +1  tier -1  total 34368077 vs 32073700  geometry state-tcp-100/geometry/1.json / state-tcp-100/geometry/2.json
+judge state-tcp 100            1 alternating-barycenter vs   3 alternating-median-centered  key decided by nearNodeSegments  key +1  tier -1  total 34368077 vs 33705420  geometry state-tcp-100/geometry/1.json / state-tcp-100/geometry/3.json
+judge state-tcp 100            2 forward-median-centered vs   4 routing-only  key decided by nearNodeSegments  key -1  tier +1  total 32073700 vs 32211665  geometry state-tcp-100/geometry/2.json / state-tcp-100/geometry/4.json
+tune  synthetic-2k 100         0 forward-barycenter vs   1 alternating-barycenter  key decided by sharedRoutePairs  key -1  tier +1  total 134522 vs 139494  geometry synthetic-2k-100/geometry/0.json / synthetic-2k-100/geometry/1.json
+tune  synthetic-2k 25          2 forward-median-centered vs   3 alternating-median-centered  key decided by nearNodeSegments  key -1  tier +1  total 7735274 vs 7761383  geometry synthetic-2k-25/geometry/2.json / synthetic-2k-25/geometry/3.json

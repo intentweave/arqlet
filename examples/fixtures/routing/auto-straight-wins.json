@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    { "id": "a", "kind": "node", "label": "A", "parentId": null },
+    { "id": "b", "kind": "node", "label": "B", "parentId": null },
+    { "id": "c", "kind": "node", "label": "C", "parentId": null },
+    { "id": "d", "kind": "node", "label": "D", "parentId": null }
+  ],
+  "edges": [
+    { "id": "ab", "kind": "flow", "source": "a", "target": "b" },
+    { "id": "cd", "kind": "flow", "source": "c", "target": "d" },
+    { "id": "cb", "kind": "flow", "source": "c", "target": "b" }
+  ],
+  "defaultRouting": "auto"
+}

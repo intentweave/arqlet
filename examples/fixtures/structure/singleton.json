@@ -1,0 +1,13 @@
+{
+  "containerDirections": {},
+  "defaultDirection": "lr",
+  "nodes": [
+    {
+      "id": "only",
+      "kind": "symbol",
+      "label": "only",
+      "parentId": null
+    }
+  ],
+  "edges": []
+}

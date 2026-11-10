@@ -1,0 +1,611 @@
+diff --git a/crates/layout/src/constructive.rs b/crates/layout/src/constructive.rs
+index 3799527..e92aa46 100644
+--- a/crates/layout/src/constructive.rs
++++ b/crates/layout/src/constructive.rs
+@@ -719,24 +719,62 @@ fn section_routes(
+         }
+         out
+     };
+-    // The chain of every edge that can be built from sections: (area, chain key, elements in flow order). The ends of the
+-    // chain are the children of the smallest area that holds both ends of the edge: the edge's own ends, or the containers
+-    // that hold them (plan section 4a, step 6); the route then leaves its node on its port's lane, crosses the container's
+-    // border on it, and follows the chain.
+-    struct Planned {
++    // The steps of every edge that can be built from sections. A step changes lane (if at all) in the channel after rank
++    // `rank` of `area`, to the lane of `target`, an element of `target_area`; `group` names the chain whose dummies parallel
++    // edges share. The steps follow the chain of the smallest area that holds both ends between the children that hold
++    // them; an end inside a container of the same axis (step 6) is reached through the container's border node, along the
++    // chain to it inside the container.
++    struct Step {
+         area: String,
+-        key: (String, String),
+-        elements: Vec<String>,
++        rank: usize,
++        target: String,
++        target_area: String,
++        group: Option<(String, (String, String))>,
++    }
++    struct Planned {
++        steps: Vec<Step>,
+         cross: bool,
+     }
++    let rank_in = |area: &str, id: &str| -> Option<usize> {
++        plans
++            .get(area)?
++            .ranks
++            .iter()
++            .position(|rank| rank.iter().any(|x| x == id))
++    };
++    let chain_elements = |area: &str, from: &str, to: &str| -> Option<Vec<String>> {
++        let dummies = plans
++            .get(area)?
++            .chains
++            .get(&(from.to_string(), to.to_string()))?;
++        let mut elements = vec![from.to_string()];
++        elements.extend(dummies.iter().cloned());
++        elements.push(to.to_string());
++        Some(elements)
++    };
++    let along =
++        |area: &str, elements: &[String], group: Option<(String, String)>| -> Option<Vec<Step>> {
++            elements
++                .windows(2)
++                .map(|w| {
++                    Some(Step {
++                        area: area.to_string(),
++                        rank: rank_in(area, &w[0])?,
++                        target: w[1].clone(),
++                        target_area: area.to_string(),
++                        group: group.clone().map(|key| (area.to_string(), key)),
++                    })
++                })
++                .collect()
++        };
+     let mut planned: BTreeMap<usize, Planned> = BTreeMap::new();
+     for (slot, (index, outcome)) in prepared.iter().enumerate() {
+         let Ok(p) = outcome else { continue };
+         let edge = &graph.edges[*index];
+-        let Some(target) = edge.target.as_deref() else {
++        let Some(target_node) = edge.target.as_deref() else {
+             continue;
+         };
+-        let (from, to) = (path(&edge.source), path(target));
++        let (from, to) = (path(&edge.source), path(target_node));
+         let Some((area, source, target)) = from.iter().find_map(|(area, s)| {
+             to.iter()
+                 .find(|(other, _)| other == area)
+@@ -744,16 +782,98 @@ fn section_routes(
+         }) else {
+             continue;
+         };
+-        let (source, target) = (source.as_str(), target.as_str());
+         if source == target {
+             continue;
+         }
+         let Some(plan) = plans.get(&area).filter(|plan| !plan.reversed) else {
+             continue;
+         };
+-        // An end inside a child container is built from the chain only when a container on the way flows along the other
+-        // axis: the border crossings are not yet ordered with the container's own edges, and in a container of the same
+-        // axis the search crosses fewer of them.
++        if plan.vertical != p.vertical {
++            continue;
++        }
++        let cross = edge.source != source || target_node != target;
++        // Through border nodes: every container on the way has one for the edge, so the route goes up to the common area
++        // along each container's chain to its border node, follows the chain there, and goes down the same way.
++        let through_borders = || -> Option<Vec<Step>> {
++            if p.reversed
++                || plan
++                    .reversed_links
++                    .contains(&(source.clone(), target.clone()))
++            {
++                return None;
++            }
++            let mut steps = Vec::new();
++            let (mut current, mut inside) = (
++                edge.source.clone(),
++                parent.get(edge.source.as_str())?.to_string(),
++            );
++            while inside != area {
++                let inner = plans.get(&inside)?;
++                if inner.vertical != plan.vertical || inner.reversed {
++                    return None;
++                }
++                let border = inner.borders.get(&edge.id)?.clone();
++                steps.extend(along(
++                    &inside,
++                    &chain_elements(&inside, &current, &border)?,
++                    None,
++                )?);
++                current = inside.clone();
++                inside = parent.get(current.as_str())?.to_string();
++            }
++            let mut outer = along(
++                &area,
++                &chain_elements(&area, &source, &target)?,
++                Some((source.clone(), target.clone())),
++            )?;
++            // Down to the target: each container's entering border node takes the place of the container as the target of
++            // the step that reaches it, and its chain to the next child goes on inside.
++            let mut container = target.clone();
++            while container != target_node {
++                let inner = plans.get(&container)?;
++                if inner.vertical != plan.vertical || inner.reversed {
++                    return None;
++                }
++                let border = inner.borders.get(&edge.id)?.clone();
++                let last = outer.last_mut()?;
++                last.target = border.clone();
++                last.target_area = container.clone();
++                last.group = None;
++                let child = to
++                    .iter()
++                    .find(|(a, _)| *a == container)
++                    .map(|(_, c)| c.clone())?;
++                steps.append(&mut outer);
++                outer = along(
++                    &container,
++                    &chain_elements(&container, &border, &child)?,
++                    None,
++                )?;
++                container = child;
++            }
++            steps.append(&mut outer);
++            Some(steps)
++        };
++        let has_border = |end: &str| {
++            parent
++                .get(end)
++                .and_then(|a| plans.get(*a))
++                .is_some_and(|inner| inner.borders.contains_key(&edge.id))
++        };
++        if cross && (has_border(&edge.source) || has_border(target_node)) && std::env::var_os("NO_THROUGH").is_none() {
++            if let Some(steps) = through_borders() {
++                planned.insert(
++                    slot,
++                    Planned {
++                        steps,
++                        cross: false,
++                    },
++                );
++            }
++            continue;
++        }
++        // An end inside a child container without a border node for the edge (a container of the other axis) is built from
++        // the common chain from its port's lane; one inside a container of the same axis is left to the search.
+         let inner = |id: &str, owner: &str| {
+             path(id)
+                 .iter()
+@@ -765,51 +885,68 @@ fn section_routes(
+                 })
+                 && id != owner
+         };
+-        if inner(&edge.source, source) || inner(edge.target.as_deref().unwrap_or_default(), target)
+-        {
++        if inner(&edge.source, &source) || inner(target_node, &target) {
+             continue;
+         }
+-        let cross = edge.source != source || edge.target.as_deref() != Some(target);
+-        if plan.vertical != p.vertical {
+-            continue;
+-        }
+-        let logical = (source.to_string(), target.to_string());
++        let logical = (source.clone(), target.clone());
+         let backward = plan.reversed_links.contains(&logical);
+         if backward != p.reversed {
+             continue;
+         }
+         let key = if backward {
+-            (target.to_string(), source.to_string())
++            (target.clone(), source.clone())
+         } else {
+             logical
+         };
+-        let Some(dummies) = plan.chains.get(&key) else {
++        let Some(elements) = chain_elements(&area, &key.0, &key.1) else {
+             continue;
+         };
+-        let mut elements = vec![key.0.clone()];
+-        elements.extend(dummies.iter().cloned());
+-        elements.push(key.1.clone());
+-        planned.insert(
+-            slot,
+-            Planned {
+-                area,
+-                key,
+-                elements,
+-                cross,
+-            },
+-        );
++        let Some(steps) = along(&area, &elements, Some(key)) else {
++            continue;
++        };
++        planned.insert(slot, Planned { steps, cross });
+     }
+     // Parallel edges of one chain share its dummies: their place among them, by edge id.
+-    let mut siblings: BTreeMap<(&str, (String, String)), Vec<(String, usize)>> = BTreeMap::new();
++    let mut siblings: BTreeMap<(String, (String, String)), Vec<(String, usize)>> = BTreeMap::new();
+     for (&slot, pl) in &planned {
+         let id = graph.edges[prepared[slot].0].id.clone();
+-        siblings
+-            .entry((pl.area.as_str(), pl.key.clone()))
+-            .or_default()
+-            .push((id, slot));
++        let mut groups: Vec<&(String, (String, String))> =
++            pl.steps.iter().filter_map(|s| s.group.as_ref()).collect();
++        groups.dedup();
++        for group in groups {
++            siblings
++                .entry(group.clone())
++                .or_default()
++                .push((id.clone(), slot));
++        }
+     }
++    // Parallel edges between containers take their places in the order of their border nodes, so that they do not cross
++    // where they leave or enter a container; then by edge id.
++    let border_place = |edge: &str| -> f64 {
++        let e = graph.edges.iter().find(|e| e.id == edge);
++        let ends = e.map(|e| [Some(e.source.as_str()), e.target.as_deref()]);
++        ends.into_iter()
++            .flatten()
++            .flatten()
++            .find_map(|end| {
++                let area = parent.get(end)?;
++                let plan = plans.get(*area)?;
++                let border = plan.borders.get(edge)?;
++                plan.ranks.iter().find_map(|rank| {
++                    rank.iter()
++                        .position(|x| x == border)
++                        .map(|i| (i as f64 + 0.5) / rank.len() as f64)
++                })
++            })
++            .unwrap_or(0.5)
++    };
+     for list in siblings.values_mut() {
+-        list.sort();
++        list.sort_by(|a, b| {
++            border_place(&a.0)
++                .total_cmp(&border_place(&b.0))
++                .then(a.cmp(b))
++        });
++        list.dedup();
+     }
+     // Absolute boxes of the elements of an area: children from `boxes`, dummies from the plan, moved by the area's origin.
+     let rect_of = |area: &str, id: &str| -> Option<Rect> {
+@@ -869,49 +1006,49 @@ fn section_routes(
+     };
+     // The lanes of every planned edge, and its lane changes per channel.
+     let mut lanes: BTreeMap<usize, Vec<f64>> = BTreeMap::new();
+-    let mut changes: BTreeMap<(&str, usize), Vec<(usize, usize, f64, f64)>> = BTreeMap::new();
++    let mut changes: BTreeMap<(String, usize), Vec<(usize, usize, f64, f64)>> = BTreeMap::new();
+     let mut failed: BTreeSet<usize> = BTreeSet::new();
+     for (&slot, pl) in &planned {
+         let p = prepared[slot].1.as_ref().unwrap();
+-        let plan = &plans[pl.area.as_str()];
+-        let rank_of = |id: &str| {
+-            plan.ranks
+-                .iter()
+-                .position(|rank| rank.iter().any(|x| x == id))
+-        };
+         let mut lane_list = vec![p.from.1];
+-        let group = &siblings[&(pl.area.as_str(), pl.key.clone())];
+-        let place = group.iter().position(|(_, s)| *s == slot).unwrap_or(0);
+-        for d in &pl.elements[1..pl.elements.len() - 1] {
+-            let Some(r) = rect_of(pl.area.as_str(), d) else {
++        for (k, step) in pl.steps.iter().enumerate() {
++            if k + 1 == pl.steps.len() {
++                lane_list.push(p.to.1);
++                break;
++            }
++            let Some(r) = rect_of(&step.target_area, &step.target) else {
+                 failed.insert(slot);
+                 break;
+             };
+-            let (lo, hi) = across_span(plan.vertical, &r);
+-            lane_list.push(lo + (hi - lo) * (place as f64 + 0.5) / group.len() as f64);
++            let (place, count) = match &step.group {
++                Some(group) => {
++                    let list = &siblings[group];
++                    (
++                        list.iter().position(|(_, s)| *s == slot).unwrap_or(0),
++                        list.len(),
++                    )
++                }
++                None => (0, 1),
++            };
++            let (lo, hi) = across_span(p.vertical, &r);
++            lane_list.push(lo + (hi - lo) * (place as f64 + 0.5) / count as f64);
+         }
+-        lane_list.push(p.to.1);
+-        if failed.contains(&slot) {
++        if failed.contains(&slot) || lane_list.len() != pl.steps.len() + 1 {
++            failed.insert(slot);
+             continue;
+         }
+-        for i in 0..pl.elements.len() - 1 {
+-            if (lane_list[i] - lane_list[i + 1]).abs() < EPS {
++        for (k, step) in pl.steps.iter().enumerate() {
++            if (lane_list[k] - lane_list[k + 1]).abs() < EPS {
+                 continue;
+             }
+-            let Some(r) = rank_of(&pl.elements[i]) else {
+-                failed.insert(slot);
+-                break;
+-            };
+-            if channel_of(pl.area.as_str(), r).is_none() {
++            if channel_of(&step.area, step.rank).is_none() {
+                 failed.insert(slot);
+                 break;
+             }
+-            changes.entry((pl.area.as_str(), r)).or_default().push((
+-                slot,
+-                i,
+-                lane_list[i],
+-                lane_list[i + 1],
+-            ));
++            changes
++                .entry((step.area.clone(), step.rank))
++                .or_default()
++                .push((slot, k, lane_list[k], lane_list[k + 1]));
+         }
+         lanes.insert(slot, lane_list);
+     }
+diff --git a/crates/layout/src/layered_plan.rs b/crates/layout/src/layered_plan.rs
+index eacb98f..b1df536 100644
+--- a/crates/layout/src/layered_plan.rs
++++ b/crates/layout/src/layered_plan.rs
+@@ -32,6 +32,10 @@ pub struct AreaPlan {
+     /// Border nodes (step 6): by edge, the virtual node where an edge between the inside and the outside of this area (a
+     /// container) crosses its border, in an extra rank at the border it leaves or enters by. It is a dummy of the plan.
+     pub borders: BTreeMap<String, String>,
++    /// The border agreement (step 6): by border node, the place where its edge goes on outside the container, in the order of
++    /// the parent's plan (`outside_border_keys`). When set, the container's border ranks keep this order and its inside is
++    /// ordered to it. Only for the passes of one layout; not kept with the snapshot.
++    pub border_keys: BTreeMap<String, f64>,
+ }
+ 
+ impl AreaPlan {
+@@ -98,10 +102,111 @@ impl AreaPlan {
+                 .collect(),
+             dummies: stored.dummies.clone(),
+             borders: stored.borders.clone(),
++            border_keys: BTreeMap::new(),
+         })
+     }
+ }
+ 
++/// The border agreement (plan section 4a, step 6): for every container with border nodes, by border node, the place where
++/// its edge goes on in the parent's plan: the position (relative, within its rank) of the element next to the container on
++/// the edge's chain there, and, for edges that share that element, the place of the edge at the next container's border.
++/// `parent_of` gives every node's area (`"<root>"` for the top level).
++pub fn outside_border_keys(
++    plans: &LayeredPlans,
++    parent_of: &BTreeMap<String, String>,
++    edges: &BTreeMap<String, (String, String)>,
++) -> BTreeMap<String, BTreeMap<String, f64>> {
++    let relative = |plan: &AreaPlan, id: &str| -> Option<f64> {
++        plan.ranks.iter().find_map(|rank| {
++            rank.iter()
++                .position(|x| x == id)
++                .map(|i| (i as f64 + 0.5) / rank.len() as f64)
++        })
++    };
++    // The child of `area` that holds `node` (or the node itself), if any.
++    let child_in = |area: &str, node: &str| -> Option<String> {
++        let mut at = node.to_string();
++        loop {
++            let up = parent_of.get(&at)?;
++            if up == area {
++                return Some(at);
++            }
++            at = up.clone();
++        }
++    };
++    let mut out = BTreeMap::new();
++    for (area, plan) in plans {
++        if plan.borders.is_empty() || area == "<root>" {
++            continue;
++        }
++        let Some(parent) = parent_of.get(area) else {
++            continue;
++        };
++        let Some(outer) = plans.get(parent) else {
++            continue;
++        };
++        let leaving_rank = plan.ranks.len().saturating_sub(1);
++        let mut keys = BTreeMap::new();
++        for (edge, border) in &plan.borders {
++            let Some((source, target)) = edges.get(edge) else {
++                continue;
++            };
++            let leaving = plan
++                .ranks
++                .get(leaving_rank)
++                .is_some_and(|rank| rank.contains(border));
++            let other = if leaving { target } else { source };
++            // The other end's element in the parent: the child that holds it, or the parent's own border node.
++            let Some(x) = child_in(parent, other).or_else(|| outer.borders.get(edge).cloned())
++            else {
++                continue;
++            };
++            let chain = outer
++                .chains
++                .iter()
++                .find(|((a, b), _)| (a == area && *b == x) || (*a == x && b == area));
++            let Some(((a, _), dummies)) = chain else {
++                continue;
++            };
++            let next = if a == area {
++                dummies.first().unwrap_or(&x)
++            } else {
++                dummies.last().unwrap_or(&x)
++            };
++            let Some(primary) = relative(outer, next) else {
++                continue;
++            };
++            // Edges that share the next element are ordered by their place at the next container's border.
++            let secondary = plans
++                .get(&x)
++                .and_then(|p| p.borders.get(edge).and_then(|b| relative(p, b)))
++                .unwrap_or(0.5);
++            keys.insert(border.clone(), primary + secondary * 1e-3);
++        }
++        if !keys.is_empty() {
++            out.insert(area.clone(), keys);
++        }
++    }
++    out
++}
++
++/// The pairs of border nodes whose order inside a container disagrees with the order of `keys` (their places outside),
++/// over all its border ranks.
++pub fn border_inversions(plan: &AreaPlan, keys: &BTreeMap<String, f64>) -> usize {
++    let mut total = 0;
++    for rank in &plan.ranks {
++        let ks: Vec<f64> = rank.iter().filter_map(|id| keys.get(id).copied()).collect();
++        for i in 0..ks.len() {
++            for j in i + 1..ks.len() {
++                if ks[i] > ks[j] + 1e-12 {
++                    total += 1;
++                }
++            }
++        }
++    }
++    total
++}
++
+ /// The crossings between neighbouring ranks of `ranks` (each in order) for the sections `links` (upper, lower). A section
+ /// whose ends are not in neighbouring ranks is not counted. Two sections that share an end do not cross.
+ pub fn order_crossings(ranks: &[Vec<String>], links: &[(String, String)]) -> usize {
+diff --git a/crates/layout/src/lib.rs b/crates/layout/src/lib.rs
+index 088cce7..1e176fe 100644
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -2215,6 +2215,80 @@ fn compute_once(
+     );
+     run.plans
+         .retain(|area, _| reused.contains(area) || changed.iter().any(|c| c == area));
++    // Experimental (plan section 4a, step 6, border agreement): the containers' border orders followed their insides; where
++    // the parent's plan continues their edges in another order, every container is placed again with its border ranks in
++    // the order outside and its inside ordered to it. The second placement is kept only when the crossings of all plans and
++    // the disagreements at the borders together fall.
++    if options.layered_construction && previous.is_none() && std::env::var_os("NO_AGREE").is_none() {
++        let parent_of: BTreeMap<String, String> = graph
++            .nodes
++            .iter()
++            .map(|n| {
++                (
++                    n.id.clone(),
++                    n.parent_id.clone().unwrap_or_else(|| "<root>".into()),
++                )
++            })
++            .collect();
++        let edges: BTreeMap<String, (String, String)> = graph
++            .edges
++            .iter()
++            .filter_map(|e| Some((e.id.clone(), (e.source.clone(), e.target.clone()?))))
++            .collect();
++        let score = |plans: &layered_plan::LayeredPlans| {
++            let keys = layered_plan::outside_border_keys(plans, &parent_of, &edges);
++            let disagreements: usize = keys
++                .iter()
++                .filter_map(|(area, k)| {
++                    plans
++                        .get(area)
++                        .map(|p| layered_plan::border_inversions(p, k))
++                })
++                .sum();
++            let crossings: usize = plans.values().map(|p| p.crossings()).sum();
++            (crossings + disagreements, disagreements, keys)
++        };
++        let (first, disagreements, keys) = score(&run.plans);
++        if disagreements > 0 {
++            let saved = (
++                boxes.clone(),
++                run.plans.clone(),
++                changed.clone(),
++                orientations.clone(),
++            );
++            for (area, k) in keys {
++                if let Some(plan) = run.plans.get_mut(&area) {
++                    plan.border_keys = k;
++                }
++            }
++            boxes = BTreeMap::new();
++            changed.clear();
++            place(
++                None,
++                graph,
++                &index,
++                &mut boxes,
++                true,
++                dirty,
++                &mut changed,
++                &mut orientations,
++                optimize,
++                options,
++                minimum,
++                &gaps,
++                &mut run.search,
++                &mut run.plans,
++            );
++            let (second, _, _) = score(&run.plans);
++            if std::env::var_os("AGREE").is_some() {
++                let (_, d2, _) = score(&run.plans);
++                eprintln!("AGREE first {first} (disagreements {disagreements}) second {second} (disagreements {d2}) {}", if second < first { "kept" } else { "rejected" });
++            }
++            if second >= first {
++                (boxes, run.plans, changed, orientations) = saved;
++            }
++        }
++    }
+     run.search.placement_nanos = run
+         .search
+         .placement_nanos
+@@ -3040,7 +3114,24 @@ fn place(
+     if options.layered_construction && layered {
+         let mut ordered: Vec<Vec<String>> = levels.values().cloned().collect();
+         let sections: Vec<(String, String)> = order_links.iter().cloned().collect();
+-        let group = |id: &str| component_of.get(id).copied().unwrap_or(0);
++        // The border agreement (step 6): border nodes whose places outside are given keep that order (each its own group,
++        // after every component's, so neither the sweeps nor the transpositions move them); the inside is ordered to it.
++        let agreed: BTreeMap<String, usize> = plans
++            .get(parent.unwrap_or("<root>"))
++            .map(|p| {
++                let mut keyed: Vec<(&String, &f64)> = p.border_keys.iter().collect();
++                keyed.sort_by(|a, b| a.1.total_cmp(b.1).then(a.0.cmp(b.0)));
++                keyed
++                    .into_iter()
++                    .enumerate()
++                    .map(|(i, (id, _))| (id.clone(), i))
++                    .collect()
++            })
++            .unwrap_or_default();
++        let group = |id: &str| match agreed.get(id) {
++            Some(i) => usize::MAX / 2 + i,
++            None => component_of.get(id).copied().unwrap_or(0),
++        };
+         // Reuse: the improvement starts from the order of the area's earlier plan (of the drawing this pass continues or
+         // refines) when that order crosses no more than the sweeps' order, so an area placed again keeps its order.
+         if let Some(earlier) = plans.get(parent.unwrap_or("<root>")) {
+@@ -3051,6 +3142,11 @@ fn place(
+                 ordered = kept;
+             }
+         }
++        if !agreed.is_empty() {
++            for rank in ordered.iter_mut() {
++                rank.sort_by_key(|id| group(id));
++            }
++        }
+         layered_plan::improve_order(&mut ordered, &sections, &group);
+         for (ids, better) in levels.values_mut().zip(ordered) {
+             *ids = better;
+@@ -3477,6 +3573,7 @@ fn place(
+                     chains,
+                     reversed_links,
+                     borders,
++                    border_keys: BTreeMap::new(),
+                     dummies: placed
+                         .iter()
+                         .filter(|(id, _)| id.starts_with(DUMMY_PREFIX))

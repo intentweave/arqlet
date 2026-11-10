@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Arqlet · first prototype</title>
+<script type="importmap">{"imports":{"@arqlet/viewer/":"/packages/viewer/","@arqlet/engine-client/":"/packages/engine-client/","@arqlet/containment-tree/":"/packages/containment-tree/"}}</script>
+<style>
+:root{--bg:#0e1520;--panel:#111a26;--raised:#172334;--line:#253244;--control:#3a485b;--text:#dfe7ef;--muted:#93a5b9;--accent:#8ee0bb;--select:#1d3a4a;font:13px/1.45 system-ui,sans-serif;color:var(--text);background:var(--bg)}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{overflow:hidden}
+body{margin:0;height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
+p{margin:6px 0}
+a{color:var(--accent)}
+button,select,textarea,input:not([type=checkbox]){font:inherit;padding:4px 8px;border:1px solid var(--control);border-radius:6px;background:var(--raised);color:#edf4ff;min-height:28px}
+button{cursor:pointer;white-space:nowrap}
+button:hover:not(:disabled),select:hover:not(:disabled){border-color:#5d7290}
+button:disabled,select:disabled,input:disabled{opacity:.45;cursor:default}
+button.primary{background:#1d5c4b;border-color:#3f8f76}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=checkbox]{accent-color:#3f8f76;margin:2px 0 0;flex:none}
+label.check{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.hint{color:var(--muted);font-size:12px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}
+.row>input:not([type=checkbox]){flex:1;min-width:0}
+
+/* Header: brand and the session toolbar. */
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:baseline;gap:10px}
+h1{font-size:16px;margin:0}
+.badge{color:#90d9c4;border:1px solid #376552;padding:1px 8px;border-radius:20px;font-size:11px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;flex:1}
+.toolbar .tool{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.toolbar .sep{width:1px;align-self:stretch;background:var(--line);margin:0 4px}
+.toolbar .end{margin-left:auto;display:flex;gap:8px;align-items:center}
+#example{max-width:240px}
+
+/* Three columns: containment tree, canvas, details. The tree panel can be widened by its lower right corner. */
+main{display:grid;grid-template-columns:auto minmax(0,1fr) auto;min-height:0}
+.panel{background:var(--panel);overflow:auto;min-width:220px;max-width:50vw}
+#tree-panel{width:300px;resize:horizontal;border-right:1px solid var(--line);display:flex;flex-direction:column}
+#side-panel{width:340px;border-left:1px solid var(--line)}
+body.hide-tree #tree-panel,body.hide-side #side-panel{display:none}
+@media (max-width:1200px){.badge,#statusbar .hint{display:none}#tree-panel{width:230px}#side-panel{width:280px}#example{max-width:190px}}
+.panel-head{position:sticky;top:0;z-index:1;background:var(--panel);padding:10px 12px 8px;border-bottom:1px solid var(--line)}
+h2{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#b8c6d6;margin:0 0 6px}
+#tree-filter{width:100%}
+
+/* Containment tree (packages/containment-tree renders the WAI-ARIA rows; the host styles them). */
+#containment-tree{padding:6px 6px 12px;flex:1}
+#containment-tree ul[role=tree]{list-style:none;margin:0;padding:0}
+#containment-tree [role=treeitem]{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:24px;line-height:24px;padding-right:6px;border-radius:4px;cursor:pointer}
+#containment-tree [role=treeitem]:not([aria-expanded])::before{content:'';display:inline-block;width:22px}
+#containment-tree [role=treeitem]:hover{background:var(--raised)}
+#containment-tree [role=treeitem][aria-selected=true]{background:var(--select);color:#fff;box-shadow:inset 2px 0 var(--accent)}
+#containment-tree .tree-toggle{min-height:0;width:18px;height:18px;padding:0;margin-right:4px;border:0;background:none;color:var(--muted);font-size:13px;line-height:18px;vertical-align:middle}
+#containment-tree .tree-toggle:hover{color:var(--text)}
+#containment-tree li[role=none]{padding-left:4px!important;list-style:none}
+#containment-tree .settings{margin:4px 0 8px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#0f1824;font-size:12px}
+#containment-tree .settings>p{margin:2px 0}
+#containment-tree .settings>p:first-child{font-weight:600}
+#containment-tree .settings section{display:grid;gap:4px 6px;align-items:center;margin:8px 0}
+#containment-tree .settings section:first-of-type{grid-template-columns:48px minmax(0,1fr) 56px}
+#containment-tree .settings section+section{grid-template-columns:64px minmax(0,1fr)}
+#containment-tree .settings h4{grid-column:1/-1;margin:0;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+#containment-tree .settings label{display:contents;text-transform:capitalize}
+#containment-tree .settings select,#containment-tree .settings input:not([type=checkbox]){width:100%;min-height:24px;padding:2px 6px}
+#containment-tree .settings small{color:var(--muted)}
+#containment-tree .settings section:first-of-type small{grid-column:2}
+#containment-tree .settings section+section small{grid-column:2}
+#containment-tree .settings button{min-height:24px;padding:2px 8px}
+#containment-tree .settings section p{grid-column:1/-1;margin:0;color:#f0a597}
+#containment-tree .settings .allowed{grid-column:2}
+.allowed{display:flex;flex-wrap:wrap;gap:2px 10px;margin:2px 0 6px}
+.allowed small{flex-basis:100%;color:#f0a597}
+#containment-tree .settings .allowed label,.body .allowed label{display:inline-flex;align-items:center;gap:4px;margin:0;color:var(--text);font-size:12px;text-transform:none}
+#view-layout h4{display:none}
+#view-layout label{text-transform:capitalize}
+#view-layout small{display:block;color:var(--muted);font-size:12px;margin:2px 0}
+
+/* Canvas with overlaid view controls and a status bar. */
+#stage{position:relative;display:grid;grid-template-rows:minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
+#canvas{overflow:auto;touch-action:none;scrollbar-gutter:stable;min-height:0}
+svg{display:block}
+.node{cursor:pointer}
+g.node:hover>rect,g.node:hover>circle{stroke:#90e4c3;stroke-width:2}
+circle[data-port-id]:hover{stroke:#edf5ff;stroke-width:2}
+/* Canvas controls (viewer): an unpinned pin stays faint until its node is hovered or the control has focus. */
+.lw-control{cursor:pointer;outline:none}
+.lw-control:hover rect,.lw-control:focus-visible rect{fill:rgba(237,245,255,.14)}
+.lw-pin:not(.lw-pinned){opacity:.35}
+g.node:hover .lw-pin,.lw-control:hover,.lw-control:focus-visible{opacity:1}
+.canvas-tools{position:absolute;top:10px;right:18px;display:flex;gap:4px;z-index:2}
+.canvas-tools .sep{width:6px}
+.canvas-tools button[aria-pressed=false]{color:var(--muted)}
+.canvas-tools button{min-width:32px;background:rgba(23,35,52,.92)}
+#conflicts{margin:6px 0;font-size:12px}#conflicts p{margin:2px 0;color:var(--muted)}#conflicts .conflict-item{display:block;width:100%;text-align:left;margin:2px 0;padding:3px 6px;border:1px solid #f08f80;border-radius:4px;background:transparent;color:inherit;font-size:12px;cursor:pointer}
+#curation-badge{position:absolute;left:12px;top:10px;padding:6px 10px;border-radius:6px;background:#142133;border:1px solid var(--line);font-size:13px;max-width:60%;pointer-events:none;z-index:2}
+#curation-badge.ok{border-color:#7ee1bc}
+#curation-badge.warn{border-color:#f08f80}
+#curation-badge small{display:block;color:var(--muted);margin-top:2px}
+#statusbar{display:flex;gap:14px;align-items:center;padding:4px 12px;border-top:1px solid var(--line);background:var(--panel);font-size:12px;min-height:26px}
+#status{color:var(--accent);flex:1 1 auto;min-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
+#stats{color:var(--muted);white-space:nowrap;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#statusbar .hint{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Details panel: collapsible sections. */
+details.section{border-bottom:1px solid var(--line)}
+details.section>summary{padding:9px 12px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#b8c6d6;cursor:pointer;user-select:none}
+details.section>summary:hover{color:#fff}
+.body{padding:0 12px 12px}
+.body details{margin:6px 0}
+.body details>summary{cursor:pointer;font-weight:600;padding:3px 0}
+.body details>.group{padding:2px 0 6px 14px}
+.body label:not(.check){display:block;margin:8px 0 3px;color:var(--muted);font-size:12px}
+.body select,.body textarea,.body input[type=number],.body input[type=search],.body .full{width:100%}
+.body label.check{margin:5px 0}
+fieldset{border:1px solid var(--line);border-radius:6px;margin:8px 0;padding:4px 8px 6px}
+legend{color:var(--muted);font-size:12px;padding:0 4px}
+#selected{font-weight:600;overflow-wrap:anywhere}
+#route-info{overflow-wrap:anywhere;color:#c9d6e3}
+#route-info button{min-height:0;padding:0 4px;margin:1px;font-size:12px}
+#backend{color:#c9d6e3}
+#routing,#geometry{overflow-wrap:anywhere;font-size:12px}
+.objective{display:grid;grid-template-columns:minmax(0,1fr) 16px 26px 26px;gap:4px;align-items:center;margin:3px 0}
+.objective button{min-height:22px;padding:0}
+.objective label.check{margin:0}
+#inspector{white-space:pre-wrap;font-size:12px;color:#c9d6e3;margin:6px 0}
+table.stats{width:100%;border-collapse:collapse;font-size:12px}
+table.stats td{padding:2px 4px;border-bottom:1px solid var(--line)}
+table.stats td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
+</style></head>
+<body>
+<header>
+ <div class="brand"><h1>Arqlet</h1><span class="badge" title="Intentweave · backend snapshot → local computation">Experimental prototype</span></div>
+ <div class="toolbar" role="toolbar" aria-label="Session">
+  <label class="tool">Example <select id="example"><option value="default">Standard (Intentweave export)</option></select></label>
+  <label class="tool" title="Experimental (global layering, first view): at most this many nodes are laid out; containers are collapsed to stay within it, the outermost first. Empty: every node.">Node budget <input id="node-budget" type="number" min="1" max="10000" step="1" style="width:5em" placeholder="all"></label>
+  <small id="example-info" class="tool" role="status"></small>
+  <label class="tool" title="Split: the backend precomputes and the browser edits. Browser only: the WASM engine imports and optimizes. Backend only: every operation runs in the backend.">Mode <select id="mode"><option value="split">Split</option><option value="browser">Browser only</option><option value="backend">Backend only</option></select></label>
+  <button id="reset" title="Reload the example in the selected mode">Reload</button>
+  <span class="sep" aria-hidden="true"></span>
+  <label class="tool">Profile <select id="profile"><option value="__default__" disabled>Engine defaults</option></select></label>
+  <label class="check tool" title="Optimize the whole view after every change"><input id="auto" type="checkbox" checked> Auto-optimize</label>
+  <button id="refine" class="primary" title="Optimize the whole view now">Optimize</button>
+  <button id="structured" title="Optimize the parts of the view separately and compose them">Structured</button>
+  <span class="end"><button id="save" disabled title="Download the displayed snapshot as JSON">Download</button><a href="./compare.html">Compare →</a></span>
+ </div>
+</header>
+<main>
+<aside id="tree-panel" class="panel" aria-label="Containment">
+ <div class="panel-head"><h2>Containment</h2><input id="tree-filter" type="search" placeholder="Filter by name" aria-label="Filter the containment tree" title="Click a row to select it · arrow keys move · ← and → collapse and expand"></div>
+ <section id="containment-tree" aria-label="Containment tree"></section>
+</aside>
+
+<section id="stage">
+ <section id="canvas" aria-label="Graph view"><svg id="graph" role="img" aria-label="Hierarchical code graph"></svg></section>
+ <div id="curation-badge" role="status" hidden></div>
+ <div class="canvas-tools" role="toolbar" aria-label="View"><button id="toggle-tree-panel" aria-pressed="true" title="Show or hide the containment tree">Tree</button><button id="toggle-side-panel" aria-pressed="true" title="Show or hide the details panel">Details</button><span class="sep" aria-hidden="true"></span><button id="fit" title="Fit view (F)">Fit</button><button id="zoom-out" title="Zoom out (−)" aria-label="Zoom out">−</button><button id="zoom" title="Zoom in (+)" aria-label="Zoom in">+</button></div>
+ <footer id="statusbar"><p id="status" role="status">Loading snapshot …</p><p id="stats"></p><p id="discarded" class="hint" title="Results of optimization jobs that arrived after the view had changed (or were superseded) and were therefore not applied." hidden></p><span class="hint">Drag a node to move it · drag the background to pan · wheel or F, +, − to zoom</span></footer>
+</section>
+
+<aside id="side-panel" class="panel" aria-label="Details">
+<details class="section" open><summary>Selection</summary><div class="body">
+ <p id="selected">Select a node in the diagram.</p>
+ <p id="route-info" role="status">Click an edge to highlight it.</p>
+ <div class="row"><button id="pin-node" disabled>Pin</button><button id="unpin-node" disabled>Unpin</button><button id="toggle" disabled>Select a container</button></div>
+ <p id="pin-info" class="hint" role="status"></p>
+ <label for="name">New node, connected to the selection</label>
+ <div class="row"><input id="name" value="New function" maxlength="80"><button id="add" class="primary" disabled>Add</button></div>
+</div></details>
+
+<details class="section" open><summary>Optimization</summary><div class="body">
+ <p id="backend" role="status">After local changes the view is optimized.</p>
+ <p id="profile-info" class="hint" role="status"></p>
+ <details id="structure-report" hidden><summary>Structured optimization report</summary><p id="structure-summary" role="status"></p><ul id="structure-parts"></ul></details>
+</div></details>
+
+<details class="section" open><summary>Quality</summary><div class="body">
+ <p id="layout-method" role="status"></p><p id="routing" role="status"></p><p id="geometry" role="status"></p>
+ <div id="conflicts" role="status" hidden></div>
+ <details><summary>All metrics</summary>
+  <table id="layout-stats" class="stats" aria-label="Layout statistics"></table>
+  <p class="hint">Shared metrics of the displayed layout, from the engine; the same as on the comparison page. Timings are in the benchmark reports.</p>
+ </details>
+</div></details>
+
+<details class="section" open><summary>Layout settings (whole view)</summary><div class="body">
+ <p class="hint">A change here switches the profile to “Custom”. Each container can override direction, strategy, routing and size in the containment tree.</p>
+ <details><summary>Ordering</summary><div class="group">
+  <fieldset><legend>Ordering strategies</legend>
+   <label class="check"><input id="cand-1" type="checkbox"> Forward · barycenter</label>
+   <label class="check"><input id="cand-2" type="checkbox"> Alternating · barycenter</label>
+   <label class="check"><input id="cand-3" type="checkbox"> Forward · median</label>
+   <label class="check"><input id="cand-4" type="checkbox"> Alternating · median</label>
+  </fieldset>
+  <label class="check"><input id="routing-candidate" type="checkbox"> Also try a routing-only candidate</label>
+  <label for="hybrid-by">Criterion for a free direction</label><select id="hybrid-by"><option value="compact">Compact</option><option value="endToEnd">End-to-end</option></select>
+ </div></details>
+ <details><summary>Placement</summary><div class="group">
+  <label for="placement-grid">Grid size (0 = free)</label><input id="placement-grid" type="number" min="0" max="100" step="1">
+  <label class="check"><input id="free-placement" type="checkbox"> Free placement: nodes slide towards the middle of their connections</label>
+  <label for="placement-search">Routing-aware placement search (0 = off)</label><input id="placement-search" type="number" min="0" max="2000" step="10">
+  <label for="min-port-spacing">Minimum port spacing (0 = engine default)</label><input id="min-port-spacing" type="number" min="0" max="200" step="1">
+  <label for="port-placement">Distribute ports</label><select id="port-placement"><option value="symmetric">Evenly spaced</option><option value="optimized">Aligned to the neighbours</option></select>
+  <label class="check"><input id="component-packing" type="checkbox"> Pack connected components as separate blocks</label>
+  <label for="organic-iterations">Organic placement iterations (empty = 300)</label><input id="organic-iterations" type="number" min="1" max="5000" step="10" placeholder="300">
+  <label class="check" title="Experimental. Use deterministic minimum-displacement separation constraints during organic placement and as a pre-pass to geometry repair. If the bounded solver cannot find a feasible result, the existing repair remains active."><input id="vpsc-overlap-removal" type="checkbox"> Constraint-based organic overlap removal</label>
+  <label class="check" title="Experimental. Organic repair first tries overlap translations and perpendicular moves away from edge crossings, and runs the exhaustive search only when these do not improve the drawing."><input id="directed-repair" type="checkbox"> Directed organic repair</label>
+  <label class="check" title="Experimental. Organic stress uses graph neighbours and pivots instead of all pairs; an area may then hold up to 500 children."><input id="sparse-stress" type="checkbox"> Sparse organic stress (up to 500 children)</label>
+  <label class="check" title="Experimental. Organic placement for large areas: pivot start, weighted sparse stress, then springs, repulsion and box collision; an area may then hold up to 2000 children."><input id="scalable-stress" type="checkbox"> Scalable organic placement (up to 2000 children)</label>
+  <label class="check" title="Experimental. After organic stress, free nodes take a bounded push away from edges they sit on. Geometry repair still checks the result."><input id="node-edge-repulsion" type="checkbox"> Organic node–edge repulsion</label>
+  <label class="check" title="In an organic area a drag does not only move one node: the dragged or pinned node is held and the others take a few damped steps of the stress placement toward their graph distances (not a separate force simulation). Off: the other nodes stay where they are."><input id="force-directed" type="checkbox"> Force-directed (nodes follow a dragged node)</label>
+  <label for="max-extent">Maximum drawing extent (empty = none; reported, not enforced)</label><input id="max-extent" type="number" min="1" step="10">
+ </div></details>
+ <details><summary>Objectives</summary><div class="group">
+  <p class="hint">Earlier objectives decide first. Tick to use; ↑ and ↓ change the priority. At least one stays active.</p>
+  <div class="objective"><label class="check"><input id="obj-siblingOverlaps" type="checkbox"> Overlapping nodes</label><span id="rank-siblingOverlaps" class="hint"></span><button id="up-siblingOverlaps" type="button" aria-label="Raise priority">↑</button><button id="down-siblingOverlaps" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-edgeNodeHits" type="checkbox"> Lines through nodes</label><span id="rank-edgeNodeHits" class="hint"></span><button id="up-edgeNodeHits" type="button" aria-label="Raise priority">↑</button><button id="down-edgeNodeHits" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-sharedRoutePairs" type="checkbox"> Overlapping lines</label><span id="rank-sharedRoutePairs" class="hint"></span><button id="up-sharedRoutePairs" type="button" aria-label="Raise priority">↑</button><button id="down-sharedRoutePairs" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-nearNodeSegments" type="checkbox"> Lines hugging node borders</label><span id="rank-nearNodeSegments" class="hint"></span><button id="up-nearNodeSegments" type="button" aria-label="Raise priority">↑</button><button id="down-nearNodeSegments" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-routedCrossings" type="checkbox"> Crossings of routes</label><span id="rank-routedCrossings" class="hint"></span><button id="up-routedCrossings" type="button" aria-label="Raise priority">↑</button><button id="down-routedCrossings" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-projectedCrossings" type="checkbox"> Crossings of straight centre lines</label><span id="rank-projectedCrossings" class="hint"></span><button id="up-projectedCrossings" type="button" aria-label="Raise priority">↑</button><button id="down-projectedCrossings" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-bends" type="checkbox"> Bends</label><span id="rank-bends" class="hint"></span><button id="up-bends" type="button" aria-label="Raise priority">↑</button><button id="down-bends" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-cost" type="checkbox"> Length, movement and area</label><span id="rank-cost" class="hint"></span><button id="up-cost" type="button" aria-label="Raise priority">↑</button><button id="down-cost" type="button" aria-label="Lower priority">↓</button></div>
+  <div class="objective"><label class="check"><input id="obj-endToEnd" type="checkbox"> End-to-end length</label><span id="rank-endToEnd" class="hint"></span><button id="up-endToEnd" type="button" aria-label="Raise priority">↑</button><button id="down-endToEnd" type="button" aria-label="Lower priority">↓</button></div>
+ </div></details>
+ <details><summary>Routing</summary><div class="group">
+  <label for="routing-engine">Routing method</label><select id="routing-engine"><option value="legacy">Candidate tracks</option><option value="channel">Grid with congestion</option></select>
+  <label for="bundle">Bundling</label><select id="bundle"><option value="none">None</option><option value="complete">Bundle parallel edges</option></select>
+  <label for="routing-clearance">Clearance to other nodes</label><input id="routing-clearance" type="number" min="0" max="50" step="1">
+  <label for="track-spacing">Track spacing of parallel edges</label><input id="track-spacing" type="number" min="1" max="50" step="1">
+  <label class="check"><input id="routing-corridors" type="checkbox"> Corridor centres as tracks</label>
+  <label class="check"><input id="routing-track-separation" type="checkbox"> Separate parallel segments after routing</label>
+  <label for="required-clearance">Required clearance to nodes (hard minimum, default 6; empty = a weighted goal, not a requirement)</label><input id="required-clearance" type="number" min="1" max="50" step="1">
+ </div></details>
+ <details><summary>Experimental</summary><div class="group">
+  <p class="hint">Off by default; their effect is mixed or unmeasured.</p>
+  <label class="check"><input id="strict-clearance" type="checkbox"> Routes never enter a foreign node's clearance (grid router)</label>
+  <label class="check"><input id="extended-conflict-selection" type="checkbox"> Also re-route crossing and border-hugging edges</label>
+  <label class="check"><input id="routed-candidates" type="checkbox"> Route every ordering candidate before comparing</label>
+  <label class="check"><input id="flat-region" type="checkbox"> Flat-region candidate (planar grid drawing)</label>
+  <label class="check" title="Experimental, needs layered construction: a container whose flow runs along the same axis as its area's takes part with its children in the area's ranks, as one block (one level)."><input id="global-layering" type="checkbox"> Global layering: same-axis containers in the common ranks</label>
+  <label class="check" title="Experimental, needs hierarchical ordering: the ranks of every area minimise the summed lengths of its links (network simplex) instead of the longest paths."><input id="simplex-ranks" type="checkbox"> Simplex ranks: shortest links instead of longest paths</label>
+  <label for="archive-refinement">Archive entries routed after the first stage (0 = off)</label><input id="archive-refinement" type="number" min="0" max="50" step="1">
+ </div></details>
+ <details><summary>Layout method</summary><div class="group">
+  <p class="hint">The hierarchical pipeline is the default for supported direction-based areas. Turn it off to compare with the previous layout. Explicit tree, radial and organic strategies keep their own placement.</p>
+  <label class="check"><input id="layered-construction" type="checkbox" checked> Use hierarchical layered pipeline</label>
+ </div></details>
+ <details><summary>Display</summary><div class="group">
+  <label class="check"><input id="show-ports" type="checkbox" checked> Port markers</label>
+  <label class="check"><input id="edge-labels" type="checkbox"> Edge labels</label>
+  <label class="check"><input id="port-labels" type="checkbox"> Port labels</label>
+  <label class="check"><input id="measure" type="checkbox"> Size nodes to their labels</label>
+ </div></details>
+ <details><summary>Advanced (JSON)</summary><div class="group">
+  <p class="hint">Options for <code>configure</code>, e.g. {"routingClearance": 16}.</p>
+  <textarea id="options-json" rows="5">{"routingClearance": 16, "trackSpacing": 12}</textarea>
+  <div class="row"><button id="apply-options">Apply options</button></div>
+ </div></details>
+</div></details>
+
+<details class="section"><summary>Reference and legacy curation</summary><div class="body">
+ <p class="hint">The view is edited directly: drag a node, a container's header, or a pin; drag a corner to resize; Ctrl or Cmd+Z undoes, with Shift (or Ctrl or Cmd+Y) it redoes. Every change goes through the engine.</p>
+ <div class="row"><button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button></div>
+ <div class="row"><button id="save-ref" disabled>Save reference (.lwref.json)</button></div>
+ <label for="load-ref">Open reference</label><input id="load-ref" class="full" type="file" accept=".json,application/json">
+ <ul id="capabilities" class="hint">
+  <li>Available: move (also a selection chosen with Cmd or Ctrl-click), resize, pin, port placement (drag a port along the border), label placement (drag a label), collapse, shape, direction, strategy, routing, undo and redo, reference save and open.</li>
+  <li>Not available in the direct view: moving a route segment, doglegs (Alt-click), route locks (Shift-click), size pins. Opening a reference there uses its baseline view and does not apply these curated parts; the legacy draft below edits and keeps them.</li>
+ </ul>
+ <div class="row"><button id="curate" disabled>Legacy curation (start a draft)</button></div>
+ <div class="row"><button id="reroute" disabled>Re-route pending</button><button id="reroute-all" disabled>Re-route all</button></div>
+ <p id="curation-info" class="hint" role="status"></p>
+ <details><summary>Inspector</summary><div class="group">
+  <pre id="inspector"></pre>
+  <div class="row"><button id="inspector-lock" disabled>Lock route</button><button id="inspector-pin" disabled>Pin size</button></div>
+  <div class="row"><label for="shape-select">Shape</label><select id="shape-select" disabled><option value="rect">Rectangle</option><option value="square">Square</option><option value="circle">Circle</option></select></div>
+  <input id="note-text" class="full" placeholder="Note on the selection" maxlength="500" aria-label="Note on the selection">
+  <div class="row"><select id="note-category" aria-label="Note category"><option value="">No category</option><option value="overlap">Overlap</option><option value="node-intersection">Node intersection</option><option value="clearance">Clearance</option><option value="port-side-or-order">Port side or order</option><option value="channel-space">Channel space</option><option value="crossing">Crossing</option><option value="bend">Bend</option><option value="label">Label</option><option value="hierarchy">Hierarchy</option><option value="readability">Readability</option><option value="other">Other</option></select><select id="note-severity" aria-label="Note severity"><option value="">No severity</option><option value="info">Info</option><option value="warning">Warning</option><option value="error">Error</option></select></div>
+  <div class="row"><button id="note-add" disabled>Add note</button><button id="note-remove" disabled>Remove notes</button></div>
+ </div></details>
+</div></details>
+</aside>
+</main>
+<script type="module" src="./app.js"></script>
+</body></html>

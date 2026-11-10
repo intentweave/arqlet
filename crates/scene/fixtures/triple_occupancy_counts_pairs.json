@@ -1,0 +1,86 @@
+{
+  "description": "Three routes on one line, no shared identity: three pairs, not one shared segment.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 300,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "c",
+        "x": 300,
+        "y": 40,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "d",
+        "x": 300,
+        "y": 80,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 300,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "id": "e2",
+        "source": "c",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 300,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "id": "e3",
+        "source": "d",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 300,
+            "y": 10
+          }
+        ]
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "sharedLinePairs": 3
+  }
+}

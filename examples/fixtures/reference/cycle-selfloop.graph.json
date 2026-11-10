@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {"id": "a", "kind": "symbol", "label": "A", "parentId": null},
+    {"id": "b", "kind": "symbol", "label": "B", "parentId": null},
+    {"id": "c", "kind": "symbol", "label": "C", "parentId": null}
+  ],
+  "edges": [
+    {"id": "ab", "kind": "calls", "source": "a", "target": "b"},
+    {"id": "ab2", "kind": "calls", "source": "a", "target": "b"},
+    {"id": "bc", "kind": "calls", "source": "b", "target": "c"},
+    {"id": "ca", "kind": "calls", "source": "c", "target": "a"},
+    {"id": "cc", "kind": "calls", "source": "c", "target": "c"}
+  ]
+}

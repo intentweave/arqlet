@@ -1,0 +1,13 @@
+[package]
+name = "arqlet-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Browser ABI of the Arqlet engine (lw_alloc, lw_free, lw_run with JSON payloads); built into the npm package @arqlet/engine-client."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+arqlet-runtime = { workspace = true }

@@ -1,0 +1,418 @@
+diff --git a/crates/layout/src/constructive.rs b/crates/layout/src/constructive.rs
+index b1ffebb..25ff0fb 100644
+--- a/crates/layout/src/constructive.rs
++++ b/crates/layout/src/constructive.rs
+@@ -315,7 +315,17 @@ pub fn construct_ordered(
+     let eligible: BTreeSet<usize> = (0..prepared.len())
+         .filter(|&slot| prepared[slot].1.is_ok())
+         .collect();
+-    let (outcomes, moved, ends) = attempt(&eligible);
++    let (mut outcomes, moved, ends) = attempt(&eligible);
++    // The built routes, ordered once more channel by channel (`order_built`).
++    order_built(
++        &mut outcomes,
++        &prepared
++            .iter()
++            .map(|(_, o)| o.as_ref().ok())
++            .collect::<Vec<_>>(),
++        boxes,
++        spacing,
++    );
+     // The self-loops of a node are nested around the corner between their two port sides, clear of the routes built.
+     let built: Vec<Segment> = outcomes
+         .iter()
+@@ -361,6 +371,394 @@ pub fn construct_ordered(
+     result
+ }
+ 
++/// A channel of the built routes: a node side (its port slots), a corridor (its tracks across the flow) or a lane (its tracks
++/// along the flow). Corridors and lanes are the intervals between neighbouring box edges of the whole drawing, so the
++/// segments of different edges in one interval share the channel.
++#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
++enum Channel {
++    Side(String, bool),
++    Corridor(bool, i64, i64),
++    Lane(bool, i64, i64),
++}
++
++/// Orders the segments of the built routes in their channels, as an orthogonal router orders the segments that share a
++/// channel after routing. A route in its flow's frame is a list of coordinates: its first run's lane (its start port), then
++/// alternately a lane change's track and the next run's lane, its last run's lane (its end port). Every coordinate is a
++/// member of a channel; the members of a channel hold a set of coordinates, sorted. Neighbouring members exchange their
++/// coordinates while the crossings, the close parallel runs and the obstacle hits of the routes fall. The set of coordinates
++/// of a channel never changes, so the tracks keep their spacing; the ways (which gaps a route passes) stay as built.
++fn order_built(
++    outcomes: &mut [Result<(Route, usize), Delegation>],
++    prepared: &[Option<&Prepared>],
++    boxes: &BTreeMap<String, Rect>,
++    spacing: Spacing,
++) {
++    let track = spacing.track;
++    let n = outcomes.len();
++    let inflated: Vec<Rect> = boxes.values().map(|r| inflate(r, spacing.margin)).collect();
++    let cuts = |horizontal_axis: bool| -> Vec<f64> {
++        let mut v: Vec<f64> = inflated
++            .iter()
++            .flat_map(|r| {
++                if horizontal_axis {
++                    [r.x, r.x + r.width]
++                } else {
++                    [r.y, r.y + r.height]
++                }
++            })
++            .collect();
++        v.sort_by(f64::total_cmp);
++        v.dedup_by(|a, b| (*a - *b).abs() < EPS);
++        v
++    };
++    let (x_cuts, y_cuts) = (cuts(true), cuts(false));
++    let cell = |horizontal_axis: bool, v: f64| -> (i64, i64) {
++        let c = if horizontal_axis { &x_cuts } else { &y_cuts };
++        let i = c.partition_point(|&e| e <= v);
++        let lo = if i == 0 { f64::MIN } else { c[i - 1] };
++        let hi = if i >= c.len() { f64::MAX } else { c[i] };
++        let key = |v: f64| {
++            if v.abs() > 1e12 {
++                i64::MAX
++            } else {
++                (v * 2.).round() as i64
++            }
++        };
++        (key(lo), key(hi))
++    };
++    // Each constructed route in its frame: (main of start, coordinates, main of end).
++    // A route in its frame: (main of start, coordinates, main of end); runs and changes alternate, first and last are runs.
++    let shape_of = |route: &Route, p: &Prepared| -> Option<(f64, Vec<f64>, f64)> {
++        let mut points: Vec<(f64, f64)> =
++            route.points.iter().map(|q| frame(p.vertical, q)).collect();
++        if p.reversed {
++            points.reverse();
++        }
++        if points.len() < 3 {
++            return None;
++        }
++        let mut coords = Vec::new();
++        for (k, w) in points.windows(2).enumerate() {
++            let run = (w[0].1 - w[1].1).abs() < EPS;
++            if run != (k % 2 == 0) {
++                return None;
++            }
++            coords.push(if run { w[0].1 } else { w[0].0 });
++        }
++        (coords.len() % 2 == 1).then(|| (points[0].0, coords, points[points.len() - 1].0))
++    };
++    let mut shapes: Vec<Option<(f64, Vec<f64>, f64)>> = (0..n)
++        .map(|e| match (&outcomes[e], prepared[e]) {
++            (Ok((route, _)), Some(p)) => shape_of(route, p),
++            _ => None,
++        })
++        .collect();
++    // The channel of every coordinate.
++    let mut members: BTreeMap<Channel, Vec<(usize, usize)>> = BTreeMap::new();
++    for (e, shape) in shapes.iter().enumerate() {
++        let (Some((_, coords, _)), Some(p)) = (shape, prepared[e]) else {
++            continue;
++        };
++        let last = coords.len() - 1;
++        for (k, &c) in coords.iter().enumerate() {
++            let channel = if k == 0 {
++                Channel::Side(p.from_node.clone(), true)
++            } else if k == last {
++                Channel::Side(p.to_node.clone(), false)
++            } else if k % 2 == 1 {
++                let (a, b) = cell(!p.vertical, c);
++                Channel::Corridor(p.vertical, a, b)
++            } else {
++                let (a, b) = cell(p.vertical, c);
++                Channel::Lane(p.vertical, a, b)
++            };
++            members.entry(channel).or_default().push((e, k));
++        }
++    }
++    let points_of = |e: usize, shapes: &[Option<(f64, Vec<f64>, f64)>]| -> Vec<Point> {
++        let (Some((from, coords, to)), Some(p)) = (&shapes[e], prepared[e]) else {
++            return Vec::new();
++        };
++        let mut frame_points = vec![(*from, coords[0])];
++        for k in (1..coords.len()).step_by(2) {
++            frame_points.push((coords[k], coords[k - 1]));
++            frame_points.push((coords[k], coords[k + 1]));
++        }
++        frame_points.push((*to, coords[coords.len() - 1]));
++        frame_points
++            .iter()
++            .map(|&c| to_point(p.vertical, c))
++            .collect()
++    };
++    let mut lines: Vec<Vec<Segment>> = (0..n)
++        .map(|e| match (&shapes[e], &outcomes[e]) {
++            (Some(_), _) => segments_of(&points_of(e, &shapes)),
++            (None, Ok((route, _))) => segments_of(&route.points),
++            _ => Vec::new(),
++        })
++        .collect();
++    let hits = |e: usize, shapes: &[Option<(f64, Vec<f64>, f64)>]| -> usize {
++        let Some(p) = prepared[e] else { return 0 };
++        points_of(e, shapes)
++            .windows(2)
++            .filter(|w| {
++                p.obstacles
++                    .iter()
++                    .any(|o| segment_hits(w[0].clone(), w[1].clone(), o))
++            })
++            .count()
++    };
++    let cost_of = |lines: &[Vec<Segment>],
++                   shapes: &[Option<(f64, Vec<f64>, f64)>],
++                   edges: &[usize]|
++     -> usize {
++        // The box a route's segments reach, with the track spacing: routes whose boxes do not meet cannot cross or run close.
++        let reach = |segments: &[Segment]| {
++            segments
++                .iter()
++                .fold([f64::MAX, f64::MAX, f64::MIN, f64::MIN], |b, s| {
++                    let [x0, y0, x1, y1] = segment_box(s, track);
++                    [b[0].min(x0), b[1].min(y0), b[2].max(x1), b[3].max(y1)]
++                })
++        };
++        let mut total = 0;
++        for (i, &e) in edges.iter().enumerate() {
++            total += 1000 * hits(e, shapes);
++            let own = reach(&lines[e]);
++            for f in 0..n {
++                if f == e || edges[..i].contains(&f) || lines[f].is_empty() {
++                    continue;
++                }
++                let other = reach(&lines[f]);
++                if other[0] > own[2] || other[2] < own[0] || other[1] > own[3] || other[3] < own[1]
++                {
++                    continue;
++                }
++                for s in &lines[e] {
++                    total += lines[f]
++                        .iter()
++                        .filter(|t| crosses(s, t) || conflicts(s, t, track))
++                        .count();
++                }
++            }
++        }
++        total
++    };
++    // Whether two routes cross or run too close: the pair moves below only help such pairs.
++    let meet = |a: &[Segment], b: &[Segment]| {
++        a.iter()
++            .any(|s| b.iter().any(|t| crosses(s, t) || conflicts(s, t, track)))
++    };
++    // Members sorted by their coordinate; a swap exchanges the coordinates of two neighbours.
++    let side_channels: Vec<Vec<(usize, usize)>> = members
++        .iter()
++        .filter(|(c, list)| matches!(c, Channel::Side(..)) && list.len() > 1)
++        .map(|(_, list)| list.clone())
++        .collect();
++    let mut orders: Vec<Vec<(usize, usize)>> = members
++        .into_values()
++        .filter(|list| list.len() > 1)
++        .map(|mut list| {
++            list.sort_by(|a, b| {
++                let ca = shapes[a.0].as_ref().unwrap().1[a.1];
++                let cb = shapes[b.0].as_ref().unwrap().1[b.1];
++                ca.total_cmp(&cb).then(a.cmp(b))
++            });
++            list
++        })
++        .collect();
++    for _ in 0..8 {
++        let mut improved = false;
++        for order in orders.iter_mut() {
++            for i in 0..order.len() - 1 {
++                let (a, b) = (order[i], order[i + 1]);
++                let ca = shapes[a.0].as_ref().unwrap().1[a.1];
++                let cb = shapes[b.0].as_ref().unwrap().1[b.1];
++                if (ca - cb).abs() < EPS {
++                    continue;
++                }
++                let mut edges = vec![a.0];
++                if b.0 != a.0 {
++                    edges.push(b.0);
++                }
++                let before = cost_of(&lines, &shapes, &edges);
++                shapes[a.0].as_mut().unwrap().1[a.1] = cb;
++                shapes[b.0].as_mut().unwrap().1[b.1] = ca;
++                let saved: Vec<Vec<Segment>> = edges.iter().map(|&e| lines[e].clone()).collect();
++                for &e in &edges {
++                    lines[e] = segments_of(&points_of(e, &shapes));
++                }
++                if cost_of(&lines, &shapes, &edges) < before {
++                    order.swap(i, i + 1);
++                    improved = true;
++                } else {
++                    shapes[a.0].as_mut().unwrap().1[a.1] = ca;
++                    shapes[b.0].as_mut().unwrap().1[b.1] = cb;
++                    for (&e, line) in edges.iter().zip(saved) {
++                        lines[e] = line;
++                    }
++                }
++            }
++        }
++        // Pair moves: two edges exchange their coordinates in the first channels they share along the route, at once (every
++        // proper prefix; exchanging them all would only swap the names). A crossing of two edges that run side by side
++        // through several channels often needs that: no single exchange removes it.
++        let mut shared: BTreeMap<(usize, usize), Vec<((usize, usize), (usize, usize))>> =
++            BTreeMap::new();
++        for order in &orders {
++            for (i, &a) in order.iter().enumerate() {
++                for &b in &order[i + 1..] {
++                    if a.0 != b.0 {
++                        let key = (a.0.min(b.0), a.0.max(b.0));
++                        let pair = if a.0 < b.0 { (a, b) } else { (b, a) };
++                        shared.entry(key).or_default().push(pair);
++                    }
++                }
++            }
++        }
++        let mut moves: Vec<((usize, usize), Vec<((usize, usize), (usize, usize))>)> = Vec::new();
++        for ((ea, eb), mut pairs) in shared {
++            if pairs.len() < 2 {
++                continue;
++            }
++            pairs.sort_by_key(|(a, _)| a.1);
++            for cut in 1..pairs.len() {
++                moves.push(((ea, eb), pairs[..cut].to_vec()));
++            }
++        }
++        for ((ea, eb), pairs) in moves {
++            if !meet(&lines[ea], &lines[eb]) {
++                continue;
++            }
++            let edges = [ea, eb];
++            let before = cost_of(&lines, &shapes, &edges);
++            let exchange = |shapes: &mut Vec<Option<(f64, Vec<f64>, f64)>>| {
++                for &(a, b) in &pairs {
++                    let ca = shapes[a.0].as_ref().unwrap().1[a.1];
++                    let cb = shapes[b.0].as_ref().unwrap().1[b.1];
++                    shapes[a.0].as_mut().unwrap().1[a.1] = cb;
++                    shapes[b.0].as_mut().unwrap().1[b.1] = ca;
++                }
++            };
++            exchange(&mut shapes);
++            let saved: Vec<Vec<Segment>> = edges.iter().map(|&e| lines[e].clone()).collect();
++            for &e in &edges {
++                lines[e] = segments_of(&points_of(e, &shapes));
++            }
++            if cost_of(&lines, &shapes, &edges) < before {
++                improved = true;
++                for order in orders.iter_mut() {
++                    order.sort_by(|a, b| {
++                        let ca = shapes[a.0].as_ref().unwrap().1[a.1];
++                        let cb = shapes[b.0].as_ref().unwrap().1[b.1];
++                        ca.total_cmp(&cb).then(a.cmp(b))
++                    });
++                }
++            } else {
++                exchange(&mut shapes);
++                for (&e, line) in edges.iter().zip(saved) {
++                    lines[e] = line;
++                }
++            }
++        }
++        if !improved {
++            break;
++        }
++    }
++    // Port exchanges with new ways: two edges of one node side exchange their port slots and are searched again, around all
++    // other built routes. Where the ways themselves have to change (an edge must pass a box on the other side of its
++    // neighbour), no exchange of coordinates alone removes the crossing.
++    // A side member is the first coordinate (start) or the last one (end) of its route, whatever its length is by then.
++    let side_value = |shapes: &[Option<(f64, Vec<f64>, f64)>], (e, k): (usize, usize)| {
++        shapes[e]
++            .as_ref()
++            .map(|s| if k == 0 { s.1[0] } else { s.1[s.1.len() - 1] })
++    };
++    for mut list in side_channels {
++        list.sort_by(|&a, &b| {
++            let ca = side_value(&shapes, a).unwrap_or(0.);
++            let cb = side_value(&shapes, b).unwrap_or(0.);
++            ca.total_cmp(&cb).then(a.cmp(&b))
++        });
++        for i in 0..list.len() - 1 {
++            let ((ea, ka), (eb, kb)) = (list[i], list[i + 1]);
++            if ea == eb
++                || shapes[ea].is_none()
++                || shapes[eb].is_none()
++                || !meet(&lines[ea], &lines[eb])
++            {
++                continue;
++            }
++            let (ca, cb) = (
++                side_value(&shapes, (ea, ka)).unwrap(),
++                side_value(&shapes, (eb, kb)).unwrap(),
++            );
++            let moved_end = |p: &Prepared, k: usize, to: f64| -> Prepared {
++                let mut p = p.clone();
++                if k == 0 {
++                    p.from.1 = to;
++                    p.start = to_point(p.vertical, p.from);
++                } else {
++                    p.to.1 = to;
++                    p.end = to_point(p.vertical, p.to);
++                }
++                p
++            };
++            let (pa, pb) = (
++                moved_end(prepared[ea].unwrap(), ka, cb),
++                moved_end(prepared[eb].unwrap(), kb, ca),
++            );
++            let mut others: Vec<Segment> = (0..n)
++                .filter(|&f| f != ea && f != eb)
++                .flat_map(|f| lines[f].iter().copied())
++                .collect();
++            let unbound = Desired::new();
++            let (Ok((ra, _)), Ok((rb, _))) = (
++                build_edge(&pa, &mut others, track, &unbound),
++                build_edge(&pb, &mut others, track, &unbound),
++            ) else {
++                continue;
++            };
++            let (Some(sa), Some(sb)) = (shape_of(&ra, &pa), shape_of(&rb, &pb)) else {
++                continue;
++            };
++            let edges = [ea, eb];
++            let before = cost_of(&lines, &shapes, &edges);
++            let saved = (
++                shapes[ea].clone(),
++                shapes[eb].clone(),
++                lines[ea].clone(),
++                lines[eb].clone(),
++            );
++            shapes[ea] = Some(sa);
++            shapes[eb] = Some(sb);
++            lines[ea] = segments_of(&points_of(ea, &shapes));
++            lines[eb] = segments_of(&points_of(eb, &shapes));
++            if cost_of(&lines, &shapes, &edges) < before {
++                list.swap(i, i + 1);
++            } else {
++                shapes[ea] = saved.0;
++                shapes[eb] = saved.1;
++                lines[ea] = saved.2;
++                lines[eb] = saved.3;
++            }
++        }
++    }
++    for e in 0..n {
++        if shapes[e].is_none() {
++            continue;
++        }
++        let p = prepared[e].unwrap();
++        let mut points = straighten(points_of(e, &shapes));
++        if p.reversed {
++            points.reverse();
++        }
++        if let Ok((route, _)) = &mut outcomes[e] {
++            route.points = points;
++        }
++    }
++}
++
+ /// The outward normal of a node side.
+ fn normal(side: PortSide) -> (f64, f64) {
+     match side {

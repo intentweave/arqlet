@@ -1,0 +1,268 @@
+diff --git a/crates/layout/src/lib.rs b/crates/layout/src/lib.rs
+index e086cc9..df05bb8 100644
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -222,11 +222,12 @@ const STUB: f64 = 20.;
+ 
+ /// Channel routing for every edge: ports, stubs and node margins come from the layout.
+ /// Every congestion round of the channel router for this view, each as a complete route set.
+-fn channel_rounds(
++/// The channel ends of a view (ports and stubs) and the node margin, shared by the full and the local routing.
++fn channel_ends(
+     graph: &Graph,
+     boxes: &BTreeMap<String, Rect>,
+     options: &LayoutOptions,
+-) -> Vec<Vec<Route>> {
++) -> (Vec<arqlet_routing::channel::ChannelEnd>, f64) {
+     let resolved = ports::resolve_with(
+         graph,
+         boxes,
+@@ -283,6 +284,17 @@ fn channel_rounds(
+             })
+         })
+         .collect();
++    (ends, margin)
++}
++
++/// Every congestion round of the channel router for this view, each as a complete route set.
++fn channel_rounds(
++    graph: &Graph,
++    boxes: &BTreeMap<String, Rect>,
++    options: &LayoutOptions,
++) -> Vec<Vec<Route>> {
++    let (ends, margin) = channel_ends(graph, boxes, options);
++    let rects = absolute_all(graph, boxes);
+     arqlet_routing::channel::route_channel_rounds(
+         graph,
+         &rects,
+@@ -1610,11 +1622,12 @@ fn local_candidate(
+     boxes: &BTreeMap<String, Rect>,
+     moved: &[&str],
+ ) -> Option<Snapshot> {
+-    if base.options.bundling == Bundling::Complete
+-        || base.options.routing_engine == RoutingEngine::Channel
+-    {
++    if base.options.bundling == Bundling::Complete {
+         return assemble(base, boxes);
+     }
++    if base.options.routing_engine == RoutingEngine::Channel {
++        return local_channel_candidate(base, boxes, moved);
++    }
+     let graph = &base.graph;
+     let old = absolute_all(graph, &base.boxes);
+     let new = absolute_all(graph, boxes);
+@@ -1667,6 +1680,70 @@ fn local_candidate(
+     Some(candidate)
+ }
+ 
++/// Channel-engine candidate for moved leaves: the edges at a moved leaf and the routes that cross its old or new
++/// rectangle are routed again; every other route keeps its points. The candidate is a complete route set, finished and
++/// checked like any other, so the caller's comparison is unchanged.
++fn local_channel_candidate(
++    base: &Snapshot,
++    boxes: &BTreeMap<String, Rect>,
++    moved: &[&str],
++) -> Option<Snapshot> {
++    let graph = &base.graph;
++    let old = absolute_all(graph, &base.boxes);
++    let new = absolute_all(graph, boxes);
++    let mut changed: BTreeSet<String> = graph
++        .edges
++        .iter()
++        .filter(|e| {
++            e.target.is_some()
++                && moved
++                    .iter()
++                    .any(|m| e.source == *m || e.target.as_deref() == Some(*m))
++        })
++        .map(|e| e.id.clone())
++        .collect();
++    for route in &base.routes {
++        if moved.iter().any(|m| {
++            arqlet_routing::hits(route, &old[*m]) || arqlet_routing::hits(route, &new[*m])
++        }) {
++            changed.insert(route.id.clone());
++        }
++    }
++    let fixed: BTreeMap<String, Vec<Point>> = base
++        .routes
++        .iter()
++        .filter(|r| r.bundle_of.is_none())
++        .map(|r| (r.id.clone(), r.points.clone()))
++        .collect();
++    let (ends, margin) = channel_ends(graph, boxes, &base.options);
++    let subset = arqlet_routing::channel::Subset {
++        fixed: &fixed,
++        changed: &changed,
++    };
++    let Some(routes) = arqlet_routing::channel::route_channel_subset(
++        graph,
++        &new,
++        &ends,
++        margin,
++        base.options.track_spacing,
++        &subset,
++    ) else {
++        return assemble(base, boxes);
++    };
++    let mut candidate = base.clone();
++    candidate.boxes = boxes.clone();
++    candidate.routes = routes;
++    finish_routes(&mut candidate, true);
++    candidate.geometry_issues = arqlet_scene::validate_geometry(
++        graph,
++        boxes,
++        arqlet_scene::GeometryRules::default(),
++    );
++    candidate.layout_version = base.layout_version + 1;
++    labels::decorate(&mut candidate);
++    Some(candidate)
++}
++
+ /// True when two box maps place every node at the same position.
+ fn same_boxes(a: &BTreeMap<String, Rect>, b: &BTreeMap<String, Rect>) -> bool {
+     a.len() == b.len()
+diff --git a/crates/routing/src/channel.rs b/crates/routing/src/channel.rs
+index eb55cec..4166876 100644
+--- a/crates/routing/src/channel.rs
++++ b/crates/routing/src/channel.rs
+@@ -87,12 +87,27 @@ pub fn route_channels(
+     track: f64,
+ ) -> Vec<Route> {
+     simplify(
+-        route_channels_raw(graph, rects, ends, margin, track)
++        route_channels_raw(graph, rects, ends, margin, track, None)
+             .pop()
+             .unwrap_or_default(),
+     )
+ }
+ 
++/// The channel routes of a view in which only `changed` edges are routed again. Every other edge keeps the points it
++/// has in `fixed`. `None` when a kept route cannot be represented on the grid; the caller then routes the whole view.
++pub fn route_channel_subset(
++    graph: &Graph,
++    rects: &BTreeMap<String, Rect>,
++    ends: &[ChannelEnd],
++    margin: f64,
++    track: f64,
++    subset: &Subset,
++) -> Option<Vec<Route>> {
++    route_channels_raw(graph, rects, ends, margin, track, Some(subset))
++        .pop()
++        .map(simplify)
++}
++
+ /// Every congestion round as a complete route set (at most `ROUNDS`, each simplified like the result).
+ /// Round 0 has no congestion penalty; later rounds spread the routes. The layout crate scores each set as a
+ /// whole candidate; this function makes no judgement itself.
+@@ -103,18 +118,32 @@ pub fn route_channel_rounds(
+     margin: f64,
+     track: f64,
+ ) -> Vec<Vec<Route>> {
+-    route_channels_raw(graph, rects, ends, margin, track)
++    route_channels_raw(graph, rects, ends, margin, track, None)
+         .into_iter()
+         .map(simplify)
+         .collect()
+ }
+ 
++/// Routes that are kept: edge id to its points. Only the edges in `changed` are routed again.
++pub struct Subset<'a> {
++    pub fixed: &'a BTreeMap<String, Vec<Point>>,
++    pub changed: &'a BTreeSet<String>,
++}
++
++impl Subset<'_> {
++    /// An edge keeps its points unless it is changed; an edge without fixed points is always routed.
++    fn keeps(&self, edge_id: &str) -> bool {
++        self.fixed.contains_key(edge_id) && !self.changed.contains(edge_id)
++    }
++}
++
+ fn route_channels_raw(
+     graph: &Graph,
+     rects: &BTreeMap<String, Rect>,
+     ends: &[ChannelEnd],
+     margin: f64,
+     track: f64,
++    subset: Option<&Subset>,
+ ) -> Vec<Vec<Route>> {
+     let containers: BTreeSet<&str> = graph
+         .nodes
+@@ -248,9 +277,51 @@ fn route_channels_raw(
+     }
+     grid.containers_at = containers_at;
+ 
+-    let mut order: Vec<usize> = (0..ends.len()).collect();
++    let mut order: Vec<usize> = (0..ends.len())
++        .filter(|k| !subset.is_some_and(|s| s.keeps(&ends[*k].edge_id)))
++        .collect();
+     order.sort_by(|a, b| ends[*a].edge_id.cmp(&ends[*b].edge_id));
+     let mut usage = vec![0usize; grid.segments()];
++    // Kept routes are congestion the rerouted ones must avoid: each axis-aligned piece on a grid line adds one use to
++    // the segments it covers. A kept piece off the grid cannot be represented, so the subset is refused (no rounds);
++    // the caller then routes the whole view.
++    if let Some(subset) = subset {
++        for (edge_id, points) in subset.fixed {
++            if subset.changed.contains(edge_id) {
++                continue;
++            }
++            for pair in points.windows(2) {
++                let (a, b) = (&pair[0], &pair[1]);
++                if (a.y - b.y).abs() < EPS {
++                    let Some(j) = grid.index(&grid.ys, a.y) else {
++                        return Vec::new();
++                    };
++                    let (Some(i0), Some(i1)) = (
++                        grid.index(&grid.xs, a.x.min(b.x)),
++                        grid.index(&grid.xs, a.x.max(b.x)),
++                    ) else {
++                        return Vec::new();
++                    };
++                    for i in i0..i1 {
++                        usage[grid.segment(i + 1, j, 1)] += 1;
++                    }
++                } else if (a.x - b.x).abs() < EPS {
++                    let Some(i) = grid.index(&grid.xs, a.x) else {
++                        return Vec::new();
++                    };
++                    let (Some(j0), Some(j1)) = (
++                        grid.index(&grid.ys, a.y.min(b.y)),
++                        grid.index(&grid.ys, a.y.max(b.y)),
++                    ) else {
++                        return Vec::new();
++                    };
++                    for j in j0..j1 {
++                        usage[grid.segment(i, j + 1, 3)] += 1;
++                    }
++                }
++            }
++        }
++    }
+     let mut paths: Vec<Option<Vec<(usize, usize)>>> = vec![None; ends.len()];
+     let mut rounds: Vec<Vec<Route>> = Vec::new();
+     for round in 0..ROUNDS {
+@@ -308,7 +379,7 @@ fn route_channels_raw(
+             }
+             paths[k] = path;
+         }
+-        rounds.push(routes_of(&grid, ends, &paths));
++        rounds.push(routes_of(&grid, ends, &paths, subset));
+     }
+     rounds
+ }
+@@ -318,10 +389,14 @@ fn routes_of(
+     grid: &Grid,
+     ends: &[ChannelEnd],
+     paths: &[Option<Vec<(usize, usize)>>],
++    subset: Option<&Subset>,
+ ) -> Vec<Route> {
+     ends.iter()
+         .enumerate()
+         .map(|(k, end)| {
++            if let Some(subset) = subset.filter(|s| s.keeps(&end.edge_id)) {
++                return Route::new(end.edge_id.clone(), subset.fixed[&end.edge_id].clone());
++            }
+             let mut points = vec![end.start.clone(), end.depart.clone()];
+             if let Some(path) = &paths[k] {
+                 for &(i, j) in path {

@@ -1,0 +1,431 @@
+{
+ "containerDirections": {
+  "cls:Address": "lr",
+  "cls:BankTransfer": "lr",
+  "cls:CreditCard": "lr",
+  "cls:Customer": "lr",
+  "cls:CustomerController": "lr",
+  "cls:CustomerRepository": "lr",
+  "cls:Database": "lr",
+  "cls:Logger": "lr",
+  "cls:Order": "lr",
+  "cls:OrderController": "lr",
+  "cls:OrderLine": "lr",
+  "cls:OrderRepository": "lr",
+  "cls:Payment": "lr",
+  "cls:Product": "lr",
+  "cls:ProductRepository": "lr",
+  "cls:Router": "lr",
+  "cls:Serializer": "lr",
+  "pkg:api": "lr",
+  "pkg:domain": "lr",
+  "pkg:persistence": "lr"
+ },
+ "defaultDirection": "tb",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "extends",
+   "source": "cls:CreditCard",
+   "target": "cls:Payment"
+  },
+  {
+   "id": "e2",
+   "kind": "extends",
+   "source": "cls:BankTransfer",
+   "target": "cls:Payment"
+  },
+  {
+   "id": "e3",
+   "kind": "uses",
+   "source": "cls:OrderRepository",
+   "target": "cls:Database"
+  },
+  {
+   "id": "e4",
+   "kind": "uses",
+   "source": "cls:CustomerRepository",
+   "target": "cls:Database"
+  },
+  {
+   "id": "e5",
+   "kind": "uses",
+   "source": "cls:ProductRepository",
+   "target": "cls:Database"
+  },
+  {
+   "id": "e6",
+   "kind": "uses",
+   "source": "cls:OrderController",
+   "target": "cls:OrderRepository"
+  },
+  {
+   "id": "e7",
+   "kind": "uses",
+   "source": "cls:CustomerController",
+   "target": "cls:CustomerRepository"
+  },
+  {
+   "id": "e8",
+   "kind": "composes",
+   "source": "cls:Router",
+   "target": "cls:OrderController"
+  },
+  {
+   "id": "e9",
+   "kind": "composes",
+   "source": "cls:Router",
+   "target": "cls:CustomerController"
+  },
+  {
+   "id": "e10",
+   "kind": "uses",
+   "source": "cls:OrderController",
+   "target": "cls:Serializer"
+  },
+  {
+   "id": "e11",
+   "kind": "uses",
+   "source": "cls:CustomerController",
+   "target": "cls:Serializer"
+  },
+  {
+   "id": "e12",
+   "kind": "composes",
+   "source": "cls:Order",
+   "target": "cls:OrderLine"
+  },
+  {
+   "id": "e13",
+   "kind": "associates",
+   "source": "cls:Order",
+   "target": "cls:Customer"
+  },
+  {
+   "id": "e14",
+   "kind": "placed by",
+   "source": "cls:Order",
+   "target": "cls:Customer"
+  },
+  {
+   "id": "e15",
+   "kind": "associates",
+   "source": "cls:Order",
+   "target": "cls:Payment"
+  },
+  {
+   "id": "e16",
+   "kind": "associates",
+   "source": "cls:OrderLine",
+   "target": "cls:Product"
+  },
+  {
+   "id": "e17",
+   "kind": "composes",
+   "source": "cls:Customer",
+   "target": "cls:Address"
+  },
+  {
+   "id": "e18",
+   "kind": "uses",
+   "source": "cls:Product",
+   "target": "cls:ProductRepository"
+  },
+  {
+   "id": "e19",
+   "kind": "uses",
+   "source": "cls:OrderRepository",
+   "target": "cls:Order"
+  },
+  {
+   "id": "e20",
+   "kind": "uses",
+   "source": "cls:Order",
+   "target": "cls:Order"
+  },
+  {
+   "id": "e21",
+   "kind": "associates",
+   "source": "cls:Customer",
+   "target": "cls:Order"
+  },
+  {
+   "id": "e22",
+   "kind": "uses",
+   "source": "cls:Serializer",
+   "target": "cls:Logger"
+  },
+  {
+   "id": "e23",
+   "kind": "uses",
+   "source": "cls:Database",
+   "target": "cls:Logger"
+  },
+  {
+   "id": "e24",
+   "kind": "uses",
+   "source": "cls:OrderController",
+   "target": "cls:Logger"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "pkg:domain",
+   "kind": "container",
+   "label": "package domain",
+   "parentId": null
+  },
+  {
+   "id": "pkg:persistence",
+   "kind": "container",
+   "label": "package persistence",
+   "parentId": null
+  },
+  {
+   "id": "pkg:api",
+   "kind": "container",
+   "label": "package api",
+   "parentId": null
+  },
+  {
+   "id": "cls:Order",
+   "kind": "container",
+   "label": "Order",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:Order.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:Order"
+  },
+  {
+   "id": "attr:Order.status",
+   "kind": "attribute",
+   "label": "status",
+   "parentId": "cls:Order"
+  },
+  {
+   "id": "attr:Order.total",
+   "kind": "attribute",
+   "label": "total",
+   "parentId": "cls:Order"
+  },
+  {
+   "id": "cls:OrderLine",
+   "kind": "container",
+   "label": "OrderLine",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:OrderLine.quantity",
+   "kind": "attribute",
+   "label": "quantity",
+   "parentId": "cls:OrderLine"
+  },
+  {
+   "id": "attr:OrderLine.price",
+   "kind": "attribute",
+   "label": "price",
+   "parentId": "cls:OrderLine"
+  },
+  {
+   "id": "cls:Customer",
+   "kind": "container",
+   "label": "Customer",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:Customer.name",
+   "kind": "attribute",
+   "label": "name",
+   "parentId": "cls:Customer"
+  },
+  {
+   "id": "attr:Customer.email",
+   "kind": "attribute",
+   "label": "email",
+   "parentId": "cls:Customer"
+  },
+  {
+   "id": "cls:Address",
+   "kind": "container",
+   "label": "Address",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:Address.street",
+   "kind": "attribute",
+   "label": "street",
+   "parentId": "cls:Address"
+  },
+  {
+   "id": "attr:Address.city",
+   "kind": "attribute",
+   "label": "city",
+   "parentId": "cls:Address"
+  },
+  {
+   "id": "cls:Product",
+   "kind": "container",
+   "label": "Product",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:Product.sku",
+   "kind": "attribute",
+   "label": "sku",
+   "parentId": "cls:Product"
+  },
+  {
+   "id": "attr:Product.price",
+   "kind": "attribute",
+   "label": "price",
+   "parentId": "cls:Product"
+  },
+  {
+   "id": "cls:Payment",
+   "kind": "container",
+   "label": "Payment",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:Payment.amount",
+   "kind": "attribute",
+   "label": "amount",
+   "parentId": "cls:Payment"
+  },
+  {
+   "id": "cls:CreditCard",
+   "kind": "container",
+   "label": "CreditCard",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:CreditCard.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:CreditCard"
+  },
+  {
+   "id": "cls:BankTransfer",
+   "kind": "container",
+   "label": "BankTransfer",
+   "parentId": "pkg:domain"
+  },
+  {
+   "id": "attr:BankTransfer.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:BankTransfer"
+  },
+  {
+   "id": "cls:OrderRepository",
+   "kind": "container",
+   "label": "OrderRepository",
+   "parentId": "pkg:persistence"
+  },
+  {
+   "id": "attr:OrderRepository.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:OrderRepository"
+  },
+  {
+   "id": "cls:CustomerRepository",
+   "kind": "container",
+   "label": "CustomerRepository",
+   "parentId": "pkg:persistence"
+  },
+  {
+   "id": "attr:CustomerRepository.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:CustomerRepository"
+  },
+  {
+   "id": "cls:ProductRepository",
+   "kind": "container",
+   "label": "ProductRepository",
+   "parentId": "pkg:persistence"
+  },
+  {
+   "id": "attr:ProductRepository.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:ProductRepository"
+  },
+  {
+   "id": "cls:Database",
+   "kind": "container",
+   "label": "Database",
+   "parentId": "pkg:persistence"
+  },
+  {
+   "id": "attr:Database.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:Database"
+  },
+  {
+   "id": "cls:OrderController",
+   "kind": "container",
+   "label": "OrderController",
+   "parentId": "pkg:api"
+  },
+  {
+   "id": "attr:OrderController.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:OrderController"
+  },
+  {
+   "id": "cls:CustomerController",
+   "kind": "container",
+   "label": "CustomerController",
+   "parentId": "pkg:api"
+  },
+  {
+   "id": "attr:CustomerController.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:CustomerController"
+  },
+  {
+   "id": "cls:Router",
+   "kind": "container",
+   "label": "Router",
+   "parentId": "pkg:api"
+  },
+  {
+   "id": "attr:Router.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:Router"
+  },
+  {
+   "id": "cls:Serializer",
+   "kind": "container",
+   "label": "Serializer",
+   "parentId": "pkg:api"
+  },
+  {
+   "id": "attr:Serializer.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:Serializer"
+  },
+  {
+   "id": "cls:Logger",
+   "kind": "container",
+   "label": "Logger",
+   "parentId": "pkg:api"
+  },
+  {
+   "id": "attr:Logger.id",
+   "kind": "attribute",
+   "label": "id",
+   "parentId": "cls:Logger"
+  }
+ ]
+}

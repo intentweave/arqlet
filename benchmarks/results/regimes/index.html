@@ -1,0 +1,142 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Regime comparison</title><style>body{font-family:system-ui;margin:16px;background:#fafafa}h2{margin-top:32px}.row{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}.cell{background:white;border:1px solid #ccc;padding:8px;max-width:48%}.cell img{max-width:100%;height:auto;border:1px solid #eee}.meta{font-size:12px;color:#333;white-space:pre-wrap;margin:4px 0}</style></head><body><h1>Joint versus structured, by regime</h1><p>Each cell shows one drawing (SVG). Keys and metrics are the same as in the results file. Smaller is better in the key; crossings and length are the report's values. The composed drawing is the raw composition before the comparison.</p>
+<h2>network-vlan</h2>
+<h3>authored</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime authored: winner joint
+joint key [0, 0, 0, 83, 50, 81, 126, 2696000]  crossings 66  length 26960
+winner key [0, 0, 0, 83, 50, 81, 126, 2696000]  crossings 66  length 26960
+shapes [[&#x27;root&#x27;, &#x27;tb&#x27;], [&#x27;vlan10&#x27;, &#x27;lr&#x27;], [&#x27;vlan20&#x27;, &#x27;lr&#x27;], [&#x27;vlan30&#x27;, &#x27;lr&#x27;], [&#x27;vlan99&#x27;, &#x27;lr&#x27;], [&#x27;dc&#x27;, &#x27;tb&#x27;]]  compositions 1</div><img src='network-vlan-authored-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (joint)</div><img src='network-vlan-authored-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='network-vlan-authored-composed.svg'></div>
+</div>
+<h3>auto</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime auto: winner composed
+joint key [0, 0, 2, 64, 24, 38, 109, 2365500]  crossings 56  length 23655
+winner key [0, 0, 0, 91, 32, 65, 117, 3312500]  crossings 74  length 33125
+shapes [[&#x27;root&#x27;, &#x27;tb&#x27;], [&#x27;vlan10&#x27;, &#x27;tb&#x27;], [&#x27;vlan20&#x27;, &#x27;lr&#x27;], [&#x27;vlan30&#x27;, &#x27;lr&#x27;], [&#x27;vlan99&#x27;, &#x27;lr&#x27;], [&#x27;dc&#x27;, &#x27;lr&#x27;]]  compositions 6</div><img src='network-vlan-auto-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='network-vlan-auto-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='network-vlan-auto-composed.svg'></div>
+</div>
+<h3>allowed</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime allowed: winner composed
+joint key [0, 0, 2, 64, 24, 38, 109, 2365500]  crossings 56  length 23655
+winner key [0, 0, 0, 91, 32, 65, 117, 3312500]  crossings 74  length 33125
+shapes [[&#x27;root&#x27;, &#x27;tb&#x27;], [&#x27;vlan10&#x27;, &#x27;tb&#x27;], [&#x27;vlan20&#x27;, &#x27;lr&#x27;], [&#x27;vlan30&#x27;, &#x27;lr&#x27;], [&#x27;vlan99&#x27;, &#x27;lr&#x27;], [&#x27;dc&#x27;, &#x27;lr&#x27;]]  compositions 6</div><img src='network-vlan-allowed-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='network-vlan-allowed-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='network-vlan-allowed-composed.svg'></div>
+</div>
+<h2>bpmn-pools</h2>
+<h3>authored</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime authored: winner joint
+joint key [0, 0, 0, 3, 10, 11, 45, 986500]  crossings 3  length 9865
+winner key [0, 0, 0, 3, 10, 11, 45, 986500]  crossings 3  length 9865
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;pool:customer&#x27;, &#x27;tb&#x27;], [&#x27;lane:sales&#x27;, &#x27;tb&#x27;], [&#x27;lane:fulfilment&#x27;, &#x27;tb&#x27;], [&#x27;pool:shop&#x27;, &#x27;lr&#x27;], [&#x27;pool:logistics&#x27;, &#x27;tb&#x27;]]  compositions 1</div><img src='bpmn-pools-authored-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (joint)</div><img src='bpmn-pools-authored-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='bpmn-pools-authored-composed.svg'></div>
+</div>
+<h3>auto</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime auto: winner composed
+joint key [0, 0, 0, 6, 11, 15, 49, 1043500]  crossings 6  length 10435
+winner key [0, 0, 0, 3, 9, 11, 47, 816100]  crossings 3  length 8161
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;pool:customer&#x27;, &#x27;tb&#x27;], [&#x27;lane:sales&#x27;, &#x27;tb&#x27;], [&#x27;lane:fulfilment&#x27;, &#x27;lr&#x27;], [&#x27;pool:shop&#x27;, &#x27;lr&#x27;], [&#x27;pool:logistics&#x27;, &#x27;tb&#x27;]]  compositions 6</div><img src='bpmn-pools-auto-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='bpmn-pools-auto-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='bpmn-pools-auto-composed.svg'></div>
+</div>
+<h3>allowed</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime allowed: winner composed
+joint key [0, 0, 0, 6, 11, 15, 49, 1043500]  crossings 6  length 10435
+winner key [0, 0, 0, 3, 9, 11, 47, 816100]  crossings 3  length 8161
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;pool:customer&#x27;, &#x27;tb&#x27;], [&#x27;lane:sales&#x27;, &#x27;tb&#x27;], [&#x27;lane:fulfilment&#x27;, &#x27;lr&#x27;], [&#x27;pool:shop&#x27;, &#x27;lr&#x27;], [&#x27;pool:logistics&#x27;, &#x27;tb&#x27;]]  compositions 6</div><img src='bpmn-pools-allowed-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='bpmn-pools-allowed-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='bpmn-pools-allowed-composed.svg'></div>
+</div>
+<h2>nested</h2>
+<h3>authored</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime authored: winner composed
+joint key [0, 0, 0, 0, 2, 0, 11, 107200]  crossings 0  length 1072
+winner key [0, 0, 0, 0, 2, 0, 11, 100000]  crossings 0  length 1000
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;inner&#x27;, &#x27;lr&#x27;], [&#x27;outer&#x27;, &#x27;lr&#x27;]]  compositions 1</div><img src='nested-authored-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='nested-authored-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='nested-authored-composed.svg'></div>
+</div>
+<h3>auto</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime auto: winner composed
+joint key [0, 0, 0, 0, 2, 0, 11, 107200]  crossings 0  length 1072
+winner key [0, 0, 0, 0, 0, 0, 8, 87200]  crossings 0  length 872
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;inner&#x27;, &#x27;tb&#x27;], [&#x27;outer&#x27;, &#x27;tb&#x27;]]  compositions 3</div><img src='nested-auto-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='nested-auto-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='nested-auto-composed.svg'></div>
+</div>
+<h3>allowed</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime allowed: winner composed
+joint key [0, 0, 0, 0, 2, 0, 11, 107200]  crossings 0  length 1072
+winner key [0, 0, 0, 0, 0, 0, 8, 87200]  crossings 0  length 872
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;inner&#x27;, &#x27;tb&#x27;], [&#x27;outer&#x27;, &#x27;tb&#x27;]]  compositions 3</div><img src='nested-allowed-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='nested-allowed-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='nested-allowed-composed.svg'></div>
+</div>
+<h2>org-chart</h2>
+<h3>authored</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime authored: winner joint
+joint key [0, 0, 6, 108, 57, 135, 290, 6761186]  crossings 92  length 67612
+winner key [0, 0, 6, 108, 57, 135, 290, 6761186]  crossings 92  length 67612
+shapes [[&#x27;root&#x27;, &#x27;tb&#x27;], [&#x27;team-0-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-0-1&#x27;, &#x27;lr&#x27;], [&#x27;team-0-0-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-0&#x27;, &#x27;tb&#x27;], [&#x27;team-0-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-1&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-1&#x27;, &#x27;tb&#x27;], [&#x27;team-0-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-2&#x27;, &#x27;tb&#x27;], [&#x27;div-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-0-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-1-0&#x27;, &#x27;tb&#x27;], [&#x27;team-1-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-1-1&#x27;, &#x27;lr&#x27;], [&#x27;dep-1-1&#x27;, &#x27;tb&#x27;], [&#x27;div-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-0&#x27;, &#x27;tb&#x27;], [&#x27;team-2-1-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-1&#x27;, &#x27;tb&#x27;], [&#x27;team-2-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-2&#x27;, &#x27;tb&#x27;], [&#x27;div-2&#x27;, &#x27;lr&#x27;], [&#x27;team-3-0-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-0&#x27;, &#x27;tb&#x27;], [&#x27;team-3-1-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-1&#x27;, &#x27;tb&#x27;], [&#x27;team-3-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-2&#x27;, &#x27;tb&#x27;], [&#x27;div-3&#x27;, &#x27;lr&#x27;]]  compositions 1</div><img src='org-chart-authored-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (joint)</div><img src='org-chart-authored-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='org-chart-authored-composed.svg'></div>
+</div>
+<h3>auto</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime auto: winner composed
+joint key [0, 0, 2, 71, 25, 115, 224, 5391400]  crossings 64  length 53914
+winner key [0, 0, 1, 101, 42, 124, 228, 5813755]  crossings 87  length 58138
+shapes [[&#x27;root&#x27;, &#x27;tb&#x27;], [&#x27;team-0-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-0-1&#x27;, &#x27;tb&#x27;], [&#x27;team-0-0-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-1&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-1&#x27;, &#x27;tb&#x27;], [&#x27;team-0-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-2&#x27;, &#x27;lr&#x27;], [&#x27;div-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-0-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-1-1&#x27;, &#x27;lr&#x27;], [&#x27;dep-1-1&#x27;, &#x27;lr&#x27;], [&#x27;div-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-0&#x27;, &#x27;lr&#x27;], [&#x27;team-2-1-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-2&#x27;, &#x27;lr&#x27;], [&#x27;div-2&#x27;, &#x27;lr&#x27;], [&#x27;team-3-0-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-0&#x27;, &#x27;lr&#x27;], [&#x27;team-3-1-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-1&#x27;, &#x27;lr&#x27;], [&#x27;team-3-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-2&#x27;, &#x27;lr&#x27;], [&#x27;div-3&#x27;, &#x27;lr&#x27;]]  compositions 34</div><img src='org-chart-auto-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='org-chart-auto-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='org-chart-auto-composed.svg'></div>
+</div>
+<h3>allowed</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime allowed: winner composed
+joint key [0, 0, 2, 71, 25, 115, 224, 5391400]  crossings 64  length 53914
+winner key [0, 0, 1, 101, 42, 124, 228, 5813755]  crossings 87  length 58138
+shapes [[&#x27;root&#x27;, &#x27;tb&#x27;], [&#x27;team-0-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-0-1&#x27;, &#x27;tb&#x27;], [&#x27;team-0-0-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-1&#x27;, &#x27;lr&#x27;], [&#x27;team-0-1-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-1&#x27;, &#x27;tb&#x27;], [&#x27;team-0-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-0-2&#x27;, &#x27;lr&#x27;], [&#x27;div-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-0-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-1-0&#x27;, &#x27;lr&#x27;], [&#x27;team-1-1-1&#x27;, &#x27;lr&#x27;], [&#x27;dep-1-1&#x27;, &#x27;lr&#x27;], [&#x27;div-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-0&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-0-2&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-0&#x27;, &#x27;lr&#x27;], [&#x27;team-2-1-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-1&#x27;, &#x27;lr&#x27;], [&#x27;team-2-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-2-2&#x27;, &#x27;lr&#x27;], [&#x27;div-2&#x27;, &#x27;lr&#x27;], [&#x27;team-3-0-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-0&#x27;, &#x27;lr&#x27;], [&#x27;team-3-1-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-1&#x27;, &#x27;lr&#x27;], [&#x27;team-3-2-0&#x27;, &#x27;lr&#x27;], [&#x27;dep-3-2&#x27;, &#x27;lr&#x27;], [&#x27;div-3&#x27;, &#x27;lr&#x27;]]  compositions 34</div><img src='org-chart-allowed-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (composed)</div><img src='org-chart-allowed-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='org-chart-allowed-composed.svg'></div>
+</div>
+<h2>workflow-dag</h2>
+<h3>authored</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime authored: winner joint
+joint key [0, 0, 33, 701, 739, 0, 500, 20785480]  crossings 624  length 207855
+winner key [0, 0, 33, 701, 739, 0, 500, 20785480]  crossings 624  length 207855
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;stage:0&#x27;, &#x27;tb&#x27;], [&#x27;stage:1&#x27;, &#x27;tb&#x27;], [&#x27;stage:2&#x27;, &#x27;tb&#x27;], [&#x27;stage:3&#x27;, &#x27;tb&#x27;], [&#x27;stage:4&#x27;, &#x27;tb&#x27;], [&#x27;stage:5&#x27;, &#x27;tb&#x27;], [&#x27;stage:6&#x27;, &#x27;tb&#x27;], [&#x27;stage:7&#x27;, &#x27;tb&#x27;]]  compositions 1</div><img src='workflow-dag-authored-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (joint)</div><img src='workflow-dag-authored-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='workflow-dag-authored-composed.svg'></div>
+</div>
+<h3>auto</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime auto: winner joint
+joint key [0, 0, 2, 474, 149, 494, 376, 5314960]  crossings 450  length 53150
+winner key [0, 0, 2, 474, 149, 494, 376, 5314960]  crossings 450  length 53150
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;stage:0&#x27;, &#x27;tb&#x27;], [&#x27;stage:1&#x27;, &#x27;tb&#x27;], [&#x27;stage:2&#x27;, &#x27;lr&#x27;], [&#x27;stage:3&#x27;, &#x27;lr&#x27;], [&#x27;stage:4&#x27;, &#x27;lr&#x27;], [&#x27;stage:5&#x27;, &#x27;tb&#x27;], [&#x27;stage:6&#x27;, &#x27;lr&#x27;], [&#x27;stage:7&#x27;, &#x27;lr&#x27;]]  compositions 9</div><img src='workflow-dag-auto-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (joint)</div><img src='workflow-dag-auto-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='workflow-dag-auto-composed.svg'></div>
+</div>
+<h3>allowed</h3><div class='row'>
+<div class='cell'><div class='meta'>joint
+regime allowed: winner joint
+joint key [0, 0, 2, 474, 149, 494, 376, 5314960]  crossings 450  length 53150
+winner key [0, 0, 2, 474, 149, 494, 376, 5314960]  crossings 450  length 53150
+shapes [[&#x27;root&#x27;, &#x27;lr&#x27;], [&#x27;stage:0&#x27;, &#x27;tb&#x27;], [&#x27;stage:1&#x27;, &#x27;tb&#x27;], [&#x27;stage:2&#x27;, &#x27;lr&#x27;], [&#x27;stage:3&#x27;, &#x27;lr&#x27;], [&#x27;stage:4&#x27;, &#x27;lr&#x27;], [&#x27;stage:5&#x27;, &#x27;tb&#x27;], [&#x27;stage:6&#x27;, &#x27;lr&#x27;], [&#x27;stage:7&#x27;, &#x27;lr&#x27;]]  compositions 9</div><img src='workflow-dag-allowed-joint.svg'></div>
+<div class='cell'><div class='meta'>winner (joint)</div><img src='workflow-dag-allowed-winner.svg'></div>
+<div class='cell'><div class='meta'>raw composition</div><img src='workflow-dag-allowed-composed.svg'></div>
+</div>
+</body></html>

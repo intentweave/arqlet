@@ -1,0 +1,518 @@
+{
+ "containerDirections": {
+  "dc": "tb",
+  "vlan10": "lr",
+  "vlan20": "lr",
+  "vlan30": "lr",
+  "vlan99": "lr"
+ },
+ "defaultDirection": "tb",
+ "edges": [
+  {
+   "id": "e1",
+   "kind": "wan",
+   "source": "internet",
+   "target": "fw-a"
+  },
+  {
+   "id": "e2",
+   "kind": "wan backup",
+   "source": "isp-b",
+   "target": "fw-b"
+  },
+  {
+   "id": "e3",
+   "kind": "trunk",
+   "source": "fw-a",
+   "target": "core-a"
+  },
+  {
+   "id": "e4",
+   "kind": "trunk",
+   "source": "fw-b",
+   "target": "core-b"
+  },
+  {
+   "id": "e5",
+   "kind": "peer link",
+   "source": "core-a",
+   "target": "core-b"
+  },
+  {
+   "id": "e6",
+   "kind": "peer link 2",
+   "source": "core-a",
+   "target": "core-b"
+  },
+  {
+   "id": "e7",
+   "kind": "vlan 10",
+   "source": "core-a",
+   "target": "sw10"
+  },
+  {
+   "id": "e8",
+   "kind": "vlan 10 standby",
+   "source": "core-b",
+   "target": "sw10"
+  },
+  {
+   "id": "e9",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-0"
+  },
+  {
+   "id": "e10",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-1"
+  },
+  {
+   "id": "e11",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-2"
+  },
+  {
+   "id": "e12",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-3"
+  },
+  {
+   "id": "e13",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-4"
+  },
+  {
+   "id": "e14",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-5"
+  },
+  {
+   "id": "e15",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-6"
+  },
+  {
+   "id": "e16",
+   "kind": "access",
+   "source": "sw10",
+   "target": "h10-7"
+  },
+  {
+   "id": "e17",
+   "kind": "allow",
+   "source": "fw-a",
+   "target": "sw10"
+  },
+  {
+   "id": "e18",
+   "kind": "allow",
+   "source": "fw-b",
+   "target": "sw10"
+  },
+  {
+   "id": "e19",
+   "kind": "vlan 20",
+   "source": "core-a",
+   "target": "sw20"
+  },
+  {
+   "id": "e20",
+   "kind": "vlan 20 standby",
+   "source": "core-b",
+   "target": "sw20"
+  },
+  {
+   "id": "e21",
+   "kind": "access",
+   "source": "sw20",
+   "target": "h20-0"
+  },
+  {
+   "id": "e22",
+   "kind": "access",
+   "source": "sw20",
+   "target": "h20-1"
+  },
+  {
+   "id": "e23",
+   "kind": "access",
+   "source": "sw20",
+   "target": "h20-2"
+  },
+  {
+   "id": "e24",
+   "kind": "access",
+   "source": "sw20",
+   "target": "h20-3"
+  },
+  {
+   "id": "e25",
+   "kind": "access",
+   "source": "sw20",
+   "target": "h20-4"
+  },
+  {
+   "id": "e26",
+   "kind": "access",
+   "source": "sw20",
+   "target": "h20-5"
+  },
+  {
+   "id": "e27",
+   "kind": "allow",
+   "source": "fw-a",
+   "target": "sw20"
+  },
+  {
+   "id": "e28",
+   "kind": "allow",
+   "source": "fw-b",
+   "target": "sw20"
+  },
+  {
+   "id": "e29",
+   "kind": "vlan 30",
+   "source": "core-a",
+   "target": "sw30"
+  },
+  {
+   "id": "e30",
+   "kind": "vlan 30 standby",
+   "source": "core-b",
+   "target": "sw30"
+  },
+  {
+   "id": "e31",
+   "kind": "access",
+   "source": "sw30",
+   "target": "h30-0"
+  },
+  {
+   "id": "e32",
+   "kind": "access",
+   "source": "sw30",
+   "target": "h30-1"
+  },
+  {
+   "id": "e33",
+   "kind": "access",
+   "source": "sw30",
+   "target": "h30-2"
+  },
+  {
+   "id": "e34",
+   "kind": "access",
+   "source": "sw30",
+   "target": "h30-3"
+  },
+  {
+   "id": "e35",
+   "kind": "access",
+   "source": "sw30",
+   "target": "h30-4"
+  },
+  {
+   "id": "e36",
+   "kind": "access",
+   "source": "sw30",
+   "target": "h30-5"
+  },
+  {
+   "id": "e37",
+   "kind": "deny",
+   "source": "fw-a",
+   "target": "sw30"
+  },
+  {
+   "id": "e38",
+   "kind": "deny",
+   "source": "fw-b",
+   "target": "sw30"
+  },
+  {
+   "id": "e39",
+   "kind": "vlan 99",
+   "source": "core-a",
+   "target": "sw99"
+  },
+  {
+   "id": "e40",
+   "kind": "vlan 99 standby",
+   "source": "core-b",
+   "target": "sw99"
+  },
+  {
+   "id": "e41",
+   "kind": "access",
+   "source": "sw99",
+   "target": "h99-0"
+  },
+  {
+   "id": "e42",
+   "kind": "access",
+   "source": "sw99",
+   "target": "h99-1"
+  },
+  {
+   "id": "e43",
+   "kind": "allow",
+   "source": "fw-a",
+   "target": "sw99"
+  },
+  {
+   "id": "e44",
+   "kind": "allow",
+   "source": "fw-b",
+   "target": "sw99"
+  },
+  {
+   "id": "e45",
+   "kind": "manage",
+   "source": "sw99",
+   "target": "fw-a"
+  },
+  {
+   "id": "e46",
+   "kind": "blocked",
+   "source": "sw30",
+   "target": "internet"
+  },
+  {
+   "id": "e47",
+   "kind": "backup route",
+   "source": "sw10",
+   "target": "sw20"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "internet",
+   "kind": "external",
+   "label": "Internet",
+   "parentId": null
+  },
+  {
+   "id": "isp-b",
+   "kind": "external",
+   "label": "Backup ISP",
+   "parentId": null
+  },
+  {
+   "id": "dc",
+   "kind": "container",
+   "label": "Data center",
+   "parentId": null
+  },
+  {
+   "id": "fw-a",
+   "kind": "firewall",
+   "label": "Firewall A",
+   "parentId": "dc"
+  },
+  {
+   "id": "fw-b",
+   "kind": "firewall",
+   "label": "Firewall B",
+   "parentId": "dc"
+  },
+  {
+   "id": "core-a",
+   "kind": "switch",
+   "label": "Core switch A",
+   "parentId": "dc"
+  },
+  {
+   "id": "core-b",
+   "kind": "switch",
+   "label": "Core switch B",
+   "parentId": "dc"
+  },
+  {
+   "id": "vlan10",
+   "kind": "container",
+   "label": "VLAN 10 users",
+   "parentId": "dc"
+  },
+  {
+   "id": "sw10",
+   "kind": "switch",
+   "label": "access switch 10",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-0",
+   "kind": "host",
+   "label": "users-0",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-1",
+   "kind": "host",
+   "label": "users-1",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-2",
+   "kind": "host",
+   "label": "users-2",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-3",
+   "kind": "host",
+   "label": "users-3",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-4",
+   "kind": "host",
+   "label": "users-4",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-5",
+   "kind": "host",
+   "label": "users-5",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-6",
+   "kind": "host",
+   "label": "users-6",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "h10-7",
+   "kind": "host",
+   "label": "users-7",
+   "parentId": "vlan10"
+  },
+  {
+   "id": "vlan20",
+   "kind": "container",
+   "label": "VLAN 20 servers",
+   "parentId": "dc"
+  },
+  {
+   "id": "sw20",
+   "kind": "switch",
+   "label": "access switch 20",
+   "parentId": "vlan20"
+  },
+  {
+   "id": "h20-0",
+   "kind": "host",
+   "label": "servers-0",
+   "parentId": "vlan20"
+  },
+  {
+   "id": "h20-1",
+   "kind": "host",
+   "label": "servers-1",
+   "parentId": "vlan20"
+  },
+  {
+   "id": "h20-2",
+   "kind": "host",
+   "label": "servers-2",
+   "parentId": "vlan20"
+  },
+  {
+   "id": "h20-3",
+   "kind": "host",
+   "label": "servers-3",
+   "parentId": "vlan20"
+  },
+  {
+   "id": "h20-4",
+   "kind": "host",
+   "label": "servers-4",
+   "parentId": "vlan20"
+  },
+  {
+   "id": "h20-5",
+   "kind": "host",
+   "label": "servers-5",
+   "parentId": "vlan20"
+  },
+  {
+   "id": "vlan30",
+   "kind": "container",
+   "label": "VLAN 30 iot",
+   "parentId": "dc"
+  },
+  {
+   "id": "sw30",
+   "kind": "switch",
+   "label": "access switch 30",
+   "parentId": "vlan30"
+  },
+  {
+   "id": "h30-0",
+   "kind": "host",
+   "label": "iot-0",
+   "parentId": "vlan30"
+  },
+  {
+   "id": "h30-1",
+   "kind": "host",
+   "label": "iot-1",
+   "parentId": "vlan30"
+  },
+  {
+   "id": "h30-2",
+   "kind": "host",
+   "label": "iot-2",
+   "parentId": "vlan30"
+  },
+  {
+   "id": "h30-3",
+   "kind": "host",
+   "label": "iot-3",
+   "parentId": "vlan30"
+  },
+  {
+   "id": "h30-4",
+   "kind": "host",
+   "label": "iot-4",
+   "parentId": "vlan30"
+  },
+  {
+   "id": "h30-5",
+   "kind": "host",
+   "label": "iot-5",
+   "parentId": "vlan30"
+  },
+  {
+   "id": "vlan99",
+   "kind": "container",
+   "label": "VLAN 99 management",
+   "parentId": "dc"
+  },
+  {
+   "id": "sw99",
+   "kind": "switch",
+   "label": "access switch 99",
+   "parentId": "vlan99"
+  },
+  {
+   "id": "h99-0",
+   "kind": "host",
+   "label": "management-0",
+   "parentId": "vlan99"
+  },
+  {
+   "id": "h99-1",
+   "kind": "host",
+   "label": "management-1",
+   "parentId": "vlan99"
+  }
+ ]
+}

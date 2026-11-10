@@ -1,0 +1,22 @@
+{
+  "containerDirections": {},
+  "defaultDirection": "lr",
+  "defaultStrategy": "tree",
+  "nodes": [
+    {"id": "r", "kind": "symbol", "label": "root", "parentId": null},
+    {"id": "a", "kind": "symbol", "label": "a", "parentId": null},
+    {"id": "b", "kind": "symbol", "label": "b", "parentId": null},
+    {"id": "c", "kind": "symbol", "label": "c", "parentId": null},
+    {"id": "d", "kind": "symbol", "label": "d", "parentId": null},
+    {"id": "e", "kind": "symbol", "label": "e", "parentId": null},
+    {"id": "f", "kind": "symbol", "label": "f", "parentId": null}
+  ],
+  "edges": [
+    {"id": "1", "kind": "flow", "source": "r", "target": "a"},
+    {"id": "2", "kind": "flow", "source": "r", "target": "b"},
+    {"id": "3", "kind": "flow", "source": "b", "target": "c"},
+    {"id": "4", "kind": "flow", "source": "b", "target": "d"},
+    {"id": "5", "kind": "flow", "source": "d", "target": "e"},
+    {"id": "6", "kind": "flow", "source": "a", "target": "f"}
+  ]
+}

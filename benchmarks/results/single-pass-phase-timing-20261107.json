@@ -1,0 +1,127 @@
+{
+ "kind": "single-pass-timing",
+ "generatedAt": "2026-11-06T18:08:40.701Z",
+ "reps": 21,
+ "environment": {
+  "cpu": "Apple M3",
+  "logicalCpus": 8,
+  "os": "darwin",
+  "arch": "arm64",
+  "node": "v24.21.0",
+  "revision": "d14db4513e7364102032306d560785d3927aef21",
+  "dirty": true,
+  "loadStart": [
+   8.14697265625,
+   6.52734375,
+   7.04296875
+  ],
+  "loadEnd": [
+   3.66796875,
+   5.39013671875,
+   6.53076171875
+  ]
+ },
+ "binary": "15585500e745eb7068de52ec0bbeab714cb7dbb9b6487df57624e5f185ef5a18",
+ "input": {
+  "replay": {
+   "path": "benchmarks/results/focused-pipeline-20261105.jsonl",
+   "sha256": "d7cf758652aa794f97ae8376c719ad771db390c0e4e8a8abbe36571b5e01942b"
+  }
+ },
+ "note": "Layerweave: bench import and refine (threads 1) in one native process, median of reps after one warm-up. elk-rs and elkjs: layout() in this process, median of reps after one warm-up. No process start or JSON transport in any arm.",
+ "cases": [
+  {
+   "name": "layerweave-code",
+   "nodes": 188,
+   "edges": 358,
+   "arms": {
+    "default": {
+     "importMs": 179.613,
+     "refineMs": 1168.828,
+     "totalMs": 1348.441,
+     "refineFingerprint": "9fc9f367016cb818"
+    },
+    "abstract": {
+     "importMs": 105.322,
+     "refineMs": 568.094,
+     "totalMs": 673.416,
+     "refineFingerprint": "b7e54234f9fbb4d9"
+    },
+    "singlePass": {
+     "importMs": 76.89,
+     "refineMs": 14.48,
+     "totalMs": 91.37,
+     "refineFingerprint": "8ee40d5812318614"
+    },
+    "elkRs": {
+     "layoutMs": 50.213209000008646
+    },
+    "elkjs": {
+     "layoutMs": 285.2849169999972
+    }
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "nodes": 72,
+   "edges": 125,
+   "arms": {
+    "default": {
+     "importMs": 17.258,
+     "refineMs": 72.694,
+     "totalMs": 89.952,
+     "refineFingerprint": "4149ea385c6a78d5"
+    },
+    "abstract": {
+     "importMs": 15.258,
+     "refineMs": 75.594,
+     "totalMs": 90.85199999999999,
+     "refineFingerprint": "0d3121127257d8ff"
+    },
+    "singlePass": {
+     "importMs": 11.569,
+     "refineMs": 1.512,
+     "totalMs": 13.081000000000001,
+     "refineFingerprint": "d16f3633c028a08d"
+    },
+    "elkRs": {
+     "layoutMs": 10.506540999995195
+    },
+    "elkjs": {
+     "layoutMs": 60.95883300001151
+    }
+   }
+  },
+  {
+   "name": "org-chart",
+   "nodes": 104,
+   "edges": 82,
+   "arms": {
+    "default": {
+     "importMs": 13.182,
+     "refineMs": 61.704,
+     "totalMs": 74.886,
+     "refineFingerprint": "bb958cfb25ae93cd"
+    },
+    "abstract": {
+     "importMs": 12.158,
+     "refineMs": 61.248,
+     "totalMs": 73.40599999999999,
+     "refineFingerprint": "ee73256294381b95"
+    },
+    "singlePass": {
+     "importMs": 12.334,
+     "refineMs": 1.351,
+     "totalMs": 13.684999999999999,
+     "refineFingerprint": "c6834572e53102c0"
+    },
+    "elkRs": {
+     "layoutMs": 8.866249999991851
+    },
+    "elkjs": {
+     "layoutMs": 42.94866700000421
+    }
+   }
+  }
+ ]
+}

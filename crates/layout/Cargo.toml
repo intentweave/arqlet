@@ -1,0 +1,26 @@
+[package]
+name = "arqlet-layout"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
+description = "Hierarchical layout phases and constraints; independent of host and renderer."
+
+[features]
+benchmark-timings = ["arqlet-routing/benchmark-timings"]
+
+[dependencies]
+arqlet-model = { workspace = true }
+arqlet-routing = { workspace = true }
+arqlet-scene = { workspace = true }
+arqlet-topology = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"

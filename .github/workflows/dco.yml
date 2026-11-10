@@ -1,0 +1,28 @@
+name: DCO
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  sign-off:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Every non-merge commit of the pull request needs a `Signed-off-by:` line (`git commit -s`); see CONTRIBUTING.md.
+      - name: Check Signed-off-by lines
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          missing=0
+          for commit in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            if ! git log -1 --format=%B "$commit" | grep -qE '^Signed-off-by: .+ <.+>$'; then
+              echo "::error::Commit $(git log -1 --format='%h %s' "$commit") has no Signed-off-by line."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Sign off each commit with 'git commit -s' (amend with 'git commit --amend -s' or 'git rebase --signoff $BASE')."
+            exit 1
+          fi

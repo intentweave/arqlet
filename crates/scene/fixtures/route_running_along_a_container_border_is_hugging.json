@@ -1,0 +1,59 @@
+{
+  "description": "A route 6 units outside a container top border, running alongside it: container hugging.",
+  "drawing": {
+    "nodes": [
+      {
+        "id": "box",
+        "x": 100,
+        "y": -50,
+        "width": 200,
+        "height": 200,
+        "container": true
+      },
+      {
+        "id": "inner",
+        "x": 150,
+        "y": 0,
+        "width": 20,
+        "height": 20,
+        "parentId": "box"
+      },
+      {
+        "id": "a",
+        "x": 0,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      },
+      {
+        "id": "b",
+        "x": 400,
+        "y": 0,
+        "width": 20,
+        "height": 20
+      }
+    ],
+    "edges": [
+      {
+        "id": "e",
+        "source": "a",
+        "target": "b",
+        "points": [
+          {
+            "x": 20,
+            "y": -56
+          },
+          {
+            "x": 400,
+            "y": -56
+          }
+        ]
+      }
+    ],
+    "trackSpacing": 6
+  },
+  "expect": {
+    "containerHugPairs": 1,
+    "hugPairs": 0
+  }
+}

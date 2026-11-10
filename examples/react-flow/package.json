@@ -1,0 +1,22 @@
+{
+  "name": "arqlet-react-flow-example",
+  "version": "0.1.0",
+  "private": true,
+  "license": "(MIT OR Apache-2.0)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174 --strictPort",
+    "build": "vite build",
+    "test": "node --test ../../packages/viewer/*.test.mjs ../../packages/engine-client/*.test.mjs"
+  },
+  "dependencies": {
+    "@arqlet/engine-client": "workspace:*",
+    "@arqlet/viewer": "workspace:*",
+    "@xyflow/react": "^12.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
