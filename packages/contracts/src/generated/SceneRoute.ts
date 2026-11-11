@@ -7,6 +7,12 @@ export type SceneRoute = { id: string,
  */
 kind?: string, source: string, target: string, points: Array<Point>, weight: number,
 /**
+ * Provisional (communities): the route stands for collapsed content in both directions; this many edges run the
+ * other way (from `target` to `source`), `weight` in its own. Present only on such routes, 0 when every one of them
+ * runs one way; a renderer draws an arrow at the start too when it is above 0.
+ */
+backWeight?: number | null,
+/**
  * True when the engine reported a structured conflict for this route.
  */
 invalid: boolean,

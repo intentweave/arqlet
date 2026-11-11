@@ -28,6 +28,25 @@ example. `renderSvg(svgElement, scene)` draws a scene; `toReactFlow(scene)` maps
 React Flow nodes and edges. Types for snapshots and scenes come from
 `@arqlet/contracts`.
 
+### A session: drill-down that keeps positions
+
+`createElkLayout` lays out from scratch on every call, like ELK. For collapsing and
+expanding groups, keep a session: it holds the current snapshot and sends each change
+as an operation on it, so unchanged parts keep their place.
+
+```js
+import {loadEngine, createSession} from 'arqlet';
+
+const session = createSession(await loadEngine(), {onChange: () => redraw()});
+await session.import(graph);            // {nodes: [{id, kind, label, parentId}], edges: [{id, kind, source, target}]}
+await session.collapse('group-1');      // expand, toggle, or apply({op: 'direction', nodeId, direction: 'tb'})
+const scene = await session.scene();    // renderSvg(svg, scene) or toReactFlow(scene)
+```
+
+Changes run one after the other on the newest snapshot. A change that a new `import`
+(or `reset()`) overtook resolves to `{ok: false, stale: true}` and is not applied. In
+a browser, run the engine in a worker: `createSession(workerRun(createEngineWorker()))`.
+
 ### Cluster overview
 
 For a whole graph (tens of thousands of nodes), the `overview` operation lays it out as nested discs, and the WebGL
@@ -45,7 +64,45 @@ renderer.resize();
 bindOverviewNavigation(canvas, renderer, {onClick: i => console.log(overview.ids[i])});
 ```
 
+A fisheye lens can follow the pointer: it enlarges the middle (here 3 times) and leaves everything outside its radius
+in place, and the texts of what it enlarges appear. Picking sees through it.
+
+```js
+bindOverviewNavigation(canvas, renderer, {onClick, lens: () => ({radius: 180, magnification: 3})});
+// or renderer.setLens({x, y, radius, magnification}) / renderer.setLens(null) by hand
+```
+
+When nobody touches it, the drawing can breathe: the discs grow and shrink a little in a slow wave from the middle, and
+the next input stops it. Nothing moves; it is off unless asked for, and off when the system asks for reduced motion.
+
+```js
+bindOverviewNavigation(canvas, renderer, {idle: {after: 8000, breathe: {amplitude: 0.06, period: 4000}}});
+```
+
 See `apps/playground/overview.js` in the repository for collapsing, structuring in place and animated changes.
+
+In React, the renderer belongs to an effect; a sketch (not tested in this repository):
+
+```jsx
+function Overview({model, onSelect}) {
+  const canvas = useRef(null), labels = useRef(null);
+  useEffect(() => {
+    const renderer = createOverviewRenderer(canvas.current, model, {labels: labels.current});
+    renderer.view = viewOf(model, -1, canvas.current.clientWidth, canvas.current.clientHeight);
+    renderer.resize();
+    const unbind = bindOverviewNavigation(canvas.current, renderer, {onClick: i => onSelect(model.overview.ids[i])});
+    const observer = new ResizeObserver(() => renderer.resize());
+    observer.observe(canvas.current);
+    return () => { observer.disconnect(); unbind(); renderer.destroy(); };
+  }, [model]);
+  return (
+    <div style={{position: 'relative', width: '100%', height: '100%'}}>
+      <canvas ref={canvas} style={{position: 'absolute', inset: 0, width: '100%', height: '100%'}} />
+      <canvas ref={labels} style={{position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none'}} />
+    </div>
+  );
+}
+```
 
 Arqlet reads graphs in the JSON form [ELK](https://eclipse.dev/elk/) uses. It is not a
 1:1 ELK, contains no ELK code and is not affiliated with the Eclipse Foundation.

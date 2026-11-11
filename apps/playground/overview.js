@@ -160,7 +160,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   unbind?.(); renderer?.destroy();
   model = next;
   renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule});
-  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto});
+  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, lens: lensSettings, idle: idleSettings()});
   focus = -1;
   zoomTo(-1);
   renderRules();
@@ -254,7 +254,8 @@ async function evaluate() {
 async function layered(id, key) {
   const direction = key.split('|').at(-1) || null;
   const {graph: excerpt} = structuredExcerpt(graph, model, id, {direction});
-  const imported = await execute({op: 'import', graph: excerpt, limit: excerpt.nodes.length});
+  // isolatedGrid: a file's unrelated functions stand in a grid instead of one long column.
+  const imported = await execute({op: 'import', graph: excerpt, limit: excerpt.nodes.length, options: {isolatedGrid: true}});
   const scene = imported.ok ? await execute({op: 'scene', snapshot: imported.snapshot}) : imported;
   if (!scene.ok) { status(`${displayName(id)}: ${scene.error}`); return null; }
   return scene.scene;
@@ -460,3 +461,30 @@ loadSettings();
 await sources();
 renderPanel();
 status('Choose a graph and lay it out.');
+
+/** The lens of the panel (radius in CSS pixels, magnification), or null when it is off. */
+function lensSettings() {
+  if (!$('lens').checked) return null;
+  return {radius: Number($('lens-radius').value) || 180, magnification: Math.max(Number($('lens-magnification').value) || 3, 1.01)};
+}
+$('lens').addEventListener('change', () => { if (!$('lens').checked) renderer?.setLens(null); });
+// L switches the lens, unless a field has the keyboard.
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() !== 'l' || e.metaKey || e.ctrlKey || e.altKey || /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? '')) return;
+  $('lens').checked = !$('lens').checked;
+  if (!$('lens').checked) renderer?.setLens(null);
+});
+
+/** Breathing when idle, from the panel; null when it is off. */
+function idleSettings() {
+  if (!$('breathe').checked) return null;
+  return {after: 1000 * (Number($('breathe-after').value) || 8), breathe: {amplitude: (Number($('breathe-amplitude').value) || 6) / 100}};
+}
+// A change of the idle settings takes effect at once: the navigation is bound again with them.
+for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
+  $(id).addEventListener('change', () => {
+    if (!renderer) return;
+    unbind?.();
+    unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, lens: lensSettings, idle: idleSettings()});
+  });
+}

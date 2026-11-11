@@ -6,6 +6,7 @@
 //! the router draws it. Nothing is removed silently. Routes are not placed here; they are routed like any other edge of
 //! the drawing.
 
+use arqlet_model::math::PortableMath;
 use arqlet_model::{Graph, Mode, Orientation, Rect};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -455,7 +456,7 @@ pub fn radial_arrange(
         let r = radius[f.depth[id] + offset];
         let (lo, hi) = interval[id];
         let t = (lo + hi) / 2.;
-        centre.insert(id.clone(), (r * t.cos(), r * t.sin()));
+        centre.insert(id.clone(), (r * t.p_cos(), r * t.p_sin()));
     }
     let mut min_x = f64::INFINITY;
     let mut min_y = f64::INFINITY;

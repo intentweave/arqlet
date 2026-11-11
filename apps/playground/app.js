@@ -199,7 +199,7 @@ function draw(fit=false){
  const key=`${snapshot.revision}:${snapshot.layoutVersion??0}`;
  if(selectionKey!==key||!scene.routes.some(r=>r.id===selectedRoute)){selectedRoute=null;selectionKey=null;}
  selection.prune({nodes:new Set(scene.nodes.map(n=>n.id)),routes:new Set(scene.routes.map(r=>r.id))});
- renderSvg($('graph'),shown,{document,onPortDragStart:(port,e)=>startPortDrag(port,e),onLabelDragStart:(label,e)=>startLabelDrag(label,e),onNodeDragStart:(n,e,opts)=>startDrag(n,e,opts),onToggle:toggleContainer,onPin:(id,on)=>{if(performance.now()<pinClickGuard)return;setPin(id,on);},onReset:resetSize,onResize:startResize,sized:sizedAxes(),selected,selectedRoute,scale,pinned:new Set(Object.keys(effectiveOptions().pins)),onSelect:(id,event)=>{if(suppressClick){suppressClick=false;return;}if(event?.ctrlKey||event?.metaKey)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=scene.nodes.find(n=>n.id===id).label;draw();},
+ renderSvg($('graph'),shown,{document,trace:traceView(),onPortDragStart:(port,e)=>startPortDrag(port,e),onLabelDragStart:(label,e)=>startLabelDrag(label,e),onNodeDragStart:(n,e,opts)=>startDrag(n,e,opts),onToggle:toggleContainer,onPin:(id,on)=>{if(performance.now()<pinClickGuard)return;setPin(id,on);},onReset:resetSize,onResize:startResize,sized:sizedAxes(),selected,selectedRoute,scale,pinned:new Set(Object.keys(effectiveOptions().pins)),onSelect:(id,event)=>{if(suppressClick){suppressClick=false;return;}if(event?.ctrlKey||event?.metaKey)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=scene.nodes.find(n=>n.id===id).label;draw();},
   onSelectRoute:id=>{selectedRoute=selectedRoute===id?null:id;selection.selectRoute(selectedRoute);selectionKey=selectedRoute?key:null;draw();}});
  renderTreeView(scene);
   if(curation){markPending();bindCurationGestures($('graph'),curation,scene,{changed:()=>draw(),status,growContainers:()=>true,selectedNodes:()=>selection.nodes});}
@@ -673,7 +673,11 @@ async function loadInitial(){
  const example=$('example').value||'default';
  // With a node budget the default graph is imported whole (the budget bounds the view), not the precomputed snapshot.
  const budget=Math.round(Number($('node-budget').value));
- if(example==='default'&&mode()!=='browser'&&!(budget>0)){
+ // Communities (provisional) apply to an import too: the graph is imported with them.
+ const communities=Math.round(Number($('communities').value));
+ const collapseFirst=$('initial-collapse').value,domainGroups=$('domain-groups').checked;
+ const abstracted=communities>0||collapseFirst!==''||domainGroups;
+ if(example==='default'&&mode()!=='browser'&&!(budget>0)&&!abstracted){
   const r=await fetch('./generated/snapshot.json',{cache:'no-store'});
   if(!r.ok)throw Error('Snapshot missing. Please run the demo build first.');
   return {snapshot:await r.json(),message:'Natively precomputed snapshot loaded'};
@@ -682,9 +686,13 @@ async function loadInitial(){
  const graph=await fetch(url,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(`${url} is missing. Please run the demo build first.`);return r.json();});
  // Entity-relationship notation (ADR 0011): an entity is a leaf node whose rows are its title and its attributes; the
  // relationships attach to those rows. The attributes are not graph nodes in the layout.
- const projected=erProjection(graph);
- const importOptions=budget>0?{...(projected.options??{}),visibleNodeBudget:budget}:projected.options;
- const limit=example==='default'&&!(budget>0)?VIEW_LIMIT:EXAMPLE_LIMIT;
+ // An example may bring its own groups (node id → path of group names); they travel as an option, not in the graph.
+ const {groups,...plain}=graph;
+ const projected=erProjection(plain);
+ const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),
+  ...(domainGroups&&groups?{groups}:{}),...(collapseFirst!==''?{initialCollapse:{depth:Number(collapseFirst)}}:{})};
+ const importOptions=Object.keys(extra).length?{...(projected.options??{}),...extra}:projected.options;
+ const limit=example==='default'&&!(budget>0)&&!abstracted?VIEW_LIMIT:EXAMPLE_LIMIT;
  const data=await execute('import',{op:'import',graph:projected.graph,limit,...(importOptions?{options:importOptions}:{})});
  if(!data.ok)throw Error(data.error);
  const snapshot=data.snapshot;
@@ -706,6 +714,9 @@ function renderExampleInfo(){
 $('example').onchange=()=>{$('example-info').textContent='';reset();};
 // The node budget (experimental) applies to an import: a change imports the example again.
 $('node-budget').onchange=()=>{$('example-info').textContent='';reset();};
+$('communities').onchange=()=>{$('example-info').textContent='';reset();};
+$('domain-groups').onchange=()=>{$('example-info').textContent='';reset();};
+$('initial-collapse').onchange=()=>{$('example-info').textContent='';reset();};
 // Scene geometry comes from the engine; the demo waits for it before the first draw.
 let sceneRun=null;
 const sceneEngine=loadEngine('./generated/arqlet.wasm').then(run=>{sceneRun=run;});
@@ -1306,3 +1317,47 @@ document.addEventListener?.('keydown',e=>{
  e.preventDefault();$(action).onclick();
 });
 $('apply-options').onclick=()=>{try{const options=JSON.parse($('options-json').value);if(!options||Array.isArray(options)||typeof options!=='object')throw Error('A JSON object is required');edit({op:'configure',snapshot,options},{busy:'Applying options …',fit:true});}catch(e){status(e.message);}};
+
+// Path cut-out (provisional): `trace` is read only and runs on the local engine like the scene; `reveal` is a view
+// change and goes through the mode's lane like a toggle. The trace follows every new snapshot.
+let tracePath=null,traceResult=null,traceSnapshot=null,traceListOf=null;
+function traceView(){
+ if(snapshot&&snapshot!==traceListOf){
+  // Every node of the source graph can be an end, also one inside a collapsed group.
+  traceListOf=snapshot;const list=$('trace-nodes');
+  if(list)list.replaceChildren(...(snapshot.sourceGraph??snapshot.graph).nodes.map(n=>{const o=document.createElement('option');o.value=n.id;o.label=n.label;return o;}));
+ }
+ if(tracePath&&snapshot&&sceneRun&&traceSnapshot!==snapshot){
+  traceSnapshot=snapshot;
+  const r=sceneRun({op:'trace',snapshot,...tracePath});
+  traceResult=r.ok?r:null;
+  $('trace-info').textContent=!r.ok?`Not traced: ${r.error}`:!r.found?'No path between these nodes, in either direction.':
+   `${r.length} step${r.length===1?'':'s'}${r.reversed?' (from “To” to “From”: no path the other way)':''} · ${r.nodes.length} nodes and ${r.edges.length} edges on the ${tracePath.mode==='all'?'paths':'shortest paths'}; ${r.visible.nodes.length} shown boxes carry them.`;
+  $('trace-reveal').disabled=!traceResult?.found;$('trace-clear').disabled=false;
+ }
+ if(!traceResult?.found)return null;
+ return {nodes:traceResult.visible.nodes,routes:traceResult.visible.routes,distance:traceResult.distance,fade:$('trace-fade').checked};
+}
+$('trace').onclick=()=>{
+ const from=$('trace-from').value.trim(),to=$('trace-to').value.trim();
+ if(!from||!to){$('trace-info').textContent='Choose a node for From and for To.';return;}
+ tracePath={from,to,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();
+};
+$('trace-clear').onclick=()=>{tracePath=null;traceResult=null;traceSnapshot=null;$('trace-info').textContent='';$('trace-reveal').disabled=true;$('trace-clear').disabled=true;if(snapshot)draw();};
+$('trace-fade').onchange=()=>{if(snapshot)draw();};
+$('trace-mode').onchange=()=>{if(tracePath){tracePath={...tracePath,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();}};
+$('trace-from-selected').onclick=()=>{if(selected)$('trace-from').value=selected;};
+$('trace-to-selected').onclick=()=>{if(selected)$('trace-to').value=selected;};
+$('trace-reveal').onclick=()=>{
+ if(!traceResult?.found||!snapshot||pending)return;
+ edit({op:'reveal',snapshot,nodeIds:traceResult.nodes,partial:$('reveal-partial').checked},{busy:'Opening the groups on the path …',remember:'Reveal path'});
+};
+// Any node by its id, also one inside collapsed groups: its groups open (in part, by default) and it is selected.
+$('show').onclick=async()=>{
+ const id=$('show-node').value.trim();
+ if(!id||!snapshot||pending)return;
+ const r=await edit({op:'reveal',snapshot,nodeIds:[id],partial:$('reveal-partial').checked},{busy:'Opening the groups that hold it …',remember:'Show node'});
+ if(r?.ok&&snapshot.graph.nodes.some(n=>n.id===id)){selected=id;draw();}
+ else if(r&&!r.ok)$('trace-info').textContent=`Not shown: ${r.error}`;
+};
+

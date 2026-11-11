@@ -1,4 +1,6 @@
 //! Bounded orthogonal lane search. This is a heuristic, not a complete path finder.
+#[cfg(test)]
+use arqlet_model::math::PortableMath;
 pub mod channel;
 pub mod fixed_tracks;
 
@@ -2308,7 +2310,7 @@ mod tests {
                 let d = (body.x - p.x)
                     .max(0.)
                     .max(p.x - body.x - body.width)
-                    .hypot((body.y - p.y).max(0.).max(p.y - body.y - body.height));
+                    .p_hypot((body.y - p.y).max(0.).max(p.y - body.y - body.height));
                 assert!(
                     d >= 12. - 1e-6,
                     "{:?} comes within the own clearance of its node",

@@ -46,7 +46,8 @@ export interface ElkNode extends ElkShape {
 export interface ElkLayoutOptions {
   /** Arqlet layout options; they win over the ones translated from `layoutOptions`. */
   options?: Record<string, unknown>;
-  /** Runs the refinement after the layout. Default `false`. */
+  /** Runs the refinement after the layout. Default `false`. It removes conflicts (routes through nodes, shared lines);
+   * a drawing without them comes back the same, a little later. */
   refine?: boolean;
 }
 

@@ -3,7 +3,73 @@
 Arqlet is a prototype: every release may change the API, the JSON protocol and the snapshot format. Versions follow
 `0.x`; a minor version adds or changes capabilities.
 
-## 0.2.0 — unreleased
+## 0.3.0 — 2026-11-11
+
+Abstraction for large graphs in the structured view: groups (automatic communities or given by the domain), collapsed
+first, edges between groups drawn by weight, and a path cut-out between two nodes; for the cluster overview a fisheye
+lens and idle breathing. Every new option is provisional and off by default: default output is unchanged.
+
+### Added
+
+- `isolatedGrid` (provisional, off by default): the children of a layered area that have no edge to another child stand
+  in a grid after the connected children instead of one long column. The cluster overview's structured clusters use it.
+- `createSession(run)` (provisional, `@arqlet/engine-client/session.js`, re-exported by `arqlet`): a layout session for
+  drill-down. It keeps the current snapshot, sends collapse, expand and other changes in order with the expected
+  revision, and reports changes overtaken by a new import as stale. `workerRun(worker)` turns the engine worker into
+  an asynchronous `run`.
+- README: a React sketch for the WebGL cluster overview.
+- Cluster overview: a fisheye lens (`renderer.setLens`, or `lens` in `bindOverviewNavigation` to follow the pointer).
+  Inside its radius the drawing is enlarged towards the middle (Sarkar–Brown), nothing outside moves, labels of what it
+  enlarges appear, and picking sees through it (`lensAt`, `lensInverse`). In the playground: panel section Lens, key L.
+- Cluster overview: breathing when idle (`renderer.breathe`, or `idle` in `bindOverviewNavigation`). After a while
+  without input the discs grow and shrink by a few per cent in a slow wave from the middle; the next input fades it out.
+  Drawing only; off under reduced motion. In the playground: panel section Idle.
+- `communities` (provisional, off by default): drill-down with automatic communities in the structured view. Large
+  containers are divided into communities (the cluster overview's Louvain), shown as collapsed containers named after
+  their best connected member and opened with `toggle`. Only the view has them; the source graph is unchanged.
+- With communities, the edges between two collapsed communities are drawn by one route for both directions; the scene
+  reports what it stands for as `weight` and `backWeight`, and the SVG viewer draws it wider with more edges, with an
+  arrow at each end when edges run both ways and a `4 ⇄ 7` label. On a flat call graph of 1 866 nodes: 168 routes
+  instead of 236, 1 164 crossing route pairs instead of 2 711.
+- `groups` (provisional): groups given by the data (a path of group names per node) instead of, or before, Louvain;
+  shown as collapsed containers of kind `group`, view only.
+- `initialCollapse` (provisional): an import shows containers collapsed from a depth on or by kind, like the cluster
+  overview's first view; edges between them are drawn by one weighted route per pair.
+- Path cut-out (provisional): the operation `trace` (read only) gives the nodes and edges on the shortest (or all)
+  directed paths between two nodes of the source graph, falling back to the other direction, and what of them the
+  current view shows: the boxes that hold them (collapsed groups included), the routes that carry them, and each visible
+  node's distance from the path. `reveal` opens exactly the collapsed containers that hold given nodes. `renderSvg`
+  takes `trace` to draw the path in amber and fade the rest by distance. Playground: section *Path*.
+- Partial reveal (provisional): `reveal` opens the containers above the nodes asked for in part by default: they show
+  only the children on the way, the others wait in a collapsed `+N more` box (`rest:<container>`, kind `rest`, dashed in
+  the SVG viewer) that a toggle dissolves; `partial: false` opens whole. Stored as `LayoutOptions::partial`, view only.
+  Playground: *Only the nodes asked for* and *Show a node*. The 5-step path of the flat example shows 17 nodes instead
+  of 56.
+- Playground: *Domain groups* and *Collapse first*; the flat call graph example brings the directories and files it was
+  flattened from as its groups.
+
+## 0.2.1 — 2026-11-11
+
+### Fixed
+
+- **The same results on every platform.** Organic layouts and the cluster overview differed between native builds and
+  the browser (WASM): an offset of the organic start positions was computed in `usize`, which overflows on 32-bit WASM,
+  and the transcendental functions came from each platform's math library. The offset is computed in `u64`, and the core
+  calls `sin`, `cos`, `atan2`, `pow` and `hypot` from the `libm` crate everywhere. Native default output is unchanged (the
+  stored refinement fingerprints hold); WASM organic layouts change to the native result.
+- ELK adapter: the layered spacings under their official names (`elk.layered.spacing.nodeNodeBetweenLayers`,
+  `…edgeEdgeBetweenLayers`) were ignored and reported as unknown; they are read now.
+- ELK adapter: `elk.separateConnectedComponents` is read (`true` turns on `componentPacking`); it is no longer reported
+  as unknown.
+
+### Changed
+
+- The WASM engine on npm is built for size: 4.8 MB (1.2 MB gzip) instead of 9.2 MB (2.1 MB gzip), with the same results
+  and somewhat slower (about 15 % in single observations).
+- CI checks Linux (x64, arm64), macOS (arm64) and Windows (x64): tests, and native against WASM (`tools/platform-parity.mjs`).
+- Documentation: one-shot ELK layout against a session that keeps positions; what `refine` does.
+
+## 0.2.0 — 2026-11-11
 
 ### Added
 

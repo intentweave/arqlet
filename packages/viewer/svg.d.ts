@@ -22,6 +22,16 @@ export interface RenderSvgOptions {
   onResize?: (node: SceneNode, event: PointerEvent) => void;
   onPortDragStart?: (port: ResolvedPort, event: PointerEvent) => void;
   onLabelDragStart?: (label: PlacedLabel, event: PointerEvent) => void;
+  /**
+   * Provisional (path cut-out): marks a trace (from the engine's `trace` operation, `visible`): its nodes and routes in
+   * amber, the other routes fainter; with `fade`, each node the fainter the farther it is from the path (`distance`).
+   */
+  trace?: {
+    nodes?: Iterable<string>;
+    routes?: Iterable<string>;
+    distance?: Record<string, number> | Map<string, number>;
+    fade?: boolean;
+  } | null;
 }
 
 /**

@@ -3,6 +3,7 @@
 //! drawing has such conflicts, both engines route it again with the same boxes, and the one with fewer conflicts (then
 //! shorter routes) is kept. The boxes never change, so no node moves.
 
+use arqlet_model::math::PortableMath;
 use arqlet_model::{EdgePorts, Graph, Port, PortSide, RoutingEngine, Snapshot};
 use std::collections::BTreeSet;
 
@@ -520,7 +521,7 @@ fn key(snapshot: &Snapshot) -> (usize, usize, f64) {
         .routes
         .iter()
         .flat_map(|r| r.points.windows(2))
-        .map(|w| (w[1].x - w[0].x).hypot(w[1].y - w[0].y))
+        .map(|w| (w[1].x - w[0].x).p_hypot(w[1].y - w[0].y))
         .sum();
     (
         snapshot.route_conflicts.len(),

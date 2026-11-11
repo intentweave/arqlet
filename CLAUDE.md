@@ -58,7 +58,8 @@ Use `--offline` locally only if the registry is unavailable; CI uses `--locked`.
 - Performance claims need reproducible measurements (hardware, build, seed, options recorded). Don't write "fast" or "scales to 100K" without one.
 - Third-party code: before copying anything, record source repository, exact revision, license and required notices. Reuse candidates are listed in `docs/architecture.md`; none is a selected dependency. Prefer adapters behind individual phases over adopting a whole engine.
 - Internal crate dependencies go through `[workspace.dependencies]` (path plus exact version) so the crates stay publishable; a new published crate needs the publish metadata of the others, `README.md` and the license links. Public npm functions need a hand-written `.d.ts` beside the module.
-- Keep scaffold APIs explicitly marked provisional. Avoid new dependencies unless they are clearly needed; the core currently uses only `serde` and `serde_json`.
+- Keep scaffold APIs explicitly marked provisional. Avoid new dependencies unless they are clearly needed; the core currently uses only `serde`, `serde_json` and `libm` (portable math, see below).
+- Cross-platform determinism: native builds (Linux x64 and arm64, macOS arm64, Windows x64) and WASM must give identical responses (`tools/platform-parity.mjs`, CI workflow `platforms.yml`). In the core, call `sin`, `cos`, `atan2`, `powf` and `hypot` through `arqlet_model::math::PortableMath` (`p_sin`, …), never the `f64` methods (the platform's math library differs in the last bits). Never let `usize` arithmetic overflow: it is 32-bit in WASM; compute hashes and mixing constants in `u64`.
 - The license is `MIT OR Apache-2.0` (dual, at the user's option); copyright holder: Benjamin Becker. Contributions: DCO sign-off on every commit (`git commit -s`, checked by `.github/workflows/dco.yml`; see CONTRIBUTING.md).
 
 ## Deployment modes (requirement)

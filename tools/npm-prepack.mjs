@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Prepares an npm package of this repository for `pnpm pack` / `pnpm publish` (run as the package's `prepack`).
 // Always copies the two license files into the package. Flags:
-//   --wasm   builds crates/wasm (release, wasm32-unknown-unknown, --locked) and copies it to ./arqlet.wasm
+//   --wasm   builds crates/wasm (profile wasm-size, wasm32-unknown-unknown, --locked) and copies it to ./arqlet.wasm
 //   --types  bundles the generated contract types (src/generated/*.ts) into ./dist/index.d.ts
 // The copies are git-ignored; they exist only so that the packed tarball contains them.
 import {execFileSync} from 'node:child_process';
@@ -15,9 +15,10 @@ const flags = new Set(process.argv.slice(2));
 for (const name of ['LICENSE-APACHE', 'LICENSE-MIT']) copyFileSync(join(root, name), join(pkg, name));
 
 if (flags.has('--wasm')) {
-  execFileSync('cargo', ['build', '-p', 'arqlet-wasm', '--target', 'wasm32-unknown-unknown', '--release', '--locked'],
+  // The size profile of Cargo.toml: the same output as `release`, about half the download.
+  execFileSync('cargo', ['build', '-p', 'arqlet-wasm', '--target', 'wasm32-unknown-unknown', '--profile', 'wasm-size', '--locked'],
     {cwd: root, stdio: 'inherit'});
-  copyFileSync(join(root, 'target/wasm32-unknown-unknown/release/arqlet_wasm.wasm'), join(pkg, 'arqlet.wasm'));
+  copyFileSync(join(root, 'target/wasm32-unknown-unknown/wasm-size/arqlet_wasm.wasm'), join(pkg, 'arqlet.wasm'));
 }
 
 if (flags.has('--types')) {

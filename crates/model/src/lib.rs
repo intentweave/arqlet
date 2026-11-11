@@ -1,4 +1,5 @@
 //! Portable graph and resumable scene contract for the first prototype.
+pub mod math;
 pub mod outline;
 
 use serde::{Deserialize, Serialize};
@@ -1545,6 +1546,28 @@ impl Graph {
     }
 }
 
+/// Which containers an import shows collapsed (`LayoutOptions::initial_collapse`).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct InitialCollapse {
+    /// Containers at this depth or deeper (the top level is 0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<usize>,
+    /// Containers of these kinds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kinds: Vec<String>,
+}
+
+/// The edges one aggregated edge stands for, by direction (see `LayoutOptions::aggregate_weights`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AggregateWeight {
+    pub forward: usize,
+    pub backward: usize,
+}
+
 /// View configuration. Part of the portable snapshot, so backend and browser compute identically.
 /// The default value reproduces the prototype's behavior and is omitted from serialized snapshots.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -1611,6 +1634,12 @@ pub struct LayoutOptions {
     /// decides between them. Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub component_packing: bool,
+    /// Experimental: the children of a layered area that have no edge to another child (a file of unrelated functions)
+    /// are spread over the ranks as a grid instead of all standing in the first rank, one long column. They fill the
+    /// ranks the connected children use, and more when there are many of them, so the grid comes out about square.
+    /// Omitted when off, so the default output does not change.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub isolated_grid: bool,
     /// How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
     /// Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1685,6 +1714,28 @@ pub struct LayoutOptions {
     /// 0 (the default, omitted) lays out every node.
     #[serde(default, skip_serializing_if = "is_zero_count")]
     pub visible_node_budget: usize,
+    /// Provisional: containers with more children than this (the root included) are divided into communities of their
+    /// children, found from the edges between them (the cluster overview's Louvain), shown as containers of kind
+    /// `community`, collapsed at first and opened with `toggle`. They exist only in the view: the source graph is
+    /// unchanged. 0 (the default, omitted) adds none.
+    #[serde(default, skip_serializing_if = "is_zero_count")]
+    pub communities: usize,
+    /// Provisional: groups given by the data or its domain, by node id: the path of groups the node belongs to inside its
+    /// container (`["ECU A", "X1"]`). They become containers of kind `group` in the view only, nested along the path,
+    /// before `communities` divides what is still large. Ids the graph does not have are ignored (a mapping may cover more
+    /// than the imported view). Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub groups: BTreeMap<String, Vec<String>>,
+    /// Provisional: which containers an import shows collapsed: those at `depth` or deeper (0: every one; the top level is
+    /// depth 0) and those of the `kinds` listed. Unset (the default, omitted): none, except the containers that
+    /// `communities` and `groups` add, which start collapsed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_collapse: Option<InitialCollapse>,
+    /// Provisional (view state, set by `reveal`): containers shown in part. The children listed for a container are shown;
+    /// the others are gathered in a collapsed container `rest:<id>` of kind `rest` ("+N more"), which a `toggle` dissolves.
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub partial: BTreeMap<String, Vec<String>>,
     /// Experimental (plan section 4a, global layering, iteration 2; needs `layered_construction`): in a layered area with a
     /// fixed flow, an expanded child container of the same flow axis takes part with its children in the area's ranks, as
     /// a contiguous block, instead of being laid out on its own. Off by default; omitted when off.
@@ -1702,6 +1753,12 @@ pub struct LayoutOptions {
     /// content (inside out), so that expanding it moves the outer picture little. Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub collapsed_sizes: BTreeMap<String, NodeSize>,
+    /// Provisional (derived by the runtime with `communities`, not set by a user): what an edge that stands for collapsed
+    /// content represents, by edge id: the edges between its two visible ends in its own direction (`forward`) and in the
+    /// other (`backward`). The route takes `forward` as its weight; the scene reports `backward` as `backWeight`, so a
+    /// renderer can draw both directions on one route. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub aggregate_weights: BTreeMap<String, AggregateWeight>,
     /// Optional limit on the drawing's larger extent, in units. Not a constraint the search enforces: when the result
     /// spans more, a routing issue reports it (the search is not extent-aware, so this proves nothing about feasibility).
     /// Omitted when unset.
@@ -1822,6 +1879,7 @@ impl Default for LayoutOptions {
             routing_clearance: 0.,
             strict_clearance: false,
             component_packing: false,
+            isolated_grid: false,
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,
@@ -1837,10 +1895,15 @@ impl Default for LayoutOptions {
             single_pass_auto: true,
             order_seed: 0,
             visible_node_budget: 0,
+            communities: 0,
+            groups: BTreeMap::new(),
+            initial_collapse: None,
+            partial: BTreeMap::new(),
             global_layering: false,
             hierarchical_ordering: true,
             simplex_ranks: false,
             collapsed_sizes: BTreeMap::new(),
+            aggregate_weights: BTreeMap::new(),
             max_extent: None,
             routed_candidates: false,
             container_sizing: BTreeMap::new(),

@@ -11,6 +11,7 @@
 //! (`SparseTargets`), and the larger bound `SPARSE_MAX_NODES` applies.
 
 use crate::{spatial::SpatialHash, vpsc};
+use arqlet_model::math::PortableMath;
 use arqlet_model::{Graph, Mode, Rect};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::rc::Rc;
@@ -252,10 +253,16 @@ fn pivot_coordinates(
         .map(|c| c.0.abs().max(c.1.abs()))
         .fold(1e-9f64, f64::max);
     for (i, c) in coords.iter_mut().enumerate() {
-        let offset = ((i * 2_654_435_761) % 1000) as f64 / 1000. - 0.5;
-        c.1 += 0.05 * scale * offset;
+        c.1 += 0.05 * scale * pivot_offset(i);
     }
     coords
+}
+
+/// The fixed offset of node `i` that keeps the second pivot axis from collapsing, in -0.5..0.5. Computed in `u64`: in
+/// `usize` the product overflows on 32-bit targets (WASM) and the offsets, and with them every organic layout, differed
+/// between the browser and a native build.
+fn pivot_offset(i: usize) -> f64 {
+    ((i as u64 * 2_654_435_761) % 1000) as f64 / 1000. - 0.5
 }
 
 /// The leading eigenvector of a symmetric matrix by power iteration, optionally orthogonal to `against`.
@@ -613,7 +620,7 @@ fn force_refine(
         degree[b] += 1;
     }
     let mut v = vec![(0f64, 0f64); n];
-    let decay = 1. - 0.001f64.powf(1. / FORCE_TICKS as f64);
+    let decay = 1. - 0.001f64.p_powf(1. / FORCE_TICKS as f64);
     let mut alpha = FORCE_ALPHA;
     let max_extent = extent.iter().map(|(w, h)| w.max(*h)).fold(0., f64::max);
     for tick in 0..FORCE_TICKS {
@@ -1158,7 +1165,7 @@ fn repel_node_edges(
         }
         let mut changed = false;
         for k in 0..positions.len() {
-            let length = delta[k].0.hypot(delta[k].1);
+            let length = delta[k].0.p_hypot(delta[k].1);
             if !pinned[k] && length > 1e-9 && length.is_finite() {
                 let scale = (max_step / length).min(0.5);
                 positions[k].0 += delta[k].0 * scale;
@@ -1382,10 +1389,10 @@ fn organic_stages_full(
                 continue;
             }
             let (dx, dy) = (x[i].0 - start[id].0, x[i].1 - start[id].1);
-            let moved = dx.hypot(dy) * FORCE_DAMPING;
+            let moved = dx.p_hypot(dy) * FORCE_DAMPING;
             let limit = length * FORCE_MAX_STEP;
             let scale = if moved > limit && moved > 0. {
-                limit / (dx.hypot(dy))
+                limit / (dx.p_hypot(dy))
             } else {
                 FORCE_DAMPING
             };
@@ -1961,11 +1968,11 @@ mod tests {
             (acc.0 + dx * dx, acc.1 + dy * dy, acc.2 + dx * dy)
         });
         // The main axis: the eigenvector of the larger eigenvalue of the covariance.
-        let theta = 0.5 * (2. * sxy).atan2(sxx - syy);
+        let theta = 0.5 * (2. * sxy).p_atan2(sxx - syy);
         let projected: Vec<f64> = s
             .stress
             .iter()
-            .map(|p| (p.0 - mx) * theta.cos() + (p.1 - my) * theta.sin())
+            .map(|p| (p.0 - mx) * theta.p_cos() + (p.1 - my) * theta.p_sin())
             .collect();
         let increasing = projected.windows(2).all(|w| w[1] >= w[0] - 1e-6);
         let decreasing = projected.windows(2).all(|w| w[1] <= w[0] + 1e-6);
@@ -2467,8 +2474,8 @@ mod scalable_tests {
             .map(|i| {
                 let a = i as f64 * 2.399963;
                 (
-                    (i as f64).sqrt() * a.cos() * 9.,
-                    (i as f64).sqrt() * a.sin() * 9.,
+                    (i as f64).sqrt() * a.p_cos() * 9.,
+                    (i as f64).sqrt() * a.p_sin() * 9.,
                 )
             })
             .chain([(3., 3.), (3., 3.)])
@@ -2507,5 +2514,30 @@ mod scalable_tests {
         // Coincident points do not push each other (no direction).
         let same = vec![(5., 5.), (5., 5.), (5., 5.)];
         assert_eq!(QuadTree::new(&same).force(&same, 1, -1.), (0., 0.));
+    }
+}
+
+#[cfg(test)]
+mod platform_tests {
+    use super::pivot_offset;
+
+    #[test]
+    fn pivot_offsets_do_not_depend_on_the_width_of_usize() {
+        // The values of the 64-bit product (as a 64-bit build computed them before the fix); a 32-bit build (WASM) now
+        // computes the same.
+        let expected = [-0.5, 0.261, 0.022, -0.217, -0.456, 0.305, 0.066, -0.173];
+        for (i, e) in expected.iter().enumerate() {
+            assert!(
+                (pivot_offset(i) - e).abs() < 1e-12,
+                "{i}: {}",
+                pivot_offset(i)
+            );
+        }
+        assert!(
+            (pivot_offset(1_000_003)
+                - (((1_000_003u64 * 2_654_435_761) % 1000) as f64 / 1000. - 0.5))
+                .abs()
+                < 1e-12
+        );
     }
 }

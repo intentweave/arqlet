@@ -29,6 +29,7 @@
 //! `incomingShape`, `outgoingShape`) relative to the node the edge is listed in, as ELK writes them by default, with that node
 //! as the edge's `container`.
 
+use arqlet_model::math::PortableMath;
 use std::collections::{BTreeMap, BTreeSet};
 
 use arqlet_model::{Point, Rect, Snapshot};
@@ -51,11 +52,18 @@ pub struct Translation {
     ends: BTreeMap<String, (String, String)>,
 }
 
-/// The options as their short names: `org.eclipse.elk.direction` and `elk.direction` are both `direction`.
+/// The options as their short names: `org.eclipse.elk.direction` and `elk.direction` are both `direction`. The spacings
+/// ELK defines for the layered algorithm (`elk.layered.spacing.nodeNodeBetweenLayers`, its official name) are read as the
+/// spacing of the same name (`spacing.nodeNodeBetweenLayers`).
 fn short(key: &str) -> &str {
-    key.strip_prefix("org.eclipse.elk.")
+    let key = key
+        .strip_prefix("org.eclipse.elk.")
         .or_else(|| key.strip_prefix("elk."))
-        .unwrap_or(key)
+        .unwrap_or(key);
+    match key.strip_prefix("layered.") {
+        Some(rest) if rest.starts_with("spacing.") => rest,
+        _ => key,
+    }
 }
 
 fn options_of(node: &Value) -> BTreeMap<String, String> {
@@ -154,6 +162,10 @@ struct AreaOptions {
     routing: Option<&'static str>,
     /// Arqlet options by name, from ELK's spacings: they apply to the whole graph.
     spacing: BTreeMap<&'static str, f64>,
+    /// `separateConnectedComponents`: whether components are laid out as blocks of their own (Arqlet's
+    /// `componentPacking`). Without it, Arqlet's layout already stacks unconnected parts across the flow, so ELK's
+    /// default (yes) needs nothing; only an explicit `true` asks for the packing.
+    separate: Option<bool>,
 }
 
 fn area_options(
@@ -165,6 +177,7 @@ fn area_options(
         strategy: None,
         routing: None,
         spacing: BTreeMap::new(),
+        separate: None,
     };
     for (key, value) in options {
         let value = value.trim_matches('"');
@@ -240,6 +253,15 @@ fn area_options(
                 let entry = out.spacing.entry(name).or_insert(v);
                 *entry = entry.min(v);
             }
+            "separateConnectedComponents" => match value {
+                "true" => out.separate = Some(true),
+                "false" => out.separate = Some(false),
+                other => {
+                    diagnostics.insert(format!(
+                        "separateConnectedComponents {other} is not true or false; not used"
+                    ));
+                }
+            },
             // Read where they apply (ports), or the defaults of Arqlet already are their meaning.
             "port.side"
             | "port.index"
@@ -597,6 +619,11 @@ pub fn translate(elk: &Value) -> Result<Translation, String> {
     if explicit_ports {
         options["portSides"] = json!(true);
     }
+    // Connected components as blocks of their own (`componentPacking`) when the graph asks for it. Measured on grouped and
+    // unconnected graphs (10 groups or islands of 50 nodes), turning it on by default did not make the drawings smaller.
+    if root.separate == Some(true) {
+        options["componentPacking"] = json!(true);
+    }
     if !buses.is_empty() {
         graph["buses"] = Value::Array(buses);
     }
@@ -627,7 +654,7 @@ fn junctions(paths: &[&Vec<Point>]) -> Vec<Point> {
                 (a[i + 1].x - at.x, a[i + 1].y - at.y),
                 (b[j + 1].x - at.x, b[j + 1].y - at.y),
             );
-            let (la, lb) = (da.0.hypot(da.1), db.0.hypot(db.1));
+            let (la, lb) = (da.0.p_hypot(da.1), db.0.p_hypot(db.1));
             if la < EPS {
                 i += 1;
                 continue;
@@ -1022,5 +1049,48 @@ mod tests {
             (105., 15.)
         );
         assert_eq!(label_placement(""), None);
+    }
+
+    #[test]
+    fn layered_spacings_are_read_under_their_official_names() {
+        let elk = json!({"id": "root", "layoutOptions": {
+            "elk.layered.spacing.nodeNodeBetweenLayers": "20",
+            "org.eclipse.elk.layered.spacing.edgeEdgeBetweenLayers": 7,
+            "elk.spacing.nodeNode": "15"},
+            "children": [{"id": "a", "width": 10, "height": 10}, {"id": "b", "width": 10, "height": 10}],
+            "edges": [{"id": "e", "sources": ["a"], "targets": ["b"]}]});
+        let t = translate(&elk).unwrap();
+        assert_eq!(t.options["layerSpacing"], json!(20.0));
+        assert_eq!(t.options["nodeSpacing"], json!(15.0));
+        assert_eq!(t.options["trackSpacing"], json!(7.0));
+        assert!(
+            t.diagnostics.iter().all(|d| !d.contains("spacing")),
+            "{:?}",
+            t.diagnostics
+        );
+    }
+
+    #[test]
+    fn separate_connected_components_is_read() {
+        let graph = |options: Value| {
+            json!({"id": "root", "layoutOptions": options,
+            "children": [{"id": "a", "width": 10, "height": 10}, {"id": "b", "width": 10, "height": 10}], "edges": []})
+        };
+        // Not set, or false: nothing changes, and it is no longer reported as unknown.
+        for options in [json!({}), json!({"elk.separateConnectedComponents": false})] {
+            let t = translate(&graph(options)).unwrap();
+            assert!(t.options.get("componentPacking").is_none());
+            assert!(t
+                .diagnostics
+                .iter()
+                .all(|d| !d.contains("separateConnectedComponents")));
+        }
+        let on = translate(&graph(json!({"elk.separateConnectedComponents": true}))).unwrap();
+        assert_eq!(on.options["componentPacking"], json!(true));
+        let bad = translate(&graph(json!({"elk.separateConnectedComponents": "maybe"}))).unwrap();
+        assert!(bad
+            .diagnostics
+            .iter()
+            .any(|d| d.contains("separateConnectedComponents")));
     }
 }

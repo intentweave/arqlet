@@ -10,6 +10,7 @@
 //! Deterministic: every pass runs in index order and nothing depends on scheduling, so the result is the same for any
 //! order in which the jobs of one level run.
 use crate::organic::QuadTree;
+use arqlet_model::math::PortableMath;
 use arqlet_model::Graph;
 use std::collections::BTreeMap;
 
@@ -691,7 +692,7 @@ fn spiral(r: &[f64], links: &[(usize, usize, f64)], gap: f64) -> Vec<(f64, f64)>
         area += size * size;
         let distance = area.sqrt() * 1.2;
         let angle = slot as f64 * golden;
-        x[i] = (distance * angle.cos(), distance * angle.sin());
+        x[i] = (distance * angle.p_cos(), distance * angle.p_sin());
     }
     x
 }
@@ -714,7 +715,7 @@ fn simulate(
     // A disc repels by its area, so a large cluster keeps more room around it.
     let mass: Vec<f64> = r.iter().map(|ri| (ri + options.gap).powi(2)).collect();
     let mut v = vec![(0f64, 0f64); k];
-    let decay = 1. - 0.001f64.powf(1. / ticks as f64);
+    let decay = 1. - 0.001f64.p_powf(1. / ticks as f64);
     let mut alpha = start_alpha;
     for _ in 0..ticks {
         alpha -= alpha * decay;
@@ -786,7 +787,7 @@ fn collide(x: &[(f64, f64)], v: &mut [(f64, f64)], r: &[f64], gap: f64, strength
                 (dx / l, dy / l)
             } else {
                 let angle = (i.min(j) * 31 + i.max(j) * 17) as f64;
-                (angle.cos(), angle.sin())
+                (angle.p_cos(), angle.p_sin())
             };
             let overlap = (reach - l) * strength;
             let (mi, mj) = (r[i] * r[i], r[j] * r[j]);

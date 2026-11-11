@@ -134,6 +134,9 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  <div class="toolbar" role="toolbar" aria-label="Session">
   <label class="tool">Example <select id="example"><option value="default">Standard (Intentweave export)</option></select></label>
   <label class="tool" title="Experimental (global layering, first view): at most this many nodes are laid out; containers are collapsed to stay within it, the outermost first. Empty: every node.">Node budget <input id="node-budget" type="number" min="1" max="10000" step="1" style="width:5em" placeholder="all"></label>
+  <label class="tool" title="Provisional: containers with more children than this (the top level included) are divided into communities of related nodes, collapsed at first; click one to open it. Empty: none.">Communities above <input id="communities" type="number" min="2" max="10000" step="1" style="width:5em" placeholder="off"></label>
+  <label class="tool" title="Provisional: the example's own groups (a path of group names per node), shown as collapsed containers; Louvain (Communities above) only divides what is still large.">Domain groups <input id="domain-groups" type="checkbox"></label>
+  <label class="tool" title="Provisional: which containers an import shows collapsed. Default: none, except added groups and communities.">Collapse first <select id="initial-collapse"><option value="">default</option><option value="0">all</option><option value="1">from depth 1</option><option value="2">from depth 2</option></select></label>
   <small id="example-info" class="tool" role="status"></small>
   <label class="tool" title="Split: the backend precomputes and the browser edits. Browser only: the WASM engine imports and optimizes. Backend only: every operation runs in the backend.">Mode <select id="mode"><option value="split">Split</option><option value="browser">Browser only</option><option value="backend">Backend only</option></select></label>
   <button id="reset" title="Reload the example in the selected mode">Reload</button>
@@ -166,6 +169,21 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  <p id="pin-info" class="hint" role="status"></p>
  <label for="name">New node, connected to the selection</label>
  <div class="row"><input id="name" value="New function" maxlength="80"><button id="add" class="primary" disabled>Add</button></div>
+</div></details>
+
+<details class="section" open><summary>Path</summary><div class="body">
+ <p class="hint">Trace the paths between two nodes, also inside collapsed groups (provisional).</p>
+ <label for="trace-from">From</label>
+ <div class="row"><input id="trace-from" list="trace-nodes" placeholder="node id"><button id="trace-from-selected" title="Use the selected node">Selected</button></div>
+ <label for="trace-to">To</label>
+ <div class="row"><input id="trace-to" list="trace-nodes" placeholder="node id"><button id="trace-to-selected" title="Use the selected node">Selected</button></div>
+ <datalist id="trace-nodes"></datalist>
+ <div class="row"><select id="trace-mode" aria-label="Paths"><option value="shortest">Shortest paths</option><option value="all">All paths</option></select><label><input id="trace-fade" type="checkbox"> Fade others</label></div>
+ <div class="row"><button id="trace" class="primary">Trace</button><button id="trace-reveal" disabled title="Open exactly the groups that hold the path">Reveal path</button><button id="trace-clear" disabled>Clear</button></div>
+ <div class="row"><label title="Opened groups show only the nodes on the way; the others wait in a dashed “+N more” box (click it to show them)."><input id="reveal-partial" type="checkbox" checked> Only the nodes asked for</label></div>
+ <p id="trace-info" role="status"></p>
+ <label for="show-node">Show a node</label>
+ <div class="row"><input id="show-node" list="trace-nodes" placeholder="node id"><button id="show">Show</button></div>
 </div></details>
 
 <details class="section" open><summary>Optimization</summary><div class="body">

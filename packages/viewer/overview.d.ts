@@ -158,8 +158,19 @@ export function labelsOf(
   view: OverviewView,
   width: number,
   height: number,
-  options?: {minPixels?: number; limit?: number; collapsed?: Set<number>},
+  options?: {minPixels?: number; limit?: number; collapsed?: Set<number>; lens?: OverviewLens | null},
 ): OverviewLabel[];
+/** A fisheye lens in CSS pixels of the canvas: centre, radius and the enlargement in its middle (> 1). */
+export interface OverviewLens {
+  x: number;
+  y: number;
+  radius: number;
+  magnification: number;
+}
+/** Where the lens shows a screen point, and its enlargement there: `[x, y, factor]` (the point and 1 outside it). */
+export function lensAt(lens: OverviewLens | null, x: number, y: number): [number, number, number];
+/** The screen point the lens shows at (`x`, `y`): the inverse of `lensAt`. */
+export function lensInverse(lens: OverviewLens | null, x: number, y: number): [number, number];
 /** The deepest node whose disc holds the world point, or -1; a collapsed cluster is picked as a whole. */
 export function pickNode(model: OverviewModel, x: number, y: number, collapsed?: Set<number>): number;
 /** The view that shows node `i` (-1: everything) in a viewport of `width` × `height` CSS pixels. */

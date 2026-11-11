@@ -19,10 +19,12 @@ const ELEMENT_NS='http://www.w3.org/2000/svg';
  */
 export function renderSvg(host,scene,options={}){
  const canKeep=options.keyed===true&&typeof host.insertBefore==='function'&&typeof host.removeChild==='function';
- if(!canKeep){keptHosts.delete(host);return drawScene(host,host,scene,options);}
+ if(!canKeep){keptHosts.delete(host);const out=drawScene(host,host,scene,options);markRests(host,scene);if(options.trace)applyTrace(host,options.trace);return out;}
  const document=options.document??host.ownerDocument;
  const stage=document.createElementNS(ELEMENT_NS,'svg');
  drawScene(stage,host,scene,options);
+ markRests(stage,scene);
+ if(options.trace)applyTrace(stage,options.trace);
  const next=[...stage.children];
  if(!keptHosts.has(host)){
   host.replaceChildren(...next);
@@ -134,8 +136,15 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  for(const route of scene.routes){const weight=route.weight??1,isActive=route===active,dim=!!active&&!isActive;
   // The engine's points already contain the arcs of a rounded route (crates/scene realize.rs); they are drawn as given.
   const points=route.points.map(p=>`${p.x},${p.y}`).join(' ');
-  const line=element('polyline',{'data-route-id':route.id,points,fill:'none',stroke:route.invalid||conflictedRoutes.has(route.id)?'#f08f80':isActive?'#c8f5e4':'#73bba7','stroke-width':Math.min(4,1.6+0.4*(weight-1))+(isActive?1.5:0),'stroke-opacity':dim?.2:isActive?1:.75,'marker-end':`url(#${markerId})`,'pointer-events':'none'});
-  if(weight>1){line.append(element('title',{},`${weight} bundled edges${route.members?.length?': '+route.members.join(', '):''}`));const mid=route.points[Math.floor(route.points.length/2)];svg.append(element('text',{x:mid.x+6,y:mid.y-6,fill:'#edf5ff','font-size':12,'pointer-events':'none'},String(weight)));}
+  // A route that stands for collapsed content (communities) carries its edges in both directions: it grows wider and
+  // more opaque with their number (logarithmically, so strong links stand out), and has an arrow at the start too when
+  // some run back.
+  const aggregated=route.backWeight!==undefined&&route.backWeight!==null,back=aggregated?route.backWeight:0,total=weight+back;
+  const width=aggregated?Math.min(7,1+1.2*Math.log2(total+1)):Math.min(4,1.6+0.4*(weight-1));
+  const opacity=aggregated?0.3+0.55*Math.min(1,Math.log2(total+1)/6):.75;
+  const line=element('polyline',{'data-route-id':route.id,points,fill:'none',stroke:route.invalid||conflictedRoutes.has(route.id)?'#f08f80':isActive?'#c8f5e4':'#73bba7','stroke-width':width+(isActive?1.5:0),'stroke-opacity':dim?.2:isActive?1:opacity,'marker-end':`url(#${markerId})`,...(back>0?{'marker-start':`url(#${markerId})`}:{}),'pointer-events':'none'});
+  if(aggregated&&total>1){line.append(element('title',{},`${weight} edge${weight===1?'':'s'} ${route.source} → ${route.target}${back?`, ${back} back`:''}`));const mid=route.points[Math.floor(route.points.length/2)];svg.append(element('text',{x:mid.x+6,y:mid.y-6,fill:'#edf5ff','font-size':12,'pointer-events':'none'},back?`${weight} ⇄ ${back}`:String(weight)));}
+  else if(weight>1){line.append(element('title',{},`${weight} bundled edges${route.members?.length?': '+route.members.join(', '):''}`));const mid=route.points[Math.floor(route.points.length/2)];svg.append(element('text',{x:mid.x+6,y:mid.y-6,fill:'#edf5ff','font-size':12,'pointer-events':'none'},String(weight)));}
   svg.append(line);
   if(onSelectRoute){const hit=element('polyline',{points,fill:'none',stroke:'transparent','stroke-width':10,'pointer-events':'stroke',class:'route-hit','data-route-id':route.id});hit.onclick=()=>onSelectRoute(route.id);svg.append(hit);}
  }
@@ -177,3 +186,43 @@ if(onPin&&n.kind!=='attribute')g.append(pinControl(n,round?cx+rad*.62-size/2:r.x
  for(const crossing of scene.crossings){const mark=element('rect',{x:crossing.position.x-3,y:crossing.position.y-3,width:6,height:6,fill:'#edc477','pointer-events':'none'});mark.append(element('title',{},`${crossing.edgeId} → ${crossing.containerId}`));svg.append(mark);}
  for(const label of scene.labels){const r=label.bounds;const box=element('rect',{...r,rx:3,fill:'#142133','pointer-events':onLabelDragStart?'all':'none','data-label-id':label.id,...(onLabelDragStart?{style:'cursor:grab'}:{})});if(onLabelDragStart)box.onpointerdown=e=>{e.stopPropagation();onLabelDragStart(label,e);};svg.append(box);svg.append(element('text',{x:r.x+4,y:r.y+r.height/2,'dominant-baseline':'middle',fill:'#edf5ff','font-size':12,'pointer-events':'none'},label.text));}
 }
+
+// Provisional (path cut-out): marks a trace on a drawn scene. The routes and nodes of the path are drawn in amber and
+// stronger; the other routes recede. With `fade`, every node is the fainter the farther it is from the path (`distance`,
+// hops through the drawn edges; nodes the path cannot reach are faintest). Only attributes change, not the geometry.
+const TRACE_COLOUR='#ffc861';
+function applyTrace(root,{nodes=[],routes=[],distance={},fade=false}={}){
+ const onNode=new Set(nodes),onRoute=new Set(routes);
+ const hops=id=>distance instanceof Map?distance.get(id):distance[id];
+ const faint=id=>{if(!fade||onNode.has(id))return 1;const d=hops(id);return d===undefined?0.12:Math.max(0.15,1-0.3*d);};
+ const all=selector=>typeof root.querySelectorAll==='function'?[...root.querySelectorAll(selector)]:[];
+ for(const line of all('polyline[data-route-id]')){
+  if(line.getAttribute('class')==='route-hit')continue;
+  const id=line.getAttribute('data-route-id');
+  if(onRoute.has(id)){line.setAttribute('stroke',TRACE_COLOUR);line.setAttribute('stroke-opacity','1');line.setAttribute('stroke-width',String(Number(line.getAttribute('stroke-width')??2)+1.5));}
+  else line.setAttribute('stroke-opacity',String(fade?0.08:0.25));
+ }
+ for(const g of all('g[data-node-id]')){
+  const id=g.getAttribute('data-node-id');
+  if(onNode.has(id)){const shape=g.querySelector('rect:not(.lw-hit), circle, ellipse, path, polygon');shape?.setAttribute('stroke',TRACE_COLOUR);shape?.setAttribute('stroke-width','2.5');}
+  g.setAttribute('opacity',String(faint(id)));
+ }
+ for(const frame of all('[data-container-id]')){
+  const id=frame.getAttribute('data-container-id');
+  if(onNode.has(id)){frame.setAttribute('stroke',TRACE_COLOUR);frame.setAttribute('stroke-width','2.5');}
+  frame.setAttribute('opacity',String(faint(id)));
+ }
+}
+
+// Provisional (partly shown containers): a rest (`rest:<container>`, kind `rest`) holds the children a container does not
+// show; its outline is dashed, so that it reads as "more here".
+function markRests(root,scene){
+ if(typeof root.querySelector!=='function')return;
+ for(const n of scene.nodes){
+  if(n.kind!=='rest')continue;
+  const g=root.querySelector(`g[data-node-id="${globalThis.CSS?.escape?globalThis.CSS.escape(n.id):n.id.replace(/"/g,'\\"')}"]`);
+  const shape=g?.querySelector('rect:not(.lw-hit), circle');
+  shape?.setAttribute('stroke-dasharray','6 4');
+ }
+}
+

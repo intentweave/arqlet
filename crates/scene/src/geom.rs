@@ -1,5 +1,6 @@
 //! Pure segment and rectangle geometry shared by the metrics (and, later, the layout and routing).
 //! Tolerances are absolute; every function is deterministic and free of host dependencies.
+use arqlet_model::math::PortableMath;
 use arqlet_model::{Point, PortSide};
 
 pub const EPS: f64 = 1e-6;
@@ -24,7 +25,7 @@ impl Rect {
 }
 
 pub fn dist(a: &Point, b: &Point) -> f64 {
-    (b.x - a.x).hypot(b.y - a.y)
+    (b.x - a.x).p_hypot(b.y - a.y)
 }
 
 pub fn same(a: &Point, b: &Point) -> bool {

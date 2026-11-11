@@ -1,4 +1,5 @@
 use super::{absolute_all, absolute_with};
+use arqlet_model::math::PortableMath;
 use arqlet_model::*;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -447,8 +448,8 @@ impl<'g> PortContext<'g> {
                             let angle = base + (offset - 0.5) * std::f64::consts::FRAC_PI_2;
                             (
                                 Point {
-                                    x: cx + radius * angle.cos(),
-                                    y: cy + radius * angle.sin(),
+                                    x: cx + radius * angle.p_cos(),
+                                    y: cy + radius * angle.p_sin(),
                                 },
                                 p.side,
                             )
@@ -468,7 +469,7 @@ impl<'g> PortContext<'g> {
                                 // first loop nearest it, all of them within the side's arc.
                                 Some(&(a, b)) => {
                                     let (na, nb) = (side_normal(a), side_normal(b));
-                                    let corner = (na.1 + nb.1).atan2(na.0 + nb.0);
+                                    let corner = (na.1 + nb.1).p_atan2(na.0 + nb.0);
                                     let mut toward = base - corner;
                                     while toward > std::f64::consts::PI {
                                         toward -= 2. * std::f64::consts::PI;
@@ -484,8 +485,8 @@ impl<'g> PortContext<'g> {
                             };
                             (
                                 Point {
-                                    x: cx + radius * angle.cos(),
-                                    y: cy + radius * angle.sin(),
+                                    x: cx + radius * angle.p_cos(),
+                                    y: cy + radius * angle.p_sin(),
                                 },
                                 side,
                             )
@@ -513,7 +514,7 @@ impl<'g> PortContext<'g> {
                                     (b.x + b.width / 2.) - (a.x + a.width / 2.),
                                     (b.y + b.height / 2.) - (a.y + a.height / 2.),
                                 );
-                                let length = wx.hypot(wy);
+                                let length = wx.p_hypot(wy);
                                 if length > 0. && radius > 0. {
                                     // The edges are spread along the axis on which a rectangle spreads its ports on the side
                                     // that faces the circle (ports are ordered by increasing coordinate), so that a circle and a
@@ -535,7 +536,7 @@ impl<'g> PortContext<'g> {
                                     let lateral = (off / radius).clamp(-0.9, 0.9);
                                     let (bx, by) = ((ax - cx) / radius, (ay - cy) / radius);
                                     let (dx, dy) = (bx + nx * lateral, by + ny * lateral);
-                                    let norm = dx.hypot(dy);
+                                    let norm = dx.p_hypot(dy);
                                     if norm > 0. {
                                         ax = cx + radius * dx / norm;
                                         ay = cy + radius * dy / norm;

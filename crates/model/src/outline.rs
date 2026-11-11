@@ -1,6 +1,7 @@
 //! The real outline of a node, for collision and clearance. A rectangle is its box; a circle is the disc inscribed in its
 //! (square) box. Pure geometry: no renderer, no I/O.
 
+use crate::math::PortableMath;
 use crate::{NodeShape, Rect};
 
 /// Where a point lies against an outline.
@@ -53,7 +54,7 @@ impl Outline {
                 x: cx,
                 y: cy,
                 radius,
-            } => (x - cx).hypot(y - cy) - radius,
+            } => (x - cx).p_hypot(y - cy) - radius,
             Outline::Rect(r) => {
                 // Signed distance to the box: negative inside, the larger of the two per-axis overhangs.
                 let dx = (r.x - x).max(x - (r.x + r.width));
@@ -61,7 +62,7 @@ impl Outline {
                 if dx <= 0. && dy <= 0. {
                     dx.max(dy)
                 } else {
-                    dx.max(0.).hypot(dy.max(0.))
+                    dx.max(0.).p_hypot(dy.max(0.))
                 }
             }
         };
@@ -78,7 +79,7 @@ impl Outline {
     /// corner of a rectangle, or the far side of a disc, decides.
     pub fn overshoot_beyond_disc(&self, cx: f64, cy: f64, radius: f64) -> f64 {
         let reach = match self {
-            Outline::Disc { x, y, radius: r } => (x - cx).hypot(y - cy) + r,
+            Outline::Disc { x, y, radius: r } => (x - cx).p_hypot(y - cy) + r,
             Outline::Rect(r) => [
                 (r.x, r.y),
                 (r.x + r.width, r.y),
@@ -86,7 +87,7 @@ impl Outline {
                 (r.x + r.width, r.y + r.height),
             ]
             .iter()
-            .map(|(x, y)| (x - cx).hypot(y - cy))
+            .map(|(x, y)| (x - cx).p_hypot(y - cy))
             .fold(0., f64::max),
         };
         (reach - radius).max(0.)
@@ -113,7 +114,7 @@ impl Outline {
                 radius,
             } => {
                 let (dx, dy) = (x - cx, y - cy);
-                let length = dx.hypot(dy);
+                let length = dx.p_hypot(dy);
                 (length > 0.).then(|| (cx + radius * dx / length, cy + radius * dy / length))
             }
             Outline::Rect(r) => {
@@ -152,7 +153,7 @@ impl Outline {
                     (((x - ax) * dx + (y - ay) * dy) / len2).clamp(0., 1.)
                 };
                 // The same tiny inset as the rectangle: a port that lies on the outline up to rounding does not enter it.
-                (ax + t * dx - x).hypot(ay + t * dy - y) < radius + margin - 1e-9
+                (ax + t * dx - x).p_hypot(ay + t * dy - y) < radius + margin - 1e-9
             }
             Outline::Rect(r) => {
                 // Liang–Barsky clipping against the rectangle grown by the margin, shrunk by a tiny inset so that a
@@ -210,11 +211,11 @@ pub fn collides(a: &Outline, b: &Outline) -> bool {
                 y: v,
                 radius: s,
             },
-        ) => (x - u).hypot(y - v) < radius + s,
+        ) => (x - u).p_hypot(y - v) < radius + s,
         (Outline::Disc { x, y, radius }, Outline::Rect(r))
         | (Outline::Rect(r), Outline::Disc { x, y, radius }) => {
             let (qx, qy) = closest_on_rect(r, *x, *y);
-            (x - qx).hypot(y - qy) < *radius
+            (x - qx).p_hypot(y - qy) < *radius
         }
     }
 }
@@ -236,11 +237,11 @@ pub fn within(a: &Outline, b: &Outline, gap: f64) -> bool {
                 y: v,
                 radius: s,
             },
-        ) => (x - u).hypot(y - v) < radius + s + gap,
+        ) => (x - u).p_hypot(y - v) < radius + s + gap,
         (Outline::Disc { x, y, radius }, Outline::Rect(r))
         | (Outline::Rect(r), Outline::Disc { x, y, radius }) => {
             let (qx, qy) = closest_on_rect(r, *x, *y);
-            (x - qx).hypot(y - qy) < radius + gap
+            (x - qx).p_hypot(y - qy) < radius + gap
         }
     }
 }

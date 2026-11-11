@@ -1,0 +1,63 @@
+name: Platforms
+# The engine must compute the same on every platform: a backend on Linux, a developer's Mac or Windows machine, and the
+# browser (WASM) continue each other's layouts. Each job runs the Rust tests and checks that the native build of that
+# platform gives the same responses as the WASM engine (tools/platform-parity.mjs); the last job compares the response
+# digests of all platforms with each other.
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, name: linux-x64}
+          - {os: ubuntu-24.04-arm, name: linux-arm64}
+          - {os: macos-latest, name: macos-arm64}
+          # No Intel macOS: Apple has sold only Apple silicon since 2020; Intel Macs build from source if needed.
+          - {os: windows-latest, name: windows-x64}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup target add wasm32-unknown-unknown --toolchain stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # Tests and the parity check read the generated datasets (deterministic, standard library only).
+      - run: python benchmarks/generate.py --no-manifest
+      - run: python benchmarks/overview/generate.py --nodes 10000 --seed 1 --out benchmarks/datasets/overview-10000.json
+      - run: cargo +stable test --workspace --locked
+      - run: cargo +stable build --release -p arqlet-runtime --bin layout-command --locked
+      - run: cargo +stable build -p arqlet-wasm --target wasm32-unknown-unknown --release --locked
+      - run: node tools/platform-parity.mjs --digest | tee parity-${{ matrix.name }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parity-${{ matrix.name }}
+          path: parity-${{ matrix.name }}.txt
+  compare:
+    needs: platform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: parity-*
+          merge-multiple: true
+      # The digests (all lines but the platform's summary) must be the same on every platform.
+      - run: |
+          for f in parity-*.txt; do grep -v ' of .* identical between' "$f" > "$f.digests"; done
+          first=$(ls parity-*.txt.digests | head -1)
+          status=0
+          for f in parity-*.txt.digests; do
+            if ! diff -u "$first" "$f"; then echo "::error::$f differs from $first"; status=1; fi
+          done
+          exit $status

@@ -1,6 +1,6 @@
 {
   "name": "@arqlet/viewer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Rendering helpers for Arqlet scenes: an SVG renderer, pan and zoom, route details, a React Flow mapping and a WebGL cluster overview. No layout of its own. Provisional.",
   "keywords": [
     "graph",

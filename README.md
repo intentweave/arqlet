@@ -109,6 +109,35 @@ const laidOut = await createElkLayout(run).layout(graph);   // an elk.layout(gra
 `createEngineWorker()` runs the engine in a worker; `renderSvg` and `toReactFlow` draw
 or map a scene.
 
+### Integrating: one-shot layout or a session
+
+- **One-shot, ELK-compatible:** `createElkLayout(run).layout(graph)` takes a graph in
+  ELK's JSON form and returns it laid out. Every call lays out from scratch, like ELK.
+  `refine: true` only helps where the first layout has conflicts (routes through nodes,
+  shared lines); on a clean drawing it returns the same drawing, a little later.
+- **A session that keeps positions** (drill-down, edits): `createSession(run)` keeps the
+  current snapshot and sends changes as operations on it. Unchanged parts are reused,
+  changes run in order, and an answer overtaken by a new import is reported as stale
+  instead of applied:
+
+  ```js
+  import {loadEngine, createSession} from 'arqlet';
+
+  const session = createSession(await loadEngine());
+  await session.import(graph);           // nodes with parentId are containers
+  await session.collapse('group-1');     // or expand, toggle, apply({op: 'direction', …})
+  draw(await session.scene());
+  ```
+
+  In a browser, `createSession(workerRun(createEngineWorker()))` runs the same in a
+  worker.
+- **Large graphs:** `{op: 'overview', graph}` and the WebGL renderer (see the
+  [package README](packages/arqlet/README.md)).
+
+The engine computes the same on every platform: native builds (Linux x64 and arm64,
+macOS arm64, Windows x64) and WASM give identical responses (checked in CI by
+`tools/platform-parity.mjs`), so a backend and a browser can continue each other's work.
+
 ## Repository structure
 
 | Path | Contents |

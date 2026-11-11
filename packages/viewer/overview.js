@@ -364,24 +364,50 @@ export function pickExpanded(model, expanded, x, y) {
 }
 
 /**
+ * A fisheye lens (Sarkar and Brown) in screen space: `{x, y, radius, magnification}` in CSS pixels. Inside `radius` around
+ * (`x`, `y`) a point at the fraction r of the radius moves to M·r / ((M−1)·r + 1), M the magnification: the middle is
+ * enlarged M times, the enlargement falls to 1 at the rim, and nothing outside moves. The disc of the lens maps onto
+ * itself, so nothing is pushed out of it. Returns the point's place under the lens and the local enlargement
+ * `[x, y, factor]`; without a lens (null, radius 0, magnification ≤ 1) the point itself and 1.
+ */
+export function lensAt(lens, x, y) {
+  if (!lens || !(lens.radius > 0) || !(lens.magnification > 1)) return [x, y, 1];
+  const dx = x - lens.x, dy = y - lens.y, r = Math.hypot(dx, dy) / lens.radius;
+  if (r >= 1) return [x, y, 1];
+  const m = lens.magnification, factor = m / ((m - 1) * r + 1);
+  return [lens.x + dx * factor, lens.y + dy * factor, factor];
+}
+
+/** The screen point that `lensAt` moves to (`x`, `y`): its inverse, r = r′ / (M − (M−1)·r′). */
+export function lensInverse(lens, x, y) {
+  if (!lens || !(lens.radius > 0) || !(lens.magnification > 1)) return [x, y];
+  const dx = x - lens.x, dy = y - lens.y, shown = Math.hypot(dx, dy) / lens.radius;
+  if (shown >= 1 || shown === 0) return [x, y];
+  const m = lens.magnification, r = shown / (m - (m - 1) * shown);
+  return [lens.x + dx * r / shown, lens.y + dy * r / shown];
+}
+
+/**
  * The texts to write over the drawing for a view (`{centreX, centreY, scale}`) of `width` × `height` CSS pixels: the
  * names of clusters large enough on screen (at the top of their disc) and the labels of structured clusters' scenes when
  * their text is at least `minPixels` high. Positions in CSS pixels; at most `limit` texts, largest first, and none that
  * would overlap a larger one.
  */
-export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set()} = {}) {
+export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set(), lens = null} = {}) {
   const o = model.overview, out = [];
-  const screen = (x, y) => [width / 2 + (x - view.centreX) * view.scale, height / 2 + (y - view.centreY) * view.scale];
+  // A screen point and the lens's enlargement there (`[x, y, factor]`); sizes on screen are multiplied by the factor, so
+  // that the lens also shows the texts of what it enlarges.
+  const screen = (x, y) => lensAt(lens, width / 2 + (x - view.centreX) * view.scale, height / 2 + (y - view.centreY) * view.scale);
   const visible = (x, y, pad) => x > -pad && y > -pad && x < width + pad && y < height + pad;
   const owner = ownersOf(model, expanded, collapsed);
   for (let i = 0; i < model.n; i++) {
     if (!model.children[i].length || owner[i] >= 0) continue;
-    const r = o.r[i] * view.scale, text = displayName(o.ids[i]);
+    const [cx, cy, factor] = screen(o.x[i], o.y[i]);
+    const r = o.r[i] * view.scale * factor, text = displayName(o.ids[i]);
     if (collapsed.has(i)) {
       // A collapsed cluster carries its name in its middle.
       if (r < 16) continue;
-      const [x, y] = screen(o.x[i], o.y[i]);
-      if (visible(x, y, r)) out.push({text, x, y, size: Math.min(10 + r / 12, 15), weight: r, kind: 'cluster'});
+      if (visible(cx, cy, r)) out.push({text, x: cx, y: cy, size: Math.min(10 + r / 12, 15), weight: r, kind: 'cluster'});
       continue;
     }
     if (r < 36) continue;
@@ -395,11 +421,12 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
     // A node's name in its box (as the SVG viewer writes it), unless the scene placed the node's label itself.
     for (const node of scene.nodes) {
       if (placed.has(node.id) || node.id === o.ids[i] || node.id.startsWith(BORDER_PREFIX)) continue;
-      const b = node.bounds, high = Math.min(b.height, 24) * place.scale * view.scale;
-      const wide = b.width * place.scale * view.scale;
-      if (high < minPixels * 2.2 || wide < 24) continue;
+      const b = node.bounds;
       const [wx, wy] = place.apply(node.container ? [b.x + b.width / 2, b.y + 9] : [b.x + b.width / 2, b.y + b.height / 2]);
-      const [x, y] = screen(wx, wy);
+      const [x, y, factor] = screen(wx, wy);
+      const high = Math.min(b.height, 24) * place.scale * view.scale * factor;
+      const wide = b.width * place.scale * view.scale * factor;
+      if (high < minPixels * 2.2 || wide < 24) continue;
       if (!visible(x, y, wide)) continue;
       const size = Math.min(high * 0.42, 14);
       // Cut to what fits the box, at about 0.55 em per character.
@@ -408,10 +435,11 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
       out.push({text: text.length > fit ? text.slice(0, Math.max(fit - 1, 1)) + '…' : text, x, y, size, weight: high, kind: 'node'});
     }
     for (const label of scene.labels ?? []) {
-      const b = label.bounds, pixels = b.height * place.scale * view.scale;
-      if (pixels < minPixels) continue;
+      const b = label.bounds;
       const [wx, wy] = place.apply([b.x + b.width / 2, b.y + b.height / 2]);
-      const [x, y] = screen(wx, wy);
+      const [x, y, factor] = screen(wx, wy);
+      const pixels = b.height * place.scale * view.scale * factor;
+      if (pixels < minPixels) continue;
       if (!visible(x, y, 50)) continue;
       out.push({text: label.text, x, y, size: Math.min(pixels * 0.8, 16), weight: pixels, kind: label.kind});
     }

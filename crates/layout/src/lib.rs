@@ -1,5 +1,6 @@
 //! Deterministic prototype: nested layered placement and simple orthogonal routes.
 //! Bounded ordering and routing heuristics with configurable endpoint ports.
+use arqlet_model::math::PortableMath;
 pub mod abstract_routing;
 mod block_placement;
 mod border_alignment;
@@ -16,6 +17,7 @@ pub mod ranking;
 pub mod structure;
 mod styles;
 use arqlet_model::*;
+pub mod communities;
 mod directed;
 mod organic;
 pub mod overview;
@@ -326,6 +328,30 @@ pub fn compute(
 /// `compute` that also returns the stage work of the first layout (placement, routing, and so on), so that a caller can
 /// report where the time of an import goes. The snapshot is the same as `compute` returns.
 pub fn compute_counted(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
+    apply_aggregate_weights(&mut snapshot);
+    Ok((snapshot, stages))
+}
+
+/// Provisional (communities): a route that stands for collapsed content is as heavy as the edges it stands for in its own
+/// direction (`LayoutOptions::aggregate_weights`; the other direction reaches the scene as `backWeight`).
+pub fn apply_aggregate_weights(snapshot: &mut Snapshot) {
+    if snapshot.options.aggregate_weights.is_empty() {
+        return;
+    }
+    for route in &mut snapshot.routes {
+        if let Some(weight) = snapshot.options.aggregate_weights.get(&route.id) {
+            route.weight = weight.forward.max(1);
+        }
+    }
+}
+
+fn compute_counted_inner(
     graph: &Graph,
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
@@ -5088,7 +5114,7 @@ fn known_reversals(
         if !global::Flattening::of(parent, graph, index, options, &children).is_empty() {
             return None;
         }
-        let (_, links, ranks) = area_ranks(&children, index, options, false);
+        let (_, links, ranks) = area_ranks(&children, index, options, false, 1.);
         out.insert(
             parent.unwrap_or("<root>").to_string(),
             links
@@ -5124,6 +5150,7 @@ fn area_ranks(
     index: &GraphIndex<'_>,
     options: &LayoutOptions,
     flattened: bool,
+    isolated_pitch: f64,
 ) -> (
     Vec<Option<usize>>,
     BTreeSet<(String, String)>,
@@ -5245,7 +5272,52 @@ fn area_ranks(
             ranks.insert(id.clone(), solved[i]);
         }
     }
+    if options.isolated_grid && !flattened {
+        spread_isolated(&ids, &outgoing, &incoming, isolated_pitch, &mut ranks);
+    }
     (child_position, links, ranks)
+}
+
+/// Experimental (`isolatedGrid`): the children without a link to another child, which all take rank 0, are spread over
+/// ranks after those of the connected children, as a grid, in id order and rank by rank (in a left-to-right flow: column
+/// by column, each read from the top). Own ranks keep the connected part exactly as it would be alone. For k of them the
+/// grid takes about √(k·pitch) ranks, where `pitch` is the distance of two neighbours in a rank over that of two ranks, so
+/// that it comes out square, or fewer when the connected part's widest rank leaves room for more rows. Fewer than three
+/// stay where they are.
+fn spread_isolated(
+    ids: &[&String],
+    outgoing: &[Vec<usize>],
+    incoming: &[Vec<usize>],
+    pitch: f64,
+    ranks: &mut BTreeMap<String, usize>,
+) {
+    let isolated: Vec<usize> = (0..ids.len())
+        .filter(|&i| outgoing[i].is_empty() && incoming[i].is_empty())
+        .collect();
+    if isolated.len() < 3 {
+        return;
+    }
+    let used = (0..ids.len())
+        .filter(|i| !isolated.contains(i))
+        .map(|i| ranks[ids[i]] + 1)
+        .max()
+        .unwrap_or(0);
+    // As many rows as the widest rank of the connected children holds, when that is more than a square needs: the grid
+    // then fills the height the connected part takes anyway.
+    let mut widest: BTreeMap<usize, usize> = BTreeMap::new();
+    for i in (0..ids.len()).filter(|i| !isolated.contains(i)) {
+        *widest.entry(ranks[ids[i]]).or_default() += 1;
+    }
+    let widest = widest.values().copied().max().unwrap_or(0);
+    let square = (isolated.len() as f64 * pitch).sqrt().round().max(1.) as usize;
+    let rows = isolated
+        .len()
+        .div_ceil(square.min(isolated.len()))
+        .max(widest)
+        .min(isolated.len());
+    for (k, &i) in isolated.iter().enumerate() {
+        ranks.insert(ids[i].clone(), used + k / rows);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5327,7 +5399,7 @@ fn place(
                         .map_or(0, |n| n.label.chars().count().min(23))
                         as f64;
                     let diameter =
-                        DEFAULT_CIRCLE_DIAMETER.max((7.5 * letters + 16.).hypot(22.).ceil());
+                        DEFAULT_CIRCLE_DIAMETER.max((7.5 * letters + 16.).p_hypot(22.).ceil());
                     (diameter, diameter)
                 }
                 _ => (180., 54.),
@@ -5385,13 +5457,39 @@ fn place(
         Mode::Orientation(_) | Mode::Chooser(_)
     );
     let reversals = ordering.reversals.clone();
-    let structural_input = placement_structure::Input::new(
+    let mut structural_input = placement_structure::Input::new(
         parent, &children, graph, index, options, plans, &reversals,
     );
+    // Experimental (`isolatedGrid`): how far apart two ranks stand against two neighbours in a rank, from the children's
+    // mean size and the spacings, so that the grid of unconnected children comes out about square.
+    let isolated_pitch = if options.isolated_grid && layered && !children.is_empty() {
+        let vertical = matches!(direction_for(graph, parent), Mode::Orientation(o) if o.vertical());
+        let (w, h) = children
+            .iter()
+            .filter_map(|n| sizes.get(&n.id))
+            .fold((0., 0.), |(w, h), s: &(f64, f64)| (w + s.0, h + s.1));
+        let (w, h) = (w / children.len() as f64, h / children.len() as f64);
+        let (along, across) = if vertical { (h, w) } else { (w, h) };
+        let along = along + options.layer_spacing.unwrap_or(64.);
+        let across = across + options.node_spacing.unwrap_or(24.);
+        if along > 0. && across > 0. {
+            across / along
+        } else {
+            1.
+        }
+    } else {
+        1.
+    };
+    structural_input.isolated_pitch = isolated_pitch.to_bits();
     let build_structure = || {
         let mut virtual_sizes = BTreeMap::new();
-        let (child_position, links, mut ranks) =
-            area_ranks(&children, index, options, !flattening.is_empty());
+        let (child_position, links, mut ranks) = area_ranks(
+            &children,
+            index,
+            options,
+            !flattening.is_empty(),
+            isolated_pitch,
+        );
         let owner = |id: usize| owner_among(&child_position, index, id);
         let mut levels: BTreeMap<usize, Vec<String>> = BTreeMap::new();
         for n in &children {
@@ -5712,7 +5810,18 @@ fn place(
         } else {
             BTreeMap::new()
         };
-        if options.component_packing {
+        // Experimental (`isolatedGrid`): the unconnected children form one block after the connected ones in every level,
+        // so the grid stands beside the connected part instead of among it, where it would push its edges into detours.
+        let mut component_of = component_of;
+        if options.isolated_grid && flattening.is_empty() {
+            let linked: BTreeSet<&String> = links.iter().flat_map(|(a, b)| [a, b]).collect();
+            for child in &children {
+                if !linked.contains(&child.id) {
+                    component_of.insert(child.id.clone(), usize::MAX);
+                }
+            }
+        }
+        if options.component_packing || options.isolated_grid {
             for ids in levels.values_mut() {
                 ids.sort_by_key(|id| component_of.get(id).copied().unwrap_or(0));
             }
@@ -6738,7 +6847,7 @@ fn place(
             .map(|(a, b)| {
                 let dx = a.x + a.width / 2. - b.x - b.width / 2.;
                 let dy = a.y + a.height / 2. - b.y - b.height / 2.;
-                dx.hypot(dy)
+                dx.p_hypot(dy)
             })
             .sum()
     };
@@ -7534,7 +7643,7 @@ fn projected_measures(
                 let b = rects.get(e.target.as_deref()?)?;
                 let dx = a.x + a.width / 2. - b.x - b.width / 2.;
                 let dy = a.y + a.height / 2. - b.y - b.height / 2.;
-                Some(dx.hypot(dy))
+                Some(dx.p_hypot(dy))
             })
             .sum()
     } else {
@@ -8178,7 +8287,7 @@ fn segment_rect_distance(a: &Point, b: &Point, r: &Rect) -> f64 {
     let (y0, y1) = (a.y.min(b.y), a.y.max(b.y));
     let dx = (r.x - x1).max(0.).max(x0 - (r.x + r.width));
     let dy = (r.y - y1).max(0.).max(y0 - (r.y + r.height));
-    dx.hypot(dy)
+    dx.p_hypot(dy)
 }
 
 /// A placement move: the nodes it moves, the first node's target, and the partner's target for swaps.
@@ -9983,6 +10092,83 @@ mod structure_fixture_tests {
         }
     }
 
+    /// A container with a chain a → b → c and `isolated` unconnected children, laid out with or without `isolatedGrid`.
+    fn isolated_layout(isolated: usize, grid: bool) -> Snapshot {
+        let mut nodes = vec![
+            serde_json::json!({"id": "file", "kind": "file", "label": "file", "parentId": null}),
+        ];
+        for id in ["a", "b", "c"]
+            .into_iter()
+            .map(String::from)
+            .chain((0..isolated).map(|i| format!("i{i:02}")))
+        {
+            nodes.push(
+                serde_json::json!({"id": id, "kind": "function", "label": id, "parentId": "file"}),
+            );
+        }
+        let edges = serde_json::json!([
+            {"id": "ab", "kind": "calls", "source": "a", "target": "b"},
+            {"id": "bc", "kind": "calls", "source": "b", "target": "c"}
+        ]);
+        let graph: Graph =
+            serde_json::from_value(serde_json::json!({"nodes": nodes, "edges": edges})).unwrap();
+        let options = LayoutOptions {
+            isolated_grid: grid,
+            ..LayoutOptions::default()
+        };
+        let snapshot = compute(&graph, None, &BTreeSet::new(), &options).unwrap();
+        assert!(
+            snapshot.geometry_issues.is_empty(),
+            "{:?}",
+            snapshot.geometry_issues
+        );
+        snapshot
+    }
+
+    /// `isolatedGrid`: twenty unconnected children stand in a grid of several columns after the connected chain instead
+    /// of in one column, and the chain is laid out exactly as without them (the same boxes, up to a shift).
+    #[test]
+    fn isolated_children_form_a_grid_after_the_connected_part() {
+        let columns = |s: &Snapshot| {
+            s.boxes
+                .iter()
+                .filter(|(id, _)| id.starts_with('i'))
+                .map(|(_, r)| r.x.round() as i64)
+                .collect::<BTreeSet<_>>()
+        };
+        let before = isolated_layout(20, false);
+        assert_eq!(columns(&before).len(), 1, "without the option: one column");
+        let grid = isolated_layout(20, true);
+        let xs = columns(&grid);
+        assert!(xs.len() >= 3, "a grid of several columns: {xs:?}");
+        let chain_end = ["a", "b", "c"]
+            .iter()
+            .map(|id| grid.boxes[*id].x + grid.boxes[*id].width)
+            .fold(f64::MIN, f64::max);
+        assert!(
+            xs.iter().all(|&x| x as f64 >= chain_end),
+            "the grid stands after the chain"
+        );
+        let alone = isolated_layout(0, true);
+        let at = |s: &Snapshot, id: &str| {
+            (
+                s.boxes[id].x - s.boxes["a"].x,
+                s.boxes[id].y - s.boxes["a"].y,
+            )
+        };
+        for id in ["b", "c"] {
+            assert_eq!(at(&grid, id), at(&alone, id), "{id} relative to a");
+        }
+        // The container is much less tall than with the one column.
+        let height = |s: &Snapshot| s.boxes["file"].height;
+        assert!(
+            height(&grid) * 2. < height(&before),
+            "{} vs {}",
+            height(&grid),
+            height(&before)
+        );
+    }
+
     /// Every structure fixture places without geometry issues: no overlapping nodes, no missing boxes, and one route
     /// per edge with the same ids. Components and cross-links are placed, not dropped. The disconnected fixture
     /// shares levels between its chains today (see `structure::analyse_graph`); this test does not assert how they
@@ -10080,7 +10266,7 @@ mod shape_tests {
         let r = &absolute["a"];
         let centre = (r.x + r.width / 2., r.y + r.height / 2.);
         let radius = r.width.min(r.height) / 2.;
-        let distance = (port.position.x - centre.0).hypot(port.position.y - centre.1);
+        let distance = (port.position.x - centre.0).p_hypot(port.position.y - centre.1);
         assert!(
             (distance - radius).abs() < 1e-6,
             "port at {distance}, radius {radius}"
@@ -10319,7 +10505,7 @@ mod routing_declaration_tests {
             };
             let (from, to) = (port("source"), port("target"));
             assert!(
-                (from.0 - to.0).hypot(from.1 - to.1) > 10.,
+                (from.0 - to.0).p_hypot(from.1 - to.1) > 10.,
                 "{routing}: {from:?} {to:?}"
             );
             let route = s.routes.iter().find(|r| r.id == "aa").unwrap();
@@ -10596,7 +10782,7 @@ mod routing_declaration_tests {
             let on_route = route.points.windows(2).any(|w| {
                 let cross = (w[1].x - w[0].x) * (c.position.y - w[0].y)
                     - (w[1].y - w[0].y) * (c.position.x - w[0].x);
-                let len = (w[1].x - w[0].x).hypot(w[1].y - w[0].y).max(1.);
+                let len = (w[1].x - w[0].x).p_hypot(w[1].y - w[0].y).max(1.);
                 cross.abs() / len < 1e-6
                     && c.position.x >= w[0].x.min(w[1].x) - 1e-6
                     && c.position.x <= w[0].x.max(w[1].x) + 1e-6

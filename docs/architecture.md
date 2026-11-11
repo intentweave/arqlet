@@ -443,6 +443,15 @@ Repeated optimization should not oscillate; acceptance considers movement as wel
 as geometric quality. Use viewport culling and spatial queries independently of
 layout scheduling.
 
+## Selected dependencies of the core
+
+- `serde`, `serde_json`: serialization.
+- `libm` 0.2.16 (exact; MIT OR Apache-2.0; https://github.com/rust-lang/libm, a Rust port of musl's libm, no
+  dependencies): the transcendental functions (`sin`, `cos`, `atan2`, `pow`, `hypot`), called through
+  `arqlet_model::math::PortableMath` on every platform, so that native builds and WASM compute the same. Added
+  2026-11-11 for 0.2.1 after organic layouts and the cluster overview were found to differ between a native build and
+  the browser. Used as a dependency, no code copied.
+
 ## Reuse candidates, not selected dependencies
 
 - https://github.com/paddison/rust-sugiyama

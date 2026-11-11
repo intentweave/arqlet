@@ -1,4 +1,4 @@
-import type {Expanded, OverviewModel, OverviewView, pickExpanded} from './overview.js';
+import type {Expanded, OverviewLens, OverviewModel, OverviewView, pickExpanded} from './overview.js';
 
 export interface OverviewRendererOptions {
   /** A 2D canvas laid over the WebGL canvas, for cluster names and the labels of structured clusters. */
@@ -30,13 +30,26 @@ export interface OverviewRenderer {
   readonly animating: boolean;
   /** Matches the canvas to its CSS size (and device pixel ratio) and draws. */
   resize(): void;
-  draw(): void;
+  /** Draws now; `labels: false` leaves the text canvas as it is. */
+  draw(options?: {labels?: boolean}): void;
   /** The world point under a CSS pixel. */
   world(clientX: number, clientY: number): [number, number];
   /** The deepest node under a CSS pixel, or -1; inside a structured cluster, that cluster. */
   pick(clientX: number, clientY: number): number;
   /** The scene node under a CSS pixel inside a structured cluster. */
   pickScene(clientX: number, clientY: number): ReturnType<typeof pickExpanded>;
+  /** The fisheye lens in CSS pixels of the canvas, or null. */
+  readonly lens: OverviewLens | null;
+  /** Shows the lens (drawn on the next frame), or none with null. Picking and `world` see through it. */
+  setLens(lens: OverviewLens | null): void;
+  /** Whether the discs breathe (fading out included). */
+  readonly breathing: boolean;
+  /**
+   * Lets the discs grow and shrink by `amplitude` (fraction of the radius, default 0.06) over `period` ms (4000), in a
+   * wave of `wavelength` CSS pixels (600) outwards from the canvas centre, fading in over `fadeIn` ms (1500). `null`
+   * fades it out over `fadeOut` ms (400; 0 at once). Only the drawing changes.
+   */
+  breathe(settings: BreathSettings | null, stop?: {fadeOut?: number}): void;
   destroy(): void;
 }
 
@@ -55,5 +68,17 @@ export function bindOverviewNavigation(
     onClick?: (index: number, event: PointerEvent) => void;
     onHover?: (index: number, event: PointerEvent) => void;
     onDoubleClick?: (index: number, event: MouseEvent) => void;
+    /** A lens that follows the pointer: its radius (CSS pixels) and magnification, or null for none; asked on every move. */
+    lens?: () => {radius: number; magnification: number} | null;
+    /** Breathing after `after` ms (default 8000) without input; stops at the next input. Not under reduced motion. */
+    idle?: {after?: number; breathe?: BreathSettings};
   },
 ): () => void;
+
+/** The idle breathing of `OverviewRenderer.breathe`. */
+export interface BreathSettings {
+  amplitude?: number;
+  period?: number;
+  wavelength?: number;
+  fadeIn?: number;
+}

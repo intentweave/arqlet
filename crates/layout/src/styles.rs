@@ -3,6 +3,8 @@
 //! Orthogonal edges keep the routes of the orthogonal router; straight edges are replaced by one segment between their ports.
 
 use super::{absolute_all, ports, published_key};
+#[cfg(test)]
+use arqlet_model::math::PortableMath;
 use arqlet_model::outline::Outline;
 use arqlet_model::*;
 use std::collections::{BTreeMap, BTreeSet};
@@ -651,10 +653,10 @@ mod contour_port_tests {
         let (cx, cy) = (x.x + x.width / 2., x.y + x.height / 2.);
         let r = x.width.min(x.height) / 2.;
         let (dx, dy) = (port.position.x - cx, port.position.y - cy);
-        assert!(((dx.hypot(dy)) - r).abs() < 1e-6, "on the outline");
+        assert!(((dx.p_hypot(dy)) - r).abs() < 1e-6, "on the outline");
         assert_eq!(port.side, PortSide::Right);
         assert!(
-            dx > 0. && dx / r >= (std::f64::consts::FRAC_PI_4).cos() - 1e-9,
+            dx > 0. && dx / r >= (std::f64::consts::FRAC_PI_4).p_cos() - 1e-9,
             "exit toward the right: {dx}, {dy}"
         );
     }

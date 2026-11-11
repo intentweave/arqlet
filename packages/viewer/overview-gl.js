@@ -6,21 +6,43 @@
 // layout of the same graph (`morph`) moves every vertex from its old to its new place in the vertex shader (two sets of
 // positions and a uniform `t`); a change of what is collapsed or structured (`setState` with `fade`) fades the old
 // drawing out under the new one.
-import {overviewBuffers, pickNode, pickExpanded, labelsOf, SHAPE_STRIDE, LINE_STRIDE} from './overview.js';
+import {overviewBuffers, pickNode, pickExpanded, labelsOf, lensInverse, SHAPE_STRIDE, LINE_STRIDE} from './overview.js';
+
+// The fisheye lens of `lensAt` (overview.js) in device pixels from the canvas centre: u_lens = (x, y, radius,
+// magnification), radius 0 for none. Returns the moved point and the enlargement there.
+const LENS = `
+uniform vec4 u_lens;
+vec3 lens(vec2 p) {
+  if (u_lens.z <= 0.0) return vec3(p, 1.0);
+  vec2 d = p - u_lens.xy;
+  float r = length(d) / u_lens.z;
+  if (r >= 1.0) return vec3(p, 1.0);
+  float f = u_lens.w / ((u_lens.w - 1.0) * r + 1.0);
+  return vec3(u_lens.xy + d * f, f);
+}`;
 
 const SHAPE_VS = `
 attribute vec2 a_centre; attribute vec2 a_half; attribute vec2 a_centre2; attribute vec2 a_half2;
 attribute vec2 a_corner; attribute vec4 a_colour; attribute float a_kind;
 uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size; uniform float u_ratio; uniform float u_t;
 varying vec2 v_local; varying vec4 v_colour; varying float v_kind; varying vec2 v_pixels;
+// Breathing (idle): (phase in radians, amplitude, wavelength in device pixels); amplitude 0 for none. A disc grows and
+// shrinks by the amplitude around its middle, in a wave that runs outwards from the canvas centre.
+uniform vec3 u_breath;
+${LENS}
 void main() {
   vec2 centre = mix(a_centre, a_centre2, u_t), extent = mix(a_half, a_half2, u_t);
   // At least 1.5 pixels across, so that a leaf far out stays visible as a dot.
   vec2 pixels = max(extent * u_scale * u_ratio, vec2(0.75));
-  vec2 world = centre + a_corner * pixels / (u_scale * u_ratio);
-  vec2 clip = (world - u_centre) * u_scale * u_ratio / (u_size * 0.5);
+  vec2 middle = (centre - u_centre) * u_scale * u_ratio;
+  // Only discs breathe; the boxes and lines of structured clusters stay with their texts.
+  if (u_breath.y > 0.0 && a_kind < 1.5) pixels *= 1.0 + u_breath.y * sin(u_breath.x - 6.2831853 * length(middle) / u_breath.z);
+  // Every corner goes through the lens (a disc larger than the lens keeps its outline); the edge width uses the
+  // enlargement at the middle.
+  vec2 screen = lens(middle + a_corner * pixels).xy;
+  vec2 clip = screen / (u_size * 0.5);
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
-  v_local = a_corner; v_colour = a_colour; v_kind = a_kind; v_pixels = pixels;
+  v_local = a_corner; v_colour = a_colour; v_kind = a_kind; v_pixels = pixels * lens(middle).z;
 }`;
 const SHAPE_FS = `
 precision mediump float;
@@ -56,8 +78,9 @@ const LINE_VS = `
 attribute vec2 a_position; attribute vec2 a_position2; attribute vec4 a_colour;
 uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size; uniform float u_ratio; uniform float u_t;
 varying vec4 v_colour;
+${LENS}
 void main() {
-  vec2 clip = (mix(a_position, a_position2, u_t) - u_centre) * u_scale * u_ratio / (u_size * 0.5);
+  vec2 clip = lens((mix(a_position, a_position2, u_t) - u_centre) * u_scale * u_ratio).xy / (u_size * 0.5);
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
   v_colour = a_colour;
 }`;
@@ -101,6 +124,18 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   if (!gl) throw Error('WebGL is not available');
   const shapes = program(gl, SHAPE_VS, SHAPE_FS), lines = program(gl, LINE_VS, LINE_FS);
   let model = initialModel, expanded = new Map(), collapsed = new Set(), selected = -1;
+  // The fisheye lens (`setLens`), in CSS pixels of the canvas, or null.
+  let lens = null;
+  // Breathing (`breathe`): {amplitude, period, wavelength, start, stop?}; it fades in over `fadeIn` and out over `fadeOut`
+  // milliseconds after `stop`, and is dropped once faded out.
+  let breath = null;
+  const breathState = () => {
+    if (!breath) return {phase: 0, amplitude: 0};
+    const now = performance.now();
+    const into = Math.min(1, (now - breath.start) / breath.fadeIn);
+    const out = breath.stop ? Math.max(0, 1 - (now - breath.stop) / breath.fadeOut) : 1;
+    return {phase: 2 * Math.PI * (now - breath.start) / breath.period, amplitude: breath.amplitude * ease(into) * ease(out)};
+  };
   // A layer: per part a buffer of the start and one of the end of a morph (the same buffer when nothing moves).
   const layer = (from, to = from) => {
     const out = {buffers: {}, counts: from.count};
@@ -142,6 +177,13 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     gl.uniform1f(gl.getUniformLocation(p, 'u_ratio'), ratio());
     gl.uniform1f(gl.getUniformLocation(p, 'u_t'), t);
     gl.uniform1f(gl.getUniformLocation(p, 'u_fade'), fade);
+    // The lens in device pixels from the canvas centre (y down, as the shaders compute before flipping).
+    const r = ratio();
+    gl.uniform4f(gl.getUniformLocation(p, 'u_lens'),
+      lens ? (lens.x - canvas.clientWidth / 2) * r : 0, lens ? (lens.y - canvas.clientHeight / 2) * r : 0,
+      lens ? lens.radius * r : 0, lens ? lens.magnification : 1);
+    const b = breathState();
+    gl.uniform3f(gl.getUniformLocation(p, 'u_breath'), b.phase, b.amplitude, (breath?.wavelength ?? 600) * r);
   };
   const drawPart = (l, part, mode, view, t, fade) => {
     if (!l.counts[part]) return;
@@ -185,11 +227,19 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     const ctx = c.getContext('2d');
     ctx.setTransform(ratio(), 0, 0, ratio(), 0, 0);
     ctx.clearRect(0, 0, c.clientWidth, c.clientHeight);
+    // The lens's rim, faint, so that one sees where the enlargement ends.
+    if (lens) {
+      ctx.beginPath();
+      ctx.arc(lens.x, lens.y, lens.radius, 0, 2 * Math.PI);
+      ctx.strokeStyle = 'rgba(223,231,239,0.32)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
     // While the drawing moves, the texts wait: they would sit at the places of the end.
     if (!show) return;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed})) {
+    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens})) {
       ctx.font = `${label.kind === 'cluster' ? 600 : 400} ${label.size.toFixed(1)}px system-ui, sans-serif`;
       ctx.fillStyle = label.kind === 'cluster' ? 'rgba(223,231,239,0.85)' : 'rgba(223,231,239,0.95)';
       ctx.fillText(label.text, label.x, label.y);
@@ -209,8 +259,10 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       if (progress(morphing) >= 1) finishMorph();
     }
     if (fading && progress(fading) >= 1) { drop(previous); previous = null; fading = null; }
-    renderer.draw();
-    if (morphing || fading) frame = requestAnimationFrame(tick);
+    if (breath?.stop && performance.now() - breath.stop >= breath.fadeOut) breath = null;
+    // Breathing alone leaves the texts as they are: they do not move, and placing them every frame is work.
+    renderer.draw({labels: !!(morphing || fading) || !breath});
+    if (morphing || fading || breath) frame = requestAnimationFrame(tick);
   };
   const animate = () => { if (!frame) frame = requestAnimationFrame(tick); };
   const finishMorph = () => {
@@ -230,6 +282,15 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     get collapsed() { return collapsed; },
     get animating() { return !!(morphing || fading); },
     setView(view) { renderer.view = {...view}; renderer.draw(); options.onView?.(renderer.view); },
+    /** The fisheye lens (see `lensAt`), `{x, y, radius, magnification}` in CSS pixels of the canvas, or null. */
+    get lens() { return lens; },
+    setLens(next) {
+      const valid = next && next.radius > 0 && next.magnification > 1;
+      if (!valid && !lens) return;
+      lens = valid ? {x: next.x, y: next.y, radius: next.radius, magnification: next.magnification} : null;
+      // One drawing per frame, however often the pointer moves.
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; renderer.draw(); if (morphing || fading || breath) animate(); });
+    },
     setExpanded(map) { renderer.setState({expanded: map}); },
     /**
      * Draws clusters structured (`expanded`, index → {scene}), collapsed into one disc (`collapsed`, indices) and marks
@@ -278,7 +339,27 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
       renderer.draw();
     },
-    draw() {
+    /** Whether the drawing breathes (see `breathe`), fading out included. */
+    get breathing() { return !!breath; },
+    /**
+     * Lets the discs breathe: each grows and shrinks by `amplitude` (a fraction of its radius) over `period`
+     * milliseconds, in a wave of `wavelength` CSS pixels that runs outwards from the centre of the canvas. Fades in over
+     * `fadeIn` milliseconds. `breathe(null)` fades it out (over `fadeOut`, default 400) and stops. Only the drawing changes.
+     */
+    breathe(settings, {fadeOut = 400} = {}) {
+      if (!settings) {
+        if (!breath) return;
+        // At once (fadeOut 0): gone with the next drawing.
+        if (fadeOut <= 0) { breath = null; return; }
+        if (!breath.stop) { breath.stop = performance.now(); breath.fadeOut = fadeOut; animate(); }
+        return;
+      }
+      const {amplitude = 0.06, period = 4000, wavelength = 600, fadeIn = 1500} = settings;
+      if (breath && !breath.stop) return;
+      breath = {amplitude, period: Math.max(period, 100), wavelength: Math.max(wavelength, 1), fadeIn: Math.max(fadeIn, 1), fadeOut, start: performance.now()};
+      animate();
+    },
+    draw({labels = true} = {}) {
       const view = renderer.view;
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(...(options.background ?? [0.047, 0.063, 0.094, 1]));
@@ -291,13 +372,14 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       // half-transparent drawings would let the background through and flicker), what goes fades, what comes is there.
       if (previous) drawLayer(previous, view, 0, 1 - f);
       drawLayer(current, view, t, 1);
-      writeLabels(view, !morphing);
+      if (labels) writeLabels(view, !morphing);
     },
     /** The world point under a CSS pixel of the canvas. */
     world(clientX, clientY) {
       const rect = canvas.getBoundingClientRect(), v = renderer.view;
-      return [v.centreX + (clientX - rect.left - rect.width / 2) / v.scale,
-        v.centreY + (clientY - rect.top - rect.height / 2) / v.scale];
+      // Under the lens, the point shown there.
+      const [x, y] = lensInverse(lens, clientX - rect.left, clientY - rect.top);
+      return [v.centreX + (x - rect.width / 2) / v.scale, v.centreY + (y - rect.height / 2) / v.scale];
     },
     /** The deepest overview node under a CSS pixel, or -1 (inside a structured cluster: that cluster). */
     pick(clientX, clientY) {
@@ -318,21 +400,45 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
 
 /**
  * Wheel zoom at the pointer and drag panning for a renderer. `onClick(index, event)` gets the node under a click that was
- * not a drag; `onHover(index, event)` the node under the pointer; `onDoubleClick(index, event)` a double-click. Returns a
- * function that removes the listeners.
+ * not a drag; `onHover(index, event)` the node under the pointer; `onDoubleClick(index, event)` a double-click. With
+ * `lens` (a function that returns `{radius, magnification}` or null, asked on every move), a fisheye lens follows the
+ * pointer and is gone when the pointer leaves the canvas. With `idle` (`{after, breathe}`), the discs start to breathe
+ * (`renderer.breathe(breathe)`) after `after` milliseconds (default 8000) without input, and stop at the next input; not
+ * when the system asks for reduced motion. Returns a function that removes the listeners.
  */
-export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick} = {}) {
+export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick, lens, idle} = {}) {
   let drag = null;
+  // Breathing after `idle.after` milliseconds without input; any input stops it and starts the wait again. Not when
+  // the user asked the system for less motion.
+  const still = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  let idleTimer = 0;
+  const awake = () => {
+    if (!idle || still) return;
+    renderer.breathe(null);
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (!drag) renderer.breathe(idle.breathe ?? {}); }, idle.after ?? 8000);
+  };
+  awake();
+  const input = () => awake();
+  const follow = e => {
+    if (!lens) return;
+    const settings = lens(), rect = canvas.getBoundingClientRect();
+    renderer.setLens(settings ? {...settings, x: e.clientX - rect.left, y: e.clientY - rect.top} : null);
+  };
+  const leave = () => { if (lens) renderer.setLens(null); };
   const wheel = e => {
     e.preventDefault();
+    awake();
     const [wx, wy] = renderer.world(e.clientX, e.clientY);
     const v = renderer.view, factor = Math.exp(-e.deltaY * 0.0015);
     const scale = Math.min(Math.max(v.scale * factor, 1e-4), 1e4);
     // Keep the world point under the pointer where it is.
     renderer.setView({scale, centreX: wx - (wx - v.centreX) * v.scale / scale, centreY: wy - (wy - v.centreY) * v.scale / scale});
   };
-  const down = e => { drag = {x: e.clientX, y: e.clientY, view: renderer.view, moved: false}; canvas.setPointerCapture?.(e.pointerId); };
+  const down = e => { awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, moved: false}; canvas.setPointerCapture?.(e.pointerId); };
   const move = e => {
+    awake();
+    follow(e);
     if (!drag) { onHover?.(renderer.pick(e.clientX, e.clientY), e); return; }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
@@ -351,7 +457,13 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
   canvas.addEventListener('pointercancel', cancel);
+  canvas.addEventListener('pointerleave', leave);
+  globalThis.addEventListener?.('keydown', input);
   return () => {
+    clearTimeout(idleTimer);
+    renderer.breathe(null, {fadeOut: 0});
+    globalThis.removeEventListener?.('keydown', input);
+    canvas.removeEventListener('pointerleave', leave);
     canvas.removeEventListener('wheel', wheel);
     canvas.removeEventListener('pointerdown', down);
     canvas.removeEventListener('pointermove', move);

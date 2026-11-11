@@ -17,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Benjamin Becker"]
@@ -29,18 +29,29 @@ categories = ["visualization", "algorithms", "wasm"]
 
 # Internal crates: exact versions, released together. A path for the workspace, a version for crates.io.
 [workspace.dependencies]
-arqlet-model = { path = "crates/model", version = "=0.2.0" }
-arqlet-topology = { path = "crates/topology", version = "=0.2.0" }
-arqlet-routing = { path = "crates/routing", version = "=0.2.0" }
-arqlet-scene = { path = "crates/scene", version = "=0.2.0" }
-arqlet-view = { path = "crates/view", version = "=0.2.0" }
-arqlet-layout = { path = "crates/layout", version = "=0.2.0" }
-arqlet-reference = { path = "crates/reference", version = "=0.2.0" }
-arqlet-elk = { path = "crates/elk", version = "=0.2.0" }
-arqlet-runtime = { path = "crates/runtime", version = "=0.2.0" }
+arqlet-model = { path = "crates/model", version = "=0.3.0" }
+arqlet-topology = { path = "crates/topology", version = "=0.3.0" }
+arqlet-routing = { path = "crates/routing", version = "=0.3.0" }
+arqlet-scene = { path = "crates/scene", version = "=0.3.0" }
+arqlet-view = { path = "crates/view", version = "=0.3.0" }
+arqlet-layout = { path = "crates/layout", version = "=0.3.0" }
+arqlet-reference = { path = "crates/reference", version = "=0.3.0" }
+arqlet-elk = { path = "crates/elk", version = "=0.3.0" }
+arqlet-runtime = { path = "crates/runtime", version = "=0.3.0" }
 
 [profile.release]
 lto = "thin"
+
+# The WASM engine shipped on npm (`tools/npm-prepack.mjs`): built for size. Its output is bit for bit the same as the
+# release build's (the same arithmetic; checked by tools/platform-parity.mjs and the playground's parity tests); it is
+# about half the size (4.8 MB, 1.2 MB gzip, against 9.2 and 2.1 MB) and somewhat slower (single observations: about 15 % on
+# the cluster overview of 10 000 nodes). The playground and the native builds keep `release`.
+[profile.wasm-size]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+strip = true
 
 # For local test runs: as fast as `release` at run time (same optimisation level), but linked without LTO, in parallel
 # code-generation units and incrementally. Rebuilding a test binary after a change takes seconds instead of half a minute.

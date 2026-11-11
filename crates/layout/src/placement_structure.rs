@@ -26,6 +26,9 @@ pub(crate) struct Input {
     hierarchical: bool,
     simplex: bool,
     components: bool,
+    isolated: bool,
+    /// `isolatedGrid`: the pitch across the flow over the pitch along it (bits), which sets the grid's columns.
+    pub(crate) isolated_pitch: u64,
     track: u64,
     grid: u64,
     /// Only ancestor reversal decisions can change which border a crossing edge uses.
@@ -112,6 +115,8 @@ impl Input {
             hierarchical: options.hierarchical_ordering,
             simplex: options.simplex_ranks,
             components: options.component_packing,
+            isolated: options.isolated_grid,
+            isolated_pitch: 1f64.to_bits(),
             track: options.track_spacing.to_bits(),
             grid: options.placement_grid.to_bits(),
             ancestors,
@@ -240,6 +245,7 @@ mod tests {
             let options = LayoutOptions {
                 simplex_ranks: variant == 4,
                 component_packing: variant == 5,
+                isolated_grid: variant == 5,
                 node_sizes: graph
                     .nodes
                     .iter()

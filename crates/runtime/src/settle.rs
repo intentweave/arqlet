@@ -3,6 +3,7 @@
 //! (`CONTINUATION_STEPS`), so a host calls it again only while the result is not converged and nothing newer has happened.
 //! This is a continuation of the placement from its positions, not of a solver state: no solver state is kept. Provisional.
 use super::{check_current, recompute_layout, uses_organic};
+use arqlet_model::math::PortableMath;
 use arqlet_model::{EditReport, Settle, Snapshot};
 
 /// The damped steps a call runs at most (each is one complete recomputation of the view from the positions before it).
@@ -17,7 +18,7 @@ fn residual(before: &Snapshot, after: &Snapshot) -> f64 {
         .iter()
         .filter_map(|(id, b)| {
             let a = before.boxes.get(id)?;
-            Some((a.x - b.x).hypot(a.y - b.y))
+            Some((a.x - b.x).p_hypot(a.y - b.y))
         })
         .fold(0., f64::max)
 }

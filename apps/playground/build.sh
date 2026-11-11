@@ -19,6 +19,37 @@ mkdir -p apps/playground/generated/presets
 python3 -c "import json; order=['vorschau','raster','lesbar','qualitaet','auto']; docs={d['id']:d for d in (json.load(open(f'presets/{n}.json')) for n in order)}; json.dump([docs[n] for n in order], open('apps/playground/generated/presets/index.json','w'), indent=1)"
 # Web-app examples: deterministic datasets from benchmarks/generate.py. Not written to the manifest.
 python3 benchmarks/generate.py --demo-out apps/playground/generated/examples --no-manifest > /dev/null
+# A flat call graph (no containers): the case for communities (option `communities`).
+python3 benchmarks/overview/generate.py --nodes 2000 --seed 1 --flat --out apps/playground/generated/examples/calls-flat.json > /dev/null
+python3 - <<'PY'
+import json, sys
+sys.path.insert(0, 'benchmarks/overview')
+import generate
+# Domain groups for the flat graph: each symbol's directories and file in the nested graph it was flattened from (the
+# same generator and seed), so that given groups can be compared with the communities Louvain finds.
+nested = generate.generate(2000, 1)
+parent = {n['id']: n.get('parentId') for n in nested['nodes']}
+label = {n['id']: n['label'] for n in nested['nodes']}
+groups = {}
+for n in nested['nodes']:
+    if n['kind'] != 'symbol':
+        continue
+    path, at = [], parent[n['id']]
+    while at:
+        path.append(label[at])
+        at = parent[at]
+    groups[n['id']] = path[::-1]
+flat_path = 'apps/playground/generated/examples/calls-flat.json'
+flat = json.load(open(flat_path))
+flat['groups'] = {k: v for k, v in groups.items() if k in {n['id'] for n in flat['nodes']}}
+json.dump(flat, open(flat_path, 'w'), separators=(',', ':'))
+path = 'apps/playground/generated/examples/index.json'
+index = [e for e in json.load(open(path)) if e['name'] != 'calls-flat']
+index.append({'name': 'calls-flat', 'title': 'Flat call graph', 'nodes': len(flat['nodes']),
+              'description': 'A call graph without containers. Try Communities above 40 (found by Louvain), or Domain groups (the directories and files it came from).',
+              'source': 'benchmarks/overview/generate.py --nodes 2000 --seed 1 --flat'})
+json.dump(index, open(path, 'w'), indent=1, ensure_ascii=False)
+PY
 # Cluster overview (overview.html): deterministic hierarchical graphs of two sizes, seed 1.
 mkdir -p apps/playground/generated/overview
 python3 benchmarks/overview/generate.py --nodes 10000 --seed 1 --out apps/playground/generated/overview/code-10000.json

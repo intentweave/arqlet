@@ -4,6 +4,7 @@
 //! not invent routes. Container coordinates are flattened once: consumers must not apply a parent
 //! transform to routes or labels again.
 use crate::{geom, realize};
+use arqlet_model::math::PortableMath;
 use arqlet_model::*;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -92,6 +93,11 @@ pub struct SceneRoute {
     pub target: String,
     pub points: Vec<Point>,
     pub weight: usize,
+    /// Provisional (communities): the route stands for collapsed content in both directions; this many edges run the
+    /// other way (from `target` to `source`), `weight` in its own. Present only on such routes, 0 when every one of them
+    /// runs one way; a renderer draws an arrow at the start too when it is above 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub back_weight: Option<usize>,
     /// True when the engine reported a structured conflict for this route.
     pub invalid: bool,
     /// True when the route is drawn with rounded corners (styles `roundedOrthogonal` and `roundedPolyline`). Its points
@@ -132,7 +138,7 @@ fn junctions_of(snapshot: &Snapshot, routes: &[SceneRoute]) -> Vec<Point> {
                 let on = |q: &Point| (q.x - p.x).abs() < EPS && (q.y - p.y).abs() < EPS;
                 let toward = |q: &Point| {
                     let (dx, dy) = (q.x - p.x, q.y - p.y);
-                    let l = dx.hypot(dy).max(EPS);
+                    let l = dx.p_hypot(dy).max(EPS);
                     (dx / l, dy / l)
                 };
                 let inside = {
@@ -313,7 +319,18 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             source: edge.source.clone(),
             target: target.to_string(),
             points,
-            weight: route.weight,
+            // An edge that stands for collapsed content: its weights come from the view (`aggregate_weights`), whichever
+            // path computed the route.
+            weight: snapshot
+                .options
+                .aggregate_weights
+                .get(&route.id)
+                .map_or(route.weight, |w| w.forward.max(1)),
+            back_weight: snapshot
+                .options
+                .aggregate_weights
+                .get(&route.id)
+                .map(|w| w.backward),
             invalid: conflicted.contains(route.id.as_str()),
             rounded: rounds,
             members: Vec::new(),

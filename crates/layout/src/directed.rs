@@ -1,5 +1,6 @@
 //! Conflict proposals only. The real geometry scan decides whether a proposal is admissible.
 
+use arqlet_model::math::PortableMath;
 /// Closest point on a segment, and its interpolation parameter. Degenerate segments are points.
 pub(crate) fn closest(point: (f64, f64), a: (f64, f64), b: (f64, f64)) -> ((f64, f64), f64) {
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
@@ -23,12 +24,12 @@ pub(crate) fn segment_push(
 ) -> ((f64, f64), f64) {
     let (near, t) = closest(point, a, b);
     let (dx, dy) = (point.0 - near.0, point.1 - near.1);
-    let distance = dx.hypot(dy);
+    let distance = dx.p_hypot(dy);
     let normal = if distance > 1e-9 {
         (dx / distance, dy / distance)
     } else {
         let (vx, vy) = (b.0 - a.0, b.1 - a.1);
-        let length = vx.hypot(vy);
+        let length = vx.p_hypot(vy);
         if length > 1e-9 {
             (-vy / length, vx / length)
         } else {

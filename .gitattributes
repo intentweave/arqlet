@@ -1,0 +1,3 @@
+# The same bytes on every platform. Tests compare generated files with committed ones byte for byte (the TypeScript
+# contracts, goldens), and fixtures are read as they are; a checkout with Windows line endings would differ.
+* text=auto eol=lf

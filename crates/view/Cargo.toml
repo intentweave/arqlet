@@ -15,3 +15,6 @@ description = "View projection, aggregation, drill-down and path cut-outs."
 
 [dependencies]
 arqlet-model = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"

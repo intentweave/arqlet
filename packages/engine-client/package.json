@@ -1,6 +1,6 @@
 {
   "name": "@arqlet/engine-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The Arqlet graph-layout engine as WebAssembly, with a loader, a worker protocol, an ELK-style layout call and preset sequencing. Provisional.",
   "keywords": [
     "graph",
@@ -43,6 +43,10 @@
       "types": "./elk.d.ts",
       "default": "./elk.js"
     },
+    "./session.js": {
+      "types": "./session.d.ts",
+      "default": "./session.js"
+    },
     "./worker.js": "./worker.js",
     "./arqlet.wasm": "./arqlet.wasm"
   },
@@ -51,10 +55,12 @@
     "wasm-client.js",
     "presets.js",
     "elk.js",
+    "session.js",
     "engine.d.ts",
     "wasm-client.d.ts",
     "presets.d.ts",
     "elk.d.ts",
+    "session.d.ts",
     "worker.js",
     "arqlet.wasm",
     "README.md",

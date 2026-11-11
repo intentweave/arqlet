@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "arqlet"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-elk",
  "arqlet-layout",
@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-contracts"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-model",
  "arqlet-reference",
@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-elk"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-model",
  "serde_json",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-layout"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-model",
  "arqlet-routing",
@@ -50,8 +50,9 @@ dependencies = [
 
 [[package]]
 name = "arqlet-model"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "libm",
  "serde",
  "serde_json",
  "ts-rs",
@@ -59,11 +60,11 @@ dependencies = [
 
 [[package]]
 name = "arqlet-node"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "arqlet-reference"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-model",
  "arqlet-routing",
@@ -76,14 +77,14 @@ dependencies = [
 
 [[package]]
 name = "arqlet-routing"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-model",
 ]
 
 [[package]]
 name = "arqlet-runtime"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-elk",
  "arqlet-layout",
@@ -97,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-scene"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-model",
  "serde",
@@ -107,18 +108,19 @@ dependencies = [
 
 [[package]]
 name = "arqlet-topology"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "arqlet-view"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-model",
+ "serde_json",
 ]
 
 [[package]]
 name = "arqlet-wasm"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "arqlet-runtime",
 ]
@@ -193,6 +195,12 @@ name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
+
+[[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "memchr"

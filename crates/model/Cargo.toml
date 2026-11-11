@@ -17,6 +17,8 @@ description = "Canonical graph identities, revisions, nested containers, ports a
 ts-rs = { version = "=12.0.1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Portable math (sin, cos, atan2, powf, hypot): the same results on every platform and in WASM (see src/math.rs).
+libm = "=0.2.16"
 
 [features]
 ts = ["dep:ts-rs"]

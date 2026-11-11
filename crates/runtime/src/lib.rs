@@ -1,4 +1,6 @@
 //! Import, bounded view selection and revision-checked editing.
+#[cfg(test)]
+use arqlet_model::math::PortableMath;
 pub mod budget;
 pub mod components;
 pub mod containers;
@@ -10,6 +12,7 @@ pub mod overview;
 pub mod port_edit;
 pub mod session;
 pub mod settle;
+pub mod trace;
 
 use execution::{
     ArchiveEntry, CandidateId, CandidateOutcome, CandidateRecord, Exclusion, InputIdentity,
@@ -130,6 +133,140 @@ pub fn import_graph_with(
     import_graph_counted(graph, limit, options).map(|(snapshot, _)| snapshot)
 }
 
+/// The source graph as the view projects it (provisional): the groups the data gives (`groups`) and then the communities
+/// of the containers that are still large (`communities`) as containers of their own (`arqlet_layout::communities`). Only
+/// the view sees them; the snapshot keeps the source graph itself, and every projection derives them again.
+pub fn structured<'a>(
+    source: &'a Graph,
+    options: &LayoutOptions,
+) -> Result<std::borrow::Cow<'a, Graph>, String> {
+    if !derives_groups(options) {
+        return Ok(std::borrow::Cow::Borrowed(source));
+    }
+    let given = arqlet_layout::communities::with_given_groups(source, &options.groups)?;
+    let grouped =
+        arqlet_layout::communities::with_community_containers(&given, options.communities)?;
+    // Containers shown in part (`reveal`): the children not shown gathered in a rest.
+    arqlet_layout::communities::with_partial(&grouped, &options.partial)
+        .map(std::borrow::Cow::Owned)
+}
+
+/// Whether the view adds containers of its own (communities, given groups, rests of partly shown containers).
+fn derives_groups(options: &LayoutOptions) -> bool {
+    options.communities > 0 || !options.groups.is_empty() || !options.partial.is_empty()
+}
+
+/// Whether the view abstracts (provisional): with derived groups or an initial collapse, the edges between collapsed
+/// containers are drawn by one route per pair with their weights (`merge_aggregated_pairs`).
+pub(crate) fn abstracts(options: &LayoutOptions) -> bool {
+    derives_groups(options) || options.initial_collapse.is_some()
+}
+
+/// Whether the projection draws the edges a collapsed container aggregates once per pair: with a node budget, and when
+/// the view abstracts (its collapsed boxes gather many edges).
+fn aggregates(options: &LayoutOptions) -> bool {
+    options.visible_node_budget > 0 || abstracts(options)
+}
+
+/// The containers the first view of an import shows collapsed, besides a node budget's: those `initial_collapse` names
+/// (at a depth or deeper, of a kind), else the groups and communities the view added.
+fn initially_collapsed(view: &Graph, options: &LayoutOptions) -> BTreeSet<String> {
+    let parent: BTreeMap<&str, Option<&str>> = view
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let containers: BTreeSet<&str> = view
+        .nodes
+        .iter()
+        .filter_map(|n| n.parent_id.as_deref())
+        .collect();
+    let depth = |id: &str| {
+        let mut d = 0;
+        let mut at = parent.get(id).copied().flatten();
+        while let Some(p) = at {
+            d += 1;
+            at = parent.get(p).copied().flatten();
+        }
+        d
+    };
+    view.nodes
+        .iter()
+        .filter(|n| containers.contains(n.id.as_str()))
+        .filter(|n| match &options.initial_collapse {
+            Some(c) => c.depth.is_some_and(|d| depth(&n.id) >= d) || c.kinds.contains(&n.kind),
+            None => {
+                n.kind == arqlet_layout::communities::COMMUNITY_KIND
+                    || n.kind == arqlet_layout::communities::GROUP_KIND
+            }
+        })
+        .map(|n| n.id.clone())
+        .collect()
+}
+
+/// The view of a source graph (`project_view`).
+pub struct View {
+    /// The structured graph (`structured`): the source graph with the communities as containers.
+    pub graph: Graph,
+    /// The collapsed containers that still exist in it (a community can be gone after the graph changed).
+    pub collapsed: BTreeSet<String>,
+    /// The projection that is laid out.
+    pub projected: Graph,
+    /// With communities: what each edge that stands for collapsed content represents (`aggregate_weights`).
+    pub weights: BTreeMap<String, AggregateWeight>,
+}
+
+/// The edges a collapsed container aggregates, merged: with communities, one edge per pair of visible ends for both
+/// directions, with its weights; else (node budget) one per pair and direction.
+fn merge_view(
+    view: &Graph,
+    projected: Graph,
+    options: &LayoutOptions,
+) -> (Graph, BTreeMap<String, AggregateWeight>) {
+    if abstracts(options) {
+        arqlet_view::merge_aggregated_pairs(view, projected)
+    } else {
+        (
+            arqlet_view::merge_aggregated(view, projected),
+            BTreeMap::new(),
+        )
+    }
+}
+
+/// The view of a source graph: the structured graph, the collapsed containers that still exist in it (others are
+/// dropped from the set), and the projection. With `merge`, the edges a collapsed container aggregates are merged when
+/// `aggregates` holds (`merge_view`). (Edits other than `toggle` do not merge under a node budget, as before communities
+/// existed; with communities every view merges.)
+pub fn project_view(
+    source: &Graph,
+    collapsed: &[String],
+    options: &LayoutOptions,
+    merge: bool,
+) -> Result<View, String> {
+    let view = structured(source, options)?.into_owned();
+    let containers: BTreeSet<&str> = view
+        .nodes
+        .iter()
+        .filter_map(|n| n.parent_id.as_deref())
+        .collect();
+    let collapsed: BTreeSet<String> = collapsed
+        .iter()
+        .filter(|id| !derives_groups(options) || containers.contains(id.as_str()))
+        .cloned()
+        .collect();
+    let mut projected = arqlet_view::project(&view, &collapsed)?;
+    let mut weights = BTreeMap::new();
+    if merge && aggregates(options) {
+        (projected, weights) = merge_view(&view, projected, options);
+    }
+    Ok(View {
+        graph: view,
+        collapsed,
+        projected,
+        weights,
+    })
+}
+
 /// The options of a layout that tries single pass (`LayoutOptions::single_pass_auto`).
 fn single_pass_options(options: &LayoutOptions) -> LayoutOptions {
     LayoutOptions {
@@ -222,14 +359,20 @@ pub fn import_graph_counted(
         .retain(|b| graph.edges.iter().any(|e| e.id == b.edge_id));
     // Experimental (global layering, iteration 1): within a node budget the first view collapses containers, the
     // outermost first, and a collapsed container takes the size estimated from its content.
-    if options.visible_node_budget > 0 {
-        let collapsed = budget::initial_collapse(&graph, options.visible_node_budget);
-        let projected =
-            arqlet_view::merge_aggregated(&graph, arqlet_view::project(&graph, &collapsed)?);
-        let options = LayoutOptions {
-            collapsed_sizes: budget::estimated_sizes(&graph, &collapsed),
-            ..options.clone()
+    if aggregates(options) {
+        let view = structured(&graph, options)?;
+        // The first view: within a node budget, the outermost containers collapsed; and those `initially_collapsed` names.
+        let mut collapsed = if options.visible_node_budget > 0 {
+            budget::initial_collapse(&view, options.visible_node_budget)
+        } else {
+            BTreeSet::new()
         };
+        if abstracts(options) {
+            collapsed.extend(initially_collapsed(&view, options));
+        }
+        let (projected, weights) =
+            merge_view(&view, arqlet_view::project(&view, &collapsed)?, options);
+        let options = view_options(&view, &collapsed, options, &weights);
         let (mut snapshot, stages) =
             arqlet_layout::compute_counted(&projected, None, &BTreeSet::new(), &options)?;
         snapshot.source_graph = Some(graph);
@@ -278,37 +421,80 @@ pub fn add_node(
     if graph.nodes.iter().any(|n| n.id == id) {
         return Err("Local node ID collision".into());
     }
+    // The parent in the source graph: in the view it may be a community, which only the view has.
+    let parent_id = graph
+        .nodes
+        .iter()
+        .find(|n| n.id == source_id)
+        .map_or_else(|| source.parent_id.clone(), |n| n.parent_id.clone());
     graph.nodes.push(Node {
         id: id.clone(),
         kind: "symbol".into(),
         label: label.chars().take(80).collect(),
-        parent_id: source.parent_id.clone(),
+        parent_id,
         shape: Default::default(),
     });
     graph.edges.push(Edge {
         id: format!("local-edge:{}", snapshot.revision + 1),
         kind: "calls".into(),
         source: source_id.into(),
-        target: Some(id),
+        target: Some(id.clone()),
     });
+    let View {
+        graph: view,
+        collapsed,
+        projected,
+        weights,
+    } = project_view(
+        &graph,
+        &snapshot.collapsed_ids,
+        &snapshot.options,
+        abstracts(&snapshot.options),
+    )?;
+    // The new node's containers in the view (communities included) are placed again.
     let mut dirty = BTreeSet::new();
-    let mut parent = source.parent_id.clone();
+    let mut parent = view
+        .nodes
+        .iter()
+        .find(|n| n.id == id)
+        .and_then(|n| n.parent_id.clone());
     while let Some(p) = parent {
-        dirty.insert(p.clone());
-        parent = graph
+        parent = view
             .nodes
             .iter()
             .find(|n| n.id == p)
-            .unwrap()
-            .parent_id
-            .clone();
+            .and_then(|n| n.parent_id.clone());
+        dirty.insert(p);
     }
-    let projected =
-        arqlet_view::project(&graph, &snapshot.collapsed_ids.iter().cloned().collect())?;
-    let mut result = arqlet_layout::compute(&projected, Some(snapshot), &dirty, &snapshot.options)?;
+    let options = if abstracts(&snapshot.options) {
+        view_options(&view, &collapsed, &snapshot.options, &weights)
+    } else {
+        snapshot.options.clone()
+    };
+    let mut result = arqlet_layout::compute(&projected, Some(snapshot), &dirty, &options)?;
     result.source_graph = Some(graph);
-    result.collapsed_ids = snapshot.collapsed_ids.clone();
+    result.collapsed_ids = collapsed.into_iter().collect();
     Ok(result)
+}
+
+/// The layout options of a view: under a node budget, collapsed containers sized from their content. Not for communities:
+/// measured on a flat call graph (1 866 nodes), content-sized collapsed communities made the first view 35 106 px wide
+/// against 4 560 with plain boxes, and opening one moved the others as much either way. With communities, the weights of
+/// the merged edges (`aggregate_weights`, replacing those of the previous view).
+fn view_options(
+    view: &Graph,
+    collapsed: &BTreeSet<String>,
+    options: &LayoutOptions,
+    weights: &BTreeMap<String, AggregateWeight>,
+) -> LayoutOptions {
+    let mut options = options.clone();
+    if options.visible_node_budget > 0 {
+        options.collapsed_sizes = budget::estimated_sizes(view, collapsed);
+    }
+    if abstracts(&options) {
+        options.aggregate_weights = weights.clone();
+    }
+    options
 }
 /// Change only view state. Hidden nodes and original edge endpoints remain canonical.
 pub fn toggle_container(
@@ -323,7 +509,10 @@ pub fn toggle_container(
     if snapshot.revision != expected || snapshot.layout_version != layout {
         return Err("Stale view request".into());
     }
-    let source = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    // The view's containers: with communities, those too.
+    let source = structured(canonical, &snapshot.options)?;
+    let source = source.as_ref();
     if !snapshot.graph.nodes.iter().any(|n| n.id == id) {
         return Err("Container is not visible".into());
     }
@@ -334,48 +523,82 @@ pub fn toggle_container(
     {
         return Err("Not a container".into());
     }
-    let mut collapsed: BTreeSet<_> = snapshot.collapsed_ids.iter().cloned().collect();
-    let expanding = collapsed.remove(id);
-    if !expanding {
-        collapsed.insert(id.to_string());
+    let mut collapsed: Vec<String> = snapshot.collapsed_ids.clone();
+    let mut options = snapshot.options.clone();
+    // The rest of a partly shown container: opening it shows every child of the container again.
+    if let Some(container) = id.strip_prefix(arqlet_layout::communities::REST_PREFIX) {
+        options.partial.remove(container);
+        collapsed.retain(|c| c != id);
+        return relayout_collapsed(
+            snapshot,
+            canonical,
+            &options,
+            collapsed,
+            &[container.to_string()],
+        );
     }
-    let mut graph = arqlet_view::project(source, &collapsed)?;
-    // With a node budget, the edges a collapsed container aggregates are drawn once per pair, and the collapsed containers
-    // keep sizes estimated from their content.
-    if snapshot.options.visible_node_budget > 0 {
-        graph = arqlet_view::merge_aggregated(source, graph);
+    // A container toggled as a whole is shown whole when it opens again.
+    if options.partial.remove(id).is_some() {
+        let rest = format!("{}{id}", arqlet_layout::communities::REST_PREFIX);
+        collapsed.retain(|c| *c != rest);
     }
-    let options = if snapshot.options.visible_node_budget > 0 {
-        LayoutOptions {
-            collapsed_sizes: budget::estimated_sizes(source, &collapsed),
-            ..snapshot.options.clone()
-        }
+    let expanding = collapsed.iter().any(|c| c == id);
+    if expanding {
+        collapsed.retain(|c| c != id);
     } else {
-        snapshot.options.clone()
+        collapsed.push(id.to_string());
+    }
+    let opened = if expanding {
+        vec![id.to_string()]
+    } else {
+        Vec::new()
     };
+    relayout_collapsed(snapshot, canonical, &options, collapsed, &opened)
+}
+
+/// The view with `collapsed` as its collapsed containers, `opened` the ones that were expanded (`toggle`, `reveal`).
+fn relayout_collapsed(
+    snapshot: &Snapshot,
+    canonical: &Graph,
+    options: &LayoutOptions,
+    collapsed: Vec<String>,
+    opened: &[String],
+) -> Result<Snapshot, String> {
+    let expanding = !opened.is_empty();
+    // With a node budget or communities, the edges a collapsed container aggregates are drawn once per pair, and the
+    // collapsed containers keep sizes estimated from their content.
+    let View {
+        graph: source,
+        collapsed,
+        projected: graph,
+        weights,
+    } = project_view(canonical, &collapsed, options, true)?;
+    let options = view_options(&source, &collapsed, options, &weights);
     // Expanding within a node budget is local (global layering plan, step 2 of the first view): the drawing continues the
     // earlier one; only the container and the areas around it are placed again (they start from their earlier order), the
     // other containers keep their boxes and plans, and the routes whose ends moved together are carried along.
-    let mut result = if expanding && snapshot.options.visible_node_budget > 0 {
-        let mut dirty = BTreeSet::from([id.to_string()]);
-        let mut at = source
-            .nodes
-            .iter()
-            .find(|n| n.id == id)
-            .and_then(|n| n.parent_id.clone());
-        while let Some(p) = at {
-            at = source
+    let mut result = if expanding && aggregates(&options) {
+        let mut dirty: BTreeSet<String> = opened.iter().cloned().collect();
+        for id in opened {
+            let mut at = source
                 .nodes
                 .iter()
-                .find(|n| n.id == p)
+                .find(|n| &n.id == id)
                 .and_then(|n| n.parent_id.clone());
-            dirty.insert(p);
+            while let Some(p) = at {
+                at = source
+                    .nodes
+                    .iter()
+                    .find(|n| n.id == p)
+                    .and_then(|n| n.parent_id.clone());
+                dirty.insert(p);
+            }
         }
         arqlet_layout::compute(&graph, Some(snapshot), &dirty, &options)?
     } else {
         arqlet_layout::compute(&graph, None, &BTreeSet::new(), &options)?
     };
-    result.source_graph = Some(source.clone());
+    result.source_graph = Some(canonical.clone());
     result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
     result.base_revision = Some(snapshot.revision);
@@ -386,6 +609,88 @@ pub fn toggle_container(
     result.omitted_unresolved_edges = snapshot.omitted_unresolved_edges;
     Ok(result)
 }
+/// Provisional (path cut-out, step 2): makes the nodes `ids` visible by expanding the collapsed containers that hold them
+/// (in the view: communities and groups too); everything else stays as it is. With `partial`, a container opened this way
+/// shows only the children on the way to those nodes, the others gathered in a collapsed rest (`LayoutOptions::partial`);
+/// a node in a rest is moved out of it. Without, the containers open whole. Nodes that are visible already change nothing,
+/// and the snapshot comes back as it was. A view request: stale revisions are refused.
+pub fn reveal_nodes(
+    snapshot: &Snapshot,
+    expected: u64,
+    layout: u64,
+    ids: &[String],
+    partial: bool,
+) -> Result<Snapshot, String> {
+    if snapshot.schema_version != 1 || snapshot.engine_version != arqlet_model::ENGINE_VERSION {
+        return Err("Incompatible snapshot".into());
+    }
+    if snapshot.revision != expected || snapshot.layout_version != layout {
+        return Err("Stale view request".into());
+    }
+    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    // The view without its rests: the way from each node up to the top.
+    let mut options = snapshot.options.clone();
+    let shown_in_part = std::mem::take(&mut options.partial);
+    let base = structured(canonical, &options)?;
+    let parent: BTreeMap<&str, Option<&str>> = base
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let mut collapsed: Vec<String> = snapshot.collapsed_ids.clone();
+    let mut partly = shown_in_part.clone();
+    let mut opened = BTreeSet::new();
+    for id in ids {
+        if !parent.contains_key(id.as_str()) {
+            return Err(format!("Unknown node: {id}"));
+        }
+        let mut child = id.as_str();
+        let mut at = parent[id.as_str()];
+        while let Some(p) = at {
+            let closed = collapsed.iter().any(|c| c == p);
+            if closed || partly.contains_key(p) {
+                if partial {
+                    let shown = partly.entry(p.to_string()).or_default();
+                    if !shown.iter().any(|c| c == child) {
+                        shown.push(child.to_string());
+                    }
+                } else {
+                    partly.remove(p);
+                }
+                if closed {
+                    opened.insert(p.to_string());
+                }
+            }
+            child = p;
+            at = parent.get(p).copied().flatten();
+        }
+    }
+    if opened.is_empty() && partly == shown_in_part {
+        return Ok(snapshot.clone());
+    }
+    collapsed.retain(|c| !opened.contains(c));
+    // Every rest starts collapsed; the rests of containers no longer shown in part go.
+    for container in partly.keys() {
+        let rest = format!("{}{container}", arqlet_layout::communities::REST_PREFIX);
+        if !collapsed.contains(&rest) {
+            collapsed.push(rest);
+        }
+    }
+    collapsed.retain(
+        |c| match c.strip_prefix(arqlet_layout::communities::REST_PREFIX) {
+            Some(container) => partly.contains_key(container),
+            None => true,
+        },
+    );
+    options.partial = partly;
+    let mut opened: Vec<String> = opened.into_iter().collect();
+    if opened.is_empty() {
+        // Only what a rest holds changed: the partly shown containers are placed again.
+        opened = options.partial.keys().cloned().collect();
+    }
+    relayout_collapsed(snapshot, canonical, &options, collapsed, &opened)
+}
+
 pub fn set_direction(
     snapshot: &Snapshot,
     expected: u64,
@@ -425,13 +730,28 @@ pub fn set_direction(
 /// Recomputes the view from an edited source graph: the revision stays, the layout version advances, and a custom change
 /// leaves its preset.
 fn recompute_source(snapshot: &Snapshot, source: Graph) -> Result<Snapshot, String> {
-    let graph = arqlet_view::project(&source, &snapshot.collapsed_ids.iter().cloned().collect())?;
+    let communities = abstracts(&snapshot.options);
+    let View {
+        graph: view,
+        collapsed,
+        projected: graph,
+        weights,
+    } = project_view(
+        &source,
+        &snapshot.collapsed_ids,
+        &snapshot.options,
+        communities,
+    )?;
     // A direction change is a custom change: the snapshot no longer matches its preset.
-    let mut options = snapshot.options.clone();
+    let mut options = if communities {
+        view_options(&view, &collapsed, &snapshot.options, &weights)
+    } else {
+        snapshot.options.clone()
+    };
     options.config_id = None;
     let mut result = arqlet_layout::compute(&graph, None, &BTreeSet::new(), &options)?;
     result.source_graph = Some(source);
-    result.collapsed_ids = snapshot.collapsed_ids.clone();
+    result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
     result.base_revision = Some(snapshot.revision);
     result.layout_version = snapshot
@@ -711,13 +1031,26 @@ fn recompute_layout(
         .source_graph
         .clone()
         .unwrap_or_else(|| snapshot.graph.clone());
-    let graph = arqlet_view::project(&source, &snapshot.collapsed_ids.iter().cloned().collect())?;
+    let communities = abstracts(options);
+    let View {
+        graph: view,
+        collapsed,
+        projected: graph,
+        weights,
+    } = project_view(&source, &snapshot.collapsed_ids, options, communities)?;
+    let sized;
+    let options = if communities {
+        sized = view_options(&view, &collapsed, options, &weights);
+        &sized
+    } else {
+        options
+    };
     // Warm start: children begin where the previous layout put them. Every node is placed again, so that a changed size or
     // a changed container reaches the drawing; only the start positions are taken from the previous layout.
     let dirty = dirty.unwrap_or_else(|| graph.nodes.iter().map(|n| n.id.clone()).collect());
     let mut result = arqlet_layout::compute(&graph, Some(snapshot), &dirty, options)?;
     result.source_graph = Some(source);
-    result.collapsed_ids = snapshot.collapsed_ids.clone();
+    result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
     result.base_revision = Some(snapshot.revision);
     result.layout_version = snapshot
@@ -3145,6 +3478,9 @@ pub fn dispatch(input: &str) -> String {
         if v["op"].as_str() == Some("scene") {
             return scene_response(&v);
         }
+        if v["op"].as_str() == Some("trace") {
+            return trace::trace_response(&v).to_string();
+        }
         if v["op"].as_str() == Some("componentRefine") {
             return component_response(&v);
         }
@@ -3275,6 +3611,16 @@ pub fn dispatch(input: &str) -> String {
                     .as_u64()
                     .ok_or("Missing expectedLayoutVersion")?,
                 v["nodeId"].as_str().ok_or("Missing nodeId")?,
+            ),
+            Some("reveal") => reveal_nodes(
+                &snapshot,
+                expected,
+                v["expectedLayoutVersion"]
+                    .as_u64()
+                    .ok_or("Missing expectedLayoutVersion")?,
+                &serde_json::from_value::<Vec<String>>(v["nodeIds"].clone())
+                    .map_err(|_| "Missing nodeIds")?,
+                v["partial"].as_bool().unwrap_or(true),
             ),
             Some("configure") => configure_snapshot(
                 &snapshot,
@@ -4621,7 +4967,7 @@ mod tests {
                 )
             };
             let (a, b) = (c("a"), c("b"));
-            (a.0 - b.0).hypot(a.1 - b.1)
+            (a.0 - b.0).p_hypot(a.1 - b.1)
         };
         assert!((span(&snapshot) - span(&lr_snapshot).min(span(&tb_snapshot))).abs() < 1e-9);
     }

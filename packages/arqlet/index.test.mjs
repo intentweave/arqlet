@@ -2,10 +2,10 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {createElkLayout, defaultWasmUrl, loadEngine, renderSvg, toReactFlow} from './index.js';
+import {createElkLayout, createSession, workerRun, defaultWasmUrl, loadEngine, renderSvg, toReactFlow} from './index.js';
 
 test('the entry point re-exports the engine and viewer functions', () => {
-  for (const f of [createElkLayout, loadEngine, renderSvg, toReactFlow]) assert.equal(typeof f, 'function');
+  for (const f of [createElkLayout, createSession, workerRun, loadEngine, renderSvg, toReactFlow]) assert.equal(typeof f, 'function');
 });
 
 // Needs the WASM next to the engine client (`pnpm pack` builds it; build.sh and CI copy it there too).

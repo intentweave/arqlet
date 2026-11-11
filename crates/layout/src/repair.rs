@@ -5,6 +5,7 @@
 //! When no admissible arrangement is found within the budget, the remaining conflicts are returned, not hidden.
 
 use crate::{absolute_all, clearance, ports, spatial::SpatialHash, styles, vpsc};
+use arqlet_model::math::PortableMath;
 use arqlet_model::outline::{within, Outline};
 use arqlet_model::{
     container_extent, AxisSize, GeometryIssue, Graph, LayoutOptions, Mode, NodeShape, NodeSize,
@@ -611,7 +612,7 @@ fn directed_trials(
         if !search.movable[i] {
             return;
         }
-        let length = delta.0.hypot(delta.1);
+        let length = delta.0.p_hypot(delta.1);
         if !length.is_finite() || length <= 1e-9 {
             return;
         }
@@ -703,7 +704,7 @@ fn pin_overlaps_a_child(
         let dy = (centres[a].1 - centres[b].1).abs();
         if shapes[a] == NodeShape::Circle && shapes[b] == NodeShape::Circle {
             let radius = |i: usize| sizes[i].0.min(sizes[i].1) / 2.;
-            dx.hypot(dy) < radius(a) + radius(b)
+            dx.p_hypot(dy) < radius(a) + radius(b)
         } else {
             dx < (sizes[a].0 + sizes[b].0) / 2. && dy < (sizes[a].1 + sizes[b].1) / 2.
         }
@@ -753,7 +754,7 @@ fn region(
                         / 4.
                         + 2. * base;
                     let (dx, dy) = (centres[f].0 - centres[m].0, centres[f].1 - centres[m].1);
-                    if dx.hypot(dy) <= reach {
+                    if dx.p_hypot(dy) <= reach {
                         grown.insert(m);
                     }
                 }
@@ -965,7 +966,7 @@ fn overlap_depth(a: &Outline, b: &Outline, gap: f64) -> f64 {
         },
     ) = (a, b)
     {
-        return (radius + s + gap - (x - u).hypot(y - v)).max(0.);
+        return (radius + s + gap - (x - u).p_hypot(y - v)).max(0.);
     }
     let (p, q) = (a.bounds(), b.bounds());
     let overlap_x = (p.x + p.width).min(q.x + q.width) - p.x.max(q.x);
@@ -981,7 +982,7 @@ fn through_depth(outline: &Outline, p: (f64, f64), q: (f64, f64), margin: f64) -
     let centre = (bounds.x + bounds.width / 2., bounds.y + bounds.height / 2.);
     let reach = match outline {
         Outline::Disc { radius, .. } => *radius,
-        Outline::Rect(r) => r.width.hypot(r.height) / 2.,
+        Outline::Rect(r) => r.width.p_hypot(r.height) / 2.,
     };
     let (dx, dy) = (q.0 - p.0, q.1 - p.1);
     let length2 = dx * dx + dy * dy;
@@ -990,7 +991,7 @@ fn through_depth(outline: &Outline, p: (f64, f64), q: (f64, f64), margin: f64) -
     } else {
         (((centre.0 - p.0) * dx + (centre.1 - p.1) * dy) / length2).clamp(0., 1.)
     };
-    let distance = (p.0 + t * dx - centre.0).hypot(p.1 + t * dy - centre.1);
+    let distance = (p.0 + t * dx - centre.0).p_hypot(p.1 + t * dy - centre.1);
     (reach + margin - distance).max(0.)
 }
 
@@ -2709,6 +2710,7 @@ mod tests {
 #[cfg(test)]
 mod root_tests {
     use crate::compute;
+    use arqlet_model::math::PortableMath;
     use arqlet_model::{Graph, LayoutOptions, Point};
     use std::collections::BTreeSet;
 
@@ -2931,7 +2933,7 @@ mod root_tests {
             for id in ["a", "b", "c", "d"] {
                 let (p, q) = (&first.boxes[id], &current.boxes[id]);
                 assert!(
-                    (p.x - q.x).hypot(p.y - q.y) < 1e-6,
+                    (p.x - q.x).p_hypot(p.y - q.y) < 1e-6,
                     "{id} drifted in round {round}: {:?} -> {:?}",
                     (p.x, p.y),
                     (q.x, q.y)

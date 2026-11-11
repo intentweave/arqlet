@@ -1,6 +1,6 @@
 {
   "name": "arqlet",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Incremental graph layout for nested graphs with ports, in the browser and Node via WebAssembly: one entry point for the Arqlet engine, its ELK-style call and the SVG and React Flow viewers. Prototype; the API is provisional.",
   "keywords": [
     "graph",

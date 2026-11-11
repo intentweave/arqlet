@@ -262,3 +262,46 @@ test('the engine’s overview feeds the model and the drill-down lays out', {ski
   assert.ok(Number.isFinite(fx) && Number.isFinite(fy), `no leg starts on the border of c0 (edge ${k})`);
   assert.equal(scene.scene.nodes.filter(n => n.id.startsWith('c0/')).length, 20);
 });
+
+test('the fisheye lens enlarges its middle, leaves its rim and outside in place, and can be inverted', async () => {
+  const {lensAt, lensInverse} = await import('./overview.js');
+  const lens = {x: 100, y: 100, radius: 50, magnification: 3};
+  assert.deepEqual(lensAt(lens, 100, 100), [100, 100, 3], 'the focus stays, enlarged M times');
+  assert.deepEqual(lensAt(lens, 200, 100), [200, 100, 1], 'outside: unchanged');
+  const [rimX, , rimF] = lensAt(lens, 149.999, 100);
+  assert.ok(Math.abs(rimX - 149.999) < 1e-3 && Math.abs(rimF - 1) < 1e-3, 'continuous at the rim');
+  let last = 100;
+  for (let d = 1; d < 50; d++) {
+    const [x, y, f] = lensAt(lens, 100 + d, 100);
+    assert.equal(y, 100);
+    assert.ok(x > last && x <= 150, `monotone and inside the lens at ${d}`);
+    assert.ok(f >= 1 && f <= 3);
+    last = x;
+    const [bx, by] = lensInverse(lens, x, y);
+    assert.ok(Math.abs(bx - (100 + d)) < 1e-9 && Math.abs(by - 100) < 1e-9, `inverse at ${d}`);
+  }
+  const [dx, dy] = lensAt(lens, 110, 120);
+  const back = lensInverse(lens, dx, dy);
+  assert.ok(Math.abs(back[0] - 110) < 1e-9 && Math.abs(back[1] - 120) < 1e-9, 'inverse off the axis');
+  for (const none of [null, {...lens, radius: 0}, {...lens, magnification: 1}]) {
+    assert.deepEqual(lensAt(none, 120, 90), [120, 90, 1]);
+    assert.deepEqual(lensInverse(none, 120, 90), [120, 90]);
+  }
+});
+
+test('under the lens, labels move with what they name and texts too small before appear', () => {
+  const m = overviewModel(overview);
+  const expanded = new Map([[0, {scene}]]);
+  const near = {centreX: -20, centreY: 0, scale: 40};
+  const plain = labelsOf(m, expanded, near, 800, 800);
+  assert.deepEqual(labelsOf(m, expanded, near, 800, 800, {lens: {x: -5000, y: -5000, radius: 100, magnification: 4}}), plain,
+    'a lens elsewhere changes nothing');
+  // Farther out the texts of the structured cluster are too small; a lens over the cluster shows them.
+  const names = ls => ls.filter(l => l.kind !== 'cluster').map(l => l.text);
+  // The largest scale at which they are gone.
+  const scale = [20, 15, 10, 8, 6, 5, 4, 3].find(k => !names(labelsOf(m, expanded, {centreX: -20, centreY: 0, scale: k}, 800, 800)).length);
+  const far = {centreX: -20, centreY: 0, scale};
+  const [cx, cy] = [400 + (overview.x[0] - far.centreX) * far.scale, 400 + (overview.y[0] - far.centreY) * far.scale];
+  const lensed = labelsOf(m, expanded, far, 800, 800, {lens: {x: cx, y: cy, radius: 300, magnification: 6}});
+  assert.ok(names(lensed).includes('a'), JSON.stringify(lensed));
+});

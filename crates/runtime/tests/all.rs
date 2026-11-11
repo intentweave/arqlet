@@ -76,3 +76,5 @@ mod shape_geometry;
 mod single_pass;
 #[path = "sparse_stress.rs"]
 mod sparse_stress;
+#[path = "structured_communities.rs"]
+mod structured_communities;

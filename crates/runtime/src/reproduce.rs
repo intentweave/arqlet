@@ -139,8 +139,13 @@ fn parse(value: &Value) -> Result<ReferenceDocument, String> {
 /// The engine's layout of the reference's input, with or without its pins.
 fn laid_out(document: &ReferenceDocument, keep_pins: bool) -> Result<Snapshot, String> {
     let input = &document.input;
-    let collapsed: BTreeSet<String> = input.collapsed_ids.iter().cloned().collect();
-    let graph = arqlet_view::project(&input.graph, &collapsed)?;
+    let graph = crate::project_view(
+        &input.graph,
+        &input.collapsed_ids,
+        &input.options,
+        crate::abstracts(&input.options),
+    )?
+    .projected;
     let mut options = input.options.clone();
     if !keep_pins {
         options.pins.clear();
