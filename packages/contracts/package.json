@@ -1,6 +1,6 @@
 {
   "name": "@arqlet/contracts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "TypeScript types of Arqlet's engine contracts (Snapshot, Scene, ConfigSet, LayoutOptions, ...), generated from the Rust types. Types only; provisional.",
   "keywords": [
     "graph",

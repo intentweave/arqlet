@@ -14,7 +14,7 @@ PACKAGES_PREFIX = "/packages/"
 PACKAGES_ROOT = (ROOT.parent.parent / "packages").resolve()
 SLOTS = threading.BoundedSemaphore(2)
 # Every operation handled by the Rust dispatcher; the backend adds no graph semantics.
-OPERATIONS = {"import", "add", "toggle", "direction", "refine", "structuredRefine", "configure", "optionDefaults", "measure", "shape", "scene", "move", "strategy", "routing", "metrics", "routeConflicts", "componentRefine", "containerRefine", "elkLayout", "refineProgressive", "intent", "restore", "port", "settle", "referenceCreate", "referenceRefresh", "referenceReroute", "referenceValidate", "referenceCanonical", "referenceSvg", "referenceFromSvg", "referenceReproduce", "referenceRepair"}
+OPERATIONS = {"import", "add", "toggle", "direction", "refine", "structuredRefine", "configure", "optionDefaults", "measure", "shape", "scene", "move", "strategy", "routing", "metrics", "routeConflicts", "componentRefine", "containerRefine", "elkLayout", "overview", "refineProgressive", "intent", "restore", "port", "settle", "referenceCreate", "referenceRefresh", "referenceReroute", "referenceValidate", "referenceCanonical", "referenceSvg", "referenceFromSvg", "referenceReproduce", "referenceRepair"}
 MAX_BODY = 64_000_000
 
 class Handler(SimpleHTTPRequestHandler):

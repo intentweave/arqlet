@@ -807,8 +807,9 @@ fn segment_hits_box(p: (f64, f64), q: (f64, f64), c: (f64, f64), hw: f64, hh: f6
 const COLLIDE_STRENGTH: f64 = 0.7;
 const VELOCITY_DECAY: f64 = 0.4;
 
-/// A Barnes–Hut quadtree over points: every cell holds its point count and centre of mass.
-struct QuadTree {
+/// A Barnes–Hut quadtree over points: every cell holds its mass (the point count, or the sum of the points' masses) and its
+/// centre of mass.
+pub(crate) struct QuadTree {
     cells: Vec<QuadCell>,
 }
 
@@ -827,6 +828,16 @@ struct QuadCell {
 
 impl QuadTree {
     fn new(points: &[(f64, f64)]) -> Self {
+        Self::build(points, None)
+    }
+
+    /// A quadtree whose points have the masses `mass` (the overview weights a cluster by its size). With every mass 1 it is
+    /// the tree of `new`, in the same arithmetic.
+    pub(crate) fn new_weighted(points: &[(f64, f64)], mass: &[f64]) -> Self {
+        Self::build(points, Some(mass))
+    }
+
+    fn build(points: &[(f64, f64)], mass: Option<&[f64]>) -> Self {
         let (mut x0, mut y0, mut x1, mut y1) = (
             f64::INFINITY,
             f64::INFINITY,
@@ -844,13 +855,13 @@ impl QuadTree {
             cells: vec![QuadCell::new(x0, y0, side)],
         };
         for i in 0..points.len() {
-            tree.insert(i, points);
+            tree.insert(i, points, mass.map_or(1., |m| m[i]));
         }
         tree.aggregate(0, points);
         tree
     }
 
-    fn insert(&mut self, i: usize, points: &[(f64, f64)]) {
+    fn insert(&mut self, i: usize, points: &[(f64, f64)], mass: f64) {
         let mut cell = 0;
         let mut depth = 0;
         loop {
@@ -858,12 +869,12 @@ impl QuadTree {
                 match self.cells[cell].point {
                     None => {
                         self.cells[cell].point = Some(i);
-                        self.cells[cell].count = 1.;
+                        self.cells[cell].count = mass;
                         return;
                     }
                     // Coincident points (or too deep to tell apart) share the leaf, counted in its mass.
                     Some(_) if depth > 48 => {
-                        self.cells[cell].count += 1.;
+                        self.cells[cell].count += mass;
                         return;
                     }
                     Some(other) => {
@@ -937,7 +948,7 @@ impl QuadTree {
 
     /// The repulsion on point `i`: `strength · count / l²` along the direction to the cell (a negative strength repels). A
     /// cell counts as one body while its side is less than 0.9 of its distance (d3's θ) and it does not hold the point.
-    fn force(&self, points: &[(f64, f64)], i: usize, strength: f64) -> (f64, f64) {
+    pub(crate) fn force(&self, points: &[(f64, f64)], i: usize, strength: f64) -> (f64, f64) {
         let mut stack = vec![0usize];
         let (mut fx, mut fy) = (0., 0.);
         let p = points[i];
@@ -2447,6 +2458,33 @@ mod scalable_tests {
         assert!(check_organic_areas(&make(SCALABLE_MAX_NODES), false, true).is_ok());
         assert!(check_organic_areas(&make(SCALABLE_MAX_NODES), true, false).is_err());
         assert!(check_organic_areas(&make(SCALABLE_MAX_NODES + 1), false, true).is_err());
+    }
+
+    #[test]
+    fn a_weighted_quadtree_with_unit_masses_is_the_unweighted_tree() {
+        // The overview (ADR 0018) weights the tree; with every mass 1 the forces must be the same bits as before.
+        let points: Vec<(f64, f64)> = (0..200)
+            .map(|i| {
+                let a = i as f64 * 2.399963;
+                (
+                    (i as f64).sqrt() * a.cos() * 9.,
+                    (i as f64).sqrt() * a.sin() * 9.,
+                )
+            })
+            .chain([(3., 3.), (3., 3.)])
+            .collect();
+        let plain = QuadTree::new(&points);
+        let weighted = QuadTree::new_weighted(&points, &vec![1.; points.len()]);
+        for i in 0..points.len() {
+            let (a, b) = (
+                plain.force(&points, i, -0.7),
+                weighted.force(&points, i, -0.7),
+            );
+            assert_eq!(
+                (a.0.to_bits(), a.1.to_bits()),
+                (b.0.to_bits(), b.1.to_bits())
+            );
+        }
     }
 
     #[test]

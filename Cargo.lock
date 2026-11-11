@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "arqlet"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-elk",
  "arqlet-layout",
@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-contracts"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-model",
  "arqlet-reference",
@@ -31,7 +31,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-elk"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-model",
  "serde_json",
@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-layout"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-model",
  "arqlet-routing",
@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-model"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -59,11 +59,11 @@ dependencies = [
 
 [[package]]
 name = "arqlet-node"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "arqlet-reference"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-model",
  "arqlet-routing",
@@ -76,14 +76,14 @@ dependencies = [
 
 [[package]]
 name = "arqlet-routing"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-model",
 ]
 
 [[package]]
 name = "arqlet-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-elk",
  "arqlet-layout",
@@ -97,7 +97,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-scene"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-model",
  "serde",
@@ -107,18 +107,18 @@ dependencies = [
 
 [[package]]
 name = "arqlet-topology"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "arqlet-view"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-model",
 ]
 
 [[package]]
 name = "arqlet-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arqlet-runtime",
 ]

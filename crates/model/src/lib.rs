@@ -2335,6 +2335,55 @@ pub struct ConfigSet {
     /// Display preference. Absent means the config set leaves the current display unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub appearance: Option<AppearanceConfig>,
+    /// Provisional (ADR 0018): how the cluster overview shows the data's clusters. Absent: no rules.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overview: Option<OverviewConfig>,
+}
+
+/// Provisional (ADR 0018, addendum): how a container of the cluster overview is shown.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum Representation {
+    /// One node; its edges aggregated.
+    Collapsed,
+    /// Its children as discs, by force layout.
+    Organic,
+    /// Its children as boxes, by the box pipeline (layered, tree, radial).
+    Structured,
+}
+
+/// Provisional (ADR 0018, addendum): the rules of the data for the cluster overview, the second step of the order
+/// user, rules, zoom.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewConfig {
+    /// The representation by node kind.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "ts",
+        ts(optional, as = "Option<BTreeMap<String, Representation>>")
+    )]
+    pub rules: BTreeMap<String, Representation>,
+    /// Whether the zoom decides what neither the user nor a rule decided. Absent: yes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub auto: Option<bool>,
+}
+
+/// Provisional (ADR 0018, addendum; ADR 0015): the user's decisions in the cluster overview as one value, by node id.
+/// The first step of the order user, rules, zoom; it always holds.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewIntent {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "ts",
+        ts(optional, as = "Option<BTreeMap<String, Representation>>")
+    )]
+    pub decisions: BTreeMap<String, Representation>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2406,6 +2455,7 @@ impl ConfigSet {
                 engine: options.routing_engine,
             },
             appearance: Some(options.appearance.clone()),
+            overview: None,
         }
     }
     pub fn apply(&self, options: &mut LayoutOptions) -> Result<(), String> {

@@ -1,7 +1,7 @@
 {
   "name": "@arqlet/viewer",
-  "version": "0.1.0",
-  "description": "Rendering helpers for Arqlet scenes: an SVG renderer, pan and zoom, route details and a React Flow mapping. No layout of its own. Provisional.",
+  "version": "0.2.0",
+  "description": "Rendering helpers for Arqlet scenes: an SVG renderer, pan and zoom, route details, a React Flow mapping and a WebGL cluster overview. No layout of its own. Provisional.",
   "keywords": [
     "graph",
     "layout",
@@ -44,6 +44,14 @@
     "./routes.js": {
       "types": "./routes.d.ts",
       "default": "./routes.js"
+    },
+    "./overview.js": {
+      "types": "./overview.d.ts",
+      "default": "./overview.js"
+    },
+    "./overview-gl.js": {
+      "types": "./overview-gl.d.ts",
+      "default": "./overview-gl.js"
     }
   },
   "files": [
@@ -57,6 +65,10 @@
     "scene.d.ts",
     "react-flow.d.ts",
     "routes.d.ts",
+    "overview.js",
+    "overview.d.ts",
+    "overview-gl.js",
+    "overview-gl.d.ts",
     "README.md",
     "LICENSE-APACHE",
     "LICENSE-MIT"

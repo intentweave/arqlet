@@ -6,6 +6,7 @@ pub mod coordinator;
 pub mod execution;
 pub mod hierarchy;
 pub mod history;
+pub mod overview;
 pub mod port_edit;
 pub mod session;
 pub mod settle;
@@ -3149,6 +3150,13 @@ pub fn dispatch(input: &str) -> String {
         }
         if v["op"].as_str() == Some("elkLayout") {
             return elk_response(&v);
+        }
+        if v["op"].as_str() == Some("overview") {
+            let threads = v["threads"]
+                .as_u64()
+                .unwrap_or(1)
+                .clamp(1, MAX_THREADS as u64) as usize;
+            return overview::overview_response(&v, threads).to_string();
         }
         if v["op"].as_str() == Some("containerRefine") {
             return container_response(&v);

@@ -28,6 +28,25 @@ example. `renderSvg(svgElement, scene)` draws a scene; `toReactFlow(scene)` maps
 React Flow nodes and edges. Types for snapshots and scenes come from
 `@arqlet/contracts`.
 
+### Cluster overview
+
+For a whole graph (tens of thousands of nodes), the `overview` operation lays it out as nested discs, and the WebGL
+renderer draws it; a cluster can then be shown structured, as its layered layout in place:
+
+```js
+import {loadEngine, overviewModel, resolvedEdgeIds, createOverviewRenderer, bindOverviewNavigation, viewOf} from 'arqlet';
+
+const run = await loadEngine();
+const {overview} = run({op: 'overview', graph});                // nodes with parentId form the clusters
+const model = overviewModel(overview, resolvedEdgeIds(graph));
+const renderer = createOverviewRenderer(canvas, model, {labels: labelCanvas});
+renderer.view = viewOf(model, -1, canvas.clientWidth, canvas.clientHeight);
+renderer.resize();
+bindOverviewNavigation(canvas, renderer, {onClick: i => console.log(overview.ids[i])});
+```
+
+See `apps/playground/overview.js` in the repository for collapsing, structuring in place and animated changes.
+
 Arqlet reads graphs in the JSON form [ELK](https://eclipse.dev/elk/) uses. It is not a
 1:1 ELK, contains no ELK code and is not affiliated with the Eclipse Foundation.
 

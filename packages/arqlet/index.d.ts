@@ -7,4 +7,6 @@ export * from '@arqlet/viewer/scene.js';
 export * from '@arqlet/viewer/react-flow.js';
 export * from '@arqlet/viewer/navigation.js';
 export * from '@arqlet/viewer/routes.js';
+export * from '@arqlet/viewer/overview.js';
+export * from '@arqlet/viewer/overview-gl.js';
 export type * from '@arqlet/contracts';

@@ -1,0 +1,64 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Arqlet · cluster overview</title>
+<script type="importmap">{"imports":{"@arqlet/viewer/":"/packages/viewer/","@arqlet/engine-client/":"/packages/engine-client/"}}</script>
+<style>
+:root{--bg:#0c1018;--panel:#121a26;--line:#2c3a4e;--text:#dfe7ef;--muted:#8fa0b4;--accent:#8ee0bb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui;display:grid;grid-template-rows:auto 1fr;height:100vh}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+header h1{font-size:15px;margin:0 8px 0 0}a{color:var(--accent)}
+select,button,input{color:inherit;background:var(--panel);border:1px solid var(--line);padding:5px 7px;border-radius:4px;font:inherit}
+button:disabled{opacity:.45}button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+#status{color:var(--muted)}
+main{position:relative;display:grid;grid-template-columns:1fr 320px;min-height:0}
+body.hide-panel main{grid-template-columns:1fr 0}body.hide-panel aside{display:none}
+#stage{position:relative;min-width:0}canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#canvas{touch-action:none;cursor:grab}#labels{pointer-events:none}
+#tip{position:absolute;pointer-events:none;background:#000c;border:1px solid var(--line);padding:4px 6px;border-radius:4px;font-size:12px;display:none;max-width:420px;overflow-wrap:anywhere}
+#crumbs{position:absolute;left:8px;top:8px;display:flex;gap:4px;flex-wrap:wrap}#crumbs button{padding:2px 6px;font-size:12px}
+aside{border-left:1px solid var(--line);overflow:auto;padding:4px 12px 16px;background:var(--bg)}
+aside h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}.row label{flex:1 1 140px}
+.grid{display:grid;grid-template-columns:1fr 88px;gap:4px 8px;align-items:center}.grid input{width:100%}
+.hint{color:var(--muted);font-size:12px;margin:4px 0}#cluster-name{font-weight:600;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse}td{padding:3px 0}td select{width:100%}
+@media(max-width:800px){main{grid-template-columns:1fr}aside{position:absolute;inset:auto 0 0 0;height:48%;border-left:0;border-top:1px solid var(--line)}}
+</style>
+<header><a href="./">← Demo</a><h1>Cluster overview</h1>
+<select id="source" aria-label="Graph"></select><input id="file" type="file" accept=".json,application/json" aria-label="Graph file">
+<select id="mode" aria-label="Where the engine runs"><option value="browser">Browser (WASM worker)</option><option value="backend">Backend</option></select>
+<button id="run">Lay out</button><button id="undo" title="Undo (Ctrl+Z)">Undo</button><button id="redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
+<button id="toggle-panel" aria-pressed="true">Panel</button><span id="status" role="status">Loading …</span></header>
+<main><div id="stage"><canvas id="canvas"></canvas><canvas id="labels"></canvas><div id="crumbs"></div><div id="tip"></div></div>
+<aside id="panel">
+<h2>Cluster</h2>
+<div id="cluster-name">Click a cluster to select it.</div>
+<div class="hint" id="cluster-info">Double-click zooms into it. Shift-click collapses or opens it.</div>
+<div class="row" role="group" aria-label="Representation">
+<button data-rep="collapsed" title="One disc; its edges bundled">Collapse</button>
+<button data-rep="organic" title="Its children as discs">Open</button>
+<button data-rep="structured" title="Its layered layout in place; it grows and its neighbours make room">Structured</button>
+<button data-rep="" title="Rules of the data, then the zoom decide">Automatic</button></div>
+<div class="row"><label for="direction">Flow of a structured cluster</label><select id="direction"><option value="">faces its neighbours</option><option value="lr">left → right</option><option value="rl">right → left</option><option value="tb">top → bottom</option><option value="bt">bottom → top</option></select></div>
+<div class="row"><button id="zoom-cluster">Zoom to it</button><button id="reset">Reset all choices</button></div>
+<h2>Rules by kind</h2>
+<div class="hint">From the data's config set; your choice for a cluster comes first, the zoom last.</div>
+<table id="rules"></table>
+<h2>Zoom</h2>
+<div class="row"><label><input id="auto" type="checkbox" checked> Collapse and structure by zoom</label></div>
+<div class="grid">
+<label for="collapse-px">Collapse below (px radius)</label><input id="collapse-px" type="number" min="0" step="1" value="14">
+<label for="structure-share">Structure from (% of view)</label><input id="structure-share" type="number" min="5" max="100" step="5" value="35">
+<label for="limit">Structured at most (nodes)</label><input id="limit" type="number" min="10" max="2000" step="10" value="300">
+<label for="scene-unit">Size of a structured layout</label><input id="scene-unit" type="number" min="0.05" max="2" step="0.05" value="0.2">
+</div>
+<h2>Layout</h2>
+<div class="grid">
+<label for="node-radius">Leaf radius</label><input id="node-radius" type="number" min="0.5" step="0.5" value="4">
+<label for="gap">Gap</label><input id="gap" type="number" min="0" step="0.5" value="2">
+<label for="padding">Padding</label><input id="padding" type="number" min="0" step="1" value="6">
+<label for="charge">Repulsion</label><input id="charge" type="number" min="0" step="0.01" value="0.05">
+<label for="gravity">Gravity</label><input id="gravity" type="number" min="0" step="0.05" value="0.1">
+<label for="communities">Communities above (children, 0 off)</label><input id="communities" type="number" min="0" step="10" value="120">
+</div>
+<div class="row"><button id="relayout">Lay out again</button><button id="defaults">Defaults</button></div>
+</aside></main>
+<script type="module" src="./overview.js"></script></html>

@@ -46,6 +46,8 @@ mod objectives;
 mod option_defaults;
 #[path = "overlaps.rs"]
 mod overlaps;
+#[path = "overview.rs"]
+mod overview;
 #[path = "parallel_straight.rs"]
 mod parallel_straight;
 #[path = "petri_shapes.rs"]

@@ -18,6 +18,7 @@ mod styles;
 use arqlet_model::*;
 mod directed;
 mod organic;
+pub mod overview;
 mod placement_geometry;
 mod placement_order;
 mod placement_region;

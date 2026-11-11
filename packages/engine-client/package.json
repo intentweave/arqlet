@@ -1,6 +1,6 @@
 {
   "name": "@arqlet/engine-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The Arqlet graph-layout engine as WebAssembly, with a loader, a worker protocol, an ELK-style layout call and preset sequencing. Provisional.",
   "keywords": [
     "graph",

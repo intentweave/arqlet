@@ -149,14 +149,16 @@ async function applyLayoutSetting(field,value){
  if(!snapshot||pending)return;
  const nodeId=viewSelected||!selected?null:selected;
  layoutError=null;
- const result=await edit({op:field,snapshot,nodeId,[field]:value},{busy:`Applying layout ${field} …`,fit:true,remember:`Layout ${field}`});
+ // A setting of one container keeps that container where it is on screen; one of the whole view fits the view.
+ const result=await edit({op:field,snapshot,nodeId,[field]:value},{busy:`Applying layout ${field} …`,...(nodeId?{anchor:nodeId}:{fit:true}),remember:`Layout ${field}`});
  if(!result.ok){layoutError={target:nodeId,field,reason:result.error};treeSignature=null;draw();}
 }
 // Expanding or collapsing a container is an engine operation: the view changes when the accepted result arrives.
 function toggleContainer(id){
  if(curation){status('Curation is active: end it to collapse or expand containers.');return;}
  if(!id||!snapshot||pending)return;
- edit({op:'toggle',snapshot,nodeId:id},{busy:'Recomputing view …',fit:true,remember:'Collapse or expand'});
+ // The opened or closed container stays where it is on screen; the rest of the view moves around it.
+ edit({op:'toggle',snapshot,nodeId:id},{busy:'Recomputing view …',anchor:id,remember:'Collapse or expand'});
 }
 // Sets one container's size (ADR 0010): `entry` is the container's new `containerSizing` entry, or null to follow content.
 // The user's decisions are values of the engine (operations `intent` and `restore`), kept as an undo stack (history.js). One
@@ -269,13 +271,52 @@ function renderConflicts(scene){
 }
 // Single edit path: one edit in flight, results accepted only if the base revision still matches.
 // Returns {ok, snapshot?, error?} so a caller can chain operations on the snapshot it got back.
-async function edit(request,{busy,fit=false,chained=false,remember=null}={}){
+// Where a node's box is drawn, relative to the drawing's origin, in pixels at the current scale; null when it is not drawn.
+function drawnPosition(id){
+ const scene=snapshot&&sceneOf(sceneRun,snapshot),box=scene?.nodes.find(n=>n.id===id)?.bounds;
+ return box?{x:(box.x-scene.bounds.x)*scale,y:(box.y-scene.bounds.y)*scale}:null;
+}
+// FLIP animation of an edit (first, last, invert, play): before the change, where every node and container is on screen;
+// after it, each starts at its old place and moves to its new one, and what is new (routes, labels, nodes) fades in. The
+// engine's result is final; this only shows the way to it. Off when the user asks for reduced motion.
+const ANIMATED=['data-node-id','data-container-id','data-header-id','data-toggle-id','data-pin-id','data-pinned-id','data-resize-id'];
+function idOf(el){for(const a of ANIMATED){const v=el.getAttribute(a);if(v!==null)return v;}return null;}
+function placesOnScreen(){
+ // Only a real DOM has places on screen; an animation never stands in the way of the change itself.
+ if(typeof $('graph').querySelectorAll!=='function')return null;
+ const out=new Map();
+ for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){const id=idOf(el);if(id!==null&&!out.has(id)){const r=el.getBoundingClientRect();out.set(id,[r.left,r.top]);}}
+ return out;
+}
+function animateFrom(before){
+ try{animate(before);}catch{/* the change is drawn; only its animation is lost */}
+}
+function animate(before){
+ if(!before||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ const after=placesOnScreen(),moved=[];
+ for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){
+  const id=idOf(el),from=before.get(id),to=after.get(id);
+  el.style.transition='none';
+  // CSS lengths in the drawing are its user units: a screen pixel is 1/scale of one.
+  if(from&&to)el.style.transform=`translate(${(from[0]-to[0])/scale}px,${(from[1]-to[1])/scale}px)`;else el.style.opacity='0';
+  moved.push(el);
+ }
+ for(const el of $('graph').querySelectorAll('[data-route-id],[data-label-id]')){el.style.transition='none';el.style.opacity='0';moved.push(el);}
+ $('graph').getBoundingClientRect();
+ requestAnimationFrame(()=>{for(const el of moved){el.style.transition='transform 380ms ease, opacity 380ms ease';el.style.transform='';el.style.opacity='';}});
+ setTimeout(()=>{for(const el of moved)el.style.transition='';},450);
+}
+// `anchor` (a node id): after the change the view scrolls so that this node's box is where it was on screen, instead of
+// fitting the whole drawing again.
+async function edit(request,{busy,fit=false,chained=false,remember=null,anchor=null}={}){
  if(curation)return {ok:false,error:'Curation is active: the view is not recomputed.'};
  if(drag?.gesture?.active)return {ok:false,error:'A move is running: finish it or cancel it first.'};
  if(!snapshot||pending)return {ok:false,error:'An operation is already running.'};
  cancelRefinement();
  const base={epoch,revision:snapshot.revision,layout:snapshot.layoutVersion??0};
  const baseSnapshot=snapshot;
+ let places=null;try{places=placesOnScreen();}catch{}
+ const before=anchor?drawnPosition(anchor):null;
  pending=base;$('add').disabled=true;draw();status(busy);
  let data;
  try{data=await execute('edit',{...request,expectedRevision:base.revision,expectedLayoutVersion:base.layout});}
@@ -284,7 +325,12 @@ async function edit(request,{busy,fit=false,chained=false,remember=null}={}){
  pending=null;$('add').disabled=!selected;
  if(!data.ok){status(data.error);draw();return {ok:false,error:data.error};}
  if(snapshot.revision!==base.revision||(snapshot.layoutVersion??0)!==base.layout||data.snapshot.baseRevision!==base.revision){status('Stale result discarded.');return {ok:false,error:'Stale result discarded.'};}
- snapshot=data.snapshot;status(`Computed locally · ${snapshot.recomputedContainers.length} container regions updated`);draw(fit);if(!chained)scheduleRefinement();
+ snapshot=data.snapshot;status(`Computed locally · ${snapshot.recomputedContainers.length} container regions updated`);
+ const after=before?drawnPosition(anchor):null;
+ if(after){autoFit=false;draw(false);const c=$('canvas');c.scrollLeft+=after.x-before.x;c.scrollTop+=after.y-before.y;}
+ else draw(fit);
+ animateFrom(places);
+ if(!chained)scheduleRefinement();
  // A new node changes the graph itself: what was remembered no longer describes it. A decision is remembered as one entry.
  if(request.op==='add')history.clear();
  else if(remember)recordHistory(typeof remember==='string'?remember:remember.label,baseSnapshot,snapshot,{merge:!!remember.merge});

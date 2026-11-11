@@ -19,6 +19,14 @@ mkdir -p apps/playground/generated/presets
 python3 -c "import json; order=['vorschau','raster','lesbar','qualitaet','auto']; docs={d['id']:d for d in (json.load(open(f'presets/{n}.json')) for n in order)}; json.dump([docs[n] for n in order], open('apps/playground/generated/presets/index.json','w'), indent=1)"
 # Web-app examples: deterministic datasets from benchmarks/generate.py. Not written to the manifest.
 python3 benchmarks/generate.py --demo-out apps/playground/generated/examples --no-manifest > /dev/null
+# Cluster overview (overview.html): deterministic hierarchical graphs of two sizes, seed 1.
+mkdir -p apps/playground/generated/overview
+python3 benchmarks/overview/generate.py --nodes 10000 --seed 1 --out apps/playground/generated/overview/code-10000.json
+python3 benchmarks/overview/generate.py --nodes 50000 --seed 1 --out apps/playground/generated/overview/code-50000.json
+python3 benchmarks/overview/generate.py --nodes 6000 --seed 1 --flat --out apps/playground/generated/overview/calls-flat.json
+# The data's config set: rules for the overview by node kind (ADR 0018, addendum).
+cp benchmarks/overview/code-index.configset.json apps/playground/generated/overview/code-index.configset.json
+printf '[{"title":"Code index, synthetic","file":"code-10000.json","nodes":10000,"configSet":"code-index.configset.json"},{"title":"Code index, synthetic","file":"code-50000.json","nodes":50000,"configSet":"code-index.configset.json"},{"title":"Flat call graph, communities","file":"calls-flat.json","nodes":5612}]\n' > apps/playground/generated/overview/index.json
 # Curation editor: TypeScript compiled to generated/editor (git-ignored), typechecked and tested below.
 pnpm --filter @arqlet/playground run build
 node apps/playground/smoke.mjs

@@ -5,7 +5,8 @@ Rendering helpers for Arqlet scenes. The engine computes all geometry; these mod
 - `svg.js`: `renderSvg(svgElement, scene, options)`;
 - `react-flow.js`: `toReactFlow(scene)`, nodes and edges for React Flow (no React dependency);
 - `navigation.js`: wheel zoom at the pointer and drag panning;
-- `scene.js`, `routes.js`: schema check, path data and route details.
+- `scene.js`, `routes.js`: schema check, path data and route details;
+- `overview.js`, `overview-gl.js`: the cluster overview of a whole graph (engine operation `overview`), drawn with WebGL, with picking and the excerpt for a drill-down.
 
 > **Status: prototype.** The API, the JSON protocol and the snapshot format are
 > provisional and may change in any release.

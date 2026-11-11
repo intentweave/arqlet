@@ -1,0 +1,33 @@
+{
+ "schemaVersion": 1,
+ "id": "code-index@1",
+ "layout": {
+  "algorithm": "hierarchical",
+  "candidates": [
+   1,
+   2,
+   3,
+   4
+  ],
+  "hybridBy": "compact",
+  "minPortSpacing": 0,
+  "placementGrid": 8,
+  "freePlacement": false,
+  "placementSearch": 0
+ },
+ "routing": {
+  "style": "orthogonal",
+  "bundling": "none",
+  "routingCandidate": true,
+  "clearance": 0,
+  "trackSpacing": 6,
+  "corridors": false,
+  "trackSeparation": false,
+  "engine": "legacy"
+ },
+ "overview": {
+  "rules": {
+   "file": "structured"
+  }
+ }
+}

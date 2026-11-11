@@ -12,8 +12,8 @@ changes. The same engine runs natively and in the browser via WebAssembly.
 
 > **Status: prototype (engine `0.2.0-prototype`).** Arqlet works end to end and is
 > tested, but every API, the JSON protocol and the snapshot format are
-> provisional and may change without notice. Nothing is published on crates.io or
-> npm yet; the packages are prepared ([releasing](docs/releasing.md)). Large graphs (100K+ nodes) are a goal, not a measured result.
+> provisional and may change in any release. Version 0.1.0 is on
+> [crates.io](https://crates.io/crates/arqlet) and [npm](https://www.npmjs.com/package/arqlet). Large graphs (100K+ nodes) are a goal, not a measured result.
 
 Arqlet was developed under the working name Layerweave. Measurement records in
 `benchmarks/results` from before 2026-11-09 and some dataset names (such as
@@ -46,9 +46,12 @@ Arqlet was developed under the working name Layerweave. Measurement records in
     reported as diagnostics.
 - **Output:** a renderer-independent scene, an SVG viewer and a React Flow
   adapter.
+- **Cluster overview (prototype):** the whole graph as nested discs, laid out per
+  container and drawn with WebGL; a click switches a small cluster in place to a
+  layered layout, and its neighbours make room ([ADR 0018](docs/adr/0018-cluster-overview.md), `apps/playground/overview.html`).
 
 Not yet: full crossing minimization, guaranteed obstacle-free routes in every
-case, a native Node.js adapter, and stable published packages. See
+case, a native Node.js adapter, and a stable API. See
 [docs/specification.md](docs/specification.md) section 8 for the detailed status.
 
 ## Quick start: browser demo
@@ -68,13 +71,12 @@ python3 apps/playground/server.py      # http://127.0.0.1:8765
 ## Using the engine
 
 Every operation is a JSON request to one dispatcher, the same in Rust, in WASM and
-behind the loopback backend. The packages are prepared for crates.io (`arqlet`) and
-npm (`arqlet`, `@arqlet/*`) but not published yet
-([releasing](docs/releasing.md)); until then, depend on the Git repository:
+behind the loopback backend. In Rust, add the `arqlet` crate (newer, unreleased work:
+depend on the Git repository instead):
 
 ```toml
 [dependencies]
-arqlet = { git = "https://github.com/intentweave/arqlet" }
+arqlet = "0.1"
 ```
 
 ```rust
@@ -94,7 +96,7 @@ The `layout-command` binary does the same on stdin:
 cargo run --release -p arqlet-runtime --bin layout-command < request.json
 ```
 
-In JavaScript, the `arqlet` package (`packages/arqlet`) is the entry point. It ships the
+In JavaScript, `npm install arqlet` (`packages/arqlet`) is the entry point. It ships the
 WASM engine, which runs in browsers and in Node:
 
 ```js
