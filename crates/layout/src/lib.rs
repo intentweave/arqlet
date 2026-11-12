@@ -455,7 +455,11 @@ fn compute_counted_inner(
         if repaired.route_conflicts.len() < snapshot.route_conflicts.len() {
             snapshot = repaired;
         }
-        if whole_reroute && !snapshot.route_conflicts.is_empty() {
+        // Not under single pass (constructed once, without later correction, ADR 0016): routing the whole drawing again
+        // with both engines found nothing better on the measured views (their output is the same without it) and took
+        // 42 s on a toggle with 481 routes that crossed container borders, for the same 6 conflicts
+        // (benchmarks/results/single-pass-without-engine-choice-20261112.md); the conflicts are reported.
+        if whole_reroute && !snapshot.route_conflicts.is_empty() && !snapshot.options.single_pass {
             if let Some(better) = engine_choice::improve(graph, previous, &snapshot, &finish)? {
                 return Ok((better, stages));
             }
@@ -552,6 +556,18 @@ fn compute_mode_plain(
 ) -> Result<Snapshot, Abort> {
     if !(options.single_pass_auto && options.single_pass) {
         return compute_requested(graph, previous, dirty, optimize, options, run);
+    }
+    // An empty graph has no plan for single pass to construct, and nothing to report: it is laid out by the other
+    // pipeline (an empty drawing) and keeps the requested options, so that the next edit tries single pass again.
+    if graph.nodes.is_empty() {
+        let other = LayoutOptions {
+            abstract_routing: false,
+            single_pass: false,
+            ..options.clone()
+        };
+        let mut snapshot = compute_requested(graph, previous, dirty, optimize, &other, run)?;
+        snapshot.options = options.clone();
+        return Ok(snapshot);
     }
     let reason = if let Some(reason) = single_pass_cannot_run(graph, options) {
         reason
@@ -10090,6 +10106,21 @@ mod structure_fixture_tests {
                 "level at x={x}: components interleave {row:?}"
             );
         }
+    }
+
+    /// An empty graph lays out without a diagnostic and keeps the requested options (report: the empty view of a host
+    /// looked like a warning).
+    #[test]
+    fn an_empty_graph_lays_out_without_a_diagnostic() {
+        let graph: Graph = serde_json::from_str(r#"{"nodes": [], "edges": []}"#).unwrap();
+        let snapshot = compute(&graph, None, &BTreeSet::new(), &LayoutOptions::default()).unwrap();
+        assert!(
+            snapshot.layout_diagnostics.is_empty(),
+            "{:?}",
+            snapshot.layout_diagnostics
+        );
+        assert!(snapshot.options.single_pass && snapshot.options.abstract_routing);
+        assert!(snapshot.boxes.is_empty());
     }
 
     /// A container with a chain a → b → c and `isolated` unconnected children, laid out with or without `isolatedGrid`.

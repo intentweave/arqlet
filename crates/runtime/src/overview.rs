@@ -216,6 +216,8 @@ fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
         "schemaVersion": 1,
         "representation": representation,
         "ids": h.ids,
+        // Each node's label (empty for the clusters the overview added), so that a viewer names nodes as the data does.
+        "labels": graph.nodes.iter().map(|n| n.label.as_str()).chain(std::iter::repeat_n("", h.ids.len() - h.real)).collect::<Vec<_>>(),
         "parent": parent,
         "x": o.x.iter().map(|&x| round(x)).collect::<Vec<_>>(),
         "y": o.y.iter().map(|&y| round(y)).collect::<Vec<_>>(),

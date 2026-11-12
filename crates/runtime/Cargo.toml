@@ -25,6 +25,7 @@ benchmark-timings = ["arqlet-layout/benchmark-timings"]
 [dependencies]
 arqlet-model = { workspace = true }
 arqlet-layout = { workspace = true }
+serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 arqlet-scene = { workspace = true }
 arqlet-view = { workspace = true }

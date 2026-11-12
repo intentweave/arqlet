@@ -718,3 +718,34 @@ fn a_path_revealed_in_part_keeps_the_view_small() {
     assert_eq!(visible, expected);
     assert_eq!(revealed["geometryIssues"], json!([]));
 }
+
+/// An abstracted view is laid out from its graph and view alone: opening a group and closing it again gives the
+/// drawing of the import, box for box and route for route, whatever was opened in between.
+#[test]
+fn opening_and_closing_a_group_returns_to_the_drawing_of_the_import() {
+    let snapshot = ok(call(json!({"op": "import", "graph": flat(), "limit": 100,
+        "options": {"groups": domain_groups()}})));
+    let open = ok(change(
+        &snapshot,
+        json!({"op": "toggle", "nodeId": "group:#:core"}),
+    ));
+    let deeper = ok(change(
+        &open,
+        json!({"op": "toggle", "nodeId": "group:#:core/a"}),
+    ));
+    let up = ok(change(
+        &deeper,
+        json!({"op": "toggle", "nodeId": "group:#:core/a"}),
+    ));
+    let closed = ok(change(
+        &up,
+        json!({"op": "toggle", "nodeId": "group:#:core"}),
+    ));
+    assert_eq!(closed["collapsedIds"], snapshot["collapsedIds"]);
+    assert_eq!(closed["boxes"], snapshot["boxes"]);
+    assert_eq!(closed["routes"], snapshot["routes"]);
+    assert_eq!(
+        up["boxes"], open["boxes"],
+        "the same view, the same drawing"
+    );
+}

@@ -5,11 +5,13 @@ pub mod budget;
 pub mod components;
 pub mod containers;
 pub mod coordinator;
+pub mod engine_session;
 pub mod execution;
 pub mod hierarchy;
 pub mod history;
 pub mod overview;
 pub mod port_edit;
+pub mod protocol;
 pub mod session;
 pub mod settle;
 pub mod trace;
@@ -577,7 +579,11 @@ fn relayout_collapsed(
     // Expanding within a node budget is local (global layering plan, step 2 of the first view): the drawing continues the
     // earlier one; only the container and the areas around it are placed again (they start from their earlier order), the
     // other containers keep their boxes and plans, and the routes whose ends moved together are carried along.
-    let mut result = if expanding && aggregates(&options) {
+    // Not for groups, communities or an initial collapse: there the local layout was slower and worse than laying out
+    // the view again (at 50 000 nodes, opening 22 groups: 9.6 s and 484 routes handed to the completing router, against
+    // 1.4 s and 19; it moved 220 of 291 boxes anyway), so their view is laid out from scratch and depends only on the
+    // graph and the view, not on the order of the toggles (benchmarks/results/toggle-layout-20261112.md).
+    let mut result = if expanding && options.visible_node_budget > 0 {
         let mut dirty: BTreeSet<String> = opened.iter().cloned().collect();
         for id in opened {
             let mut at = source
@@ -3465,7 +3471,17 @@ pub fn dispatch_streaming(input: &str, publish: &mut dyn FnMut(&str)) -> String 
 /// JSON transport shared by browser WASM, the native command and the backend.
 /// Every operation accepts an optional `threads` field (clamped to 1..=MAX_THREADS).
 /// The response is `{ok, snapshot}` or `{ok:false, error}`; it never panics on bad input.
+/// The engine's one entry point: a JSON request in, a JSON answer out (ADR 0019: through the typed [`protocol`]).
 pub fn dispatch(input: &str) -> String {
+    match protocol::Request::from_json(input) {
+        Ok(request) => protocol::handle(request).to_json(),
+        Err(error) => protocol::Response::Error(error).to_json(),
+    }
+}
+
+/// The dispatcher before the protocol was typed, kept for the test that compares both answer for answer.
+#[cfg(test)]
+pub(crate) fn dispatch_legacy(input: &str) -> String {
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(input) {
         if v["op"].as_str() == Some("optionDefaults") {
             // The engine defaults. The UI reads them instead of copying values; absent keys are defaults too.

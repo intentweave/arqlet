@@ -58,6 +58,37 @@ python3 benchmarks/overview/generate.py --nodes 6000 --seed 1 --flat --out apps/
 # The data's config set: rules for the overview by node kind (ADR 0018, addendum).
 cp benchmarks/overview/code-index.configset.json apps/playground/generated/overview/code-index.configset.json
 printf '[{"title":"Code index, synthetic","file":"code-10000.json","nodes":10000,"configSet":"code-index.configset.json"},{"title":"Code index, synthetic","file":"code-50000.json","nodes":50000,"configSet":"code-index.configset.json"},{"title":"Flat call graph, communities","file":"calls-flat.json","nodes":5612}]\n' > apps/playground/generated/overview/index.json
+# Local examples, never committed (apps/playground/local-examples/ is ignored by git): every <name>.json there is offered
+# on the main page (an Arqlet graph, or an ELK graph with `children`, laid out through the ELK adapter); a
+# <name>.meta.json beside it may give `title`, `description` and `overview: true` (also offered on the overview page).
+python3 - <<'PY'
+import json, shutil
+from pathlib import Path
+local = Path('apps/playground/local-examples')
+if local.is_dir():
+    examples = Path('apps/playground/generated/examples')
+    overview = Path('apps/playground/generated/overview')
+    index = json.loads((examples / 'index.json').read_text())
+    overview_index = json.loads((overview / 'index.json').read_text())
+    for path in sorted(local.glob('*.json')):
+        if path.name.endswith('.meta.json'):
+            continue
+        meta_path = path.with_name(path.stem + '.meta.json')
+        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+        graph = json.loads(path.read_text())
+        nodes = len(graph.get('nodes') or graph.get('children') or [])
+        name = 'local-' + path.stem
+        shutil.copyfile(path, examples / f'{name}.json')
+        index.append({'name': name, 'title': meta.get('title', path.stem) + ' (local)', 'nodes': nodes,
+                      'description': meta.get('description', 'A local example (not in the repository).'),
+                      'source': meta.get('source', str(path))})
+        if meta.get('overview') and 'nodes' in graph:
+            shutil.copyfile(path, overview / f'{name}.json')
+            overview_index.insert(0, {'title': meta.get('title', path.stem) + ' (local)', 'file': f'{name}.json', 'nodes': nodes})
+    (examples / 'index.json').write_text(json.dumps(index, indent=1, ensure_ascii=False))
+    (overview / 'index.json').write_text(json.dumps(overview_index))
+    print(f'Local examples: {len(list(local.glob("*.json")))} files from {local}')
+PY
 # Curation editor: TypeScript compiled to generated/editor (git-ignored), typechecked and tested below.
 pnpm --filter @arqlet/playground run build
 node apps/playground/smoke.mjs

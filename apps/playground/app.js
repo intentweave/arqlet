@@ -686,6 +686,14 @@ async function loadInitial(){
  const graph=await fetch(url,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(`${url} is missing. Please run the demo build first.`);return r.json();});
  // Entity-relationship notation (ADR 0011): an entity is a leaf node whose rows are its title and its attributes; the
  // relationships attach to those rows. The attributes are not graph nodes in the layout.
+ // A graph in ELK's JSON form (`children`): laid out through the ELK adapter, as `elkLayout` lays it out for a host;
+ // the snapshot behind it continues here like any other.
+ if(Array.isArray(graph.children)){
+  const data=await execute('import',{op:'elkLayout',graph,snapshot:true});
+  if(!data.ok)throw Error(data.error);
+  const notes=(data.diagnostics??[]).length?` · ELK adapter: ${data.diagnostics.join('; ')}`:'';
+  return {snapshot:data.snapshot,message:`ELK graph „${$('example').selectedOptions?.[0]?.textContent??example}“ laid out through the ELK adapter${notes}`};
+ }
  // An example may bring its own groups (node id → path of group names); they travel as an option, not in the graph.
  const {groups,...plain}=graph;
  const projected=erProjection(plain);

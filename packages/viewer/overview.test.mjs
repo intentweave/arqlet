@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, SHAPE_STRIDE, LINE_STRIDE} from './overview.js';
+import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, SHAPE_STRIDE, LINE_STRIDE} from './overview.js';
 
 // Two clusters: c (with leaves a, b) and d (with leaf e); edges a→b, b→a (a cycle) and a→e.
 const overview = {
@@ -305,3 +305,11 @@ test('under the lens, labels move with what they name and texts too small before
   const lensed = labelsOf(m, expanded, far, 800, 800, {lens: {x: cx, y: cy, radius: 300, magnification: 6}});
   assert.ok(names(lensed).includes('a'), JSON.stringify(lensed));
 });
+
+test('a node is named by its label, else by the last part of its id', () => {
+  const m = overviewModel({...overview, labels: overview.ids.map((id, i) => (i === 0 ? 'Cluster A' : ''))});
+  assert.equal(nameOf(m, 0), 'Cluster A');
+  assert.equal(nameOf(m, 1), overview.ids[1].split('/').at(-1));
+  assert.equal(nameOf(overviewModel(overview), 0), overview.ids[0].split('/').at(-1), 'without labels: the id');
+});
+

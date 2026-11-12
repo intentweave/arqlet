@@ -232,6 +232,8 @@ fn area_options(
             | "spacing.nodeNodeBetweenLayers"
             | "spacing.edgeEdge"
             | "spacing.edgeEdgeBetweenLayers"
+            | "spacing.edgeNode"
+            | "spacing.edgeNodeBetweenLayers"
             | "spacing.portPort" => {
                 let Some(v) = value
                     .parse::<f64>()
@@ -243,6 +245,13 @@ fn area_options(
                     ));
                     continue;
                 };
+                // The distance between an edge and a node it does not attach to: Arqlet's `routingClearance`, one value
+                // for both of ELK's; the larger one, so that both hold.
+                if key.starts_with("spacing.edgeNode") {
+                    let entry = out.spacing.entry("routingClearance").or_insert(v);
+                    *entry = entry.max(v);
+                    continue;
+                }
                 let name = match key.as_str() {
                     "spacing.nodeNode" => "nodeSpacing",
                     "spacing.nodeNodeBetweenLayers" => "layerSpacing",
@@ -623,6 +632,30 @@ pub fn translate(elk: &Value) -> Result<Translation, String> {
     // unconnected graphs (10 groups or islands of 50 nodes), turning it on by default did not make the drawings smaller.
     if root.separate == Some(true) {
         options["componentPacking"] = json!(true);
+    }
+    // Nodes without any edge in a grid instead of one long row (`isolatedGrid`), as ELK packs its components (its default
+    // for `separateConnectedComponents` is true, so only `false` turns this off), where they are at least half of the
+    // nodes: on an evaluation's graphs without edges the row (19 624 x 172 for 74 nodes, 60 032 x 172 for 256) became a
+    // block (2 520 x 1 972, 4 392 x 3 172); on one with 13 of 500 nodes unconnected the grid made the drawing 26 % larger
+    // and added crossings, so it is left out there (benchmarks/results/elk-isolated-grid-20261112.md).
+    let unconnected = {
+        let mut linked = std::collections::BTreeSet::new();
+        for e in graph["edges"].as_array().into_iter().flatten() {
+            for end in ["source", "target"] {
+                if let Some(id) = e[end].as_str() {
+                    linked.insert(id.to_string());
+                }
+            }
+        }
+        let leaves: Vec<&Value> = graph["nodes"].as_array().into_iter().flatten().collect();
+        let alone = leaves
+            .iter()
+            .filter(|n| n["id"].as_str().is_some_and(|id| !linked.contains(id)))
+            .count();
+        alone * 2 >= leaves.len() && alone >= 3
+    };
+    if root.separate != Some(false) && unconnected {
+        options["isolatedGrid"] = json!(true);
     }
     if !buses.is_empty() {
         graph["buses"] = Value::Array(buses);
@@ -1087,6 +1120,30 @@ mod tests {
         }
         let on = translate(&graph(json!({"elk.separateConnectedComponents": true}))).unwrap();
         assert_eq!(on.options["componentPacking"], json!(true));
+        // Mostly unconnected nodes go into a grid unless the graph turns the separation off.
+        let row = |options: Value| {
+            json!({"id": "root", "layoutOptions": options,
+            "children": (0..6).map(|i| json!({"id": format!("n{i}"), "width": 10, "height": 10})).collect::<Vec<_>>(),
+            "edges": [{"id": "e", "sources": ["n0"], "targets": ["n1"]}]})
+        };
+        assert_eq!(
+            translate(&row(json!({}))).unwrap().options["isolatedGrid"],
+            json!(true)
+        );
+        assert!(
+            translate(&row(json!({"elk.separateConnectedComponents": false})))
+                .unwrap()
+                .options
+                .get("isolatedGrid")
+                .is_none()
+        );
+        let connected = json!({"id": "root", "children": (0..6).map(|i| json!({"id": format!("n{i}"), "width": 10, "height": 10})).collect::<Vec<_>>(),
+            "edges": (0..5).map(|i| json!({"id": format!("e{i}"), "sources": [format!("n{i}")], "targets": [format!("n{}", i + 1)]})).collect::<Vec<_>>()});
+        assert!(translate(&connected)
+            .unwrap()
+            .options
+            .get("isolatedGrid")
+            .is_none());
         let bad = translate(&graph(json!({"elk.separateConnectedComponents": "maybe"}))).unwrap();
         assert!(bad
             .diagnostics

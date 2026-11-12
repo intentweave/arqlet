@@ -43,9 +43,14 @@ await session.collapse('group-1');      // expand, toggle, or apply({op: 'direct
 const scene = await session.scene();    // renderSvg(svg, scene) or toReactFlow(scene)
 ```
 
+For large graphs, import with groups that start collapsed (`options: {communities: 40}`, or `groups` your domain
+gives, or `initialCollapse: {depth: 1}`), and follow a path between two nodes with `session.trace(from, to)` and
+`session.reveal(nodes)`; see the repository README, section *Large graphs*.
+
 Changes run one after the other on the newest snapshot. A change that a new `import`
 (or `reset()`) overtook resolves to `{ok: false, stale: true}` and is not applied. In
-a browser, run the engine in a worker: `createSession(workerRun(createEngineWorker()))`.
+a browser, run the engine in a worker: `createSession(workerRun(createEngineWorker()))`. The snapshot stays in the
+engine: `session.snapshot` is the view's state, and `await session.exportSnapshot()` gives the whole snapshot.
 
 ### Cluster overview
 

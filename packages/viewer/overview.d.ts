@@ -2,6 +2,8 @@
 export interface OverviewResult {
   schemaVersion: 1;
   ids: string[];
+  /** Each node's label from the data (empty for the clusters the overview added); see `nameOf`. */
+  labels?: string[];
   /** The parent's index, or -1 for a node at the top level. */
   parent: number[];
   x: number[];
@@ -62,6 +64,8 @@ export const BORDER_PREFIX: 'border:';
 /** The id prefix of the clusters the overview adds for communities. */
 export const COMMUNITY_PREFIX: 'community:';
 /** A short name: the last part of a path-like id; `≈ <level>.<k>` for a community. */
+/** The name of node `i`: its label from the data (`overview.labels`), else `displayName` of its id. */
+export function nameOf(model: OverviewModel, i: number): string;
 export function displayName(id: string): string;
 /** RGB in 0..1 for the n-th top-level cluster. */
 export function clusterColour(rootOrdinal: number): [number, number, number];
@@ -194,7 +198,14 @@ export function structuredExcerpt(
   model: OverviewModel,
   id: string,
   options?: {direction?: FlowDirection | null},
-): {graph: InputGraph; leaving: number; inner: number; standIns: number};
+): {
+  graph: InputGraph;
+  /** The layout options to import the excerpt with (`isolatedGrid`: unconnected children in a grid, not one row). */
+  options: {isolatedGrid: boolean};
+  leaving: number;
+  inner: number;
+  standIns: number;
+};
 
 export type FlowDirection = 'lr' | 'rl' | 'tb' | 'bt';
 /** The flow for a structured cluster that faces its neighbours, or null when there is no clear side. */

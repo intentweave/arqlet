@@ -20,6 +20,32 @@
 //! assert!(response.contains(r#""ok":true"#));
 //! ```
 //!
+//! The same requests exist as Rust values ([`protocol::Request`], provisional, ADR 0019): a host in Rust builds them
+//! without JSON and gets a [`protocol::Response`].
+//!
+//! ```
+//! use arqlet::protocol::{handle, Request, Response};
+//! let graph = serde_json::from_str(r#"{"nodes": [
+//!   {"id": "g", "kind": "group", "label": "G", "parentId": null},
+//!   {"id": "a", "kind": "fn", "label": "A", "parentId": "g"},
+//!   {"id": "b", "kind": "fn", "label": "B", "parentId": "g"}],
+//!   "edges": [{"id": "ab", "kind": "calls", "source": "a", "target": "b"}]}"#).unwrap();
+//! let Response::Snapshot(snapshot) = handle(Request::Import { graph, limit: 100, options: None }) else { panic!() };
+//! assert_eq!(snapshot.graph.nodes.len(), 3);
+//! ```
+//!
+//! A [`Session`] (provisional, ADR 0019) keeps a view's snapshot inside the engine: requests carry only the change, and
+//! answers bring the new versions and the scene.
+//!
+//! ```
+//! let mut session = arqlet::Session::new();
+//! let graph = r#"{"nodes": [{"id": "g", "kind": "group", "label": "G", "parentId": null},
+//!   {"id": "a", "kind": "fn", "label": "A", "parentId": "g"}], "edges": []}"#;
+//! session.run(&format!(r#"{{"op": "import", "graph": {graph}, "limit": 10}}"#));
+//! let answer = session.run(r#"{"op": "toggle", "nodeId": "g"}"#);
+//! assert!(answer.contains(r#""collapsedIds":["g"]"#));
+//! ```
+//!
 //! The crates, in order of the pipeline:
 //!
 //! - [`model`]: canonical graph, identities, revisions and layout options;
@@ -38,6 +64,8 @@ pub use arqlet_model as model;
 pub use arqlet_reference as reference;
 pub use arqlet_routing as routing;
 pub use arqlet_runtime as runtime;
+pub use arqlet_runtime::engine_session::EngineSession as Session;
+pub use arqlet_runtime::protocol;
 pub use arqlet_scene as scene;
 pub use arqlet_topology as topology;
 pub use arqlet_view as view;

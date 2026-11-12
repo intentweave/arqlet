@@ -16,7 +16,8 @@ async function readWasm(url) {
     const {readFile} = await import(fs);
     return readFile(href);
   }
-  const response = await fetch(href, {cache: 'no-store'});
+  // The browser's HTTP cache applies, as for any asset.
+  const response = await fetch(href);
   if (!response.ok) throw Error(`Engine not available: ${href}`);
   return response.arrayBuffer();
 }

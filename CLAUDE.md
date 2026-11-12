@@ -77,10 +77,10 @@ Status: all three modes are implemented in the demo and tested (`ui-regression.m
 - Core crates stay synchronous, pure and deterministic: no threads, no async runtime, no I/O, no host APIs.
 - Parallelism belongs in `crates/runtime` (`parallel_map`): independent jobs run concurrently on native builds (scoped threads) and serially on `wasm32`. Selection and acceptance stay sequential in fixed order.
 - Output must be identical for any `threads` value. A test (`refinement_is_identical_for_any_thread_count`) and `smoke.mjs` enforce this. Do not add a parallel path whose results depend on scheduling.
-- Asynchrony lives in hosts. Browser: separate interactive and background workers; stale results are rejected by revision and layout-version checks. Backend: one process per request with a timeout and a concurrency limit.
+- Asynchrony lives in hosts. Browser: separate interactive and background workers; stale results are rejected by revision and layout-version checks. Backend: one process per request with a timeout and a concurrency limit; sessions (ADR 0019) live in one long-running `layout-command --sessions` process that the backend feeds one message at a time, with a time limit per message (it restarts the process, and the sessions are lost) and a limit on open sessions.
 - Cancellation: discard stale results, or terminate the process. An in-process cancel flag, checked between independent jobs, is added when a job needs it.
 - Do not add a thread-pool or async crate without a measured need.
-- Shared-memory threads in the browser need cross-origin isolation; not planned yet.
+- Shared-memory threads in the browser need cross-origin isolation. ADR 0019 (proposed) plans `SharedArrayBuffer` as an optional mode of a columnar data path, behind a capability check; nothing may require it.
 
 ## Git and attribution
 

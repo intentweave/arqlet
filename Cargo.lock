@@ -15,6 +15,7 @@ dependencies = [
  "arqlet-scene",
  "arqlet-topology",
  "arqlet-view",
+ "serde_json",
 ]
 
 [[package]]
@@ -93,6 +94,7 @@ dependencies = [
  "arqlet-routing",
  "arqlet-scene",
  "arqlet-view",
+ "serde",
  "serde_json",
 ]
 

@@ -18,6 +18,11 @@ pub fn trace_response(v: &Value) -> Value {
 fn trace_of(v: &Value) -> Result<Value, String> {
     let snapshot: Snapshot =
         serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
+    trace_on(&snapshot, v)
+}
+
+/// The trace of the request `v` (`from`, `to`, `mode`) on a snapshot the caller holds (a session's).
+pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
     let from = v["from"].as_str().ok_or("Missing from")?;
     let to = v["to"].as_str().ok_or("Missing to")?;
     let mode = match v["mode"].as_str() {

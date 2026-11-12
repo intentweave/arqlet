@@ -23,3 +23,6 @@ arqlet-topology = { workspace = true }
 arqlet-reference = { workspace = true }
 arqlet-elk = { workspace = true }
 arqlet-runtime = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"

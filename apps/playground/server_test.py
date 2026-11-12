@@ -68,13 +68,38 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(result["revision"],snapshot["revision"]+1)
     def test_the_allowlist_covers_every_operation_the_dispatcher_knows(self):
         import re
-        source=(ROOT/"../../crates/runtime/src/lib.rs").read_text()
-        start=source.index("pub fn dispatch(input: &str)")
-        body=source[start:source.index("#[cfg(test)]",start)]
-        known=set(re.findall(r'Some\("([A-Za-z]+)"\)',body))|set(re.findall(r'"(reference[A-Za-z]+)"',body))
+        # The operations the typed protocol reads (ADR 0019): every op name its parser matches.
+        source=(ROOT/"../../crates/runtime/src/protocol.rs").read_text()
+        start=source.index("pub fn from_value(")
+        body=source[start:source.index("pub fn to_value(",start)]
+        known=set(re.findall(r'Some\("([A-Za-z]+)"\)',body))|set(re.findall(r'"([a-z][A-Za-z]+)"\s*(?:=>|\|)',body))
         known.add("refineProgressive")
         self.assertTrue({"move","intent","restore","import"}<=known,known)
         self.assertEqual(sorted(known-module.OPERATIONS),[],"operations the dispatcher knows but the backend refuses")
+    def session(self,payload):
+        request=urllib.request.Request(self.url.replace("/api/op","/api/session"),json.dumps(payload).encode(),{"Content-Type":"application/json"})
+        try:
+            with urllib.request.urlopen(request,timeout=30) as response:return response.status,json.load(response)
+        except urllib.error.HTTPError as error:return error.code,json.load(error)
+    def test_a_backend_session_keeps_the_view(self):
+        graph=json.loads((ROOT/"../../examples/fixtures/small.json").read_text())
+        status,opened=self.session({"session":"open"})
+        self.assertEqual(status,200);key=opened["session"]
+        self.assertEqual(len(key),32,"a random key, not the process's number")
+        status,imported=self.session({"session":key,"request":{"op":"import","graph":graph,"limit":100}})
+        self.assertEqual(status,200);self.assertIn("scene",imported);self.assertNotIn("snapshot",imported)
+        # The change alone: no snapshot travels.
+        status,toggled=self.session({"session":key,"request":{"op":"toggle","nodeId":"root"}})
+        self.assertEqual((status,toggled["collapsedIds"]),(200,["root"]))
+        status,stale=self.session({"session":key,"request":{"op":"toggle","nodeId":"root","expectedLayoutVersion":0}})
+        self.assertEqual((status,stale["error"]),(400,"Stale view request"))
+        status,exported=self.session({"session":key,"request":{"op":"export"}})
+        self.assertEqual(exported["snapshot"]["collapsedIds"],["root"])
+        status,refused=self.session({"session":key,"request":{"op":"rm -rf"}})
+        self.assertEqual(status,400)
+        self.assertEqual(self.session({"session":key,"close":True})[0],200)
+        self.assertEqual(self.session({"session":key,"request":{"op":"export"}}),(404,{"ok":False,"error":"Unknown session"}))
+        self.assertEqual(self.session({"session":"guessed","request":{"op":"export"}})[0],404)
     def test_cross_origin_is_rejected(self):
         with self.assertRaises(urllib.error.HTTPError) as error:self.request({"op":"refine"},"https://example.org")
         self.assertEqual(error.exception.code,403)

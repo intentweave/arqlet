@@ -6,6 +6,8 @@ dist/
 /exports/
 
 /apps/playground/generated/
+# Examples a developer keeps locally (data that must not be published); see apps/playground/build.sh.
+/apps/playground/local-examples/
 
 __pycache__/
 *.pyc

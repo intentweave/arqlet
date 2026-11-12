@@ -60,6 +60,14 @@ export function resolvedEdgeIds(graph) {
 export const COMMUNITY_PREFIX = 'community:';
 
 /** A short name for a node: the last part of a path-like id; for a community, `≈` and its place in its container. */
+/**
+ * The name of node `i` of an overview model: its label from the data (`overview.labels`), else `displayName` of its id.
+ */
+export function nameOf(model, i) {
+  const label = model.overview.labels?.[i];
+  return label ? label : displayName(model.overview.ids[i]);
+}
+
 export function displayName(id) {
   if (id.startsWith(COMMUNITY_PREFIX)) return `≈ ${id.split(':').at(-1)}`;
   return id.split('/').at(-1);
@@ -403,7 +411,7 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
   for (let i = 0; i < model.n; i++) {
     if (!model.children[i].length || owner[i] >= 0) continue;
     const [cx, cy, factor] = screen(o.x[i], o.y[i]);
-    const r = o.r[i] * view.scale * factor, text = displayName(o.ids[i]);
+    const r = o.r[i] * view.scale * factor, text = nameOf(model, i);
     if (collapsed.has(i)) {
       // A collapsed cluster carries its name in its middle.
       if (r < 16) continue;
@@ -557,5 +565,6 @@ export function structuredExcerpt(graph, model, id, {direction = null} = {}) {
     edges.push(s ? {...e, target: stand} : {...e, source: stand});
   }
   const excerpt = {nodes: [...nodes, ...standIns.values()], edges, ...(direction ? {defaultDirection: direction} : {})};
-  return {graph: excerpt, leaving, inner: edges.length - leaving, standIns: standIns.size};
+  // The options to import the excerpt with: a file's unrelated functions stand in a grid, not in one long row.
+  return {graph: excerpt, options: {isolatedGrid: true}, leaving, inner: edges.length - leaving, standIns: standIns.size};
 }

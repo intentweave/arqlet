@@ -3,7 +3,57 @@
 Arqlet is a prototype: every release may change the API, the JSON protocol and the snapshot format. Versions follow
 `0.x`; a minor version adds or changes capabilities.
 
-## 0.3.0 — 2026-11-11
+## Unreleased
+
+### Changed
+
+- **`createSession` keeps the snapshot in the engine by default** (`resident: 'auto'`) where the engine can
+  (`loadEngine`, `workerRun`): requests carry only the change and answers bring the scene. Measured in the browser path:
+  a trace 20–30×, a scene 4–6× faster. **`session.snapshot` is then the session's state** (`revision`, `layoutVersion`,
+  `collapsedIds`), not the whole snapshot; use `await session.exportSnapshot()` for that, or `createSession(run,
+  {resident: false})` for the earlier behaviour.
+
+### Added
+
+- Sessions in the backend (provisional, ADR 0019): `layout-command --sessions` keeps sessions in one long-running
+  process (one JSON message per line); the playground backend serves them at `/api/session` with random keys, one
+  message at a time, a time limit per message and at most 32 sessions. `httpRun(base)` in `@arqlet/engine-client`
+  (re-exported by `arqlet`) is a backend as a `run` with `openSession()`, so `createSession` keeps the snapshot in the
+  backend too.
+- `session.trace(from, to)` and `session.reveal(nodeIds)` in `@arqlet/engine-client` (provisional).
+- Resident sessions (provisional, ADR 0019 step 3): `arqlet::Session` keeps a view's snapshot inside the engine;
+  requests carry only the change and answers bring the scene. In WASM through `lw_session_open/run/close`, in the
+  worker by message, and in JavaScript through `createSession` (by default, see above); `exportSnapshot()` and `load`
+  hand a view over.
+- `arqlet::protocol` (provisional, ADR 0019 step 1): the engine's requests as a Rust type (`Request`, `Response`,
+  `handle`); `dispatch` goes through it with the same JSON and the same errors.
+- README: section *Large graphs* (flexible layout per container, groups and drill-down, path cut-out, cluster
+  overview with lens and breathing).
+
+### Fixed
+
+- ELK adapter: graphs whose nodes are mostly without edges were laid out as one long row (74 nodes: 19 624 × 172); unless
+  `separateConnectedComponents` is `false`, such nodes now stand in a grid (2 520 × 1 972). Mixed graphs (several
+  components plus a few lone nodes) are unchanged; real component packing is still open.
+- ELK adapter: `spacing.edgeNode` and `spacing.edgeNodeBetweenLayers` are read (as `routingClearance`) instead of
+  reported as unknown.
+- An empty graph no longer reports `Single pass was not used: …`.
+- The WASM engine is fetched with the browser's HTTP cache (no `cache: 'no-store'`), and `createEngine` takes a
+  `WebAssembly.Module` the host compiled.
+- `session.import` defaults its `limit` to at most 10 000 (`MAX_VIEW_LIMIT`) instead of failing on larger graphs.
+- Cluster overview: nodes are named by their `label` (`overview.labels`, `nameOf`), not by the last part of the id;
+  `structuredExcerpt` returns the options to import the excerpt with (`isolatedGrid`), so a structured cluster is no
+  longer one long row in its disc.
+- A toggle in a graph whose edges mostly cross container boundaries took up to 53 s: after single pass, the routes
+  still in conflict made the layout route the whole drawing again with both routing engines, which found nothing
+  better. Under single pass the conflicts are now reported instead (0.1–0.2 s; the same conflicts). Default output
+  on the measured views is unchanged.
+
+- Opening a group, community or initially collapsed container laid out only around it, which at 50 000 nodes took
+  9.7 s and handed hundreds of routes to the slow completing router; such views are laid out from scratch again
+  (1.6 s), and their drawing depends only on the graph and the view.
+
+## 0.3.0 — 2026-11-12
 
 Abstraction for large graphs in the structured view: groups (automatic communities or given by the domain), collapsed
 first, edges between groups drawn by weight, and a path cut-out between two nodes; for the cluster overview a fisheye
@@ -49,6 +99,8 @@ lens and idle breathing. Every new option is provisional and off by default: def
   flattened from as its groups.
 
 ## 0.2.1 — 2026-11-11
+
+Not published on its own: its changes were first released in 0.3.0.
 
 ### Fixed
 

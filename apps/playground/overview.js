@@ -4,7 +4,7 @@
 // zoom (`representationsOf`). Only a decision of the user makes a structured cluster grow and its neighbours make room;
 // what the zoom or a rule structures is fitted into the disc it has, so that zooming never makes the drawing jump.
 // Stale replies are dropped.
-import {overviewModel, viewOf, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, displayName} from '@arqlet/viewer/overview.js';
+import {overviewModel, viewOf, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, displayName, nameOf} from '@arqlet/viewer/overview.js';
 import {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
 import {createEngineWorker} from '@arqlet/engine-client/engine.js';
 
@@ -253,9 +253,8 @@ async function evaluate() {
 /** The layered layout of a cluster's excerpt (with border ports, in its flow), or null with the error in the status line. */
 async function layered(id, key) {
   const direction = key.split('|').at(-1) || null;
-  const {graph: excerpt} = structuredExcerpt(graph, model, id, {direction});
-  // isolatedGrid: a file's unrelated functions stand in a grid instead of one long column.
-  const imported = await execute({op: 'import', graph: excerpt, limit: excerpt.nodes.length, options: {isolatedGrid: true}});
+  const {graph: excerpt, options} = structuredExcerpt(graph, model, id, {direction});
+  const imported = await execute({op: 'import', graph: excerpt, limit: excerpt.nodes.length, options});
   const scene = imported.ok ? await execute({op: 'scene', snapshot: imported.snapshot}) : imported;
   if (!scene.ok) { status(`${displayName(id)}: ${scene.error}`); return null; }
   return scene.scene;
@@ -300,9 +299,9 @@ function hover(i, e) {
   if (scene?.node) text = `${scene.node.label || scene.node.id} · ${scene.node.kind}`;
   else if (i >= 0) {
     const kids = model.children[i].length;
-    const name = label(i).startsWith('community:') ? `community ${displayName(label(i))}` : label(i);
+    const name = label(i).startsWith('community:') ? `community ${displayName(label(i))}` : nameOf(model, i);
     const {now, why} = kids ? representationOf(i) : {};
-    text = kids ? `${name} · ${model.size[i].toLocaleString()} nodes · ${now}, ${why}` : label(i);
+    text = kids ? `${name} · ${model.size[i].toLocaleString()} nodes · ${now}, ${why}` : nameOf(model, i);
   }
   if (!text) { tip.style.display = 'none'; return; }
   tip.textContent = text;
@@ -401,7 +400,7 @@ function crumbs() {
   const path = [];
   for (let i = focus; i >= 0; i = model.overview.parent[i]) path.unshift(i);
   const button = (text, i) => { const b = document.createElement('button'); b.textContent = text; b.onclick = () => { focus = i; zoomTo(i, true); crumbs(); }; return b; };
-  $('crumbs').replaceChildren(button('All', -1), ...path.map(i => button(displayName(label(i)), i)));
+  $('crumbs').replaceChildren(button('All', -1), ...path.map(i => button(nameOf(model, i), i)));
 }
 
 function step(from, to) {

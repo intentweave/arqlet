@@ -12,7 +12,7 @@ changes. The same engine runs natively and in the browser via WebAssembly.
 
 > **Status: prototype (engine `0.2.0-prototype`).** Arqlet works end to end and is
 > tested, but every API, the JSON protocol and the snapshot format are
-> provisional and may change in any release. Version 0.1.0 is on
+> provisional and may change in any release. Version 0.3.0 is on
 > [crates.io](https://crates.io/crates/arqlet) and [npm](https://www.npmjs.com/package/arqlet). Large graphs (100K+ nodes) are a goal, not a measured result.
 
 Arqlet was developed under the working name Layerweave. Measurement records in
@@ -23,9 +23,9 @@ Arqlet was developed under the working name Layerweave. Measurement records in
 
 - **Graphs:** nested containers, ports, cycles, self-loops and parallel edges.
   Logical edge direction is preserved in every output.
-- **Layout:** hierarchical (layered) layout with a single pass by default, with a
-  direction per container; tree, radial and organic (stress) areas inside one
-  diagram.
+- **Flexible layout:** hierarchical (layered) layout with a single pass by default;
+  each container chooses its own direction, strategy (layered, tree, radial, organic)
+  and routing style, all in one diagram.
 - **Routing:** orthogonal and polyline routes, port sides and order, and bundled
   edges.
 - **Incremental edits:** you can add a node, collapse or expand a container,
@@ -46,9 +46,15 @@ Arqlet was developed under the working name Layerweave. Measurement records in
     reported as diagnostics.
 - **Output:** a renderer-independent scene, an SVG viewer and a React Flow
   adapter.
+- **Abstraction for large graphs (provisional):** groups found in the edges
+  (communities) or given by the domain, collapsed at first and opened level by level;
+  edges between groups drawn as one weighted route per pair.
+- **Path cut-out (provisional):** the paths between two nodes highlighted, also through
+  collapsed groups; only the groups on the way opened, the rest faded.
 - **Cluster overview (prototype):** the whole graph as nested discs, laid out per
-  container and drawn with WebGL; a click switches a small cluster in place to a
-  layered layout, and its neighbours make room ([ADR 0018](docs/adr/0018-cluster-overview.md), `apps/playground/overview.html`).
+  container and drawn with WebGL, with a fisheye lens; a click switches a small cluster
+  in place to a layered layout, and its neighbours make room
+  ([ADR 0018](docs/adr/0018-cluster-overview.md), `apps/playground/overview.html`).
 
 Not yet: full crossing minimization, guaranteed obstacle-free routes in every
 case, a native Node.js adapter, and a stable API. See
@@ -76,7 +82,7 @@ depend on the Git repository instead):
 
 ```toml
 [dependencies]
-arqlet = "0.1"
+arqlet = "0.3"
 ```
 
 ```rust
@@ -130,9 +136,86 @@ or map a scene.
   ```
 
   In a browser, `createSession(workerRun(createEngineWorker()))` runs the same in a
-  worker.
+  worker, and `createSession(httpRun('/api'))` in a backend (the playground's
+  `server.py`, or any host that runs `layout-command --sessions`). The snapshot stays inside the engine (or its worker): a change sends only
+  itself and gets back the scene, so reading and drawing large views stays cheap
+  ([measurement](benchmarks/results/protocol-resident-20261112.md)).
+  `session.snapshot` holds the view's state; `await session.exportSnapshot()` gives the
+  whole snapshot, to save or to hand to another engine.
 - **Large graphs:** `{op: 'overview', graph}` and the WebGL renderer (see the
   [package README](packages/arqlet/README.md)).
+
+## Large graphs: abstraction, paths and the overview
+
+All of this is provisional and off by default; the default layout does not change. The
+examples use the JavaScript session; the same requests go to `arqlet::dispatch` in Rust.
+
+### Flexible layout per container
+
+A graph says per container how it is laid out, and a session can change it later:
+
+```js
+await session.import({
+  nodes, edges,                                   // nodes with parentId are containers
+  defaultDirection: 'lr',
+  containerDirections: {'service-a': 'tb'},       // lr, rl, tb, bt, or auto
+  containerStrategies: {'org': 'tree', 'deps': 'organic'},   // layered, tree, radial, organic
+  containerRouting: {'deps': 'straight'},         // orthogonal, polyline, straight, …
+});
+await session.apply({op: 'direction', nodeId: 'service-a', direction: 'lr'});
+await session.apply({op: 'strategy', nodeId: 'org', strategy: 'radial'});
+```
+
+### Groups and drill-down
+
+Large containers and flat graphs are divided into groups that start collapsed; a
+collapsed group is one box, and the edges it exchanges with another group are one route
+that carries their number in both directions (`weight`, `backWeight` in the scene).
+
+```js
+await session.import(graph, {options: {
+  communities: 40,                       // divide containers of more than 40 children (Louvain)
+  groups: {'fn-1': ['ECU A', 'X1']},     // or groups the domain gives: a path of names per node
+  initialCollapse: {depth: 1},           // and/or collapse containers from a depth or by kind
+}});
+await session.toggle('group:#:ECU A');   // open a group in place; the others keep their place
+```
+
+Given groups come first; Louvain only divides what is still large. Groups exist only in
+the view: the source graph is never changed. In the playground: *Communities above*,
+*Domain groups*, *Collapse first*, and the example *Flat call graph*.
+
+### Path cut-out
+
+`trace` finds the nodes and edges on the shortest (or all) directed paths between two
+nodes, also inside collapsed groups, and tells which boxes and routes of the current
+view carry them and how far every other node is. `reveal` opens only the groups on the
+way: the other children of an opened group wait in a collapsed `+N more` box.
+
+```js
+const path = await session.trace('a', 'z');                 // read only; {mode: 'all'} for every path
+renderSvg(svg, await session.scene(), {trace: {...path.visible, distance: path.distance, fade: true}});
+await session.reveal(path.nodes);                            // only as far as needed; {partial: false} opens whole
+```
+
+In the playground: section *Path* (from, to, *Trace*, *Reveal path*, *Fade others*,
+*Show a node*).
+
+### Cluster overview
+
+For a whole graph of tens of thousands of nodes, `{op: 'overview', graph}` lays it out
+as nested discs and the WebGL renderer draws it; a cluster can switch in place to its
+layered layout. A fisheye lens follows the pointer (enlarging what is under it and its
+labels, picking through it), and the discs can breathe while nobody touches the view:
+
+```js
+bindOverviewNavigation(canvas, renderer, {
+  lens: () => ({radius: 180, magnification: 3}),
+  idle: {after: 8000, breathe: {amplitude: 0.06}},   // off under reduced motion
+});
+```
+
+See the [package README](packages/arqlet/README.md) and `apps/playground/overview.html`.
 
 The engine computes the same on every platform: native builds (Linux x64 and arm64,
 macOS arm64, Windows x64) and WASM give identical responses (checked in CI by

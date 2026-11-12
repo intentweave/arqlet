@@ -17,6 +17,11 @@ ports and orthogonal routing. Add constraint diagnostics and stable placement.
 Compact long-edge representation, aggregation, drill-down, cut-out, cache
 invalidation and adaptive region expansion. Benchmark real graphs through 100K+.
 
+The engine interface for this scale (typed protocol, sessions in Rust and
+JavaScript with state kept in the engine, a columnar data path with optional
+shared memory) is proposed in [ADR 0019](adr/0019-engine-interface.md), step by
+step and measured first.
+
 ## 4. Additional geometry
 
 Grid placement, rounded routes, explicit bundling, straight routes and free curves.
