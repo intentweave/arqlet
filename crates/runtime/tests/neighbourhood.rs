@@ -130,3 +130,41 @@ fn bad_requests_are_refused_and_a_session_answers_the_same() {
         around(&open, json!({"direction": "out", "hops": 2}))
     );
 }
+
+#[test]
+fn read_answers_are_the_typed_contracts() {
+    use arqlet_runtime::protocol::{handle, Request, Response};
+    let open = ok(call(
+        json!({"op": "import", "graph": graph(), "limit": 100}),
+    ));
+    // Every JSON answer, without `ok`, reads back as its contract type (unknown fields refused) and writes back the same.
+    fn check<T: serde::de::DeserializeOwned + serde::Serialize>(mut answer: Value) {
+        assert_eq!(answer["ok"], true, "{answer}");
+        answer.as_object_mut().unwrap().remove("ok");
+        let typed: T = serde_json::from_value(answer.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&typed).unwrap(), answer);
+    }
+    check::<arqlet_model::TraceAnswer>(call(
+        json!({"op": "trace", "snapshot": open, "from": "p0/f0", "to": "p1/f1"}),
+    ));
+    check::<arqlet_model::TraceAnswer>(call(
+        json!({"op": "trace", "snapshot": open, "from": "p1/f1", "to": "p0/f2"}),
+    ));
+    check::<arqlet_model::NeighbourhoodAnswer>(around(&open, json!({"hops": 2})));
+    // The typed protocol hands Rust hosts the values themselves.
+    let request =
+        Request::from_value(&json!({"op": "neighbourhood", "snapshot": open, "nodeId": "p0/f0"}))
+            .unwrap();
+    let Response::Neighbourhood(answer) = handle(request) else {
+        panic!("a typed neighbourhood answer")
+    };
+    assert!(answer.nodes.contains(&"p0/f1".to_string()));
+    let request = Request::from_value(&json!({"op": "scene", "snapshot": open})).unwrap();
+    assert!(matches!(handle(request), Response::Scene(_)));
+    // A refused read is an error, as before.
+    let request = Request::from_value(
+        &json!({"op": "trace", "snapshot": open, "from": "nowhere", "to": "p0/f0"}),
+    )
+    .unwrap();
+    assert!(matches!(handle(request), Response::Error(_)));
+}
