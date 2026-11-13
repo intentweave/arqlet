@@ -5,8 +5,8 @@ use arqlet_layout::overview::{
     self, Arrangement, Container, OverviewHints, OverviewOptions, Previous,
 };
 use arqlet_model::{
-    validate, ConfigSet, Graph, Overview, OverviewConfig, OverviewIntent, OverviewRepresentation,
-    OverviewStats,
+    validate, ConfigSet, Graph, Overview, OverviewConfig, OverviewIntent, OverviewPositions,
+    OverviewRepresentation, OverviewStats,
 };
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -355,12 +355,18 @@ impl OverviewSession {
     /// Answers one `overview` request (`{ok, overview}`, or `{ok: false, error}`); a refused request changes nothing.
     pub fn run(&mut self, v: &Value, threads: usize) -> Value {
         match self.overview(v, threads) {
-            Ok(overview) => json!({"ok": true, "overview": overview}),
+            // `positionsOnly`: on the clusters of the last overview, only what moves (`OverviewPositions`); the host keeps
+            // the rest from its last answer.
+            Ok((overview, true)) if v["positionsOnly"].as_bool() == Some(true) => {
+                json!({"ok": true, "overview": OverviewPositions::of(overview)})
+            }
+            Ok((overview, _)) => json!({"ok": true, "overview": overview}),
             Err(e) => json!({"ok": false, "error": e}),
         }
     }
 
-    fn overview(&mut self, v: &Value, threads: usize) -> Result<Overview, String> {
+    /// The overview, and whether it was laid out on the clusters of the session's last overview.
+    fn overview(&mut self, v: &Value, threads: usize) -> Result<(Overview, bool), String> {
         let options = options_of(v)?;
         let new_graph = if v.get("graph").is_some() {
             Some(graph_of(v)?)
@@ -412,6 +418,12 @@ impl OverviewSession {
             }
         }
         let overview = lay_out(grouped, h, &request, &options, threads)?;
+        // The same clusters as the last overview of this session: its ids, labels, parents, kinds, edges and links hold.
+        let same_clusters = new_graph.is_none()
+            && self
+                .last
+                .as_ref()
+                .is_some_and(|(clusters, _)| *clusters == key);
         // Accepted: keep what the next request builds on.
         let last = (
             key.clone(),
@@ -424,6 +436,6 @@ impl OverviewSession {
             self.graph = Some(g);
         }
         self.last = Some(last);
-        Ok(overview)
+        Ok((overview, same_clusters))
     }
 }
