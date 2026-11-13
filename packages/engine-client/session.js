@@ -268,6 +268,17 @@ export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
     }
     return run(sent);
   };
+  // A read of the overview's graph, after the changes before it: the session's graph, or the one kept here.
+  const read = request => {
+    const mine = generation;
+    const result = queue.then(async () => {
+      if (!started) return {ok: false, error: 'No graph yet: open one first.'};
+      const answer = resident ? await (await opened).run(request) : await run({...request, graph});
+      return mine === generation ? answer : {ok: false, stale: true, error: 'A new graph overtook this read.'};
+    });
+    queue = result.catch(() => {});
+    return result;
+  };
   const enqueue = (request, fresh) => {
     if (fresh) generation++;
     const mine = generation;
@@ -297,6 +308,18 @@ export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
       if (!started) return Promise.resolve({ok: false, error: 'No graph yet: open one first.'});
       const {graph: _ignored, ...rest} = request;
       return enqueue({...rest, op: 'overview'}, false);
+    },
+    /**
+     * Provisional: the paths between two nodes of the overview's graph (`overviewTrace`: `{ok, found, reversed, length,
+     * nodes, edges}`), read only; `mode` and `edgeKinds` as for `trace`. The viewer's `pathOf` maps them to its discs.
+     */
+    trace(from, to, {mode, edgeKinds} = {}) {
+      return read({op: 'overviewTrace', from, to, ...(mode ? {mode} : {}), ...(edgeKinds ? {edgeKinds} : {})});
+    },
+    /** Provisional: the nodes within `hops` of a node of the overview's graph (`overviewNeighbourhood`), read only. */
+    neighbourhood(nodeId, {hops, direction, edgeKinds} = {}) {
+      return read({op: 'overviewNeighbourhood', ...(Array.isArray(nodeId) ? {nodeIds: nodeId} : {nodeId}),
+        ...(hops !== undefined ? {hops} : {}), ...(direction ? {direction} : {}), ...(edgeKinds ? {edgeKinds} : {})});
     },
     /** The last overview (`{ids, parent, x, y, r, …}`), or null. */
     get overview() { return last; },

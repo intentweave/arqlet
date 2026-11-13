@@ -1,4 +1,4 @@
-import type {Graph, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
+import type {Graph, GraphNeighbourhood, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
@@ -130,6 +130,13 @@ export interface OverviewSession {
   open(graph: Graph, request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options). */
   layOut(request?: OverviewSessionRequest): Promise<OverviewAnswer>;
+  /** Provisional: the paths between two nodes of the overview's graph, read only (`GraphTrace`). */
+  trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<ReadAnswer<GraphTrace>>;
+  /** Provisional: the nodes within `hops` of a node (or of each of a list) of the overview's graph, read only. */
+  neighbourhood(
+    nodeId: string | string[],
+    init?: {hops?: number; direction?: 'out' | 'in' | 'both'; edgeKinds?: string[]},
+  ): Promise<ReadAnswer<GraphNeighbourhood>>;
   /** The last overview, or null. */
   readonly overview: OverviewAnswer['overview'] | null;
   /** Whether the graph stays in the engine. */

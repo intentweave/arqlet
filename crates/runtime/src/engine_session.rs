@@ -78,6 +78,16 @@ impl EngineSession {
             }
             Some("export") => Ok(json!({"ok": true, "snapshot": self.current()?})),
             Some("scene") => Ok(json!({"ok": true, "scene": scene_of(self.current()?)?})),
+            // Paths and neighbourhoods on the overview's graph: the session's, unless the request brings one.
+            Some("overviewTrace" | "overviewNeighbourhood") if v.get("graph").is_none() => {
+                let graph = self.overview.graph().cloned().ok_or(
+                    "The session has no overview yet: send the first overview with its graph.",
+                );
+                Ok(crate::trace::graph_read_response(
+                    graph.map_err(String::from),
+                    v,
+                ))
+            }
             Some("overview") => {
                 let threads = v["threads"]
                     .as_u64()

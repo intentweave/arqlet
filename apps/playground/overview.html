@@ -39,6 +39,14 @@ table{width:100%;border-collapse:collapse}td{padding:3px 0}td select{width:100%}
 <button data-rep="" title="Rules of the data, then the zoom decide">Automatic</button></div>
 <div class="row"><label for="direction">Flow of a structured cluster</label><select id="direction"><option value="">faces its neighbours</option><option value="lr">left → right</option><option value="rl">right → left</option><option value="tb">top → bottom</option><option value="bt">bottom → top</option></select></div>
 <div class="row"><button id="zoom-cluster">Zoom to it</button><button id="reset">Reset all choices</button></div>
+<h2>Path</h2>
+<div class="hint">Trace the paths between two nodes, or a node's neighbourhood, on the whole graph (provisional). <em>Reveal</em> opens the clusters on the way.</div>
+<div class="row"><input id="path-from" placeholder="from: node id" aria-label="From"><button id="path-from-selected" title="Use the selected cluster">Selected</button></div>
+<div class="row"><input id="path-to" placeholder="to: node id" aria-label="To"><button id="path-to-selected" title="Use the selected cluster">Selected</button></div>
+<div class="row"><select id="path-mode" aria-label="Paths"><option value="shortest">Shortest paths</option><option value="all">All paths</option></select><button id="path-trace">Trace</button></div>
+<div class="row"><input id="path-hops" type="number" min="0" max="20" value="1" aria-label="Hops" style="width:4em"><select id="path-direction" aria-label="Direction"><option value="both">both ways</option><option value="out">outgoing</option><option value="in">incoming</option></select><button id="path-near">Neighbourhood of From</button></div>
+<div class="row"><label><input id="path-fade" type="checkbox" checked> Fade others</label><button id="path-reveal" disabled>Reveal</button><button id="path-clear" disabled>Clear</button></div>
+<div id="path-info" class="hint" role="status"></div>
 <h2>Rules by kind</h2>
 <div class="hint">From the data's config set; your choice for a cluster comes first, the zoom last. The second column draws a kind as a circle, square, octagon or diamond inside its disc (drawing only).</div>
 <table id="rules"></table>

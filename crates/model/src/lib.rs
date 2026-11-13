@@ -2725,6 +2725,30 @@ impl OverviewPositions {
     }
 }
 
+/// Provisional: the paths between two nodes of a graph (`overviewTrace`), without a view: the overview's viewer maps them
+/// to its discs. `reversed`: no path from `from` to `to`, the paths are those back; `length` is null without a path.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphTrace {
+    pub found: bool,
+    pub reversed: bool,
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
+    pub length: Option<usize>,
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+}
+
+/// Provisional: the nodes within some hops of nodes of a graph (`overviewNeighbourhood`), without a view.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphNeighbourhood {
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+    pub hops: BTreeMap<String, usize>,
+}
+
 /// Provisional: the counts of an overview.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

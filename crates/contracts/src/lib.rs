@@ -8,8 +8,9 @@ use std::io;
 use std::path::Path;
 
 use arqlet_model::{
-    ConfigSet, Intent, LayoutStrategy, Measurement, NeighbourhoodAnswer, Orientation, Overview,
-    OverviewIntent, OverviewPositions, OverviewRequest, PublicationEnvelope, Snapshot, TraceAnswer,
+    ConfigSet, GraphNeighbourhood, GraphTrace, Intent, LayoutStrategy, Measurement,
+    NeighbourhoodAnswer, Orientation, Overview, OverviewIntent, OverviewPositions, OverviewRequest,
+    PublicationEnvelope, Snapshot, TraceAnswer,
 };
 use arqlet_reference::{document::ReferenceDocument, Report};
 use arqlet_scene::Scene;
@@ -37,6 +38,8 @@ pub fn export_to(dir: &Path) -> io::Result<()> {
     ConfigSet::export_all(&config).map_err(io::Error::other)?;
     OverviewIntent::export_all(&config).map_err(io::Error::other)?;
     Overview::export_all(&config).map_err(io::Error::other)?;
+    GraphTrace::export_all(&config).map_err(io::Error::other)?;
+    GraphNeighbourhood::export_all(&config).map_err(io::Error::other)?;
     TraceAnswer::export_all(&config).map_err(io::Error::other)?;
     NeighbourhoodAnswer::export_all(&config).map_err(io::Error::other)?;
     OverviewPositions::export_all(&config).map_err(io::Error::other)?;

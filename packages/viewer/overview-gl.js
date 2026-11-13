@@ -122,8 +122,8 @@ const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
 /**
  * Draws `model` (from `overviewModel`) into `canvas`. Returns a renderer: `view` is `{centreX, centreY, scale}` with
- * `scale` in CSS pixels per unit; `setState({expanded, collapsed, selected}, {fade})` draws clusters structured in their
- * discs (index → {scene}), collapsed into one disc (indices) and marks one, blending the change in over `fade`
+ * `scale` in CSS pixels per unit; `setState({expanded, collapsed, selected, trace}, {fade})` draws clusters structured in
+ * their discs (index → {scene}), collapsed into one disc (indices), marks one and a path (`pathOf`), blending the change in over `fade`
  * milliseconds; `morph(model, {duration, view})` moves the drawing to a new layout of the same graph (and the view to
  * `view`). `options.labels` is a 2D canvas laid over `canvas` for texts; `options.onView(view)` is called after every
  * view change; `options.edgeAlpha` (default 1) scales the opacity of the overview's edges; `options.background` is the
@@ -133,7 +133,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   const gl = canvas.getContext('webgl', {antialias: true, premultipliedAlpha: false});
   if (!gl) throw Error('WebGL is not available');
   const shapes = program(gl, SHAPE_VS, SHAPE_FS), lines = program(gl, LINE_VS, LINE_FS);
-  let model = initialModel, expanded = new Map(), collapsed = new Set(), selected = -1;
+  let model = initialModel, expanded = new Map(), collapsed = new Set(), selected = -1, trace = null;
   // The fisheye lens (`setLens`), in CSS pixels of the canvas, or null.
   let lens = null;
   // Breathing (`breathe`): {amplitude, period, wavelength, start, stop?}; it fades in over `fadeIn` and out over `fadeOut`
@@ -168,7 +168,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     for (const p of PARTS) { gl.deleteBuffer(l.buffers[p].a); if (l.buffers[p].b !== l.buffers[p].a) gl.deleteBuffer(l.buffers[p].b); }
   };
   let outlines = options.shapes ?? {};
-  const data = () => overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines});
+  const data = () => overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace});
   let current = layer(data()), previous = null;
   // The running animation: a morph (`t` of the current layer, and the view) and a fade (of the previous layer).
   let morphing = null, fading = null, frame = 0;
@@ -309,9 +309,9 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
      * Draws clusters structured (`expanded`, index → {scene}), collapsed into one disc (`collapsed`, indices) and marks
      * `selected` (-1: none); omitted parts are kept. With `fade` (milliseconds) the old drawing blends into the new one.
      */
-    setState({expanded: e = expanded, collapsed: c = collapsed, selected: s = selected} = {}, {fade = 0} = {}) {
+    setState({expanded: e = expanded, collapsed: c = collapsed, selected: s = selected, trace: p = trace} = {}, {fade = 0} = {}) {
       finishMorph();
-      expanded = new Map(e); collapsed = new Set(c); selected = s;
+      expanded = new Map(e); collapsed = new Set(c); selected = s; trace = p;
       if (fade > 0) {
         // A blend still running keeps fading what it had: the older drawing is dropped only when the new one is whole.
         drop(previous);

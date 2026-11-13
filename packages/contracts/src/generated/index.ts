@@ -20,6 +20,8 @@ export * from './EditReport';
 export * from './GeometryIssue';
 export * from './Gesture';
 export * from './Graph';
+export * from './GraphNeighbourhood';
+export * from './GraphTrace';
 export * from './Hidden';
 export * from './HybridCriterion';
 export * from './Integrity';

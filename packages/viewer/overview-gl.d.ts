@@ -24,7 +24,7 @@ export interface OverviewRenderer {
   setShapes(shapes: Record<string, import('./overview.js').Outline>): void;
   /** Draws clusters structured (`expanded`) or collapsed into one disc (`collapsed`, indices); omitted parts are kept.
    * With `fade` (milliseconds) the old drawing blends into the new one. */
-  setState(state: {expanded?: Expanded; collapsed?: Set<number>; selected?: number}, animation?: {fade?: number}): void;
+  setState(state: {expanded?: Expanded; collapsed?: Set<number>; selected?: number; trace?: import('./overview.js').OverviewPath | null}, animation?: {fade?: number}): void;
   /** Moves the drawing to a new layout of the same graph (and the view to `view`) over `duration` milliseconds. Returns
    * false when the two drawings differ in their vertices and the new one was shown at once. */
   morph(next: OverviewModel, animation?: {duration?: number; view?: OverviewView | null}): boolean;
