@@ -1,7 +1,9 @@
 //! Provisional: the `patch` operation. Changes the source graph of a view without a new import: adds nodes and edges, and
 //! removes nodes (each with what it holds and the edges at them) and edges. The view keeps its state (collapsed
-//! containers, filter, options) and is laid out again from its earlier positions, so what did not change stays about
-//! where it was. A graph change: the revision and the layout version advance; stale requests are refused.
+//! containers, filter, options). An abstracting view (level of detail, communities, groups) is laid out from scratch, as a
+//! toggle lays it out, so the drawing is the one a fresh import of the changed graph gets with the same view; other views
+//! are laid out again from their earlier positions. A graph change: the revision and the layout version advance; stale
+//! requests are refused.
 use crate::{abstracts, project_view, view_options, View};
 use arqlet_model::{validate, GraphPatch, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
@@ -136,9 +138,22 @@ pub fn patch_snapshot(
     } else {
         options
     };
-    // Every node is placed again, starting from where the earlier layout put it.
-    let dirty: BTreeSet<String> = projected.nodes.iter().map(|n| n.id.clone()).collect();
-    let mut result = arqlet_layout::compute(&projected, Some(snapshot), &dirty, &layout_options)?;
+    // An abstracting view (level of detail, communities, groups) is laid out from scratch, as a toggle lays it out: there a
+    // warm start was slower and worse (benchmarks/results/toggle-layout-20261112.md; a patch that loaded 1 173 member
+    // edges into an opened container gave a drawing 45 times taller from the earlier places), and the drawing depends
+    // only on the graph and the view. Otherwise every node is placed again, starting from where the earlier layout put it.
+    let mut result = if abstracts(&layout_options) {
+        arqlet_layout::compute(&projected, None, &BTreeSet::new(), &layout_options)?
+    } else {
+        let dirty: BTreeSet<String> = projected.nodes.iter().map(|n| n.id.clone()).collect();
+        arqlet_layout::compute(&projected, Some(snapshot), &dirty, &layout_options)?
+    };
+    result.revision = snapshot.revision + 1;
+    result.base_revision = Some(snapshot.revision);
+    result.layout_version = snapshot
+        .layout_version
+        .checked_add(1)
+        .ok_or("Layout version overflow")?;
     result.source_graph = Some(graph);
     result.collapsed_ids = collapsed.into_iter().collect();
     result.omitted_unresolved_edges = omitted;

@@ -188,8 +188,8 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
 
     /**
      * Provisional: changes the graph without a new import: `{nodes, edges, removeNodes, removeEdges}` (removals first; a
-     * removed node takes what it holds and its edges along). The view keeps its state and is laid out again from where
-     * it was, so what did not change stays about in place.
+     * removed node takes what it holds and its edges along). The view keeps its state; with a level of detail,
+     * communities or groups it is laid out as a toggle lays it out, otherwise again from where it was.
      */
     patch(patch) { return change({op: 'patch', patch}); },
 

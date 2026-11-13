@@ -53,7 +53,8 @@ export interface Session {
   ): Promise<EngineResponse>;
   /**
    * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
-   * edges along); the view keeps its state and is laid out again from where it was.
+   * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from
+   * where it was.
    */
   patch(patch: GraphPatch): Promise<SessionResult>;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */

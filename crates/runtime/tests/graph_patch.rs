@@ -98,20 +98,20 @@ fn opening_a_package_and_loading_its_member_edges_keeps_the_view() {
     let scene = call(json!({"op": "scene", "snapshot": patched}));
     let routes = scene["scene"]["routes"].as_array().unwrap();
     assert!(routes.iter().any(|r| r["source"] == "p0/f0"), "{routes:?}");
-    // What did not change stays about where it was: the collapsed packages move less than a box on average.
-    let (a, b) = (boxes(&opened), boxes(&patched));
-    let moves: Vec<f64> = (1..10)
-        .map(|p| {
-            let (r0, r1) = (&a[&format!("p{p}")], &b[&format!("p{p}")]);
-            (r1["x"].as_f64().unwrap() - r0["x"].as_f64().unwrap())
-                .hypot(r1["y"].as_f64().unwrap() - r0["y"].as_f64().unwrap())
-        })
-        .collect();
-    // Measured: 47–150 units for boxes 180 wide (a warm start, not pinned places).
-    let mean = moves.iter().sum::<f64>() / moves.len() as f64;
-    assert!(
-        mean < 180.,
-        "the collapsed packages move about a box at most: {moves:?}"
+    // An abstracting view is laid out from scratch, as a toggle lays it out: the drawing depends only on the graph and the
+    // view, so it is the one an import of the patched graph gets with the same container opened.
+    let mut graph = packages();
+    let edges = graph["edges"].as_array_mut().unwrap();
+    edges.retain(|e| e["id"] != "agg:p0-p1" && e["id"] != "agg:p0-p3");
+    edges.extend(member_edges(0));
+    let fresh = ok(call(
+        json!({"op": "import", "graph": graph, "limit": 100, "options": {"levelOfDetail": {"depth": 0}}}),
+    ));
+    let fresh = ok(edit(&fresh, json!({"op": "toggle", "nodeId": "p0"})));
+    assert_eq!(
+        boxes(&patched),
+        boxes(&fresh),
+        "the same drawing as a fresh import"
     );
 }
 
