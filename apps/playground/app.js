@@ -698,7 +698,7 @@ async function loadInitial(){
  const {groups,...plain}=graph;
  const projected=erProjection(plain);
  const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),
-  ...(domainGroups&&groups?{groups}:{}),...(collapseFirst!==''?{initialCollapse:{depth:Number(collapseFirst)}}:{})};
+  ...(domainGroups&&groups?{groups}:{}),...(collapseFirst!==''?{levelOfDetail:{depth:Number(collapseFirst)}}:{})};
  const importOptions=Object.keys(extra).length?{...(projected.options??{}),...extra}:projected.options;
  const limit=example==='default'&&!(budget>0)&&!abstracted?VIEW_LIMIT:EXAMPLE_LIMIT;
  const data=await execute('import',{op:'import',graph:projected.graph,limit,...(importOptions?{options:importOptions}:{})});

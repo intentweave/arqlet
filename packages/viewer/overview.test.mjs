@@ -157,9 +157,12 @@ test('the representation follows the user, then the rules of the data, then the 
   assert.deepEqual([...representationsOf(m, near, 400, 400, {rules: {dir: 'organic'}, decisions: new Map([['c', 'structured']])}).structured], [0]);
   assert.deepEqual([...representationsOf(m, near, 400, 400, {decisions: new Map([['c', 'collapsed']])}).collapsed], [0]);
   // A level of detail collapses the clusters from that depth on, before the zoom; the user's decision opens one again.
-  assert.deepEqual([...representationsOf(m, near, 400, 400, {depth: 0}).collapsed].sort(), [0, 3]);
-  assert.deepEqual([...representationsOf(m, near, 400, 400, {depth: 0, decisions: new Map([['c', 'organic']])}).collapsed], [3]);
-  assert.equal(representationsOf(m, near, 400, 400, {depth: 1}).structured.size, 1, 'deeper levels leave the top to the zoom');
+  assert.deepEqual([...representationsOf(m, near, 400, 400, {levelOfDetail: {depth: 0}}).collapsed].sort(), [0, 3]);
+  assert.deepEqual([...representationsOf(m, near, 400, 400, {levelOfDetail: {depth: 0}, decisions: new Map([['c', 'organic']])}).collapsed], [3]);
+  assert.equal(representationsOf(m, near, 400, 400, {levelOfDetail: {depth: 1}}).structured.size, 1, 'deeper levels leave the top to the zoom');
+  // By kind: the clusters of a kind listed are collapsed, the others left to the zoom.
+  assert.deepEqual([...representationsOf(m, near, 400, 400, {levelOfDetail: {kinds: ['dir']}}).collapsed].sort(), [0, 3]);
+  assert.equal(representationsOf(m, near, 400, 400, {levelOfDetail: {kinds: ['fn']}}).collapsed.size, 0);
   // Without the automatic policy everything without a decision or rule stays organic.
   const off = representationsOf(m, far, 400, 400, {auto: false});
   assert.equal(off.collapsed.size + off.structured.size, 0);
@@ -354,6 +357,6 @@ test('a chain of single children is drawn, named, picked and decided as one', ()
   const far = {centreX: 0, centreY: 0, scale: 10};
   assert.deepEqual([...representationsOf(m, far, 400, 400, {rules: {module: 'collapsed'}}).collapsed], [0]);
   // Opened by the level of detail, the whole chain opens: p is not collapsed again one level deeper.
-  const opened = representationsOf(m, far, 400, 400, {depth: 0, decisions: new Map([['f', 'organic']])});
+  const opened = representationsOf(m, far, 400, 400, {levelOfDetail: {depth: 0}, decisions: new Map([['f', 'organic']])});
   assert.deepEqual([...opened.collapsed], [4]);
 });

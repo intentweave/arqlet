@@ -5,8 +5,8 @@ import type { Bundling } from "./Bundling";
 import type { ContainerSizing } from "./ContainerSizing";
 import type { EdgeRouting } from "./EdgeRouting";
 import type { HybridCriterion } from "./HybridCriterion";
-import type { InitialCollapse } from "./InitialCollapse";
 import type { LabelSpec } from "./LabelSpec";
+import type { LevelOfDetail } from "./LevelOfDetail";
 import type { NodeSize } from "./NodeSize";
 import type { Objective } from "./Objective";
 import type { OrderHint } from "./OrderHint";
@@ -209,11 +209,11 @@ communities?: number,
  */
 groups?: { [key in string]: Array<string> },
 /**
- * Provisional: which containers an import shows collapsed: those at `depth` or deeper (0: every one; the top level is
- * depth 0) and those of the `kinds` listed. Unset (the default, omitted): none, except the containers that
- * `communities` and `groups` add, which start collapsed.
+ * Provisional: the level of detail, which containers an import shows collapsed: those at `depth` or deeper (0: every
+ * one; the top level is depth 0) and those of the `kinds` listed. Unset (the default, omitted): none, except the
+ * containers that `communities` and `groups` add, which start collapsed.
  */
-initialCollapse?: InitialCollapse | null,
+levelOfDetail?: LevelOfDetail | null,
 /**
  * Provisional (view state, set by `reveal`): containers shown in part. The children listed for a container are shown;
  * the others are gathered in a collapsed container `rest:<id>` of kind `rest` ("+N more"), which a `toggle` dissolves.

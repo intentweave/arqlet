@@ -32,6 +32,8 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
                     _ => options.padding = x,
                 }
             }
+            // Groups the data gives are read by `overview_of`, which adds them to the graph before the hierarchy.
+            "groups" => {}
             "chains" => {
                 options.chains = value
                     .as_bool()
@@ -149,12 +151,17 @@ fn representation_of(v: &Value, h: &overview::Hierarchy, kinds: &[&str]) -> Resu
         .keys()
         .filter(|k| !kinds.contains(&k.as_str()))
         .collect();
-    Ok(json!({
+    let mut out = json!({
         "decisions": intent.decisions,
         "rules": config.rules,
         "auto": config.auto.unwrap_or(true),
         "unknownKinds": unknown_kinds,
-    }))
+    });
+    // The level of detail, when the config set gives one.
+    if let Some(level) = config.level_of_detail {
+        out["levelOfDetail"] = serde_json::to_value(level).map_err(|e| e.to_string())?;
+    }
+    Ok(out)
 }
 
 /// Rounds a coordinate to hundredths, which keeps the response small; the layout itself is computed in full precision.
@@ -179,6 +186,15 @@ fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
     }
     validate(&graph)?;
     let options = options_of(v)?;
+    // Groups the data gives (node id → path of group names), as containers of kind `group`, the same as an import's
+    // `groups`; communities then divide what is still large.
+    let groups: std::collections::BTreeMap<String, Vec<String>> = match v["options"].get("groups") {
+        Some(g) => serde_json::from_value(g.clone()).map_err(|e| {
+            format!("Overview option groups must map node ids to paths of names: {e}")
+        })?,
+        None => Default::default(),
+    };
+    let graph = arqlet_layout::communities::with_given_groups(&graph, &groups)?;
     let h = overview::with_satellites(
         overview::with_communities(overview::hierarchy(&graph), options.communities)?,
         options.satellites,

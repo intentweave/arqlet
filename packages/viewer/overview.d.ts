@@ -148,9 +148,9 @@ export interface RepresentationOptions {
   collapsePixels?: number;
   structureShare?: number;
   rulePixels?: number;
-  /** A level of detail: clusters at this depth (0: the top level) or deeper are collapsed, after the user's decisions and
-   * the rules, before the zoom. Default null (off). */
-  depth?: number | null;
+  /** The level of detail: clusters at `depth` (0: the top level) or deeper and of the `kinds` listed are collapsed, after
+   * the user's decisions and the rules, before the zoom. The same value as an import's `levelOfDetail`. Default null. */
+  levelOfDetail?: import('@arqlet/contracts').LevelOfDetail | null;
 }
 /** The representation of every container for a view (ADR 0018, addendum): user, then rules, then zoom. */
 export function representationsOf(

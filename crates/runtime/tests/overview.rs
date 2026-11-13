@@ -364,3 +364,46 @@ fn chains_of_single_children_share_a_disc_when_asked() {
     assert!(r(&plain, 0) > r(&plain, 1), "off by default");
     assert_eq!(run(json!({"chains": 1}))["ok"], false);
 }
+
+#[test]
+fn the_overview_takes_groups_and_a_level_of_detail() {
+    let graph = json!({"nodes": [
+        {"id": "a", "kind": "service", "label": "A"},
+        {"id": "b", "kind": "service", "label": "B"},
+        {"id": "c", "kind": "service", "label": "C"}
+    ], "edges": [{"id": "e", "kind": "e", "source": "a", "target": "b"}]});
+    let preset: Value = serde_json::from_str(include_str!("../../../presets/auto.json")).unwrap();
+    let mut config = preset["configSet"].clone();
+    config["overview"] = json!({"levelOfDetail": {"depth": 0, "kinds": ["group"]}});
+    let out: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "threads": 1,
+            "options": {"groups": {"a": ["Core"], "b": ["Core"]}}, "configSet": config})
+        .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(out["ok"], true, "{out}");
+    let o = &out["overview"];
+    let ids: Vec<&str> = o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let group = ids
+        .iter()
+        .position(|id| id.starts_with("group:"))
+        .expect("a group container");
+    assert_eq!(o["labels"][group], "Core");
+    assert_eq!(
+        o["kinds"][o["kind"][group].as_u64().unwrap() as usize],
+        "group"
+    );
+    for member in ["a", "b"] {
+        let i = ids.iter().position(|id| *id == member).unwrap();
+        assert_eq!(o["parent"][i], group as i64);
+    }
+    assert_eq!(
+        o["representation"]["levelOfDetail"],
+        json!({"depth": 0, "kinds": ["group"]})
+    );
+}

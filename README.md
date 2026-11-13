@@ -176,14 +176,19 @@ that carries their number in both directions (`weight`, `backWeight` in the scen
 await session.import(graph, {options: {
   communities: 40,                       // divide containers of more than 40 children (Louvain)
   groups: {'fn-1': ['ECU A', 'X1']},     // or groups the domain gives: a path of names per node
-  initialCollapse: {depth: 1},           // and/or collapse containers from a depth or by kind
+  levelOfDetail: {depth: 1},             // and/or collapse containers from a depth or by kind
 }});
 await session.toggle('group:#:ECU A');   // open a group in place; the others keep their place
 ```
 
 Given groups come first; Louvain only divides what is still large. Groups exist only in
 the view: the source graph is never changed. In the playground: *Communities above*,
-*Domain groups*, *Collapse first*, and the example *Flat call graph*.
+*Domain groups*, *Level of detail*, and the example *Flat call graph*.
+
+The same words apply to both views (the session's layered view and the cluster overview):
+`groups`, `communities` divide what is large; `levelOfDetail: {depth, kinds}` says what is
+collapsed at first, and the user opens it (`toggle`, `reveal`, a double-click in the
+overview).
 
 ### Path cut-out
 
@@ -213,6 +218,20 @@ bindOverviewNavigation(canvas, renderer, {
   lens: () => ({radius: 180, magnification: 3}),
   idle: {after: 8000, breathe: {amplitude: 0.06}},   // off under reduced motion
 });
+```
+
+For hierarchical exports the overview can gather and fold what adds little (all off by
+default): `satellites` gathers a node with the siblings that send most of their edges to it
+(`<hub> +<n>`), `chains` draws a chain of single children (a package with one module
+with one file) as one disc, and `groups` takes the domain's groups as for an import. Added
+clusters are named after their most connected member (`≈ <name>`). A config set's
+`overview.levelOfDetail` collapses from a depth or by kind, and the renderer draws a kind
+as a circle, square, octagon or diamond:
+
+```js
+const {overview} = await run({op: 'overview', graph, options: {satellites: 0.6, chains: true},
+  configSet: {...base, overview: {levelOfDetail: {depth: 0}}}});
+const renderer = createOverviewRenderer(canvas, overviewModel(overview), {shapes: {service: 'square', package: 'octagon'}});
 ```
 
 See the [package README](packages/arqlet/README.md) and `apps/playground/overview.html`.

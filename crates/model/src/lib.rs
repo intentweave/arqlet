@@ -1546,11 +1546,20 @@ impl Graph {
     }
 }
 
-/// Which containers an import shows collapsed (`LayoutOptions::initial_collapse`).
+/// Refuses `initialCollapse`, renamed to `levelOfDetail` in engine 0.4.
+fn renamed_to_level_of_detail<'de, D: serde::Deserializer<'de>>(_: D) -> Result<(), D::Error> {
+    Err(serde::de::Error::custom(
+        "initialCollapse was renamed to levelOfDetail in engine 0.4",
+    ))
+}
+
+/// The level of detail (provisional): which containers a view shows collapsed at first, by depth and by kind; opening
+/// them is up to the user (`toggle`, `reveal`, or a click in the cluster overview). The same value for the layered view
+/// (`LayoutOptions::level_of_detail`) and the cluster overview (`OverviewConfig::level_of_detail`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
-pub struct InitialCollapse {
+pub struct LevelOfDetail {
     /// Containers at this depth or deeper (the top level is 0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth: Option<usize>,
@@ -1726,11 +1735,20 @@ pub struct LayoutOptions {
     /// than the imported view). Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub groups: BTreeMap<String, Vec<String>>,
-    /// Provisional: which containers an import shows collapsed: those at `depth` or deeper (0: every one; the top level is
-    /// depth 0) and those of the `kinds` listed. Unset (the default, omitted): none, except the containers that
-    /// `communities` and `groups` add, which start collapsed.
+    /// Provisional: the level of detail, which containers an import shows collapsed: those at `depth` or deeper (0: every
+    /// one; the top level is depth 0) and those of the `kinds` listed. Unset (the default, omitted): none, except the
+    /// containers that `communities` and `groups` add, which start collapsed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub initial_collapse: Option<InitialCollapse>,
+    pub level_of_detail: Option<LevelOfDetail>,
+    /// The name before engine 0.4 (`initialCollapse`), refused with a message that names the new one.
+    #[serde(
+        default,
+        rename = "initialCollapse",
+        skip_serializing,
+        deserialize_with = "renamed_to_level_of_detail"
+    )]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub renamed_initial_collapse: (),
     /// Provisional (view state, set by `reveal`): containers shown in part. The children listed for a container are shown;
     /// the others are gathered in a collapsed container `rest:<id>` of kind `rest` ("+N more"), which a `toggle` dissolves.
     /// Omitted when empty.
@@ -1897,7 +1915,8 @@ impl Default for LayoutOptions {
             visible_node_budget: 0,
             communities: 0,
             groups: BTreeMap::new(),
-            initial_collapse: None,
+            level_of_detail: None,
+            renamed_initial_collapse: (),
             partial: BTreeMap::new(),
             global_layering: false,
             hierarchical_ordering: true,
@@ -2433,6 +2452,11 @@ pub struct OverviewConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub auto: Option<bool>,
+    /// What is collapsed at first, after the user's decisions and the rules, before the zoom (the same value as
+    /// `LayoutOptions::level_of_detail`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub level_of_detail: Option<LevelOfDetail>,
 }
 
 /// Provisional (ADR 0018, addendum; ADR 0015): the user's decisions in the cluster overview as one value, by node id.

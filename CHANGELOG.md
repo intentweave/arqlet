@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **`initialCollapse` is now `levelOfDetail`** (`{depth?, kinds?}`, the same value for the layered view and the
+  cluster overview); `initialCollapse` is refused with a message that names the new option. The Rust type
+  `InitialCollapse` is `LevelOfDetail`, the field `LayoutOptions::level_of_detail`. Rename the option in requests and
+  in stored snapshots.
 - **`createSession` keeps the snapshot in the engine by default** (`resident: 'auto'`) where the engine can
   (`loadEngine`, `workerRun`): requests carry only the change and answers bring the scene. Measured in the browser path:
   a trace 20–30×, a scene 4–6× faster. **`session.snapshot` is then the session's state** (`revision`, `layoutVersion`,
@@ -23,9 +27,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - `session.trace(from, to)` and `session.reveal(nodeIds)` in `@arqlet/engine-client` (provisional).
 - Overview (provisional): option `satellites` (a share, off by default) gathers a node with the siblings that send at
   least that share of their edges to it, as a cluster named `<hub> +<n>`. Clusters the overview adds are named after
-  their most connected member (`overview.labels`: `≈ <name>` for a community). `representationsOf` takes a level of
-  detail `depth`: clusters from that depth on are collapsed until opened. Playground: *Satellites to their hub* and
-  *Collapse from level*; a double-click opens a collapsed cluster.
+  their most connected member (`overview.labels`: `≈ <name>` for a community). `representationsOf` takes the level of
+  detail (`levelOfDetail: {depth, kinds}`), and a config set's `overview.levelOfDetail` carries it to the engine:
+  clusters from that depth on, and of those kinds, are collapsed until opened. Overview option `groups` takes the
+  domain's groups as an import does. Playground: *Satellites to their hub* and
+  *Level of detail*; a double-click opens a collapsed cluster.
 - Overview: an outline per node kind (`circle`, `square`, `octagon`, `diamond`, inscribed in the disc, so the layout
   stays as it is): `overviewBuffers(…, {shapes})`, renderer option `shapes` and `setShapes`. Playground: a shape column
   in *Rules by kind*. A community inside another named after the same member is named after the next one.

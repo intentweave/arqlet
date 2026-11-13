@@ -67,7 +67,7 @@ async function measure(name, request) {
 }
 
 const limit = Math.min(nodes, 10000);
-const imported = await measure('import', {op: 'import', graph, limit, options: {initialCollapse: {depth: 1}}});
+const imported = await measure('import', {op: 'import', graph, limit, options: {levelOfDetail: {depth: 1}}});
 const snapshot = imported.snapshot;
 const visible = new Set(snapshot.graph.nodes.map(n => n.id));
 const container = snapshot.collapsedIds.find(c => visible.has(c));

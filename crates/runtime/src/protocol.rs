@@ -732,7 +732,7 @@ mod tests {
         let mut requests = vec![
             json!({"op": "optionDefaults"}),
             json!({"op": "import", "graph": graph, "limit": 100}),
-            json!({"op": "import", "graph": graph, "limit": 100, "options": {"communities": 2, "initialCollapse": {"depth": 0}}}),
+            json!({"op": "import", "graph": graph, "limit": 100, "options": {"communities": 2, "levelOfDetail": {"depth": 0}}}),
             json!({"op": "import", "graph": graph}),
             json!({"op": "import", "graph": graph, "limit": 0}),
             json!({"op": "import", "graph": {"nodes": 3}, "limit": 10}),
