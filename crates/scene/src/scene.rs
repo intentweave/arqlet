@@ -239,6 +239,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     let straight: BTreeSet<&str> = snapshot.straight_edges.iter().map(String::as_str).collect();
     let edges: BTreeMap<&str, &Edge> = graph.edges.iter().map(|e| (e.id.as_str(), e)).collect();
     let mut routes = Vec::new();
+    let weighted = snapshot.weighted_routes();
     let mut pulled_ids: BTreeSet<String> = BTreeSet::new();
     for route in snapshot.routes.iter().filter(|r| r.bundle_of.is_none()) {
         let edge = edges
@@ -321,11 +322,15 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             points,
             // An edge that stands for collapsed content: its weights come from the view (`aggregate_weights`), whichever
             // path computed the route.
-            weight: snapshot
-                .options
-                .aggregate_weights
-                .get(&route.id)
-                .map_or(route.weight, |w| w.forward.max(1)),
+            weight: match &weighted {
+                // With input weights: the edges it stands for (`Snapshot::weighted_routes`).
+                Some(w) => w.get(&route.id).copied().unwrap_or(route.weight),
+                None => snapshot
+                    .options
+                    .aggregate_weights
+                    .get(&route.id)
+                    .map_or(route.weight, |w| w.forward.max(1)),
+            },
             back_weight: snapshot
                 .options
                 .aggregate_weights

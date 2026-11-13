@@ -640,6 +640,7 @@ mod tests {
             kind: "flow".into(),
             source: "b".into(),
             target: Some("d".into()),
+            weight: None,
         });
         assert!(check_tree_areas(&diamond)
             .unwrap_err()
@@ -656,6 +657,7 @@ mod tests {
             kind: "flow".into(),
             source: "a".into(),
             target: Some("a".into()),
+            weight: None,
         });
         // A self-loop is allowed in a tree area: the arrangement ignores it, and the router draws it.
         assert!(check_tree_areas(&looped).is_ok());

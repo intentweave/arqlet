@@ -106,8 +106,10 @@ pub struct Hierarchy {
     pub roots: Vec<usize>,
     /// The resolved edges as node index pairs, in input order (self-loops and parallel edges kept).
     pub edges: Vec<(usize, usize)>,
+    /// How many edges each of `edges` stands for (`Edge::weight`, 1 when left out).
+    pub weights: Vec<f64>,
     /// Per container (the root last, at index `ids.len()`): the links between its children that the edges below it make,
-    /// as (child, child, number of edges), each pair once with the smaller child index first, in index order. An edge
+    /// as (child, child, number of edges by weight), each pair once with the smaller child index first, in index order. An edge
     /// counts in the container that is the lowest common ancestor of its ends; an edge between a container and its own
     /// descendant, and a self-loop, count nowhere.
     pub links: Vec<Vec<(usize, usize, f64)>>,
@@ -152,16 +154,19 @@ pub fn hierarchy(graph: &Graph) -> Hierarchy {
                 .and_then(|p| index.get(p).copied())
         })
         .collect();
-    let edges: Vec<(usize, usize)> = graph
+    let (edges, weights): (Vec<(usize, usize)>, Vec<f64>) = graph
         .edges
         .iter()
         .filter_map(|e| {
             let target = e.target.as_deref()?;
-            Some((*index.get(e.source.as_str())?, *index.get(target)?))
+            Some((
+                (*index.get(e.source.as_str())?, *index.get(target)?),
+                e.count() as f64,
+            ))
         })
-        .collect();
+        .unzip();
     let ids = graph.nodes.iter().map(|node| node.id.clone()).collect();
-    build(ids, parent, edges, graph.nodes.len())
+    build(ids, parent, edges, weights, graph.nodes.len())
 }
 
 /// The children, roots and links of a hierarchy given by its parents. `real` is the number of nodes from the graph; the
@@ -170,6 +175,7 @@ fn build(
     ids: Vec<String>,
     parent: Vec<Option<usize>>,
     edges: Vec<(usize, usize)>,
+    weights: Vec<f64>,
     real: usize,
 ) -> Hierarchy {
     let n = ids.len();
@@ -192,7 +198,7 @@ fn build(
         depth[i] = d;
     }
     let mut counted: Vec<BTreeMap<(usize, usize), f64>> = vec![BTreeMap::new(); n + 1];
-    for &(a, b) in &edges {
+    for (&(a, b), &w) in edges.iter().zip(&weights) {
         if a == b {
             continue;
         }
@@ -213,7 +219,7 @@ fn build(
             v = parent[v].unwrap();
         }
         let slot = parent[u].unwrap_or(n);
-        *counted[slot].entry((u.min(v), u.max(v))).or_default() += 1.;
+        *counted[slot].entry((u.min(v), u.max(v))).or_default() += w;
     }
     let links = counted
         .into_iter()
@@ -225,6 +231,7 @@ fn build(
         children,
         roots,
         edges,
+        weights,
         links,
         real,
     }
@@ -372,10 +379,10 @@ pub fn with_communities(h: Hierarchy, threshold: usize) -> Result<Hierarchy, Str
             }
         }
     }
-    Ok(build(ids, parent, h.edges, h.real))
+    Ok(build(ids, parent, h.edges, h.weights, h.real))
 }
 
-/// For every node, the edges with exactly one end in its subtree.
+/// For every node, the edges with exactly one end in its subtree (by weight).
 fn outward_edges(h: &Hierarchy) -> Vec<f64> {
     let n = h.ids.len();
     let mut outward = vec![0.; n];
@@ -387,7 +394,7 @@ fn outward_edges(h: &Hierarchy) -> Vec<f64> {
         }
         chain
     };
-    for &(a, b) in &h.edges {
+    for (&(a, b), &w) in h.edges.iter().zip(&h.weights) {
         if a == b {
             continue;
         }
@@ -400,7 +407,7 @@ fn outward_edges(h: &Hierarchy) -> Vec<f64> {
             .collect();
         for x in up_a.iter().chain(&up_b) {
             if !shared.contains(x) {
-                outward[*x] += 1.;
+                outward[*x] += w;
             }
         }
     }
@@ -490,7 +497,7 @@ pub fn with_satellites(h: Hierarchy, share: f64) -> Result<Hierarchy, String> {
             }
         }
     }
-    Ok(build(ids, parent, h.edges, h.real))
+    Ok(build(ids, parent, h.edges, h.weights, h.real))
 }
 
 /// Names for the clusters the overview added (from index `h.real` on), after their most connected member: the node of
@@ -1195,6 +1202,7 @@ mod tests {
             kind: "e".into(),
             source: s.into(),
             target: t.map(Into::into),
+            weight: None,
         }
     }
 
@@ -1502,7 +1510,8 @@ mod tests {
         ids.push("community:#:2.0".into());
         ids.push("community:#:1.0".into());
         let parent = vec![Some(4), Some(4), Some(3), None, Some(3)];
-        let h = build(ids, parent, hierarchy(&graph).edges, 3);
+        let base = hierarchy(&graph);
+        let h = build(ids, parent, base.edges, base.weights, 3);
         assert_eq!(
             cluster_labels(&h, &[]),
             vec!["≈ hub".to_string(), "≈ b".to_string()],

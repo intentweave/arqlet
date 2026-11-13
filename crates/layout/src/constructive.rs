@@ -3270,6 +3270,7 @@ mod tests {
                     kind: "calls".into(),
                     source: s.into(),
                     target: Some(t.into()),
+                    weight: None,
                 })
                 .collect(),
             buses: Vec::new(),

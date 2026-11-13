@@ -18,6 +18,8 @@ mod curation_reroute;
 mod directed_repair;
 #[path = "drag_region.rs"]
 mod drag_region;
+#[path = "edge_weights.rs"]
+mod edge_weights;
 #[path = "elk.rs"]
 mod elk;
 #[path = "engine_choice.rs"]

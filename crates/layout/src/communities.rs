@@ -123,7 +123,7 @@ pub fn with_community_containers(graph: &Graph, threshold: usize) -> Result<Grap
     if h.ids.len() == h.real {
         return Ok(graph.clone());
     }
-    // Edges per graph node: self-loops count once, unresolved edges not at all.
+    // Edges per graph node (by weight): self-loops count once, unresolved edges not at all.
     let index: BTreeMap<&str, usize> = graph
         .nodes
         .iter()
@@ -136,9 +136,10 @@ pub fn with_community_containers(graph: &Graph, threshold: usize) -> Result<Grap
             continue;
         };
         if let (Some(&a), Some(&b)) = (index.get(edge.source.as_str()), index.get(target)) {
-            degree[a] += 1;
+            // By weight: an edge standing for several counts as many (saturating: 32-bit in WASM).
+            degree[a] = degree[a].saturating_add(edge.count());
             if b != a {
-                degree[b] += 1;
+                degree[b] = degree[b].saturating_add(edge.count());
             }
         }
     }

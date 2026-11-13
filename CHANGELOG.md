@@ -19,6 +19,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Input edge weights (provisional): `Edge.weight` (a whole number of at least 1, omitted when 1) says how many edges an
+  input edge stands for (pre-aggregated relations). A bundle, a route for collapsed content (`weight`, `backWeight`)
+  and the filter's recount count it that many times, so the drawn width follows it; the overview's links,
+  communities, satellites and cluster names pull by it. Weights do not move anything; without them the output is
+  byte-identical. A bundle that loses members to the filter now weighs what it still carries.
 - `trace` takes `edgeKinds` (provisional): the paths follow only edges of those kinds; `session.trace(from, to,
   {edgeKinds})`; the playground can follow the edge kinds its filter shows. `arqlet_view::trace_along` takes any edge
   predicate.

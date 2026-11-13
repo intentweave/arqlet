@@ -442,6 +442,7 @@ pub fn add_node(
         kind: "calls".into(),
         source: source_id.into(),
         target: Some(id.clone()),
+        weight: None,
     });
     let View {
         graph: view,
@@ -6491,12 +6492,14 @@ mod tests {
                     kind: "calls".into(),
                     source: "a".into(),
                     target: Some("d".into()),
+                    weight: None,
                 },
                 Edge {
                     id: "bc".into(),
                     kind: "calls".into(),
                     source: "b".into(),
                     target: Some("c".into()),
+                    weight: None,
                 },
             ],
             buses: Vec::new(),

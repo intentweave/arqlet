@@ -648,6 +648,7 @@ mod tests {
                     kind: "edge".into(),
                     source: source.into(),
                     target: Some(target.into()),
+                    weight: None,
                 })
                 .to_vec(),
             buses: Vec::new(),
@@ -880,6 +881,7 @@ mod tests {
             kind: "edge".into(),
             source: "c".into(),
             target: Some("d".into()),
+            weight: None,
         });
         let mut second = fixed[0].clone();
         second.id = "second".into();

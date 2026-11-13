@@ -170,7 +170,10 @@ await session.apply({op: 'strategy', nodeId: 'org', strategy: 'radial'});
 
 Large containers and flat graphs are divided into groups that start collapsed; a
 collapsed group is one box, and the edges it exchanges with another group are one route
-that carries their number in both directions (`weight`, `backWeight` in the scene).
+that carries their number in both directions (`weight`, `backWeight` in the scene). An
+input edge that already stands for several (a pre-aggregated relation) says how many with
+`weight` (`{id, kind, source, target, weight: 12}`); it counts as many in these routes, in
+bundles, in the filter's recount and in the overview's pull, and does not move anything.
 
 ```js
 await session.import(graph, {options: {

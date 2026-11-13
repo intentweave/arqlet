@@ -2314,6 +2314,7 @@ mod tests {
             kind: "flow".into(),
             source: "a".into(),
             target: Some("a".into()),
+            weight: None,
         });
         let drawn = crate::compute(&looped, None, &BTreeSet::new(), &options).unwrap();
         let looping = drawn.routes.iter().find(|r| r.id == "loop").unwrap();

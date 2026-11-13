@@ -100,7 +100,7 @@ pub fn merge_aggregated(source: &Graph, mut projected: Graph) -> Graph {
 
 /// Provisional (communities): the projection with every pair of visible ends that a collapsed container joins drawn by one
 /// edge, both directions together. The first edge of the pair (in the projection's order) stands for the others; the
-/// returned map says, by its id, how many edges it stands for in its own direction and in the other. Edges between nodes
+/// returned map says, by its id, how many edges it stands for in its own direction and in the other (by `Edge::weight`). Edges between nodes
 /// that are both visible as themselves are all kept, parallel and opposite ones included. The canonical graph is unchanged.
 pub fn merge_aggregated_pairs(
     source: &Graph,
@@ -139,7 +139,7 @@ pub fn merge_aggregated_pairs(
                 weights.insert(
                     e.id.clone(),
                     AggregateWeight {
-                        forward: 1,
+                        forward: e.count(),
                         backward: 0,
                     },
                 );
@@ -148,10 +148,11 @@ pub fn merge_aggregated_pairs(
             Some(first) => {
                 let same = endpoints[first].0 == e.source;
                 let weight = weights.get_mut(first).expect("a weight per representative");
+                // By weight (`Edge::weight`); saturating, as `usize` is 32-bit in WASM.
                 if same {
-                    weight.forward += 1;
+                    weight.forward = weight.forward.saturating_add(e.count());
                 } else {
-                    weight.backward += 1;
+                    weight.backward = weight.backward.saturating_add(e.count());
                 }
                 false
             }
