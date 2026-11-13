@@ -44,7 +44,7 @@ const scene = await session.scene();    // renderSvg(svg, scene) or toReactFlow(
 ```
 
 For large graphs, import with groups that start collapsed (`options: {communities: 40}`, or `groups` your domain
-gives, or `initialCollapse: {depth: 1}`), and follow a path between two nodes with `session.trace(from, to)` and
+gives, or `levelOfDetail: {depth: 1}`), and follow a path between two nodes with `session.trace(from, to)` and
 `session.reveal(nodes)`; see the repository README, section *Large graphs*.
 
 Changes run one after the other on the newest snapshot. A change that a new `import`

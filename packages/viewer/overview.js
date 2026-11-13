@@ -183,7 +183,7 @@ export const REPRESENTATIONS = ['collapsed', 'organic', 'structured'];
  */
 export function representationsOf(model, view, width, height, {
   decisions = new Map(), rules = {}, auto = true, limit = 300, current = new Set(), focus = null,
-  collapsePixels = 14, structureShare = 0.35, rulePixels = 80, depth = null,
+  collapsePixels = 14, structureShare = 0.35, rulePixels = 80, levelOfDetail = null,
 } = {}) {
   const o = model.overview, collapsed = new Set(), structured = new Set();
   const screenRadius = i => o.r[i] * view.scale;
@@ -204,8 +204,12 @@ export function representationsOf(model, view, width, height, {
     const rule = o.kinds && o.kind ? chainOf(model, i).map(j => rules[o.kinds[o.kind[j]]]).find(r => r) : undefined;
     if (rule === 'collapsed' || rule === 'organic') return rule;
     if (rule === 'structured' && fits(i) && screenRadius(i) >= rulePixels && inView(i)) return 'structured';
-    // A level of detail: clusters from this depth on are shown collapsed until the user opens them.
-    if (depth !== null && model.depth[i] >= depth) return 'collapsed';
+    // The level of detail: clusters from its depth on, and of its kinds, are collapsed until the user opens them.
+    if (levelOfDetail) {
+      const {depth = null, kinds = []} = levelOfDetail;
+      if (depth !== null && model.depth[i] >= depth) return 'collapsed';
+      if (kinds.length && o.kinds && o.kind && chainOf(model, i).some(j => kinds.includes(o.kinds[o.kind[j]]))) return 'collapsed';
+    }
     if (!auto) return 'organic';
     const r = screenRadius(i);
     if (r < collapsePixels) return 'collapsed';

@@ -114,7 +114,10 @@ function request(extra = {}) {
     ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {}),
     ...($('chains').checked ? {chains: true} : {})};
   const values = {op: 'overview', graph, threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
-  if (baseConfig) values.configSet = {...baseConfig, overview: {rules, auto: $('auto').checked}};
+  // The level of detail travels in the config set, so that the engine checks it (a config set needs its base: without
+  // one it acts in the viewer only).
+  const levelOfDetail = levelOfDetailOf();
+  if (baseConfig) values.configSet = {...baseConfig, overview: {rules, auto: $('auto').checked, ...(levelOfDetail ? {levelOfDetail} : {})}};
   return values;
 }
 
@@ -203,7 +206,7 @@ async function evaluate() {
   const focusPoint = pointer ? renderer.world(...pointer) : null;
   const wanted = representationsOf(model, renderer.view, c.clientWidth, c.clientHeight, {
     decisions, rules, auto: $('auto').checked, limit: limit(), current, focus: focusPoint,
-    collapsePixels: number('collapse-px'), structureShare: number('structure-share') / 100, depth: levelOfDetail(),
+    collapsePixels: number('collapse-px'), structureShare: number('structure-share') / 100, levelOfDetail: levelOfDetailOf(),
   });
   if (!sameSet(wanted.collapsed, collapsed)) { collapsed = wanted.collapsed; redraw(FADE); }
   const want = new Map([...wanted.structured].map(i => [model.overview.ids[i], sceneKey(model.overview.ids[i])]));
@@ -298,10 +301,15 @@ function clusterOf(i) {
   return c < 0 ? -1 : model.chainTop[c];
 }
 
-/** The level from which clusters are collapsed until opened, or null. */
+/** The depth from which clusters are collapsed until opened, or null. */
 function levelOfDetail() {
   const value = $('levels').value.trim();
   return value === '' || !(Number(value) >= 0) ? null : Math.floor(Number(value));
+}
+/** The level of detail as the engine and `representationsOf` take it, or null. */
+function levelOfDetailOf() {
+  const depth = levelOfDetail();
+  return depth === null ? null : {depth};
 }
 
 /** How cluster `i` is shown now, and why. */

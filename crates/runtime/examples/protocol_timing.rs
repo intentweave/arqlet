@@ -58,7 +58,7 @@ fn main() {
     let nodes = graph["nodes"].as_array().map_or(0, Vec::len);
     let limit = nodes.min(arqlet_runtime::MAX_VIEW_LIMIT);
     let import = json!({"op": "import", "graph": graph, "limit": limit,
-        "options": {"initialCollapse": {"depth": 1}}})
+        "options": {"levelOfDetail": {"depth": 1}}})
     .to_string();
     let answer: Value = serde_json::from_str(&measure("import", &import, reps, nodes)).unwrap();
     let snapshot = &answer["snapshot"];

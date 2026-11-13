@@ -443,9 +443,9 @@ fn nested() -> Value {
 }
 
 #[test]
-fn an_initial_collapse_shows_containers_collapsed_by_depth_or_kind() {
+fn a_level_of_detail_shows_containers_collapsed_by_depth_or_kind() {
     let all = ok(call(
-        json!({"op": "import", "graph": nested(), "limit": 100, "options": {"initialCollapse": {"depth": 0}}}),
+        json!({"op": "import", "graph": nested(), "limit": 100, "options": {"levelOfDetail": {"depth": 0}}}),
     ));
     let visible: Vec<&str> = all["graph"]["nodes"]
         .as_array()
@@ -463,7 +463,7 @@ fn an_initial_collapse_shows_containers_collapsed_by_depth_or_kind() {
         6
     );
     let files = ok(call(
-        json!({"op": "import", "graph": nested(), "limit": 100, "options": {"initialCollapse": {"kinds": ["file"]}}}),
+        json!({"op": "import", "graph": nested(), "limit": 100, "options": {"levelOfDetail": {"kinds": ["file"]}}}),
     ));
     let kinds: Vec<&str> = files["graph"]["nodes"]
         .as_array()
@@ -474,7 +474,7 @@ fn an_initial_collapse_shows_containers_collapsed_by_depth_or_kind() {
     assert_eq!(kinds.iter().filter(|k| **k == "file").count(), 6);
     assert_eq!(kinds.iter().filter(|k| **k == "function").count(), 0);
     let one = ok(call(
-        json!({"op": "import", "graph": nested(), "limit": 100, "options": {"initialCollapse": {"depth": 1}}}),
+        json!({"op": "import", "graph": nested(), "limit": 100, "options": {"levelOfDetail": {"depth": 1}}}),
     ));
     assert_eq!(
         ids(&one, "file").len(),
@@ -748,4 +748,28 @@ fn opening_and_closing_a_group_returns_to_the_drawing_of_the_import() {
         up["boxes"], open["boxes"],
         "the same view, the same drawing"
     );
+}
+
+#[test]
+fn the_name_before_engine_0_4_is_refused_with_the_new_one() {
+    let graph = serde_json::json!({"nodes": [{"id": "a", "kind": "n", "label": "a"}], "edges": []});
+    for request in [
+        serde_json::json!({"op": "import", "graph": graph, "limit": 10, "options": {"initialCollapse": {"depth": 0}}}),
+        serde_json::json!({"op": "import", "graph": graph, "limit": 10, "options": {"levelOfDetail": {"depth": 0}}}),
+    ] {
+        let out: serde_json::Value =
+            serde_json::from_str(&arqlet_runtime::dispatch(&request.to_string())).unwrap();
+        if request["options"].get("initialCollapse").is_some() {
+            assert_eq!(out["ok"], false);
+            assert!(
+                out["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains("renamed to levelOfDetail"),
+                "{out}"
+            );
+        } else {
+            assert_eq!(out["ok"], true, "{out}");
+        }
+    }
 }

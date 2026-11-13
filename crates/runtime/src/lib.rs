@@ -161,7 +161,7 @@ fn derives_groups(options: &LayoutOptions) -> bool {
 /// Whether the view abstracts (provisional): with derived groups or an initial collapse, the edges between collapsed
 /// containers are drawn by one route per pair with their weights (`merge_aggregated_pairs`).
 pub(crate) fn abstracts(options: &LayoutOptions) -> bool {
-    derives_groups(options) || options.initial_collapse.is_some()
+    derives_groups(options) || options.level_of_detail.is_some()
 }
 
 /// Whether the projection draws the edges a collapsed container aggregates once per pair: with a node budget, and when
@@ -170,7 +170,7 @@ fn aggregates(options: &LayoutOptions) -> bool {
     options.visible_node_budget > 0 || abstracts(options)
 }
 
-/// The containers the first view of an import shows collapsed, besides a node budget's: those `initial_collapse` names
+/// The containers the first view of an import shows collapsed, besides a node budget's: those `level_of_detail` names
 /// (at a depth or deeper, of a kind), else the groups and communities the view added.
 fn initially_collapsed(view: &Graph, options: &LayoutOptions) -> BTreeSet<String> {
     let parent: BTreeMap<&str, Option<&str>> = view
@@ -195,7 +195,7 @@ fn initially_collapsed(view: &Graph, options: &LayoutOptions) -> BTreeSet<String
     view.nodes
         .iter()
         .filter(|n| containers.contains(n.id.as_str()))
-        .filter(|n| match &options.initial_collapse {
+        .filter(|n| match &options.level_of_detail {
             Some(c) => c.depth.is_some_and(|d| depth(&n.id) >= d) || c.kinds.contains(&n.kind),
             None => {
                 n.kind == arqlet_layout::communities::COMMUNITY_KIND
