@@ -295,6 +295,169 @@ fn trace_directed(
     }
 }
 
+/// Provisional: which way a `neighbourhood` follows edges.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reach {
+    /// Along the edges (what the start leads to).
+    Out,
+    /// Against the edges (what leads to the start).
+    In,
+    /// Either way.
+    Both,
+}
+
+/// The nodes within some hops of start nodes (`neighbourhood`), in the graph's order.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Neighbourhood {
+    pub nodes: Vec<String>,
+    /// The edges the neighbourhood was reached by: a followed edge that leaves a node closer than the hop limit in an
+    /// allowed direction (so edges between two nodes at the limit are not part of it).
+    pub edges: Vec<String>,
+    /// The hops of every node from the nearest start (0 for a start).
+    pub hops: BTreeMap<String, usize>,
+}
+
+/// Provisional: the nodes and edges within `hops` edges of the `starts` in `graph`, following only edges `follow` accepts,
+/// in the direction `reach` allows. Unresolved edges are left out; cycles, self-loops and parallel edges are allowed.
+/// Unknown start ids are an error.
+pub fn neighbourhood(
+    graph: &Graph,
+    starts: &[&str],
+    hops: usize,
+    reach: Reach,
+    follow: impl Fn(&Edge) -> bool,
+) -> Result<Neighbourhood, String> {
+    let index: BTreeMap<&str, usize> = graph
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+    let mut start = Vec::new();
+    for id in starts {
+        start.push(*index.get(id).ok_or_else(|| format!("Unknown node: {id}"))?);
+    }
+    let n = graph.nodes.len();
+    let edges: Vec<(usize, usize, &str)> = graph
+        .edges
+        .iter()
+        .filter(|e| follow(e))
+        .filter_map(|e| {
+            let t = *index.get(e.target.as_deref()?)?;
+            Some((*index.get(e.source.as_str())?, t, e.id.as_str()))
+        })
+        .collect();
+    let mut next = vec![Vec::new(); n];
+    for &(a, b, _) in &edges {
+        if matches!(reach, Reach::Out | Reach::Both) {
+            next[a].push(b);
+        }
+        if matches!(reach, Reach::In | Reach::Both) {
+            next[b].push(a);
+        }
+    }
+    let mut dist = vec![usize::MAX; n];
+    let mut queue = std::collections::VecDeque::new();
+    for &s in &start {
+        if dist[s] == usize::MAX {
+            dist[s] = 0;
+            queue.push_back(s);
+        }
+    }
+    while let Some(v) = queue.pop_front() {
+        if dist[v] >= hops {
+            continue;
+        }
+        for &w in &next[v] {
+            if dist[w] == usize::MAX {
+                dist[w] = dist[v] + 1;
+                queue.push_back(w);
+            }
+        }
+    }
+    let inside = |v: usize| dist[v] < hops;
+    let reached = |v: usize| dist[v] != usize::MAX;
+    let used = |a: usize, b: usize| {
+        (matches!(reach, Reach::Out | Reach::Both) && inside(a) && reached(b))
+            || (matches!(reach, Reach::In | Reach::Both) && inside(b) && reached(a))
+    };
+    Ok(Neighbourhood {
+        nodes: (0..n)
+            .filter(|&v| reached(v))
+            .map(|v| graph.nodes[v].id.clone())
+            .collect(),
+        edges: edges
+            .iter()
+            .filter(|&&(a, b, _)| used(a, b))
+            .map(|&(_, _, id)| id.to_string())
+            .collect(),
+        hops: (0..n)
+            .filter(|&v| reached(v))
+            .map(|v| (graph.nodes[v].id.clone(), dist[v]))
+            .collect(),
+    })
+}
+
+#[cfg(test)]
+mod neighbourhood_tests {
+    use super::*;
+
+    fn graph() -> Graph {
+        // a → b → c → d, b → b (loop), e → b, c → a (cycle), x unresolved from d, a → b twice (parallel).
+        serde_json::from_value(serde_json::json!({
+            "nodes": (["a", "b", "c", "d", "e", "f"].iter().map(|id| serde_json::json!({"id": id, "kind": "n", "label": id})).collect::<Vec<_>>()),
+            "edges": [
+                {"id": "ab", "kind": "calls", "source": "a", "target": "b"},
+                {"id": "ab2", "kind": "calls", "source": "a", "target": "b"},
+                {"id": "bc", "kind": "calls", "source": "b", "target": "c"},
+                {"id": "cd", "kind": "data", "source": "c", "target": "d"},
+                {"id": "bb", "kind": "calls", "source": "b", "target": "b"},
+                {"id": "eb", "kind": "calls", "source": "e", "target": "b"},
+                {"id": "ca", "kind": "calls", "source": "c", "target": "a"},
+                {"id": "dx", "kind": "calls", "source": "d", "target": null}
+            ]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn hops_direction_and_kinds_bound_the_neighbourhood() {
+        let g = graph();
+        let all = |_: &Edge| true;
+        let out1 = neighbourhood(&g, &["b"], 1, Reach::Out, all).unwrap();
+        assert_eq!(out1.nodes, ["b", "c"]);
+        assert_eq!(out1.edges, ["bc", "bb"]);
+        assert_eq!(out1.hops["c"], 1);
+        let in1 = neighbourhood(&g, &["b"], 1, Reach::In, all).unwrap();
+        assert_eq!(in1.nodes, ["a", "b", "e"]);
+        assert_eq!(in1.edges, ["ab", "ab2", "bb", "eb"]);
+        let both2 = neighbourhood(&g, &["b"], 2, Reach::Both, all).unwrap();
+        assert_eq!(both2.nodes, ["a", "b", "c", "d", "e"]);
+        assert_eq!(both2.hops["d"], 2);
+        // ca joins two nodes at hop 1: reached from c (hop 1 < 2), so it is part of it.
+        assert!(both2.edges.contains(&"ca".to_string()));
+        // Only data edges from c: d; the calls are not followed.
+        let data = neighbourhood(&g, &["c"], 3, Reach::Both, |e: &Edge| e.kind == "data").unwrap();
+        assert_eq!(data.nodes, ["c", "d"]);
+        assert_eq!(data.edges, ["cd"]);
+        // Zero hops: the starts alone; several starts; an unknown start is an error.
+        assert_eq!(
+            neighbourhood(&g, &["a", "e"], 0, Reach::Both, all)
+                .unwrap()
+                .nodes,
+            ["a", "e"]
+        );
+        assert!(neighbourhood(&g, &["nowhere"], 1, Reach::Both, all).is_err());
+        // f has no edges: only itself.
+        assert_eq!(
+            neighbourhood(&g, &["f"], 5, Reach::Both, all)
+                .unwrap()
+                .nodes,
+            ["f"]
+        );
+    }
+}
+
 #[cfg(test)]
 mod trace_tests {
     use super::*;

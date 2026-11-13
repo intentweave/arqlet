@@ -4,7 +4,7 @@
 //! path, so that a renderer can highlight the path and fade the rest. Read only: the snapshot is not changed.
 use crate::structured;
 use arqlet_model::Snapshot;
-use arqlet_view::{trace_along, TraceMode};
+use arqlet_view::{neighbourhood, trace_along, Reach, TraceMode};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -31,21 +31,53 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
         Some("all") => TraceMode::All,
         Some(other) => return Err(format!("Unknown trace mode: {other}")),
     };
-    let kinds: Option<BTreeSet<String>> = match v.get("edgeKinds") {
-        None | Some(Value::Null) => None,
-        Some(k) => {
-            let kinds: BTreeSet<String> = serde_json::from_value(k.clone())
-                .map_err(|_| "Trace edgeKinds must be a list of edge kinds")?;
-            if kinds.is_empty() {
-                return Err("Trace edgeKinds must name at least one kind (leave it out to follow every edge)".into());
-            }
-            Some(kinds)
-        }
-    };
+    let kinds = edge_kinds_of(v, "Trace")?;
     let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
     let path = trace_along(canonical, from, to, mode, |e| {
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;
+    let (nodes, routes, distance) = on_view(snapshot, &path.nodes, &path.edges, &kinds)?;
+    Ok(json!({
+        "ok": true,
+        "found": path.length.is_some(),
+        "reversed": path.reversed,
+        "length": path.length,
+        "nodes": path.nodes,
+        "edges": path.edges,
+        "visible": {"nodes": nodes, "routes": routes},
+        "distance": distance,
+    }))
+}
+
+/// The `edgeKinds` of a request (`what` names the operation in errors): `None` follows every edge.
+pub(crate) fn edge_kinds_of(v: &Value, what: &str) -> Result<Option<BTreeSet<String>>, String> {
+    match v.get("edgeKinds") {
+        None | Some(Value::Null) => Ok(None),
+        Some(k) => {
+            let kinds: BTreeSet<String> = serde_json::from_value(k.clone())
+                .map_err(|_| format!("{what} edgeKinds must be a list of edge kinds"))?;
+            if kinds.is_empty() {
+                return Err(format!(
+                    "{what} edgeKinds must name at least one kind (leave it out to follow every edge)"
+                ));
+            }
+            Ok(Some(kinds))
+        }
+    }
+}
+
+/// What of some source-graph nodes and edges the current view shows: the visible boxes that hold the nodes (sorted), the
+/// routes that carry the edges (preferring a drawn edge of a followed kind), and the hops of every visible node from
+/// those boxes through the drawn edges (for fading).
+pub(crate) type OnView = (Vec<String>, BTreeSet<String>, BTreeMap<String, usize>);
+
+pub(crate) fn on_view(
+    snapshot: &Snapshot,
+    path_nodes: &[String],
+    path_edges: &[String],
+    kinds: &Option<BTreeSet<String>>,
+) -> Result<OnView, String> {
+    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
     // The visible node of every node of the view: itself, or the outermost collapsed container above it.
     let view = structured(canonical, &snapshot.options)?;
     let parent: BTreeMap<&str, Option<&str>> = view
@@ -69,7 +101,7 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
         }
         shown.map(String::from)
     };
-    let mut nodes: Vec<String> = path.nodes.iter().filter_map(|n| owner(n)).collect();
+    let mut nodes: Vec<String> = path_nodes.iter().filter_map(|n| owner(n)).collect();
     nodes.sort();
     nodes.dedup();
     // The routes that carry the path's edges: the edge itself when it is drawn, else the edge the view draws between the
@@ -97,7 +129,7 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
             .is_none_or(|k| drawn_kind.get(id).is_some_and(|kind| k.contains(*kind)))
     };
     let mut routes = BTreeSet::new();
-    for edge in &path.edges {
+    for edge in path_edges {
         let (s, Some(t)) = ends[edge.as_str()] else {
             continue;
         };
@@ -154,13 +186,66 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
             }
         }
     }
+    Ok((nodes, routes, distance))
+}
+
+/// Provisional: the `neighbourhood` operation (read only). The nodes within `hops` edges (default 1) of `nodeId` (or of
+/// each of `nodeIds`), following edges `out`, `in` or `both` ways (`direction`, default `both`), only of `edgeKinds` if
+/// given; and what of them the current view shows, as for `trace`, so that a host can highlight them or `reveal` them.
+pub fn neighbourhood_response(v: &Value) -> Value {
+    let result = serde_json::from_value::<Snapshot>(v["snapshot"].clone())
+        .map_err(|e| e.to_string())
+        .and_then(|snapshot| neighbourhood_on(&snapshot, v));
+    match result {
+        Ok(result) => result,
+        Err(error) => json!({"ok": false, "error": error}),
+    }
+}
+
+/// The neighbourhood of the request `v` on a snapshot the caller holds (a session's).
+pub fn neighbourhood_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
+    let starts: Vec<&str> = match (v.get("nodeId"), v.get("nodeIds")) {
+        (Some(id), None) => vec![id
+            .as_str()
+            .ok_or("Neighbourhood nodeId must be a node id")?],
+        (None, Some(ids)) => ids
+            .as_array()
+            .filter(|ids| !ids.is_empty())
+            .ok_or("Neighbourhood nodeIds must be a non-empty list of node ids")?
+            .iter()
+            .map(|id| id.as_str().ok_or("Neighbourhood nodeIds must be node ids"))
+            .collect::<Result<_, _>>()?,
+        _ => return Err("Neighbourhood needs nodeId or nodeIds (one of them)".into()),
+    };
+    let hops = match v.get("hops") {
+        None => 1,
+        Some(h) => h
+            .as_u64()
+            .filter(|h| *h <= 1_000)
+            .ok_or("Neighbourhood hops must be a whole number from 0 to 1000")?
+            as usize,
+    };
+    let reach = match v["direction"].as_str() {
+        None | Some("both") => Reach::Both,
+        Some("out") => Reach::Out,
+        Some("in") => Reach::In,
+        Some(other) => {
+            return Err(format!(
+                "Unknown neighbourhood direction: {other} (out, in or both)"
+            ))
+        }
+    };
+    let kinds = edge_kinds_of(v, "Neighbourhood")?;
+    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let found = neighbourhood(canonical, &starts, hops, reach, |e| {
+        kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
+    })?;
+    let (nodes, routes, distance) = on_view(snapshot, &found.nodes, &found.edges, &kinds)?;
     Ok(json!({
         "ok": true,
-        "found": path.length.is_some(),
-        "reversed": path.reversed,
-        "length": path.length,
-        "nodes": path.nodes,
-        "edges": path.edges,
+        "nodes": found.nodes,
+        "edges": found.edges,
+        "hops": found.hops,
         "visible": {"nodes": nodes, "routes": routes},
         "distance": distance,
     }))

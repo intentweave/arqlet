@@ -3499,6 +3499,9 @@ pub(crate) fn dispatch_legacy(input: &str) -> String {
         if v["op"].as_str() == Some("trace") {
             return trace::trace_response(&v).to_string();
         }
+        if v["op"].as_str() == Some("neighbourhood") {
+            return trace::neighbourhood_response(&v).to_string();
+        }
         if v["op"].as_str() == Some("componentRefine") {
             return component_response(&v);
         }

@@ -10,7 +10,7 @@
 //! - every operation on a snapshot (`toggle`, `reveal`, `direction`, `move`, `refine`, …): applied to the session's
 //!   snapshot; `expectedRevision` and `expectedLayoutVersion` default to the session's own, and a request that names
 //!   other ones is refused as stale;
-//! - `scene`, `trace`, `intent`: read the session's snapshot;
+//! - `scene`, `trace`, `neighbourhood`, `intent`: read the session's snapshot;
 //! - `export`: the whole snapshot.
 //!
 //! Answers to `import`, `load` and the operations: `{ok, revision, layoutVersion, collapsedIds, scene}` (`"scene": false`
@@ -86,6 +86,7 @@ impl EngineSession {
                 Ok(self.overview.run(v, threads))
             }
             Some("trace") => crate::trace::trace_on(self.current()?, v),
+            Some("neighbourhood") => crate::trace::neighbourhood_on(self.current()?, v),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))
             }

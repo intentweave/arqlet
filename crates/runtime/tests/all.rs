@@ -44,6 +44,8 @@ mod local_edit_large;
 mod move_gesture;
 #[path = "move_only.rs"]
 mod move_only;
+#[path = "neighbourhood.rs"]
+mod neighbourhood;
 #[path = "objectives.rs"]
 mod objectives;
 #[path = "option_defaults.rs"]
