@@ -56,8 +56,8 @@ export interface Session {
   ): Promise<ReadAnswer<NeighbourhoodAnswer>>;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<SessionResult>;
-  /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest;
-   * `hide` replaces what was hidden before, `{}` shows everything. */
+  /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest, or
+   * (`compact: true`) laying the view out again without them; `hide` replaces what was hidden before, `{}` shows everything. */
   filter(hide?: Hidden): Promise<SessionResult>;
   /** The scene of the current snapshot, computed once per snapshot. Throws the engine's error. */
   scene(): Promise<Scene>;

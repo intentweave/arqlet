@@ -250,3 +250,72 @@ fn a_trace_follows_only_the_edge_kinds_asked_for() {
         .run_value(&json!({"op": "trace", "from": "e0/f1", "to": "e0/f2", "edgeKinds": ["calls"]}));
     assert_eq!(resident["edges"], json!(["x0"]));
 }
+
+#[test]
+fn a_compacting_filter_lays_the_view_out_again_without_the_hidden() {
+    let snapshot = ok(call(
+        json!({"op": "import", "graph": catalog(), "limit": 100}),
+    ));
+    let area = |s: &Value| {
+        let b = &scene(s)["bounds"];
+        b["width"].as_f64().unwrap() * b["height"].as_f64().unwrap()
+    };
+    let in_graph = |s: &Value, id: &str| {
+        s["graph"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|n| n["id"] == id)
+    };
+    // Kept in place: the hidden keep their room, the drawing does not shrink.
+    let kept = ok(filter(&snapshot, json!({"nodes": ["e1"]})));
+    assert_eq!(area(&kept), area(&snapshot));
+    assert!(in_graph(&kept, "e1"), "still laid out");
+    // Compact: laid out again without e1 and its files; the drawing closes up.
+    let compact = ok(filter(&snapshot, json!({"nodes": ["e1"], "compact": true})));
+    assert!(!in_graph(&compact, "e1") && !in_graph(&compact, "e1/f0"));
+    assert!(
+        area(&compact) < area(&snapshot) * 0.75,
+        "{} vs {}",
+        area(&compact),
+        area(&snapshot)
+    );
+    assert_eq!(
+        compact["options"]["hidden"],
+        json!({"nodes": ["e1"], "compact": true})
+    );
+    assert_eq!(
+        compact["layoutVersion"],
+        snapshot["layoutVersion"].as_u64().unwrap() + 1
+    );
+    let s = scene(&compact);
+    assert!(
+        route_ids(&s)
+            .iter()
+            .all(|r| ["d0", "x0", "x1"].contains(&r.as_str())),
+        "only edges inside e0"
+    );
+    // A toggle keeps the compacting filter; the same nodes can be named again, and a kept filter of them works too.
+    let toggled = ok(call(
+        json!({"op": "toggle", "snapshot": compact, "nodeId": "e0",
+        "expectedRevision": compact["revision"], "expectedLayoutVersion": compact["layoutVersion"]}),
+    ));
+    assert_eq!(toggled["options"]["hidden"]["compact"], true);
+    assert!(!in_graph(&toggled, "e1"));
+    let back_to_kept = ok(filter(&compact, json!({"nodes": ["e1"]})));
+    assert!(in_graph(&back_to_kept, "e1"), "laid out again with e1");
+    // Showing everything again: everything is laid out again.
+    let shown = ok(filter(&compact, json!({})));
+    assert!(in_graph(&shown, "e1") && in_graph(&shown, "e1/f2"));
+    assert_eq!(
+        route_ids(&scene(&shown)).len(),
+        route_ids(&scene(&snapshot)).len()
+    );
+    // Hiding an edge kind compactly keeps every node.
+    let calls = ok(filter(
+        &snapshot,
+        json!({"edgeKinds": ["calls"], "compact": true}),
+    ));
+    assert!(in_graph(&calls, "e1/f0"));
+    assert!(route_ids(&scene(&calls)).iter().all(|r| r.starts_with('s')));
+}

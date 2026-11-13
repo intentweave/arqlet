@@ -143,8 +143,16 @@ pub fn structured<'a>(
     source: &'a Graph,
     options: &LayoutOptions,
 ) -> Result<std::borrow::Cow<'a, Graph>, String> {
+    let compact = options.hidden.compacts();
     if !derives_groups(options) {
-        return Ok(std::borrow::Cow::Borrowed(source));
+        if !compact {
+            return Ok(std::borrow::Cow::Borrowed(source));
+        }
+        // A compacting filter: the view without what it hides.
+        return Ok(std::borrow::Cow::Owned(filter::without_hidden(
+            source,
+            &options.hidden,
+        )));
     }
     let given = arqlet_layout::communities::with_given_groups(source, &options.groups)?;
     let grouped = arqlet_layout::communities::with_community_containers_except(
@@ -153,8 +161,12 @@ pub fn structured<'a>(
         &hubs_of(&options.community_hubs),
     )?;
     // Containers shown in part (`reveal`): the children not shown gathered in a rest.
-    arqlet_layout::communities::with_partial(&grouped, &options.partial)
-        .map(std::borrow::Cow::Owned)
+    let view = arqlet_layout::communities::with_partial(&grouped, &options.partial)?;
+    Ok(std::borrow::Cow::Owned(if compact {
+        filter::without_hidden(&view, &options.hidden)
+    } else {
+        view
+    }))
 }
 
 /// The hubs `communities` leaves out (`LayoutOptions::community_hubs`), for the layout crate.
@@ -265,7 +277,10 @@ pub fn project_view(
         .collect();
     let collapsed: BTreeSet<String> = collapsed
         .iter()
-        .filter(|id| !derives_groups(options) || containers.contains(id.as_str()))
+        .filter(|id| {
+            !(derives_groups(options) || options.hidden.compacts())
+                || containers.contains(id.as_str())
+        })
         .cloned()
         .collect();
     let mut projected = arqlet_view::project(&view, &collapsed)?;
