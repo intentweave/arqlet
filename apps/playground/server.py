@@ -15,6 +15,28 @@ BINARY = ROOT.parent.parent / "target/debug/layout-command"
 PACKAGES_PREFIX = "/packages/"
 PACKAGES_ROOT = (ROOT.parent.parent / "packages").resolve()
 SLOTS = threading.BoundedSemaphore(2)
+# Local examples (`--local-examples DIR`): data a developer keeps outside the repository and must not publish. Served
+# read-only at this prefix straight from DIR; nothing is copied into the repository folder.
+LOCAL_PREFIX = "/local/"
+LOCAL = {"root": None, "index": []}
+
+
+def local_index(root):
+    """Every <name>.json in root as an example (an Arqlet graph, or an ELK graph with `children`); a <name>.meta.json
+    beside it may give `title`, `description` and `overview: true` (offered on the overview page too)."""
+    index = []
+    for path in sorted(root.glob("*.json")):
+        if path.name.endswith(".meta.json") or path.name == "index.json":
+            continue
+        meta_path = path.with_name(path.stem + ".meta.json")
+        meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+        graph = json.loads(path.read_text())
+        index.append({"name": "local-" + path.stem, "url": LOCAL_PREFIX + path.name,
+                      "title": meta.get("title", path.stem) + " (local)",
+                      "nodes": len(graph.get("nodes") or graph.get("children") or []),
+                      "description": meta.get("description", "A local example (not in the repository)."),
+                      "source": "local examples folder", "overview": bool(meta.get("overview")) and "nodes" in graph})
+    return index
 # Every operation handled by the Rust dispatcher; the backend adds no graph semantics.
 OPERATIONS = {"import", "add", "toggle", "reveal", "trace", "direction", "refine", "structuredRefine", "configure", "optionDefaults", "measure", "shape", "scene", "move", "strategy", "routing", "metrics", "routeConflicts", "componentRefine", "containerRefine", "elkLayout", "overview", "refineProgressive", "intent", "restore", "port", "settle", "referenceCreate", "referenceRefresh", "referenceReroute", "referenceValidate", "referenceCanonical", "referenceSvg", "referenceFromSvg", "referenceReproduce", "referenceRepair"}
 MAX_BODY = 64_000_000
@@ -106,7 +128,20 @@ class Handler(SimpleHTTPRequestHandler):
             if PACKAGES_ROOT in target.parents and target.is_file():
                 return str(target)
             return str(PACKAGES_ROOT / ".not-found")  # no such file: the base class answers 404
+        if route.startswith(LOCAL_PREFIX):
+            root = LOCAL["root"]
+            name = route[len(LOCAL_PREFIX):]
+            if root is not None and "/" not in name and name.endswith(".json") and not name.endswith(".meta.json"):
+                target = (root / name).resolve()
+                if target.parent == root and target.is_file():
+                    return str(target)
+            return str(ROOT / ".not-found")
         return super().translate_path(path)
+
+    def do_GET(self):
+        if unquote(urlsplit(self.path).path) == LOCAL_PREFIX + "index.json":
+            return self.reply(200, LOCAL["index"])
+        return super().do_GET()
 
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
@@ -167,6 +202,12 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--local-examples", type=Path, default=None,
+                        help="folder of local examples (outside the repository), served at /local/")
     args = parser.parse_args()
+    if args.local_examples is not None:
+        LOCAL["root"] = args.local_examples.resolve()
+        LOCAL["index"] = local_index(LOCAL["root"])
+        print(f"Local examples: {len(LOCAL['index'])} from {LOCAL['root']}", flush=True)
     print(f"Arqlet: http://127.0.0.1:{args.port}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", args.port), Handler).serve_forever()

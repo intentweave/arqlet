@@ -6,7 +6,7 @@ dist/
 /exports/
 
 /apps/playground/generated/
-# Examples a developer keeps locally (data that must not be published); see apps/playground/build.sh.
+# Never keep unpublishable data in the repository folder: serve it with server.py --local-examples <folder outside>.
 /apps/playground/local-examples/
 
 __pycache__/

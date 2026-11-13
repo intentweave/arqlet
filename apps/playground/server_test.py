@@ -26,6 +26,26 @@ class StaticTest(unittest.TestCase):
         with urllib.request.urlopen(f"{self.base}/packages/viewer/svg.js",timeout=10) as response:
             self.assertEqual(response.status,200)
             self.assertIn(b"export",response.read())
+    def test_local_examples_are_served_only_from_their_folder(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/"examples";root.mkdir()
+            (root/"tiny.json").write_text('{"nodes":[{"id":"a"}],"edges":[]}')
+            (root/"tiny.meta.json").write_text('{"title":"Tiny","overview":true}')
+            (Path(folder)/"secret.json").write_text("{}")
+            module.LOCAL.update(root=root.resolve(),index=module.local_index(root.resolve()))
+            try:
+                with urllib.request.urlopen(f"{self.base}/local/index.json",timeout=10) as response:
+                    index=json.loads(response.read())
+                self.assertEqual([(e["name"],e["url"],e["nodes"],e["overview"]) for e in index],[("local-tiny","/local/tiny.json",1,True)])
+                with urllib.request.urlopen(f"{self.base}/local/tiny.json",timeout=10) as response:
+                    self.assertEqual(json.loads(response.read())["nodes"][0]["id"],"a")
+                for path in ["/local/../secret.json","/local/%2e%2e/secret.json","/local/%2e%2e%2fsecret.json","/local/tiny.meta.json","/local/missing.json"]:
+                    with self.subTest(path=path),self.assertRaises(urllib.error.HTTPError) as caught:
+                        urllib.request.urlopen(f"{self.base}{path}",timeout=10)
+                    self.assertEqual(caught.exception.code,404)
+            finally:
+                module.LOCAL.update(root=None,index=[])
     def test_packages_do_not_escape_their_root(self):
         for path in ["/packages/../apps/playground/server.py","/packages/%2e%2e/apps/playground/server.py","/packages/viewer/"]:
             with self.subTest(path=path),self.assertRaises(urllib.error.HTTPError) as caught:

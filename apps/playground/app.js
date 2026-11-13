@@ -682,7 +682,7 @@ async function loadInitial(){
   if(!r.ok)throw Error('Snapshot missing. Please run the demo build first.');
   return {snapshot:await r.json(),message:'Natively precomputed snapshot loaded'};
  }
- const url=example==='default'?'./generated/graph.json':`./generated/examples/${example}.json`;
+ const url=example==='default'?'./generated/graph.json':exampleNotes.get(example)?.url??`./generated/examples/${example}.json`;
  const graph=await fetch(url,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error(`${url} is missing. Please run the demo build first.`);return r.json();});
  // Entity-relationship notation (ADR 0011): an entity is a leaf node whose rows are its title and its attributes; the
  // relationships attach to those rows. The attributes are not graph nodes in the layout.
@@ -708,7 +708,8 @@ async function loadInitial(){
 }
 // Examples come from the demo build; without an index only the default graph is offered.
 const exampleNotes=new Map();
-fetch('./generated/examples/index.json',{cache:'no-store'}).then(r=>r.ok?r.json():[]).then(list=>{
+// Local examples (server.py --local-examples, data kept outside the repository) follow them when the server has any.
+Promise.all(['./generated/examples/index.json','./local/index.json'].map(u=>fetch(u,{cache:'no-store'}).then(r=>r.ok?r.json():[]).catch(()=>[]))).then(lists=>lists.flat()).then(list=>{
  for(const e of list){const option=document.createElement('option');option.value=e.name;option.textContent=`${e.title} · ${e.nodes} nodes`;option.title=e.description??'';exampleNotes.set(e.name,e);$('example').append(option);}
 }).catch(()=>{});
 // What the example is, where it comes from, and how much of it the view shows (the view is bounded, so a large one can be cut).
