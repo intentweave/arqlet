@@ -13,6 +13,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `filter` takes `compact: true` (provisional): the view is laid out again without what is hidden, so the rest closes
+  up instead of leaving gaps; a toggle or an edit keeps it, and showing everything lays the view out again. Playground:
+  *Close up* in the section *Filter*.
 - Hubs left out of communities (provisional): `communityHubs: {minLinks?, nodes?}` (layered view) and the overview
   option `hubs` (same value). Children with at least `minLinks` links in their container (by edge weight) or named in
   `nodes` stay out of Louvain and remain direct children, so one hub no longer pulls the others into one community

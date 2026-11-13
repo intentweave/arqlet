@@ -219,15 +219,18 @@ In the playground: section *Path* (from, to, *Trace*, *Reveal path*, *Fade other
 
 `filter` hides nodes by kind or id (each with what it holds) and edges by kind, without
 a new import: what stays keeps its place, and a route that stands for collapsed content
-counts only the edges still shown. The next filter replaces it; `{}` shows everything.
+counts only the edges still shown. With `compact: true` the view is laid out again
+without what is hidden, so the rest closes up (positions change). The next filter
+replaces it; `{}` shows everything.
 
 ```js
 await session.filter({nodeKinds: ['test'], edgeKinds: ['imports']});
 await session.filter({nodes: ['vendor']});                   // a container with all it holds
+await session.filter({nodes: ['vendor'], compact: true});    // and close up the gap
 await session.filter({});                                    // everything again
 ```
 
-In the playground: section *Filter* (a box per node kind and edge kind).
+In the playground: section *Filter* (a box per node kind and edge kind, *Close up*).
 
 ### Cluster overview
 
