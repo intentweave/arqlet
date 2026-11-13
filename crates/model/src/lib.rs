@@ -2679,6 +2679,47 @@ impl GraphPatch {
     }
 }
 
+/// Provisional: what of some source-graph nodes and edges the current view shows (`trace`, `neighbourhood`): the visible
+/// boxes that hold the nodes, and the routes that carry the edges.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VisibleParts {
+    pub nodes: Vec<String>,
+    pub routes: Vec<String>,
+}
+
+/// Provisional: the answer of `trace` (besides `ok`): the nodes and edges on the paths between two nodes of the source
+/// graph, and what of them the view shows. `reversed`: no path from `from` to `to`, the paths are those back; `length`
+/// is null without a path.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TraceAnswer {
+    pub found: bool,
+    pub reversed: bool,
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
+    pub length: Option<usize>,
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+    pub visible: VisibleParts,
+    /// Hops of every visible node from the path through the drawn edges (for fading); unreachable nodes are left out.
+    pub distance: BTreeMap<String, usize>,
+}
+
+/// Provisional: the answer of `neighbourhood` (besides `ok`): the nodes within some hops of nodes, the edges they were
+/// reached by, each node's hops, and what of them the view shows (as for `trace`).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NeighbourhoodAnswer {
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+    pub hops: BTreeMap<String, usize>,
+    pub visible: VisibleParts,
+    pub distance: BTreeMap<String, usize>,
+}
+
 /// Provisional (sessions): the part of an overview that changes while the clusters stay the same, answered for a request
 /// with `positionsOnly` laid out on the clusters of the session's last overview. The host keeps ids, labels, parents,
 /// kinds, edges and links from that answer.

@@ -3,7 +3,7 @@
 //! the collapsed container it is in), the routes that carry the path's edges, and how far every visible node is from the
 //! path, so that a renderer can highlight the path and fade the rest. Read only: the snapshot is not changed.
 use crate::structured;
-use arqlet_model::Snapshot;
+use arqlet_model::{NeighbourhoodAnswer, Snapshot, TraceAnswer, VisibleParts};
 use arqlet_view::{neighbourhood, trace_along, Reach, TraceMode};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -24,6 +24,18 @@ fn trace_of(v: &Value) -> Result<Value, String> {
 /// The trace of the request `v` (`from`, `to`, `mode`, `edgeKinds`) on a snapshot the caller holds (a session's).
 /// `edgeKinds` (provisional): the paths follow only edges of these kinds (for example the data flow, not the calls).
 pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
+    trace_answer_on(snapshot, v).and_then(|answer| answered(&answer))
+}
+
+/// The answer of a `trace` request that carries its snapshot (`trace_on` as a typed value).
+pub fn trace_answer(v: &Value) -> Result<TraceAnswer, String> {
+    let snapshot: Snapshot =
+        serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
+    trace_answer_on(&snapshot, v)
+}
+
+/// The typed answer of `trace_on`.
+pub fn trace_answer_on(snapshot: &Snapshot, v: &Value) -> Result<TraceAnswer, String> {
     let from = v["from"].as_str().ok_or("Missing from")?;
     let to = v["to"].as_str().ok_or("Missing to")?;
     let mode = match v["mode"].as_str() {
@@ -37,16 +49,28 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;
     let (nodes, routes, distance) = on_view(snapshot, &path.nodes, &path.edges, &kinds)?;
-    Ok(json!({
-        "ok": true,
-        "found": path.length.is_some(),
-        "reversed": path.reversed,
-        "length": path.length,
-        "nodes": path.nodes,
-        "edges": path.edges,
-        "visible": {"nodes": nodes, "routes": routes},
-        "distance": distance,
-    }))
+    Ok(TraceAnswer {
+        found: path.length.is_some(),
+        reversed: path.reversed,
+        length: path.length,
+        nodes: path.nodes,
+        edges: path.edges,
+        visible: VisibleParts {
+            nodes,
+            routes: routes.into_iter().collect(),
+        },
+        distance,
+    })
+}
+
+/// A typed answer as JSON, with `ok: true` beside its fields (keys in order, as every answer).
+pub(crate) fn answered<T: serde::Serialize>(answer: &T) -> Result<Value, String> {
+    let mut value = serde_json::to_value(answer).map_err(|e| e.to_string())?;
+    value
+        .as_object_mut()
+        .ok_or("An answer is an object")?
+        .insert("ok".into(), json!(true));
+    Ok(value)
 }
 
 /// The `edgeKinds` of a request (`what` names the operation in errors): `None` follows every edge.
@@ -193,9 +217,7 @@ pub(crate) fn on_view(
 /// each of `nodeIds`), following edges `out`, `in` or `both` ways (`direction`, default `both`), only of `edgeKinds` if
 /// given; and what of them the current view shows, as for `trace`, so that a host can highlight them or `reveal` them.
 pub fn neighbourhood_response(v: &Value) -> Value {
-    let result = serde_json::from_value::<Snapshot>(v["snapshot"].clone())
-        .map_err(|e| e.to_string())
-        .and_then(|snapshot| neighbourhood_on(&snapshot, v));
+    let result = neighbourhood_answer(v).and_then(|answer| answered(&answer));
     match result {
         Ok(result) => result,
         Err(error) => json!({"ok": false, "error": error}),
@@ -204,6 +226,21 @@ pub fn neighbourhood_response(v: &Value) -> Value {
 
 /// The neighbourhood of the request `v` on a snapshot the caller holds (a session's).
 pub fn neighbourhood_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
+    neighbourhood_answer_on(snapshot, v).and_then(|answer| answered(&answer))
+}
+
+/// The answer of a `neighbourhood` request that carries its snapshot, as a typed value.
+pub fn neighbourhood_answer(v: &Value) -> Result<NeighbourhoodAnswer, String> {
+    let snapshot: Snapshot =
+        serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
+    neighbourhood_answer_on(&snapshot, v)
+}
+
+/// The typed answer of `neighbourhood_on`.
+pub fn neighbourhood_answer_on(
+    snapshot: &Snapshot,
+    v: &Value,
+) -> Result<NeighbourhoodAnswer, String> {
     let starts: Vec<&str> = match (v.get("nodeId"), v.get("nodeIds")) {
         (Some(id), None) => vec![id
             .as_str()
@@ -241,12 +278,14 @@ pub fn neighbourhood_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String>
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;
     let (nodes, routes, distance) = on_view(snapshot, &found.nodes, &found.edges, &kinds)?;
-    Ok(json!({
-        "ok": true,
-        "nodes": found.nodes,
-        "edges": found.edges,
-        "hops": found.hops,
-        "visible": {"nodes": nodes, "routes": routes},
-        "distance": distance,
-    }))
+    Ok(NeighbourhoodAnswer {
+        nodes: found.nodes,
+        edges: found.edges,
+        hops: found.hops,
+        visible: VisibleParts {
+            nodes,
+            routes: routes.into_iter().collect(),
+        },
+        distance,
+    })
 }

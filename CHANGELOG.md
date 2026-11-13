@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **`arqlet::protocol::Response` has typed answers** (provisional) for `scene`, `trace`, `neighbourhood`, `overview`,
+  `intent` and `metrics` (`Response::Scene`, `Trace`, `Neighbourhood`, `Overview`, `Intent`, `Metrics`) instead of
+  `Response::Encoded`; the JSON is unchanged byte for byte. A Rust host that matched `Encoded` for these operations
+  matches the new variants. Contract types `TraceAnswer`, `NeighbourhoodAnswer`, `VisibleParts`; `session.trace` and
+  `session.neighbourhood` return them (`ReadAnswer<T>` in `@arqlet/engine-client`).
 - Playground: `build.sh` builds the native binaries with the `fast` profile (optimised like release, without LTO), and
   the backend runs `target/fast/layout-command` (`ARQLET_LAYOUT_COMMAND` overrides it; a debug build is the fallback).
   On a synthetic 20 000-node overview: 0.56 instead of 4.08 s (single run, Apple M3).
