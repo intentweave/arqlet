@@ -11,6 +11,7 @@ pub mod filter;
 pub mod hierarchy;
 pub mod history;
 pub mod overview;
+pub mod patch;
 pub mod port_edit;
 pub mod protocol;
 pub mod session;

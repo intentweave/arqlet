@@ -186,6 +186,13 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
         ...(hops !== undefined ? {hops} : {}), ...(direction ? {direction} : {}), ...(edgeKinds ? {edgeKinds} : {})});
     },
 
+    /**
+     * Provisional: changes the graph without a new import: `{nodes, edges, removeNodes, removeEdges}` (removals first; a
+     * removed node takes what it holds and its edges along). The view keeps its state and is laid out again from where
+     * it was, so what did not change stays about in place.
+     */
+    patch(patch) { return change({op: 'patch', patch}); },
+
     /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default) only as far as needed. */
     reveal(nodeIds, {partial = true} = {}) { return change({op: 'reveal', nodeIds, partial}); },
 

@@ -1,4 +1,4 @@
-import type {Graph, Hidden, Overview, OverviewRequest, Scene, Snapshot} from '@arqlet/contracts';
+import type {Graph, GraphPatch, Hidden, Overview, OverviewRequest, Scene, Snapshot} from '@arqlet/contracts';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
@@ -51,6 +51,11 @@ export interface Session {
     nodeId: string | string[],
     init?: {hops?: number; direction?: 'out' | 'in' | 'both'; edgeKinds?: string[]},
   ): Promise<EngineResponse>;
+  /**
+   * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
+   * edges along); the view keeps its state and is laid out again from where it was.
+   */
+  patch(patch: GraphPatch): Promise<SessionResult>;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<SessionResult>;
   /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest, or

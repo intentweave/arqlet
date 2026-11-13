@@ -232,6 +232,19 @@ await session.filter({});                                    // everything again
 
 In the playground: section *Filter* (a box per node kind and edge kind, *Close up*).
 
+### Graph changes
+
+`patch` changes the graph of a view without a new import: `{nodes, edges, removeNodes,
+removeEdges}` (removals first; a removed node takes what it holds and its edges). The
+view keeps its state (collapsed containers, filter) and is laid out again from where it
+was, so a host can start with aggregated edges between collapsed containers and load the
+member edges of a container when it is opened:
+
+```js
+await session.expand('billing');
+await session.patch({edges: memberEdgesOf('billing'), removeEdges: aggregatedEdgesOf('billing')});
+```
+
 ### Cluster overview
 
 For a whole graph of tens of thousands of nodes, `{op: 'overview', graph}` lays it out
