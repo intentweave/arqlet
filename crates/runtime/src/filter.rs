@@ -22,13 +22,22 @@ pub fn filter_view(
         return Err("Stale view request".into());
     }
     let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
-    let view = crate::structured(canonical, &snapshot.options)?;
+    // Known nodes: those of the view with nothing hidden (a compacting filter leaves the hidden out of the view).
+    let mut shown_all = snapshot.options.clone();
+    shown_all.hidden = Hidden::default();
+    let view = crate::structured(canonical, &shown_all)?;
     let known: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
     if let Some(id) = hidden.nodes.iter().find(|id| !known.contains(id.as_str())) {
         return Err(format!("Unknown node: {id}"));
     }
     if snapshot.options.hidden == hidden {
         return Ok(snapshot.clone());
+    }
+    // Compacting (now or before): the view is laid out again without what is hidden; the rest closes up.
+    if hidden.compacts() || snapshot.options.hidden.compacts() {
+        let mut options = snapshot.options.clone();
+        options.hidden = hidden;
+        return crate::recompute_layout(snapshot, &options, None);
     }
     let mut next = snapshot.clone();
     next.options.hidden = hidden;
@@ -166,4 +175,49 @@ fn hide(snapshot: &Snapshot, scene: &mut Scene) -> Result<(), String> {
         .crossings
         .retain(|c| !is_hidden(&c.container_id) && !dropped.contains(&c.edge_id));
     Ok(())
+}
+
+/// The view without what `hidden` hides (a compacting filter): the nodes named or of a hidden kind with everything below
+/// them, the edges of a hidden kind or with an end left out, and the ports, edge ports and bus members that refer to them.
+pub(crate) fn without_hidden(view: &arqlet_model::Graph, hidden: &Hidden) -> arqlet_model::Graph {
+    let parent: BTreeMap<&str, Option<&str>> = view
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let kind: BTreeMap<&str, &str> = view
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.kind.as_str()))
+        .collect();
+    let gone = |id: &str| {
+        let mut at = Some(id);
+        while let Some(x) = at {
+            if hidden.nodes.iter().any(|n| n == x)
+                || kind
+                    .get(x)
+                    .is_some_and(|k| hidden.node_kinds.iter().any(|h| h == k))
+            {
+                return true;
+            }
+            at = parent.get(x).copied().flatten();
+        }
+        false
+    };
+    let mut out = view.clone();
+    out.nodes.retain(|n| !gone(&n.id));
+    let kept: BTreeSet<String> = out.nodes.iter().map(|n| n.id.clone()).collect();
+    out.edges.retain(|e| {
+        !hidden.edge_kinds.contains(&e.kind)
+            && kept.contains(&e.source)
+            && e.target.as_ref().is_none_or(|t| kept.contains(t))
+    });
+    let edges: BTreeSet<String> = out.edges.iter().map(|e| e.id.clone()).collect();
+    out.ports.retain(|p| kept.contains(&p.node_id));
+    out.edge_ports.retain(|b| edges.contains(&b.edge_id));
+    for bus in &mut out.buses {
+        bus.edges.retain(|e| edges.contains(e));
+    }
+    out.buses.retain(|b| !b.edges.is_empty());
+    out
 }

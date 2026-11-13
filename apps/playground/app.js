@@ -1381,6 +1381,7 @@ function filterView(){
  boxes('filter-node-kinds',source.nodes.map(n=>n.kind),hidden.nodeKinds,'');
  boxes('filter-edge-kinds',source.edges.map(e=>e.kind),hidden.edgeKinds,'→ ');
  $('filter-show-all').disabled=!(hidden.nodeKinds?.length||hidden.edgeKinds?.length||hidden.nodes?.length);
+ $('filter-compact').checked=!!hidden.compact;
 }
 function applyFilter(){
  if(!snapshot||pending)return;
@@ -1389,8 +1390,10 @@ function applyFilter(){
  const nodeKinds=off('filter-node-kinds'),edgeKinds=off('filter-edge-kinds');
  if(nodeKinds.length)hide.nodeKinds=nodeKinds;
  if(edgeKinds.length)hide.edgeKinds=edgeKinds;
- edit({op:'filter',snapshot,hide},{busy:'Filtering …',remember:'Filter'});
+ if($('filter-compact').checked&&Object.keys(hide).length)hide.compact=true;
+ edit({op:'filter',snapshot,hide},{busy:hide.compact?'Laying out without the hidden …':'Filtering …',remember:'Filter'});
 }
+$('filter-compact').onchange=applyFilter;
 $('filter-show-all').onclick=()=>{if(snapshot&&!pending)edit({op:'filter',snapshot,hide:{}},{busy:'Showing everything …',remember:'Show all'});};
 $('trace-fade').onchange=()=>{if(snapshot)draw();};
 $('trace-mode').onchange=()=>{if(tracePath&&!tracePath.op){tracePath={...tracePath,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();}};
