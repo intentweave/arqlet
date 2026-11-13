@@ -4,13 +4,15 @@ cd "$(dirname "$0")/../.."
 input=${1:-exports/intentweave-initial/graph.json}
 mkdir -p apps/playground/generated
 cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --locked
-cargo build -p arqlet-runtime --bins --locked
+# The native binaries the backend and the smoke test run: optimised like release, without LTO (`fast` profile), so the
+# backend answers about as fast as a release build and the build stays quick.
+cargo build -p arqlet-runtime --bins --locked --profile fast
 cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm apps/playground/generated/arqlet.wasm
 # The npm package ships the engine beside its loader (git-ignored copy); the package tests load it from there in Node.
 cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm packages/engine-client/arqlet.wasm
 # Replace only this generated demo artifact, never caller input.
 rm -f apps/playground/generated/snapshot.json
-target/debug/snapshot "$input" apps/playground/generated/snapshot.json 40
+target/fast/snapshot "$input" apps/playground/generated/snapshot.json 40
 # Browser-only mode imports this copy; the caller's input is only read.
 cp "$input" apps/playground/generated/graph.json
 # Presets for both UIs: versioned config sets with run policy. One index holds the full documents,

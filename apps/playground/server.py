@@ -5,12 +5,18 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 import queue
+import os
 import secrets
 import subprocess
 import threading
 
 ROOT = Path(__file__).resolve().parent
-BINARY = ROOT.parent.parent / "target/debug/layout-command"
+# The native engine: `ARQLET_LAYOUT_COMMAND` if set, else the optimised build `build.sh` makes (`target/fast`), else a
+# debug build (several times slower on large graphs).
+BINARY = Path(os.environ["ARQLET_LAYOUT_COMMAND"]) if os.environ.get("ARQLET_LAYOUT_COMMAND") else next(
+    (path for path in (ROOT.parent.parent / "target" / profile / "layout-command" for profile in ("fast", "debug"))
+     if path.exists()),
+    ROOT.parent.parent / "target/fast/layout-command")
 # Workspace packages are served read-only at this prefix; nothing else outside apps/playground is exposed.
 PACKAGES_PREFIX = "/packages/"
 PACKAGES_ROOT = (ROOT.parent.parent / "packages").resolve()
