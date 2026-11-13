@@ -208,3 +208,45 @@ fn a_resident_session_filters_too() {
         .collect();
     assert!(!ids.iter().any(|id| id.ends_with("/test")));
 }
+
+#[test]
+fn a_trace_follows_only_the_edge_kinds_asked_for() {
+    let snapshot = ok(call(
+        json!({"op": "import", "graph": catalog(), "limit": 100}),
+    ));
+    let trace = |from: &str, to: &str, kinds: Value| {
+        let mut request = json!({"op": "trace", "snapshot": snapshot, "from": from, "to": to});
+        if !kinds.is_null() {
+            request["edgeKinds"] = kinds;
+        }
+        call(request)
+    };
+    // e0/f2 calls e1/f2 (twice), which imports e0/f0.
+    let any = trace("e0/f2", "e0/f0", Value::Null);
+    assert_eq!(any["found"], true, "{any}");
+    assert_eq!(any["length"], 2);
+    assert_eq!(any["edges"], json!(["c2", "c3", "s1"]));
+    let both = trace("e0/f2", "e0/f0", json!(["calls", "imports"]));
+    assert_eq!(both["edges"], any["edges"]);
+    // Along calls only there is no way, in either direction.
+    let calls = trace("e0/f2", "e0/f0", json!(["calls"]));
+    assert_eq!(calls["ok"], true, "{calls}");
+    assert_eq!(calls["found"], false);
+    assert_eq!(calls["visible"]["routes"], json!([]));
+    assert_eq!(
+        trace("e0/f1", "e0/f2", json!(["calls"]))["edges"],
+        json!(["x0"])
+    );
+    assert_eq!(trace("e0/f1", "e0/f2", json!(["imports"]))["found"], false);
+    // Bad kinds are refused; a kind the graph lacks just finds nothing.
+    for bad in [json!([]), json!("calls")] {
+        assert_eq!(trace("e0/f1", "e0/f2", bad)["ok"], false);
+    }
+    assert_eq!(trace("e0/f1", "e0/f2", json!(["events"]))["found"], false);
+    // In a session the same.
+    let mut session = arqlet_runtime::engine_session::EngineSession::new();
+    session.run_value(&json!({"op": "import", "graph": catalog(), "limit": 100, "scene": false}));
+    let resident = session
+        .run_value(&json!({"op": "trace", "from": "e0/f1", "to": "e0/f2", "edgeKinds": ["calls"]}));
+    assert_eq!(resident["edges"], json!(["x0"]));
+}

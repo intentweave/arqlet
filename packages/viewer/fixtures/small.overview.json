@@ -1,0 +1,82 @@
+{
+ "edges": [
+  1,
+  2,
+  2,
+  1,
+  1,
+  1,
+  1,
+  2
+ ],
+ "ids": [
+  "root",
+  "a",
+  "b"
+ ],
+ "kind": [
+  0,
+  1,
+  1
+ ],
+ "kinds": [
+  "directory",
+  "symbol"
+ ],
+ "labels": [
+  "Example",
+  "Parse",
+  "Analyze"
+ ],
+ "links": [
+  1.0,
+  2.0,
+  3.0
+ ],
+ "parent": [
+  -1,
+  0,
+  0
+ ],
+ "r": [
+  15.6,
+  4.0,
+  4.0
+ ],
+ "representation": {
+  "auto": true,
+  "decisions": {
+   "root": "organic"
+  },
+  "levelOfDetail": {
+   "depth": 1
+  },
+  "rules": {
+   "node": "collapsed"
+  },
+  "unknownKinds": [
+   "node"
+  ]
+ },
+ "rootRadius": 21.6,
+ "schemaVersion": 1,
+ "stats": {
+  "communities": 0,
+  "containers": 1,
+  "edges": 4,
+  "levels": 2,
+  "nodes": 3,
+  "overlaps": 0,
+  "unresolvedEdges": 1
+ },
+ "x": [
+  0.0,
+  5.07,
+  -5.07
+ ],
+ "y": [
+  0.0,
+  -2.37,
+  2.37
+ ]
+}

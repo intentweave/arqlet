@@ -19,6 +19,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `trace` takes `edgeKinds` (provisional): the paths follow only edges of those kinds; `session.trace(from, to,
+  {edgeKinds})`; the playground can follow the edge kinds its filter shows. `arqlet_view::trace_along` takes any edge
+  predicate.
+- Overview types in `@arqlet/contracts` (provisional): `Overview` (the answer, with `OverviewStats` and
+  `OverviewRepresentation`) and `OverviewRequest` (with `OverviewLayoutOptions`, `OverviewStart`), generated from
+  `arqlet_model`; the engine writes its answer through them (byte-identical output). `@arqlet/viewer`'s `OverviewResult`
+  is now based on `Overview`; `createOverviewSession` is typed with them.
 - Resident overview sessions (provisional, ADR 0019): in a session, `overview` keeps the graph, its cluster hierarchy
   and the last positions; later requests leave the graph out, and a `start` without positions (`{settle}`) continues
   from the last overview (refused when `communities`, `satellites` or `groups` changed). The hierarchy is built again

@@ -488,3 +488,44 @@ fn overview_with(graph: &Value, options: &Value) -> Value {
     assert_eq!(response["ok"], true, "{response}");
     response["overview"].clone()
 }
+
+#[test]
+fn every_answer_is_the_typed_overview_contract() {
+    // The answer is written from `arqlet_model::Overview`; reading it back with unknown fields refused keeps the
+    // contract types in `@arqlet/contracts` exact, with and without the optional parts.
+    let graph = hierarchical(3, 3, 5);
+    for request in [
+        json!({"op": "overview", "graph": graph}),
+        json!({"op": "overview", "graph": graph, "options": {"satellites": 0.5, "chains": true, "communities": 2},
+            "intent": {"decisions": {"g0": "organic"}}}),
+    ] {
+        let response: Value = serde_json::from_str(&dispatch(&request.to_string())).unwrap();
+        assert_eq!(response["ok"], true, "{response}");
+        let typed: arqlet_model::Overview =
+            serde_json::from_value(response["overview"].clone()).unwrap();
+        assert_eq!(serde_json::to_value(&typed).unwrap(), response["overview"]);
+    }
+    // A typed request is a request the operation takes.
+    let request = arqlet_model::OverviewRequest {
+        graph: Some(serde_json::from_value(graph).unwrap()),
+        options: Some(arqlet_model::OverviewLayoutOptions {
+            node_radius: Some(3.),
+            gap: Some(1.),
+            padding: Some(4.),
+            charge: Some(0.05),
+            gravity: Some(0.1),
+            communities: Some(4),
+            satellites: Some(0.5),
+            chains: Some(true),
+            ticks: Some(50),
+            groups: Some([("g0/f0".to_string(), vec!["A".to_string()])].into()),
+        }),
+        radii: Some([("g1".to_string(), 80.)].into()),
+        threads: Some(2),
+        ..Default::default()
+    };
+    let mut v = serde_json::to_value(&request).unwrap();
+    v["op"] = json!("overview");
+    let response: Value = serde_json::from_str(&dispatch(&v.to_string())).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+}

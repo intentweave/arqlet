@@ -204,7 +204,7 @@ visibleNodeBudget?: number,
 communities?: number,
 /**
  * Provisional: groups given by the data or its domain, by node id: the path of groups the node belongs to inside its
- * container (`["ECU A", "X1"]`). They become containers of kind `group` in the view only, nested along the path,
+ * container (`["Billing", "Invoices"]`). They become containers of kind `group` in the view only, nested along the path,
  * before `communities` divides what is still large. Ids the graph does not have are ignored (a mapping may cover more
  * than the imported view). Omitted when empty.
  */

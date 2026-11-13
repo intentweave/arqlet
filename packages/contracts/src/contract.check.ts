@@ -6,11 +6,12 @@
 // - JSON imports widen string literals to `string`, so enum values are checked by the Rust contract test
 //   (crates/contracts/tests/contract.rs), not here. `Relax` keeps every other part of the shape exact.
 // - Extra JSON keys are not rejected; the Rust serialization tests cover what the engine emits.
-import type {Scene, Snapshot} from './generated/index.js';
+import type {Overview, Scene, Snapshot} from './generated/index.js';
 import sceneFixture from '../../viewer/fixtures/bpmn-pools.scene.json';
 import stateSceneFixture from '../../viewer/fixtures/state-tcp.scene.json';
 import snapshotFixture from '../../viewer/fixtures/bpmn-pools.snapshot.json';
 import stateSnapshotFixture from '../../viewer/fixtures/state-tcp.snapshot.json';
+import overviewFixture from '../../viewer/fixtures/small.overview.json';
 
 type Relax<T> = T extends string
   ? string
@@ -24,3 +25,4 @@ type Relax<T> = T extends string
 
 export const scenes: [Relax<Scene>, Relax<Scene>] = [sceneFixture, stateSceneFixture];
 export const snapshots: [Relax<Snapshot>, Relax<Snapshot>] = [snapshotFixture, stateSnapshotFixture];
+export const overview: Relax<Overview> = overviewFixture;

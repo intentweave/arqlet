@@ -1,34 +1,10 @@
-/** The result of the engine's `overview` operation (ADR 0018). Provisional. Arrays are indexed by node, in input order. */
-export interface OverviewResult {
-  schemaVersion: 1;
-  ids: string[];
-  /** Each node's label from the data; a cluster the overview added is named after its most connected member
-   * (`≈ <name>` for a community, `<name> +<n>` for a hub with its satellites); see `nameOf`. */
-  labels?: string[];
-  /** The parent's index, or -1 for a node at the top level. */
-  parent: number[];
-  x: number[];
-  y: number[];
-  /** Disc radii: leaves share the leaf radius, a container holds its children. */
-  r: number[];
-  /** The radius of the disc around everything, centred on the origin. */
-  rootRadius: number;
-  /** Resolved edges as index pairs, source first, in input order. */
-  edges: number[];
-  /** Per container, the links between its children: child, child, number of edges (flat triples). */
-  links: number[];
-  stats: {nodes: number; containers: number; communities: number; levels: number; edges: number; unresolvedEdges: number; overlaps: number};
-  /** The values of the order user, rules, zoom, as the engine checked them (ADR 0018, addendum). */
-  representation?: {
-    decisions: Record<string, Representation>;
-    rules: Record<string, Representation>;
-    auto: boolean;
-    unknownKinds: string[];
-  };
-  /** Node kinds in order of first use, and the kind of every node as an index into them. */
-  kinds?: string[];
-  kind?: number[];
-}
+/**
+ * The result of the engine's `overview` operation (`Overview` in `@arqlet/contracts`, ADR 0018). Provisional. Arrays are
+ * indexed by node, in input order. A viewer also takes one without labels, kinds and representation (each node is then
+ * named by its id; rules and the level of detail do not apply).
+ */
+export type OverviewResult = Omit<import('@arqlet/contracts').Overview, 'labels' | 'kinds' | 'kind' | 'representation'>
+  & Partial<Pick<import('@arqlet/contracts').Overview, 'labels' | 'kinds' | 'kind' | 'representation'>>;
 
 export interface OverviewModel {
   overview: OverviewResult;

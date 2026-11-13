@@ -168,11 +168,11 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
     /**
      * Provisional (path cut-out): the paths from `from` to `to` in the current snapshot (read only, nothing changes):
      * `{ok, found, reversed, length, nodes, edges, visible: {nodes, routes}, distance}`. `mode`: `shortest` (default) or
-     * `all`.
+     * `all`. `edgeKinds`: follow only edges of these kinds (default: every edge).
      */
-    async trace(from, to, {mode = 'shortest'} = {}) {
+    async trace(from, to, {mode = 'shortest', edgeKinds} = {}) {
       if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
-      return call({op: 'trace', snapshot, from, to, mode});
+      return call({op: 'trace', snapshot, from, to, mode, ...(edgeKinds ? {edgeKinds} : {})});
     },
 
     /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default) only as far as needed. */
