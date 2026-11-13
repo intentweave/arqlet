@@ -12,7 +12,7 @@ changes. The same engine runs natively and in the browser via WebAssembly.
 
 > **Status: prototype (engine `0.2.0-prototype`).** Arqlet works end to end and is
 > tested, but every API, the JSON protocol and the snapshot format are
-> provisional and may change in any release. Version 0.3.0 is on
+> provisional and may change in any release. Version 0.4.0 is on
 > [crates.io](https://crates.io/crates/arqlet) and [npm](https://www.npmjs.com/package/arqlet). Large graphs (100K+ nodes) are a goal, not a measured result.
 
 Arqlet was developed under the working name Layerweave. Measurement records in
@@ -82,7 +82,7 @@ depend on the Git repository instead):
 
 ```toml
 [dependencies]
-arqlet = "0.3"
+arqlet = "0.4"
 ```
 
 ```rust

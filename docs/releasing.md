@@ -7,7 +7,7 @@ Provisional. Arqlet is a prototype; releases are `0.x` and may break any API.
 | Registry | Package | Contents |
 |---|---|---|
 | crates.io | `arqlet` | facade: re-exports the engine crates, `dispatch` and `dispatch_streaming` |
-| crates.io | `arqlet-model`, `arqlet-topology`, `arqlet-routing`, `arqlet-scene`, `arqlet-view`, `arqlet-layout`, `arqlet-reference`, `arqlet-elk`, `arqlet-runtime` | the engine crates, exact internal versions (`=0.1.0`) |
+| crates.io | `arqlet-model`, `arqlet-topology`, `arqlet-routing`, `arqlet-scene`, `arqlet-view`, `arqlet-layout`, `arqlet-reference`, `arqlet-elk`, `arqlet-runtime` | the engine crates, exact internal versions (`=x.y.z`) |
 | npm | `arqlet` | entry point: re-exports engine client and viewer, types from contracts |
 | npm | `@arqlet/engine-client` | `arqlet.wasm` (built by `prepack`), loader, worker, ELK-style call, presets |
 | npm | `@arqlet/viewer` | SVG renderer, navigation, route helpers, React Flow mapping |
@@ -21,7 +21,10 @@ Not published: `arqlet-wasm` (its output ships in `@arqlet/engine-client`), `arq
 1. Set `version` in `[workspace.package]` and every `=x.y.z` in `[workspace.dependencies]` of `Cargo.toml`.
 2. Set `version` in `packages/{arqlet,engine-client,viewer,contracts}/package.json`. Internal npm dependencies use
    `workspace:^`; pnpm replaces them with the released version.
-3. Run the checks in `CLAUDE.md` and `sh apps/playground/build.sh examples/fixtures/small.json`.
+3. In `CHANGELOG.md`, move the entries under *Unreleased* to a section `## x.y.z — <date>` with a short summary and,
+   when anything breaks, an *Upgrading from* section; keep an empty *Unreleased* above it. Update the version in
+   `README.md` (status line and the `arqlet = "x.y"` dependency) and the packaging row of `docs/specification.md`.
+4. Run the checks in `CLAUDE.md` and `sh apps/playground/build.sh examples/fixtures/small.json`.
 
 ## Dry run
 
@@ -42,7 +45,7 @@ cargo login                       # token from crates.io
 cargo publish --workspace --exclude arqlet-wasm --exclude arqlet-contracts --exclude arqlet-node
 npm login                         # the account that owns the @arqlet organisation
 pnpm -r --filter @arqlet/contracts --filter @arqlet/engine-client --filter @arqlet/viewer --filter arqlet publish --access public
-git tag v0.1.0 && git push origin v0.1.0
+git tag -a vx.y.z -m x.y.z && git push origin vx.y.z
 ```
 
 `cargo publish --workspace` publishes in dependency order. `pnpm -r publish` publishes in dependency order as well and
@@ -52,5 +55,4 @@ skips versions that already exist.
 
 - A release workflow on tags with trusted publishing (OIDC) for crates.io and npm and npm provenance, so no tokens
   are stored.
-- `CHANGELOG.md`.
 - A smaller WASM (size-optimised profile or `wasm-opt`); only with unchanged output.

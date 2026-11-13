@@ -9,11 +9,11 @@ import type { Port } from "./Port";
  * A graph: the canonical data of a view. Direction and layout strategy are two constraints, each set for the root and for
  * containers and inherited by containers that declare nothing (docs/adr/0003-container-direction-constraints.md).
  */
-export type Graph = { defaultDirection: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt">, containerDirections: { [key in string]: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt"> }, defaultStrategy?: "none" | "tree" | "radial" | "auto" | Array<"none" | "tree" | "radial">, containerStrategies?: { [key in string]: "none" | "tree" | "radial" | "auto" | Array<"none" | "tree" | "radial"> },
+export type Graph = { defaultDirection?: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt">, containerDirections?: { [key in string]: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt"> }, defaultStrategy?: "none" | "tree" | "radial" | "auto" | Array<"none" | "tree" | "radial">, containerStrategies?: { [key in string]: "none" | "tree" | "radial" | "auto" | Array<"none" | "tree" | "radial"> },
 /**
  * The edge routing of the root and its containers (docs/adr/0005-routing-constraints.md).
  */
-defaultRouting?: "straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus" | "auto" | Array<"straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus">, containerRouting?: { [key in string]: "straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus" | "auto" | Array<"straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus"> }, ports: Array<Port>, edgePorts: Array<EdgePorts>, nodes: Array<Node>, edges: Array<Edge>,
+defaultRouting?: "straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus" | "auto" | Array<"straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus">, containerRouting?: { [key in string]: "straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus" | "auto" | Array<"straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | "roundedPolyline" | "octilinear" | "curve" | "bus"> }, ports?: Array<Port>, edgePorts?: Array<EdgePorts>, nodes: Array<Node>, edges: Array<Edge>,
 /**
  * Provisional: explicit buses (ADR 0005): each groups edges drawn on one shared trunk with branches. Membership is never
  * inferred. Omitted when empty, so earlier documents and drawings do not change.
