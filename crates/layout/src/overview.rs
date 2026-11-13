@@ -35,6 +35,9 @@ pub struct OverviewOptions {
     /// Satellites are gathered with their hub (`with_satellites`) when at least this share of their edges goes to it;
     /// 0 (the default) never.
     pub satellites: f64,
+    /// A container with a single child takes that child's disc, without padding of its own, so that a chain of single
+    /// children (a package holding one module holding one file) is one disc a viewer draws once. Off by default.
+    pub chains: bool,
 }
 
 impl Default for OverviewOptions {
@@ -48,6 +51,7 @@ impl Default for OverviewOptions {
             gravity: 0.1,
             communities: 120,
             satellites: 0.,
+            chains: false,
         }
     }
 }
@@ -763,7 +767,7 @@ pub fn arrange(
     if k == 1 {
         return Arrangement {
             positions: vec![(0., 0.)],
-            radius: r[0] + options.padding,
+            radius: r[0] + if options.chains { 0. } else { options.padding },
             overlaps: 0,
         };
     }
@@ -1449,6 +1453,41 @@ mod tests {
         let off = with_satellites(hierarchy(&graph), 0.).unwrap();
         assert_eq!((off.ids.len(), off.parent), (5, hierarchy(&graph).parent));
         assert_eq!(OverviewOptions::default().satellites, 0.);
+    }
+
+    #[test]
+    fn a_chain_of_single_children_shares_one_disc() {
+        // f holds only p, p holds only q, q holds two leaves.
+        let g = graph(
+            vec![
+                node("f", None),
+                node("p", Some("f")),
+                node("q", Some("p")),
+                node("s1", Some("q")),
+                node("s2", Some("q")),
+            ],
+            vec![],
+        );
+        let chained = OverviewOptions {
+            chains: true,
+            ..OverviewOptions::default()
+        };
+        let (_, o) = overview(&g, &chained, &OverviewHints::default());
+        assert_eq!(
+            (o.radius[0], o.radius[1]),
+            (o.radius[2], o.radius[2]),
+            "f, p and q: one disc"
+        );
+        assert_eq!((o.x[0], o.y[0]), (o.x[2], o.y[2]));
+        let (_, plain) = overview(&g, &OverviewOptions::default(), &OverviewHints::default());
+        assert!(
+            plain.radius[0] > plain.radius[1] && plain.radius[1] > plain.radius[2],
+            "off by default: padding per level"
+        );
+        assert_eq!(
+            plain.radius[2], o.radius[2],
+            "what the chain holds is laid out the same"
+        );
     }
 
     #[test]

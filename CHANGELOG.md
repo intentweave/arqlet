@@ -29,6 +29,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - Overview: an outline per node kind (`circle`, `square`, `octagon`, `diamond`, inscribed in the disc, so the layout
   stays as it is): `overviewBuffers(…, {shapes})`, renderer option `shapes` and `setShapes`. Playground: a shape column
   in *Rules by kind*. A community inside another named after the same member is named after the next one.
+- Overview: option `chains` (off by default): a container with a single child takes that child's disc, without padding
+  of its own. The viewer draws, names (`A › B`, a repeated name once) and picks such a chain as one (`chainTop` in the
+  model, `chainOf`); a rule for any kind of the chain applies to it. Playground: *Fold chains of single children*.
 - Playground: `server.py --local-examples <folder>` offers the graphs of a folder outside the repository on both pages
   (served read-only at `/local/`, nothing copied into the repository); an ELK graph (`children`) is laid out through
   the ELK adapter.

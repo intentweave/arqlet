@@ -47,6 +47,9 @@ export interface OverviewModel {
   index: Map<string, number>;
   /** The result's edge ids (see `resolvedEdgeIds`), or null. */
   edgeIds: string[] | null;
+  /** The outermost node of every node's chain: a node that is its parent's only child and has the same disc (overview
+   * option `chains`) is drawn, named and picked with its parent. The node itself when it is in no chain. */
+  chainTop: Int32Array;
 }
 
 export interface OverviewView {
@@ -65,9 +68,12 @@ export const BORDER_PREFIX: 'border:';
 /** The id prefix of the clusters the overview adds for communities. */
 export const COMMUNITY_PREFIX: 'community:';
 /** A short name: the last part of a path-like id; `≈ <level>.<k>` for a community. */
-/** The name of node `i`: its label from the data (`overview.labels`), else `displayName` of its id. */
+/** The name of node `i`: its label from the data (`overview.labels`), else `displayName` of its id; the top of a chain
+ * names the chain (`A › B`, a repeated name once). */
 export function nameOf(model: OverviewModel, i: number): string;
 export function displayName(id: string): string;
+/** The nodes of node `i`'s chain from its top down (just `i` when it is in none). */
+export function chainOf(model: OverviewModel, i: number): number[];
 /** RGB in 0..1 for the n-th top-level cluster. */
 export function clusterColour(rootOrdinal: number): [number, number, number];
 /** Floats per shape vertex and per line or triangle vertex of `overviewBuffers`. */

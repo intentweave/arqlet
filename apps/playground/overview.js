@@ -41,11 +41,12 @@ function loadSettings() {
     const saved = JSON.parse(localStorage.getItem(STORE) ?? '{}');
     for (const id of [...LAYOUT, ...ZOOM]) if (saved[id] !== undefined) $(id).value = saved[id];
     if (saved.auto !== undefined) $('auto').checked = saved.auto;
+    if (saved.chains !== undefined) $('chains').checked = saved.chains;
   } catch { /* no storage: the defaults */ }
 }
 function saveSettings() {
   try {
-    const out = {auto: $('auto').checked};
+    const out = {auto: $('auto').checked, chains: $('chains').checked};
     for (const id of [...LAYOUT, ...ZOOM]) out[id] = $(id).value;
     localStorage.setItem(STORE, JSON.stringify(out));
   } catch { /* no storage */ }
@@ -110,7 +111,8 @@ async function loadConfig(url = $('source').selectedOptions[0]?.dataset.config) 
 function request(extra = {}) {
   const options = {nodeRadius: number('node-radius'), gap: number('gap'), padding: number('padding'),
     charge: number('charge'), gravity: number('gravity'), communities: number('communities'),
-    ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {})};
+    ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {}),
+    ...($('chains').checked ? {chains: true} : {})};
   const values = {op: 'overview', graph, threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
   if (baseConfig) values.configSet = {...baseConfig, overview: {rules, auto: $('auto').checked}};
   return values;
@@ -290,15 +292,19 @@ function zoomTo(i, smooth = false) {
 
 function label(i) { return model.overview.ids[i]; }
 function kindOf(i) { const o = model.overview; return o.kinds && o.kind ? o.kinds[o.kind[i]] : null; }
-function clusterOf(i) { return i < 0 ? -1 : model.children[i].length ? i : model.overview.parent[i]; }
+/** The cluster a click on node `i` means: the node if it is a cluster (else its parent), as the top of its chain. */
+function clusterOf(i) {
+  const c = i < 0 ? -1 : model.children[i].length ? i : model.overview.parent[i];
+  return c < 0 ? -1 : model.chainTop[c];
+}
 
-/** How cluster `i` is shown now, and why. */
 /** The level from which clusters are collapsed until opened, or null. */
 function levelOfDetail() {
   const value = $('levels').value.trim();
   return value === '' || !(Number(value) >= 0) ? null : Math.floor(Number(value));
 }
 
+/** How cluster `i` is shown now, and why. */
 function representationOf(i) {
   const id = label(i);
   const now = shown.has(id) ? 'structured' : collapsed.has(i) ? 'collapsed' : 'open';
@@ -432,7 +438,8 @@ function renderRules() {
 
 function crumbs() {
   const path = [];
-  for (let i = focus; i >= 0; i = model.overview.parent[i]) path.unshift(i);
+  // A chain is one step, named by its top.
+  for (let i = focus; i >= 0; i = model.overview.parent[i]) if (model.chainTop[i] === i) path.unshift(i);
   const button = (text, i) => { const b = document.createElement('button'); b.textContent = text; b.onclick = () => { focus = i; zoomTo(i, true); crumbs(); }; return b; };
   $('crumbs').replaceChildren(button('All', -1), ...path.map(i => button(nameOf(model, i), i)));
 }
@@ -452,6 +459,7 @@ $('run').onclick = () => layOut(true);
 $('relayout').onclick = () => { saveSettings(); layOut(false); };
 $('defaults').onclick = () => {
   for (const [id, value] of Object.entries(DEFAULTS)) $(id).value = value;
+  $('chains').checked = false;
   saveSettings();
   schedule();
 };

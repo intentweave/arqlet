@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES} from './overview.js';
+import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES} from './overview.js';
 
 // Two clusters: c (with leaves a, b) and d (with leaf e); edges a→b, b→a (a cycle) and a→e.
 const overview = {
@@ -326,4 +326,34 @@ test('an outline per kind travels as the tenths of the shape kind', () => {
   assert.deepEqual(OUTLINES, ['circle', 'square', 'octagon', 'diamond']);
   // Containers (rings, kind 1) become squares (+0.1), leaves (fill, kind 0) octagons (+0.2); circles add nothing.
   assert.deepEqual(shaped.map((k, i) => Math.round((k - plain[i]) * 10)), plain.map(k => (k >= 1 ? 1 : 2)));
+});
+
+test('a chain of single children is drawn, named, picked and decided as one', () => {
+  // f holds only p (same disc), p holds q and r; g is a container with one child of a smaller disc: no chain.
+  const o = {
+    schemaVersion: 1,
+    ids: ['f', 'p', 'q', 'r', 'g', 'h'],
+    labels: ['Core', 'Core', 'q', 'r', 'G', 'h'],
+    parent: [-1, 0, 1, 1, -1, 4],
+    x: [0, 0, -3, 3, 30, 30], y: [0, 0, 0, 0, 0, 0], r: [8, 8, 2, 2, 8, 4],
+    rootRadius: 40, edges: [], links: [],
+    kinds: ['package', 'module', 'leaf'], kind: [0, 1, 2, 2, 0, 2],
+  };
+  const m = overviewModel(o);
+  assert.deepEqual([...m.chainTop], [0, 0, 2, 3, 4, 5]);
+  assert.deepEqual(chainOf(m, 1), [0, 1]);
+  assert.equal(nameOf(m, 0), 'Core', 'a name repeated in the chain is written once');
+  assert.equal(nameOf(m, 4), 'G');
+  assert.equal(nameOf({...m, overview: {...o, labels: ['Core', 'Util', 'q', 'r', 'G', 'h']}}, 0), 'Core › Util');
+  // Picking on the ring of the chain gives its top; a leaf inside stays itself.
+  assert.equal(pickNode(m, 0, 6), 0);
+  assert.equal(pickNode(m, -3, 0), 2);
+  // One ring for the chain: f's ring, not p's (5 discs of 6 nodes).
+  assert.equal(overviewBuffers(m).count.discs / 6, 5);
+  // A rule on the inner kind applies to the chain; its top carries the decision.
+  const far = {centreX: 0, centreY: 0, scale: 10};
+  assert.deepEqual([...representationsOf(m, far, 400, 400, {rules: {module: 'collapsed'}}).collapsed], [0]);
+  // Opened by the level of detail, the whole chain opens: p is not collapsed again one level deeper.
+  const opened = representationsOf(m, far, 400, 400, {depth: 0, decisions: new Map([['f', 'organic']])});
+  assert.deepEqual([...opened.collapsed], [4]);
 });

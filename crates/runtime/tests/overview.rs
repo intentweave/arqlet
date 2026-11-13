@@ -340,3 +340,27 @@ fn satellites_are_gathered_with_their_hub_and_added_clusters_are_named() {
     let refused = request(json!({"satellites": 1.5}));
     assert_eq!(refused["ok"], false);
 }
+
+#[test]
+fn chains_of_single_children_share_a_disc_when_asked() {
+    let graph = json!({"nodes": [
+        {"id": "f", "kind": "package", "label": "f"},
+        {"id": "p", "kind": "module", "label": "p", "parentId": "f"},
+        {"id": "s1", "kind": "file", "label": "s1", "parentId": "p"},
+        {"id": "s2", "kind": "file", "label": "s2", "parentId": "p"},
+        {"id": "x", "kind": "package", "label": "x"}
+    ], "edges": []});
+    let run = |options: Value| -> Value {
+        serde_json::from_str(&dispatch(
+            &json!({"op": "overview", "graph": graph, "threads": 1, "options": options})
+                .to_string(),
+        ))
+        .unwrap()
+    };
+    let r = |o: &Value, i: usize| o["overview"]["r"][i].as_f64().unwrap();
+    let chained = run(json!({"chains": true}));
+    assert_eq!(r(&chained, 0), r(&chained, 1));
+    let plain = run(json!({}));
+    assert!(r(&plain, 0) > r(&plain, 1), "off by default");
+    assert_eq!(run(json!({"chains": 1}))["ok"], false);
+}

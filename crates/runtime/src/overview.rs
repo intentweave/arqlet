@@ -32,6 +32,11 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
                     _ => options.padding = x,
                 }
             }
+            "chains" => {
+                options.chains = value
+                    .as_bool()
+                    .ok_or("Overview option chains must be true or false")?;
+            }
             "satellites" => {
                 options.satellites = value.as_f64().filter(|x| (0. ..=1.).contains(x)).ok_or(
                     "Overview option satellites must be a share between 0 and 1 (0: never)",

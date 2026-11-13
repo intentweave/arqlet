@@ -47,8 +47,17 @@ export function overviewModel(overview, edgeIds = null) {
     const p = overview.parent[i];
     cluster[i] = colourOf.has(i) ? i : p >= 0 ? cluster[p] : i;
   }
+  // Chains: a node that is the only child of its parent and has the same disc (the overview's option `chains`) is drawn,
+  // named and picked with that parent; `chainTop` is the outermost node of each node's chain (the node itself if none).
+  const chainTop = new Int32Array(n);
+  const same = (a, b) => Math.abs(overview.x[a] - overview.x[b]) + Math.abs(overview.y[a] - overview.y[b]) +
+    Math.abs(overview.r[a] - overview.r[b]) <= 1e-6 * Math.max(overview.r[a], 1);
+  for (const i of order) {
+    const p = overview.parent[i];
+    chainTop[i] = p >= 0 && children[p].length === 1 && same(p, i) ? chainTop[p] : i;
+  }
   const index = new Map(overview.ids.map((id, i) => [id, i]));
-  return {overview, n, children, roots, tops, depth, cluster, leaves, size, index, edgeIds};
+  return {overview, n, children, roots, tops, depth, cluster, leaves, size, index, edgeIds, chainTop};
 }
 
 /** The ids of a graph's resolved edges, in input order: the edges of its `overview` result. */
@@ -64,8 +73,24 @@ export const COMMUNITY_PREFIX = 'community:';
  * The name of node `i` of an overview model: its label from the data (`overview.labels`), else `displayName` of its id.
  */
 export function nameOf(model, i) {
-  const label = model.overview.labels?.[i];
-  return label ? label : displayName(model.overview.ids[i]);
+  const own = j => model.overview.labels?.[j] || displayName(model.overview.ids[j]);
+  // The top of a chain names the chain: its members' names in order, a name repeated only once.
+  const names = [own(i)];
+  for (let j = i; model.chainTop && model.children[j].length === 1 && model.chainTop[model.children[j][0]] === i;) {
+    j = model.children[j][0];
+    if (own(j) !== names.at(-1)) names.push(own(j));
+  }
+  return names.join(' › ');
+}
+
+/** The nodes of `i`'s chain from its top down (just `i` without one); see `chainTop` of the model. */
+export function chainOf(model, i) {
+  const top = model.chainTop ? model.chainTop[i] : i, out = [top];
+  for (let j = top; model.chainTop && model.children[j].length === 1 && model.chainTop[model.children[j][0]] === top;) {
+    j = model.children[j][0];
+    out.push(j);
+  }
+  return out;
 }
 
 export function displayName(id) {
@@ -175,7 +200,8 @@ export function representationsOf(model, view, width, height, {
     const decided = decisions.get(o.ids[i]);
     if (decided === 'collapsed' || decided === 'organic') return decided;
     if (decided === 'structured' && fits(i)) return 'structured';
-    const rule = o.kinds && o.kind ? rules[o.kinds[o.kind[i]]] : undefined;
+    // A chain follows the first rule of its members' kinds, from its top down.
+    const rule = o.kinds && o.kind ? chainOf(model, i).map(j => rules[o.kinds[o.kind[j]]]).find(r => r) : undefined;
     if (rule === 'collapsed' || rule === 'organic') return rule;
     if (rule === 'structured' && fits(i) && screenRadius(i) >= rulePixels && inView(i)) return 'structured';
     // A level of detail: clusters from this depth on are shown collapsed until the user opens them.
@@ -192,6 +218,8 @@ export function representationsOf(model, view, width, height, {
   while (stack.length) {
     const i = stack.pop();
     if (!model.children[i].length) continue;
+    // A node inside a chain is shown as its top is: open, since the walk reached it.
+    if (model.chainTop && model.chainTop[i] !== i) { stack.push(...model.children[i]); continue; }
     const representation = choose(i);
     if (representation === 'collapsed') collapsed.add(i);
     else if (representation === 'structured') structured.add(i);
@@ -218,7 +246,9 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const ordinal = new Map(tops.map((r, k) => [r, k]));
   const colour = i => clusterColour(ordinal.get(cluster[i]));
   const owner = ownersOf(model, expanded, collapsed);
-  const order = [...Array(n).keys()].filter(i => owner[i] < 0).sort((a, b) =>
+  // A container inside a chain shares its top's disc: only the top's ring is drawn.
+  const folded = i => model.chainTop && model.chainTop[i] !== i && children[i].length > 0;
+  const order = [...Array(n).keys()].filter(i => owner[i] < 0 && !folded(i)).sort((a, b) =>
     (children[b].length > 0) - (children[a].length > 0) || depth[a] - depth[b] || a - b);
   const discs = [];
   for (const i of order) {
@@ -421,6 +451,7 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
   const owner = ownersOf(model, expanded, collapsed);
   for (let i = 0; i < model.n; i++) {
     if (!model.children[i].length || owner[i] >= 0) continue;
+    if (model.chainTop && model.chainTop[i] !== i) continue;
     const [cx, cy, factor] = screen(o.x[i], o.y[i]);
     const r = o.r[i] * view.scale * factor, text = nameOf(model, i);
     if (collapsed.has(i)) {
@@ -484,7 +515,7 @@ export function pickNode(model, x, y, collapsed = new Set()) {
   let found = -1, candidates = roots;
   for (;;) {
     const next = candidates.find(inside);
-    if (next === undefined) return found;
+    if (next === undefined) return found >= 0 && model.chainTop ? model.chainTop[found] : found;
     found = next;
     // A collapsed cluster is picked as a whole.
     if (collapsed.has(next)) return found;

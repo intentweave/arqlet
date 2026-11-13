@@ -9,5 +9,5 @@ export {checkScene, routePath} from '@arqlet/viewer/scene.js';
 export {toReactFlow} from '@arqlet/viewer/react-flow.js';
 export {bindNavigation, zoomAnchor} from '@arqlet/viewer/navigation.js';
 export {bendsOf, pathLength, crosses, routeDetails, drawingOf, routeConflictsOf} from '@arqlet/viewer/routes.js';
-export {overviewModel, overviewBuffers, pickNode, pickExpanded, placeScene, frameOf, clipToFrame, ownersOf, labelsOf, viewOf, subtreeOf, structuredExcerpt, resolvedEdgeIds, BORDER_PREFIX, representationsOf, REPRESENTATIONS, flowDirectionOf, displayName, nameOf, COMMUNITY_PREFIX, clusterColour, lensAt, lensInverse} from '@arqlet/viewer/overview.js';
+export {overviewModel, overviewBuffers, pickNode, pickExpanded, placeScene, frameOf, clipToFrame, ownersOf, labelsOf, viewOf, subtreeOf, structuredExcerpt, resolvedEdgeIds, BORDER_PREFIX, representationsOf, REPRESENTATIONS, flowDirectionOf, displayName, nameOf, chainOf, OUTLINES, COMMUNITY_PREFIX, clusterColour, lensAt, lensInverse} from '@arqlet/viewer/overview.js';
 export {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
