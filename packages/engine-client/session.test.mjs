@@ -287,6 +287,7 @@ test('an overview session that keeps the graph gets only the positions back and 
   const a = await kept.layOut(request), b = await plain.layOut(request);
   assert.deepEqual(a, b, 'the same whole overview either way');
   assert.deepEqual(sent.at(-1), {asked: true, whole: false}, 'only the positions crossed');
+});
 
 test('a compacting filter lays the view out again without the hidden, in both kinds of session', {skip: !engine}, async () => {
   const g = {nodes: [{id: 'p', kind: 'package', label: 'p'}, {id: 'q', kind: 'package', label: 'q'},
