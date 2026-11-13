@@ -280,21 +280,9 @@ fn single_pass_options(options: &LayoutOptions) -> LayoutOptions {
 }
 
 /// `import_graph_with` that also returns the stage work of the first layout, for reports of where an import's time goes.
-pub fn import_graph_counted(
-    mut graph: Graph,
-    limit: usize,
-    options: &LayoutOptions,
-) -> Result<(Snapshot, arqlet_layout::SearchCounters), String> {
-    if limit == 0 || limit > MAX_VIEW_LIMIT {
-        return Err(format!("View limit must be between 1 and {MAX_VIEW_LIMIT}"));
-    }
-    let single_pass = options
-        .single_pass_auto
-        .then(|| single_pass_options(options));
-    let options = single_pass.as_ref().unwrap_or(options);
-    validate(&graph)?;
-    let omitted = graph.edges.iter().filter(|e| e.target.is_none()).count();
-    graph.edges.retain(|e| e.target.is_some());
+/// The view of an import within `limit` nodes: the connected neighbourhood of the most connected node, then of the next,
+/// until the limit is reached (see `import_graph_counted`).
+fn select_connected(graph: &Graph, limit: usize) -> BTreeSet<String> {
     let mut neighbors: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for e in &graph.edges {
         let t = e.target.as_ref().unwrap();
@@ -340,6 +328,151 @@ pub fn import_graph_counted(
             }
         }
     }
+    selected
+}
+
+/// Provisional: the view of an import within `limit`, counting what the first view shows when it abstracts (level of
+/// detail, communities, groups). A container the view starts collapsed counts once and keeps its whole content, so that
+/// it can be opened; a container an edge reaches while none of its content is selected keeps its content too and starts
+/// collapsed (the second set). Otherwise as `select_connected`: the most connected neighbourhoods first, then the rest
+/// in input order.
+fn select_visible(
+    graph: &Graph,
+    limit: usize,
+    options: &LayoutOptions,
+) -> Result<(BTreeSet<String>, BTreeSet<String>), String> {
+    let view = structured(graph, options)?;
+    let collapsed = initially_collapsed(&view, options);
+    let parent: BTreeMap<&str, Option<&str>> = view
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let containers: BTreeSet<&str> = view
+        .nodes
+        .iter()
+        .filter_map(|n| n.parent_id.as_deref())
+        .collect();
+    // What stands for a node in the first view: the outermost collapsed container above it, or itself.
+    let unit = |id: &str| -> String {
+        let mut shown = id;
+        let mut at = Some(id);
+        while let Some(x) = at {
+            if collapsed.contains(x) {
+                shown = x;
+            }
+            at = parent.get(x).copied().flatten();
+        }
+        shown.to_string()
+    };
+    let mut neighbors: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for e in &graph.edges {
+        let (a, b) = (unit(&e.source), unit(e.target.as_ref().unwrap()));
+        neighbors.entry(a.clone()).or_default().insert(b.clone());
+        neighbors.entry(b).or_default().insert(a);
+    }
+    let mut seeds: Vec<String> = neighbors.keys().cloned().collect();
+    seeds.sort_by(|a, b| {
+        neighbors[b]
+            .len()
+            .cmp(&neighbors[a].len())
+            .then_with(|| a.cmp(b))
+    });
+    // Then what has no edges, in input order: every leaf's unit once.
+    let mut seen: BTreeSet<String> = seeds.iter().cloned().collect();
+    for node in &graph.nodes {
+        if containers.contains(node.id.as_str()) {
+            continue;
+        }
+        let u = unit(&node.id);
+        if seen.insert(u.clone()) {
+            seeds.push(u);
+        }
+    }
+    let mut units = BTreeSet::new();
+    for seed in seeds {
+        if units.len() >= limit {
+            break;
+        }
+        let mut queue = VecDeque::from([seed]);
+        while let Some(id) = queue.pop_front() {
+            if !units.insert(id.clone()) {
+                continue;
+            }
+            if units.len() >= limit {
+                break;
+            }
+            if let Some(ns) = neighbors.get(&id) {
+                queue.extend(ns.iter().filter(|n| !units.contains(*n)).cloned());
+            }
+        }
+    }
+    // Back to the graph's nodes: every node whose unit is selected, a collapsed container with all it holds.
+    let mut selected: BTreeSet<String> = graph
+        .nodes
+        .iter()
+        .filter(|n| units.contains(&unit(&n.id)))
+        .map(|n| n.id.clone())
+        .collect();
+    // A selected container that is not collapsed and holds nothing selected (an edge reached it): whole, collapsed.
+    let holds_selected: BTreeSet<&str> = selected
+        .iter()
+        .flat_map(|id| {
+            let mut up = Vec::new();
+            let mut at = parent.get(id.as_str()).copied().flatten();
+            while let Some(p) = at {
+                up.push(p);
+                at = parent.get(p).copied().flatten();
+            }
+            up
+        })
+        .collect();
+    let mut pulled = BTreeSet::new();
+    for id in &units {
+        if containers.contains(id.as_str())
+            && !collapsed.contains(id.as_str())
+            && !holds_selected.contains(id.as_str())
+        {
+            pulled.insert(id.clone());
+        }
+    }
+    if !pulled.is_empty() {
+        for node in &graph.nodes {
+            let mut at = parent.get(node.id.as_str()).copied().flatten();
+            while let Some(p) = at {
+                if pulled.contains(p) {
+                    selected.insert(node.id.clone());
+                    break;
+                }
+                at = parent.get(p).copied().flatten();
+            }
+        }
+    }
+    Ok((selected, pulled))
+}
+
+pub fn import_graph_counted(
+    mut graph: Graph,
+    limit: usize,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, arqlet_layout::SearchCounters), String> {
+    if limit == 0 || limit > MAX_VIEW_LIMIT {
+        return Err(format!("View limit must be between 1 and {MAX_VIEW_LIMIT}"));
+    }
+    let single_pass = options
+        .single_pass_auto
+        .then(|| single_pass_options(options));
+    let options = single_pass.as_ref().unwrap_or(options);
+    validate(&graph)?;
+    let omitted = graph.edges.iter().filter(|e| e.target.is_none()).count();
+    graph.edges.retain(|e| e.target.is_some());
+    // With an abstracting view, the limit counts what the first view shows (`select_visible`); otherwise the most
+    // connected neighbourhoods of the graph's nodes.
+    let (mut selected, pulled) = if abstracts(options) && graph.nodes.len() > limit {
+        select_visible(&graph, limit, options)?
+    } else {
+        (select_connected(&graph, limit), BTreeSet::new())
+    };
     let parents: BTreeMap<_, _> = graph
         .nodes
         .iter()
@@ -372,6 +505,12 @@ pub fn import_graph_counted(
         };
         if abstracts(options) {
             collapsed.extend(initially_collapsed(&view, options));
+            // Containers an edge pulled in without their content selected: whole, and collapsed (`select_visible`).
+            collapsed.extend(
+                pulled
+                    .into_iter()
+                    .filter(|id| view.nodes.iter().any(|n| &n.id == id)),
+            );
         }
         let (projected, weights) =
             merge_view(&view, arqlet_view::project(&view, &collapsed)?, options);
