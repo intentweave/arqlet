@@ -1752,6 +1752,12 @@ pub struct LayoutOptions {
     /// Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub isolated_grid: bool,
+    /// Experimental (single pass): the edges that leave or enter a container towards the same node outside share one
+    /// border node, as wide across the flow as their tracks, instead of one border node each; inside they fan out to
+    /// their children. A container with many edges to few outside nodes no longer grows by a neighbour's gap per edge
+    /// along its border. Omitted when off, so the default output does not change.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub bundle_borders: bool,
     /// How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
     /// Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2009,6 +2015,7 @@ impl Default for LayoutOptions {
             strict_clearance: false,
             component_packing: false,
             isolated_grid: false,
+            bundle_borders: false,
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,

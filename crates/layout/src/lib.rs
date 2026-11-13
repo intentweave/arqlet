@@ -5604,6 +5604,9 @@ fn place(
             if same_axis_container || cross_axis_container {
                 let mut leaving: Vec<(String, Option<String>)> = Vec::new();
                 let mut entering: Vec<(String, Option<String>)> = Vec::new();
+                // Experimental (`bundleBorders`): the end of each crossing edge outside the area, which its border node is
+                // shared by.
+                let mut outside_end: BTreeMap<String, String> = BTreeMap::new();
                 for (edge, &ends) in graph.edges.iter().zip(&index.edge_ends) {
                     let (Some(target), (Some(s), Some(t))) = (edge.target.as_deref(), ends) else {
                         continue;
@@ -5627,6 +5630,17 @@ fn place(
                     }
                     let backward = options.hierarchical_ordering
                         && reversed_above(index, plans, &reversals, &edge.source, target);
+                    if options.bundle_borders {
+                        match (from, to) {
+                            (Some(_), None) => {
+                                outside_end.insert(edge.id.clone(), target.to_string());
+                            }
+                            (None, Some(_)) => {
+                                outside_end.insert(edge.id.clone(), edge.source.clone());
+                            }
+                            _ => {}
+                        }
+                    }
                     match (from, to) {
                         (Some(a), None) if backward => {
                             entering.push((edge.id.clone(), Some(children[a].id.clone())))
@@ -5748,33 +5762,63 @@ fn place(
                         levels = levels.into_iter().map(|(r, ids)| (r + 1, ids)).collect();
                     }
                     let last = levels.keys().copied().max().unwrap_or(0) + 1;
-                    for (edge, child) in &entering {
-                        let node = format!("{BORDER_PREFIX}{edge}");
-                        levels.entry(0).or_default().push(node.clone());
-                        ranks.insert(node.clone(), 0);
-                        virtual_sizes.insert(node.clone(), (side, side));
-                        if let Some(child) = child {
-                            order_links.insert((node.clone(), child.clone()));
-                            multiplicity.insert((node.clone(), child.clone()), 1);
-                            link_edges.insert((node.clone(), child.clone()), vec![edge.clone()]);
+                    // One border node per edge, or (`bundleBorders`) one per node outside and side, shared by its edges and
+                    // as wide across the flow as their tracks.
+                    let along_y = matches!(direction_for(graph, parent), Mode::Orientation(o) if o.vertical());
+                    let mut widths: BTreeMap<String, usize> = BTreeMap::new();
+                    for (sides_of, rank, entering_side) in
+                        [(&entering, 0, true), (&leaving, last, false)]
+                    {
+                        for (edge, child) in sides_of {
+                            let node = match outside_end.get(edge) {
+                                Some(end) => format!(
+                                    "{BORDER_PREFIX}{}{end}",
+                                    if entering_side { "<" } else { ">" }
+                                ),
+                                None => format!("{BORDER_PREFIX}{edge}"),
+                            };
+                            let count = widths.entry(node.clone()).or_default();
+                            if *count == 0 {
+                                levels.entry(rank).or_default().push(node.clone());
+                                ranks.insert(node.clone(), rank);
+                            }
+                            *count += 1;
+                            if let Some(child) = child {
+                                let link = if entering_side {
+                                    (node.clone(), child.clone())
+                                } else {
+                                    (child.clone(), node.clone())
+                                };
+                                order_links.insert(link.clone());
+                                *multiplicity.entry(link.clone()).or_insert(0) += 1;
+                                link_edges.entry(link).or_default().push(edge.clone());
+                            }
+                            borders.insert(edge.clone(), node);
                         }
-                        borders.insert(edge.clone(), node);
                     }
-                    for (edge, child) in &leaving {
-                        let node = format!("{BORDER_PREFIX}{edge}");
-                        levels.entry(last).or_default().push(node.clone());
-                        ranks.insert(node.clone(), last);
-                        virtual_sizes.insert(node.clone(), (side, side));
-                        if let Some(child) = child {
-                            order_links.insert((child.clone(), node.clone()));
-                            multiplicity.insert((child.clone(), node.clone()), 1);
-                            link_edges.insert((child.clone(), node.clone()), vec![edge.clone()]);
-                        }
-                        borders.insert(edge.clone(), node);
+                    for (node, count) in widths {
+                        let across = side * count as f64;
+                        virtual_sizes.insert(
+                            node,
+                            if along_y {
+                                (across, side)
+                            } else {
+                                (side, across)
+                            },
+                        );
                     }
                 }
             }
             let normalized: BTreeSet<(String, String)> = order_links.clone();
+            // Experimental (`bundleBorders`): the chains towards (or from) one shared border node share their dummy in
+            // every rank, as wide as all their tracks (edge concentration), instead of one dummy per chain and rank.
+            let mut shared_tracks: BTreeMap<String, usize> = BTreeMap::new();
+            let shared_border = |id: &str| {
+                options.bundle_borders
+                    && id
+                        .strip_prefix(BORDER_PREFIX)
+                        .is_some_and(|rest| rest.starts_with('<') || rest.starts_with('>'))
+            };
             for (a, b) in &normalized {
                 let (ra, rb) = (ranks[a], ranks[b]);
                 if rb == ra + 1 {
@@ -5795,7 +5839,27 @@ fn place(
                 order_links.remove(&(a.clone(), b.clone()));
                 let mut previous = a.clone();
                 let mut chain = Vec::new();
+                let shared = if shared_border(b) {
+                    Some(b)
+                } else if shared_border(a) {
+                    Some(a)
+                } else {
+                    None
+                };
                 for rank in ra + 1..rb {
+                    if let Some(end) = shared {
+                        let dummy = format!("{DUMMY_PREFIX}={end}@{rank}");
+                        let count = shared_tracks.entry(dummy.clone()).or_default();
+                        if *count == 0 {
+                            levels.entry(rank).or_default().push(dummy.clone());
+                            ranks.insert(dummy.clone(), rank);
+                        }
+                        *count += tracks;
+                        order_links.insert((previous, dummy.clone()));
+                        chain.push(dummy.clone());
+                        previous = dummy;
+                        continue;
+                    }
                     let dummy = format!("{DUMMY_PREFIX}{a}->{b}@{rank}");
                     levels.entry(rank).or_default().push(dummy.clone());
                     ranks.insert(dummy.clone(), rank);
@@ -5806,6 +5870,13 @@ fn place(
                 }
                 order_links.insert((previous, b.clone()));
                 chains.insert((a.clone(), b.clone()), chain);
+            }
+            for (dummy, tracks) in shared_tracks {
+                let side = snap(
+                    tracks as f64 * options.track_spacing,
+                    options.placement_grid,
+                );
+                virtual_sizes.insert(dummy, (side, side));
             }
         }
         // Component packing (opt-in): each weakly connected component of the children is ordered on its own, and the
