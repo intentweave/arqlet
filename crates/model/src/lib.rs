@@ -234,7 +234,9 @@ pub struct Graph {
             type = "\"lr\" | \"rl\" | \"tb\" | \"bt\" | \"auto\" | Array<\"lr\" | \"rl\" | \"tb\" | \"bt\">"
         )
     )]
+    // Optional in the contract: a graph as it is read may leave these out (defaults), and the type serves input too.
     #[cfg_attr(feature = "ts", ts(rename = "defaultDirection"))]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub default_direction: DirectionConstraint,
     #[cfg_attr(
         feature = "ts",
@@ -243,6 +245,7 @@ pub struct Graph {
         )
     )]
     #[cfg_attr(feature = "ts", ts(rename = "containerDirections"))]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub container_directions: BTreeMap<String, DirectionConstraint>,
     #[cfg_attr(
         feature = "ts",
@@ -281,8 +284,10 @@ pub struct Graph {
     #[cfg_attr(feature = "ts", ts(rename = "containerRouting"))]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub container_routing: BTreeMap<String, RoutingConstraint>,
+    #[cfg_attr(feature = "ts", ts(as = "Option<Vec<Port>>", optional))]
     pub ports: Vec<Port>,
     #[cfg_attr(feature = "ts", ts(rename = "edgePorts"))]
+    #[cfg_attr(feature = "ts", ts(as = "Option<Vec<EdgePorts>>", optional))]
     pub edge_ports: Vec<EdgePorts>,
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,

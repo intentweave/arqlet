@@ -5,6 +5,27 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+## 0.4.0 — 2026-11-13
+
+Views that change without a new import: a filter that keeps positions, sessions whose state stays in the engine (also
+for the cluster overview and in the backend), `trace` along chosen edge kinds, input edge weights, and typed overview
+contracts. One vocabulary for the level of detail.
+
+### Upgrading from 0.3
+
+- **Rename `initialCollapse` to `levelOfDetail`** in import options, config sets and stored snapshots; the old name is
+  refused with a message that names the new one. Rust: `InitialCollapse` is `LevelOfDetail`,
+  `LayoutOptions::initial_collapse` is `level_of_detail`.
+- **`createSession` is resident by default** where the engine can keep a session (`loadEngine`, `workerRun`,
+  `httpRun`). `session.snapshot` is then only the state (`revision`, `layoutVersion`, `collapsedIds`); call
+  `await session.exportSnapshot()` for the whole snapshot, or pass `{resident: false}` for the 0.3 behaviour.
+- **Rust: `arqlet_model::Edge` has a field `weight: Option<u32>`.** Struct literals need `weight: None`; JSON input and
+  output are unchanged when no edge has a weight.
+- **TypeScript:** `@arqlet/viewer`'s `OverviewResult` is now based on `Overview` from `@arqlet/contracts`
+  (`schemaVersion` is `number`). The overview's JSON answer is unchanged byte for byte.
+- Additive and omitted when unused, so 0.3 snapshots without `initialCollapse` load unchanged: `LayoutOptions.hidden`
+  (filter), `Edge.weight`.
+
 ### Changed
 
 - **`initialCollapse` is now `levelOfDetail`** (`{depth?, kinds?}`, the same value for the layered view and the
@@ -73,6 +94,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- `@arqlet/contracts`: `Graph` no longer requires `defaultDirection`, `containerDirections`, `ports` and `edgePorts`;
+  the engine reads a graph without them, and `session.import({nodes, edges})` now typechecks.
 - ELK adapter: graphs whose nodes are mostly without edges were laid out as one long row (74 nodes: 19 624 × 172); unless
   `separateConnectedComponents` is `false`, such nodes now stand in a grid (2 520 × 1 972). Mixed graphs (several
   components plus a few lone nodes) are unchanged; real component packing is still open.
