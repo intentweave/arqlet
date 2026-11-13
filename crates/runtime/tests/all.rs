@@ -34,6 +34,8 @@ mod filter;
 mod force_directed;
 #[path = "geometry_update.rs"]
 mod geometry_update;
+#[path = "graph_patch.rs"]
+mod graph_patch;
 #[path = "graph_roundtrip.rs"]
 mod graph_roundtrip;
 #[path = "import_limit.rs"]

@@ -18,6 +18,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `patch` (provisional): changes the graph of a view without a new import — `{nodes, edges, removeNodes, removeEdges}`,
+  removals first, a removed node with what it holds and its edges. The view keeps its collapsed containers, filter and
+  options; an abstracting view is laid out from scratch as a toggle lays it out (the same drawing as a fresh import of
+  the changed graph with that view), other views from their earlier positions. A host can start with aggregated edges
+  between collapsed containers and load a container's member edges when it is opened. `session.patch(patch)`; contract
+  type `GraphPatch`.
 - Overview sessions answer only what moves (provisional): a session's `overview` with `positionsOnly` returns
   `OverviewPositions` (positions, root radius, counts, representation) while the clusters stay those of its last
   overview, and the whole overview otherwise. `createOverviewSession` asks for it on the graph the engine keeps and
