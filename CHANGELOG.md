@@ -19,6 +19,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `filter` (provisional, view state `hidden`): hides nodes by kind or id (each with what it holds) and edges by kind
+  without a new import; what stays keeps its place, the scene leaves the hidden out, and a route for collapsed content
+  counts only the edges still shown. `session.filter(hide)` in `@arqlet/engine-client`; playground section *Filter*.
 - Sessions in the backend (provisional, ADR 0019): `layout-command --sessions` keeps sessions in one long-running
   process (one JSON message per line); the playground backend serves them at `/api/session` with random keys, one
   message at a time, a time limit per message and at most 32 sessions. `httpRun(base)` in `@arqlet/engine-client`

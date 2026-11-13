@@ -7,6 +7,7 @@ pub mod containers;
 pub mod coordinator;
 pub mod engine_session;
 pub mod execution;
+pub mod filter;
 pub mod hierarchy;
 pub mod history;
 pub mod overview;
@@ -3335,7 +3336,7 @@ fn structured_result(v: &serde_json::Value) -> Result<serde_json::Value, String>
 fn scene_response(v: &serde_json::Value) -> String {
     let result = serde_json::from_value::<Snapshot>(v["snapshot"].clone())
         .map_err(|e| e.to_string())
-        .and_then(|snapshot| arqlet_scene::build_scene(&snapshot))
+        .and_then(|snapshot| filter::scene_of(&snapshot))
         .and_then(|scene| serde_json::to_value(scene).map_err(|e| e.to_string()));
     match result {
         Ok(scene) => serde_json::json!({"ok": true, "scene": scene}).to_string(),

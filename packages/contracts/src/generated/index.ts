@@ -19,6 +19,7 @@ export * from './EditReport';
 export * from './GeometryIssue';
 export * from './Gesture';
 export * from './Graph';
+export * from './Hidden';
 export * from './HybridCriterion';
 export * from './Integrity';
 export * from './Intent';

@@ -1,4 +1,4 @@
-import type {Graph, Scene, Snapshot} from '@arqlet/contracts';
+import type {Graph, Hidden, Scene, Snapshot} from '@arqlet/contracts';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
@@ -43,6 +43,9 @@ export interface Session {
   trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'}): Promise<EngineResponse>;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<SessionResult>;
+  /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest;
+   * `hide` replaces what was hidden before, `{}` shows everything. */
+  filter(hide?: Hidden): Promise<SessionResult>;
   /** The scene of the current snapshot, computed once per snapshot. Throws the engine's error. */
   scene(): Promise<Scene>;
   /** The whole snapshot: the current one, or with `resident` the one the engine keeps (for saving or hand-over). */

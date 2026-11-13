@@ -4,6 +4,7 @@ import type { AppearanceConfig } from "./AppearanceConfig";
 import type { Bundling } from "./Bundling";
 import type { ContainerSizing } from "./ContainerSizing";
 import type { EdgeRouting } from "./EdgeRouting";
+import type { Hidden } from "./Hidden";
 import type { HybridCriterion } from "./HybridCriterion";
 import type { LabelSpec } from "./LabelSpec";
 import type { LevelOfDetail } from "./LevelOfDetail";
@@ -214,6 +215,10 @@ groups?: { [key in string]: Array<string> },
  * containers that `communities` and `groups` add, which start collapsed.
  */
 levelOfDetail?: LevelOfDetail | null,
+/**
+ * Provisional (view state, set by `filter`): what the view hides, keeping the place of the rest. Omitted when empty.
+ */
+hidden?: Hidden,
 /**
  * Provisional (view state, set by `reveal`): containers shown in part. The children listed for a container are shown;
  * the others are gathered in a collapsed container `rest:<id>` of kind `rest` ("+N more"), which a `toggle` dissolves.

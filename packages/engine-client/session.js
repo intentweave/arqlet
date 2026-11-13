@@ -178,6 +178,12 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
     /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default) only as far as needed. */
     reveal(nodeIds, {partial = true} = {}) { return change({op: 'reveal', nodeIds, partial}); },
 
+    /**
+     * Provisional: hides nodes by kind or id (each with what it holds) and edges by kind, keeping the place of the rest.
+     * `hide` replaces what was hidden before; `{}` shows everything again.
+     */
+    filter(hide = {}) { return change({op: 'filter', hide}); },
+
     /** The scene (drawing) of the current snapshot, computed once per snapshot. */
     async scene() {
       const current = snapshot;

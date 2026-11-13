@@ -24,6 +24,8 @@ mod elk;
 mod engine_choice;
 #[path = "explicit_constraints.rs"]
 mod explicit_constraints;
+#[path = "filter.rs"]
+mod filter;
 #[path = "force_directed.rs"]
 mod force_directed;
 #[path = "geometry_update.rs"]
