@@ -12,6 +12,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `nodes` stay out of Louvain and remain direct children, so one hub no longer pulls the others into one community
   named after it. Omitted when empty; without it the communities are unchanged. Playground: *Hubs from … links* on
   both pages.
+- `packComponents: {aspect?}` (experimental, off): the components of a layered container (a lone child is one) are
+  packed in rank space towards an aspect ratio (default 1), so a view with many small components or many leaves no
+  longer comes out as one very tall column. On synthetic shapes the aspect goes from 0.02–0.23 to 0.91–1.67 at equal or
+  smaller area, without crossings or lines through nodes
+  ([measurement](benchmarks/results/pack-components-20261113.md)). On larger nested graphs with many edges across
+  containers it did not help and raised crossings, so it stays opt-in. Default output unchanged. Playground: *Pack
+  components*.
 - `neighbourhood` (provisional, read only): the nodes within `hops` (default 1) of `nodeId` or `nodeIds`, following
   edges `out`, `in` or `both` ways (default) and only of `edgeKinds` if given; answered as `trace` (`nodes`, `edges`,
   `visible: {nodes, routes}`, `distance`) plus each node's `hops`, so its nodes can go to `reveal`. In every mode and

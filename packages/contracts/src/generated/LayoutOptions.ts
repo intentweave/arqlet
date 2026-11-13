@@ -12,6 +12,7 @@ import type { LevelOfDetail } from "./LevelOfDetail";
 import type { NodeSize } from "./NodeSize";
 import type { Objective } from "./Objective";
 import type { OrderHint } from "./OrderHint";
+import type { PackComponents } from "./PackComponents";
 import type { Point } from "./Point";
 import type { PortPlacement } from "./PortPlacement";
 import type { RoutingEngine } from "./RoutingEngine";
@@ -100,6 +101,14 @@ strictClearance?: boolean,
  * decides between them. Omitted when off, so the default output does not change.
  */
 componentPacking?: boolean,
+/**
+ * Experimental: the weakly connected components of a container's children (a lone child is one) keep their own
+ * arrangement and are packed as boxes in rows towards an aspect ratio (`aspect`, width over height, default 1),
+ * largest first, instead of all sharing the ranks of one long drawing. Orders the components in blocks as
+ * `component_packing` does. Not for circle containers, containers with a pinned child, or flattened areas. Omitted
+ * when off, so the default output does not change.
+ */
+packComponents?: PackComponents,
 /**
  * Experimental: the children of a layered area that have no edge to another child (a file of unrelated functions)
  * are spread over the ranks as a grid instead of all standing in the first rank, one long column. They fill the

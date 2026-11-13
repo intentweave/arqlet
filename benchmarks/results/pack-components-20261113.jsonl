@@ -1,0 +1,26 @@
+{"shape":"mixed","variant":"default","nodes":374,"edges":304,"width":1400,"height":13507.5,"aspect":0.1,"areaM":18.91,"crossings":0,"bends":312,"lineNodeHits":0,"siblingOverlaps":0,"ms":22}
+{"shape":"mixed","variant":"componentPacking","nodes":374,"edges":304,"width":1400,"height":13507.5,"aspect":0.1,"areaM":18.91,"crossings":0,"bends":312,"lineNodeHits":0,"siblingOverlaps":0,"ms":21}
+{"shape":"mixed","variant":"isolatedGrid","nodes":374,"edges":304,"width":1644,"height":11206.5,"aspect":0.15,"areaM":18.42,"crossings":0,"bends":310,"lineNodeHits":0,"siblingOverlaps":0,"ms":21}
+{"shape":"mixed","variant":"packComponents","nodes":374,"edges":304,"width":4328,"height":4104,"aspect":1.05,"areaM":17.76,"crossings":0,"bends":304,"lineNodeHits":0,"siblingOverlaps":0,"ms":21}
+{"shape":"mixed","variant":"packComponents 16:9","nodes":374,"edges":304,"width":5060,"height":3442.5,"aspect":1.47,"areaM":17.42,"crossings":0,"bends":298,"lineNodeHits":0,"siblingOverlaps":0,"ms":21}
+{"shape":"mixed","variant":"elk-rs layered","nodes":374,"edges":304,"width":1300,"height":11838,"aspect":0.11,"areaM":15.39,"crossings":0,"bends":272,"lineNodeHits":0,"siblingOverlaps":0,"ms":11}
+{"shape":"mixed","variant":"elk-rs, components separated","nodes":374,"edges":304,"width":4830,"height":2671,"aspect":1.81,"areaM":12.9,"crossings":0,"bends":272,"lineNodeHits":0,"siblingOverlaps":0,"ms":10}
+{"shape":"lone","variant":"default","nodes":120,"edges":0,"width":180,"height":9336,"aspect":0.02,"areaM":1.68,"crossings":0,"bends":0,"lineNodeHits":0,"siblingOverlaps":0,"ms":4}
+{"shape":"lone","variant":"componentPacking","nodes":120,"edges":0,"width":180,"height":9336,"aspect":0.02,"areaM":1.68,"crossings":0,"bends":0,"lineNodeHits":0,"siblingOverlaps":0,"ms":4}
+{"shape":"lone","variant":"isolatedGrid","nodes":120,"edges":0,"width":1400,"height":1536,"aspect":0.91,"areaM":2.15,"crossings":0,"bends":0,"lineNodeHits":0,"siblingOverlaps":0,"ms":4}
+{"shape":"lone","variant":"packComponents","nodes":120,"edges":0,"width":1400,"height":1536,"aspect":0.91,"areaM":2.15,"crossings":0,"bends":0,"lineNodeHits":0,"siblingOverlaps":0,"ms":4}
+{"shape":"lone","variant":"packComponents 16:9","nodes":120,"edges":0,"width":1888,"height":1146,"aspect":1.65,"areaM":2.16,"crossings":0,"bends":0,"lineNodeHits":0,"siblingOverlaps":0,"ms":4}
+{"shape":"lone","variant":"elk-rs layered","nodes":120,"edges":0,"width":180,"height":8860,"aspect":0.02,"areaM":1.59,"crossings":0,"bends":0,"lineNodeHits":0,"siblingOverlaps":0,"ms":2}
+{"shape":"lone","variant":"elk-rs, components separated","nodes":120,"edges":0,"width":1580,"height":1090,"aspect":1.45,"areaM":1.72,"crossings":0,"bends":0,"lineNodeHits":0,"siblingOverlaps":0,"ms":3}
+{"shape":"leaves","variant":"default","nodes":106,"edges":24,"width":1448,"height":6408,"aspect":0.23,"areaM":9.28,"crossings":0,"bends":28,"lineNodeHits":0,"siblingOverlaps":0,"ms":5}
+{"shape":"leaves","variant":"componentPacking","nodes":106,"edges":24,"width":1448,"height":6408,"aspect":0.23,"areaM":9.28,"crossings":0,"bends":28,"lineNodeHits":0,"siblingOverlaps":0,"ms":5}
+{"shape":"leaves","variant":"isolatedGrid","nodes":106,"edges":24,"width":2668,"height":1296,"aspect":2.06,"areaM":3.46,"crossings":0,"bends":26,"lineNodeHits":0,"siblingOverlaps":0,"ms":5}
+{"shape":"leaves","variant":"packComponents","nodes":106,"edges":24,"width":2424,"height":1452,"aspect":1.67,"areaM":3.52,"crossings":0,"bends":26,"lineNodeHits":0,"siblingOverlaps":0,"ms":5}
+{"shape":"leaves","variant":"packComponents 16:9","nodes":106,"edges":24,"width":2912,"height":1062,"aspect":2.74,"areaM":3.09,"crossings":0,"bends":28,"lineNodeHits":0,"siblingOverlaps":0,"ms":5}
+{"shape":"leaves","variant":"elk-rs layered","nodes":106,"edges":24,"width":1254,"height":5998,"aspect":0.21,"areaM":7.52,"crossings":0,"bends":26,"lineNodeHits":0,"siblingOverlaps":0,"ms":2}
+{"shape":"wide","variant":"default","nodes":292,"edges":235,"width":1694,"height":10066.5,"aspect":0.17,"areaM":17.05,"crossings":0,"bends":212,"lineNodeHits":0,"siblingOverlaps":0,"ms":17}
+{"shape":"wide","variant":"componentPacking","nodes":292,"edges":235,"width":1694,"height":10134,"aspect":0.17,"areaM":17.17,"crossings":0,"bends":214,"lineNodeHits":0,"siblingOverlaps":0,"ms":17}
+{"shape":"wide","variant":"isolatedGrid","nodes":292,"edges":235,"width":1938,"height":9937.5,"aspect":0.2,"areaM":19.26,"crossings":0,"bends":210,"lineNodeHits":0,"siblingOverlaps":0,"ms":17}
+{"shape":"wide","variant":"packComponents","nodes":292,"edges":235,"width":4030,"height":4251,"aspect":0.95,"areaM":17.13,"crossings":0,"bends":204,"lineNodeHits":0,"siblingOverlaps":0,"ms":18}
+{"shape":"wide","variant":"packComponents 16:9","nodes":292,"edges":235,"width":5320,"height":2886,"aspect":1.84,"areaM":15.35,"crossings":0,"bends":198,"lineNodeHits":0,"siblingOverlaps":0,"ms":18}
+{"shape":"wide","variant":"elk-rs layered","nodes":292,"edges":235,"width":1499,"height":9479,"aspect":0.16,"areaM":14.21,"crossings":0,"bends":186,"lineNodeHits":0,"siblingOverlaps":0,"ms":7}

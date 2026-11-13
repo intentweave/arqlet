@@ -5139,7 +5139,7 @@ fn known_reversals(
         if !global::Flattening::of(parent, graph, index, options, &children).is_empty() {
             return None;
         }
-        let (_, links, ranks) = area_ranks(&children, index, options, false, 1.);
+        let (_, links, ranks) = area_ranks(&children, index, options, false, 1., false);
         out.insert(
             parent.unwrap_or("<root>").to_string(),
             links
@@ -5176,6 +5176,7 @@ fn area_ranks(
     options: &LayoutOptions,
     flattened: bool,
     isolated_pitch: f64,
+    vertical: bool,
 ) -> (
     Vec<Option<usize>>,
     BTreeSet<(String, String)>,
@@ -5297,10 +5298,114 @@ fn area_ranks(
             ranks.insert(id.clone(), solved[i]);
         }
     }
-    if options.isolated_grid && !flattened {
+    if let Some(pack) = options.pack_components.as_ref().filter(|_| !flattened) {
+        pack_ranks(
+            &ids,
+            &outgoing,
+            &incoming,
+            isolated_pitch,
+            pack.aspect.unwrap_or(1.),
+            vertical,
+            &mut ranks,
+        );
+    } else if options.isolated_grid && !flattened {
         spread_isolated(&ids, &outgoing, &incoming, isolated_pitch, &mut ranks);
     }
     (child_position, links, ranks)
+}
+
+/// Experimental (`packComponents`): the weakly connected components of the children (a lone child is one) are packed in
+/// rank space, so that the layered arrangement stays one: each keeps its own ranks shifted to an offset, components stand
+/// across the flow in columns of rank ranges, and the next column begins after the deepest component of the one before,
+/// one rank apart. The column height is chosen so that the whole comes out about `aspect` (width over height on the
+/// drawing; `vertical` flows turn it), with `pitch` the distance of two neighbours in a rank over that of two ranks.
+/// Deeper components come first (then wider, then by their first child). Fewer than two components change nothing.
+#[allow(clippy::too_many_arguments)]
+fn pack_ranks(
+    ids: &[&String],
+    outgoing: &[Vec<usize>],
+    incoming: &[Vec<usize>],
+    pitch: f64,
+    aspect: f64,
+    vertical: bool,
+    ranks: &mut BTreeMap<String, usize>,
+) {
+    let n = ids.len();
+    // Components by union-find over the links.
+    let mut root: Vec<usize> = (0..n).collect();
+    fn find(root: &mut [usize], mut i: usize) -> usize {
+        while root[i] != i {
+            root[i] = root[root[i]];
+            i = root[i];
+        }
+        i
+    }
+    for (a, targets) in outgoing.iter().enumerate() {
+        for &b in targets.iter().chain(&incoming[a]) {
+            let (ra, rb) = (find(&mut root, a), find(&mut root, b));
+            if ra != rb {
+                root[ra.max(rb)] = ra.min(rb);
+            }
+        }
+    }
+    let mut members: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for i in 0..n {
+        let r = find(&mut root, i);
+        members.entry(r).or_default().push(i);
+    }
+    if members.len() < 2 {
+        return;
+    }
+    // Each component: its first rank, its depth (ranks) and its breadth (most members in one rank).
+    let mut parts: Vec<(usize, usize, usize, Vec<usize>)> = members
+        .into_values()
+        .map(|m| {
+            let first = m.iter().map(|&i| ranks[ids[i]]).min().unwrap_or(0);
+            let last = m.iter().map(|&i| ranks[ids[i]]).max().unwrap_or(0);
+            let mut per_rank: BTreeMap<usize, usize> = BTreeMap::new();
+            for &i in &m {
+                *per_rank.entry(ranks[ids[i]]).or_default() += 1;
+            }
+            let breadth = per_rank.values().copied().max().unwrap_or(1);
+            (first, last - first + 1, breadth, m)
+        })
+        .collect();
+    parts.sort_by(|a, b| b.1.cmp(&a.1).then(b.2.cmp(&a.2)).then(a.3[0].cmp(&b.3[0])));
+    // In units of one neighbour across the flow: a rank is 1 / pitch long; one free unit and one free rank between parts.
+    let pitch = if pitch.is_finite() && pitch > 0. {
+        pitch
+    } else {
+        1.
+    };
+    let aspect = if aspect.is_finite() && aspect > 0. {
+        aspect
+    } else {
+        1.
+    };
+    let along_over_across = if vertical { 1. / aspect } else { aspect };
+    let area: f64 = parts
+        .iter()
+        .map(|p| ((p.1 + 1) as f64 / pitch) * (p.2 + 1) as f64)
+        .sum();
+    let broadest = parts.iter().map(|p| p.2).max().unwrap_or(1);
+    let column = (area / along_over_across)
+        .sqrt()
+        .ceil()
+        .max(broadest as f64) as usize;
+    let (mut offset, mut depth, mut used) = (0usize, 0usize, 0usize);
+    for (first, d, breadth, m) in &parts {
+        if used > 0 && used + breadth > column {
+            offset += depth + 1;
+            depth = 0;
+            used = 0;
+        }
+        for &i in m {
+            let r = ranks[ids[i]];
+            ranks.insert(ids[i].clone(), offset + r - first);
+        }
+        used += breadth + 1;
+        depth = depth.max(*d);
+    }
 }
 
 /// Experimental (`isolatedGrid`): the children without a link to another child, which all take rank 0, are spread over
@@ -5487,7 +5592,10 @@ fn place(
     );
     // Experimental (`isolatedGrid`): how far apart two ranks stand against two neighbours in a rank, from the children's
     // mean size and the spacings, so that the grid of unconnected children comes out about square.
-    let isolated_pitch = if options.isolated_grid && layered && !children.is_empty() {
+    let isolated_pitch = if (options.isolated_grid || options.pack_components.is_some())
+        && layered
+        && !children.is_empty()
+    {
         let vertical = matches!(direction_for(graph, parent), Mode::Orientation(o) if o.vertical());
         let (w, h) = children
             .iter()
@@ -5514,6 +5622,7 @@ fn place(
             options,
             !flattening.is_empty(),
             isolated_pitch,
+            matches!(direction_for(graph, parent), Mode::Orientation(o) if o.vertical()),
         );
         let owner = |id: usize| owner_among(&child_position, index, id);
         let mut levels: BTreeMap<usize, Vec<String>> = BTreeMap::new();
@@ -5811,30 +5920,31 @@ fn place(
         // Component packing (opt-in): each weakly connected component of the children is ordered on its own, and the
         // components occupy consecutive blocks of every level, so they do not interleave along the cross axis. With the
         // option off every component index is 0, and the orderings below are unchanged.
-        let component_of: BTreeMap<String, usize> = if options.component_packing {
-            let index: BTreeMap<&str, usize> = children
-                .iter()
-                .enumerate()
-                .map(|(i, n)| (n.id.as_str(), i))
-                .collect();
-            let pairs: Vec<(usize, usize)> = links
-                .iter()
-                .map(|(a, b)| (index[a.as_str()], index[b.as_str()]))
-                .collect();
-            let mut map = BTreeMap::new();
-            for (c, members) in structure::analyse(children.len(), &pairs)
-                .components
-                .iter()
-                .enumerate()
-            {
-                for &i in members {
-                    map.insert(children[i].id.clone(), c);
+        let component_of: BTreeMap<String, usize> =
+            if options.component_packing || (options.pack_components.is_some() && layered) {
+                let index: BTreeMap<&str, usize> = children
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| (n.id.as_str(), i))
+                    .collect();
+                let pairs: Vec<(usize, usize)> = links
+                    .iter()
+                    .map(|(a, b)| (index[a.as_str()], index[b.as_str()]))
+                    .collect();
+                let mut map = BTreeMap::new();
+                for (c, members) in structure::analyse(children.len(), &pairs)
+                    .components
+                    .iter()
+                    .enumerate()
+                {
+                    for &i in members {
+                        map.insert(children[i].id.clone(), c);
+                    }
                 }
-            }
-            map
-        } else {
-            BTreeMap::new()
-        };
+                map
+            } else {
+                BTreeMap::new()
+            };
         // Experimental (`isolatedGrid`): the unconnected children form one block after the connected ones in every level,
         // so the grid stands beside the connected part instead of among it, where it would push its edges into detours.
         let mut component_of = component_of;
@@ -5846,7 +5956,10 @@ fn place(
                 }
             }
         }
-        if options.component_packing || options.isolated_grid {
+        if options.component_packing
+            || options.isolated_grid
+            || (options.pack_components.is_some() && layered)
+        {
             for ids in levels.values_mut() {
                 ids.sort_by_key(|id| component_of.get(id).copied().unwrap_or(0));
             }

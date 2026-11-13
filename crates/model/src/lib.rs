@@ -1671,6 +1671,17 @@ impl CommunityHubs {
     }
 }
 
+/// Experimental (`LayoutOptions::pack_components`): how the components of a container are packed.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct PackComponents {
+    /// The width over the height the packed components aim at (default 1: square).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub aspect: Option<f64>,
+}
+
 /// The edges one aggregated edge stands for, by direction (see `LayoutOptions::aggregate_weights`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -1746,6 +1757,14 @@ pub struct LayoutOptions {
     /// decides between them. Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub component_packing: bool,
+    /// Experimental: the weakly connected components of a container's children (a lone child is one) keep their own
+    /// arrangement and are packed as boxes in rows towards an aspect ratio (`aspect`, width over height, default 1),
+    /// largest first, instead of all sharing the ranks of one long drawing. Orders the components in blocks as
+    /// `component_packing` does. Not for circle containers, containers with a pinned child, or flattened areas. Omitted
+    /// when off, so the default output does not change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub pack_components: Option<PackComponents>,
     /// Experimental: the children of a layered area that have no edge to another child (a file of unrelated functions)
     /// are spread over the ranks as a grid instead of all standing in the first rank, one long column. They fill the
     /// ranks the connected children use, and more when there are many of them, so the grid comes out about square.
@@ -2008,6 +2027,7 @@ impl Default for LayoutOptions {
             routing_clearance: 0.,
             strict_clearance: false,
             component_packing: false,
+            pack_components: None,
             isolated_grid: false,
             force_directed: false,
             edge_routing: None,
