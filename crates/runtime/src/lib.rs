@@ -147,11 +147,22 @@ pub fn structured<'a>(
         return Ok(std::borrow::Cow::Borrowed(source));
     }
     let given = arqlet_layout::communities::with_given_groups(source, &options.groups)?;
-    let grouped =
-        arqlet_layout::communities::with_community_containers(&given, options.communities)?;
+    let grouped = arqlet_layout::communities::with_community_containers_except(
+        &given,
+        options.communities,
+        &hubs_of(&options.community_hubs),
+    )?;
     // Containers shown in part (`reveal`): the children not shown gathered in a rest.
     arqlet_layout::communities::with_partial(&grouped, &options.partial)
         .map(std::borrow::Cow::Owned)
+}
+
+/// The hubs `communities` leaves out (`LayoutOptions::community_hubs`), for the layout crate.
+pub(crate) fn hubs_of(hubs: &arqlet_model::CommunityHubs) -> arqlet_layout::overview::Hubs {
+    arqlet_layout::overview::Hubs {
+        min_links: hubs.min_links.map(f64::from),
+        nodes: hubs.nodes.iter().cloned().collect(),
+    }
 }
 
 /// Whether the view adds containers of its own (communities, given groups, rests of partly shown containers).

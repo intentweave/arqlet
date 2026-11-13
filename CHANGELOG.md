@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Hubs left out of communities (provisional): `communityHubs: {minLinks?, nodes?}` (layered view) and the overview
+  option `hubs` (same value). Children with at least `minLinks` links in their container (by edge weight) or named in
+  `nodes` stay out of Louvain and remain direct children, so one hub no longer pulls the others into one community
+  named after it. Omitted when empty; without it the communities are unchanged. Playground: *Hubs from … links* on
+  both pages.
 - `neighbourhood` (provisional, read only): the nodes within `hops` (default 1) of `nodeId` or `nodeIds`, following
   edges `out`, `in` or `both` ways (default) and only of `edgeKinds` if given; answered as `trace` (`nodes`, `edges`,
   `visible: {nodes, routes}`, `distance`) plus each node's `hops`, so its nodes can go to `reveal`. In every mode and

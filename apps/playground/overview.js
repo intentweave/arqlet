@@ -31,9 +31,9 @@ let baseConfig = null, rules = {};
 const undo = [], redo = [];
 
 // Settings of the panel, remembered in this browser (a convenience; the page works without).
-const LAYOUT = ['node-radius', 'gap', 'padding', 'charge', 'gravity', 'communities', 'satellites'];
+const LAYOUT = ['node-radius', 'gap', 'padding', 'charge', 'gravity', 'communities', 'satellites', 'hub-links'];
 const ZOOM = ['levels', 'collapse-px', 'structure-share', 'limit', 'scene-unit'];
-const DEFAULTS = {'node-radius': 4, gap: 2, padding: 6, charge: 0.05, gravity: 0.1, communities: 120, satellites: 0,
+const DEFAULTS = {'node-radius': 4, gap: 2, padding: 6, charge: 0.05, gravity: 0.1, communities: 120, satellites: 0, 'hub-links': 0,
   levels: '', 'collapse-px': 14, 'structure-share': 35, limit: 300, 'scene-unit': 0.2};
 const STORE = 'arqlet-overview-settings';
 function loadSettings() {
@@ -125,6 +125,7 @@ function request(extra = {}) {
   const options = {nodeRadius: number('node-radius'), gap: number('gap'), padding: number('padding'),
     charge: number('charge'), gravity: number('gravity'), communities: number('communities'),
     ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {}),
+    ...(number('hub-links') > 0 ? {hubs: {minLinks: Math.round(number('hub-links'))}} : {}),
     ...($('chains').checked ? {chains: true} : {})};
   const values = {threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
   // The level of detail travels in the config set, so that the engine checks it (a config set needs its base: without

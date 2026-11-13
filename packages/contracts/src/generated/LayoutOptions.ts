@@ -2,6 +2,7 @@
 import type { AggregateWeight } from "./AggregateWeight";
 import type { AppearanceConfig } from "./AppearanceConfig";
 import type { Bundling } from "./Bundling";
+import type { CommunityHubs } from "./CommunityHubs";
 import type { ContainerSizing } from "./ContainerSizing";
 import type { EdgeRouting } from "./EdgeRouting";
 import type { Hidden } from "./Hidden";
@@ -219,6 +220,10 @@ levelOfDetail?: LevelOfDetail | null,
  * Provisional (view state, set by `filter`): what the view hides, keeping the place of the rest. Omitted when empty.
  */
 hidden?: Hidden,
+/**
+ * Provisional: the children `communities` leaves out of Louvain (hubs). Omitted when empty.
+ */
+communityHubs?: CommunityHubs,
 /**
  * Provisional (view state, set by `reveal`): containers shown in part. The children listed for a container are shown;
  * the others are gathered in a collapsed container `rest:<id>` of kind `rest` ("+N more"), which a `toggle` dissolves.

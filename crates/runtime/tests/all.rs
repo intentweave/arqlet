@@ -6,6 +6,8 @@
 mod abstract_pipeline;
 #[path = "circle_containers.rs"]
 mod circle_containers;
+#[path = "community_hubs.rs"]
+mod community_hubs;
 #[path = "containers_straight.rs"]
 mod containers_straight;
 #[path = "curation_labels.rs"]

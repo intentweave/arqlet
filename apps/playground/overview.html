@@ -72,6 +72,7 @@ table{width:100%;border-collapse:collapse}td{padding:3px 0}td select{width:100%}
 <label for="gravity">Gravity</label><input id="gravity" type="number" min="0" step="0.05" value="0.1">
 <label for="communities">Communities above (children, 0 off)</label><input id="communities" type="number" min="0" step="10" value="120">
 <label for="satellites">Satellites to their hub (share of edges, 0 off)</label><input id="satellites" type="number" min="0" max="1" step="0.1" value="0">
+<label for="hub-links" title="Children with at least this many links in their container are left out of the communities (hubs); 0 off">Hubs from links (0 off)</label><input id="hub-links" type="number" min="0" step="10" value="0">
 </div>
 <div class="row"><label><input id="chains" type="checkbox"> Fold chains of single children into one disc</label></div>
 <div class="row"><button id="relayout">Lay out again</button><button id="defaults">Defaults</button></div>

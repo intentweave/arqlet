@@ -7,6 +7,7 @@ export * from './AxisSize';
 export * from './BoundaryCrossing';
 export * from './Bundling';
 export * from './Bus';
+export * from './CommunityHubs';
 export * from './ConfigSet';
 export * from './ContainerSizing';
 export * from './Contour';

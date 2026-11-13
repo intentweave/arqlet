@@ -697,7 +697,7 @@ async function loadInitial(){
  // An example may bring its own groups (node id → path of group names); they travel as an option, not in the graph.
  const {groups,...plain}=graph;
  const projected=erProjection(plain);
- const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),
+ const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),...(communities>0&&Number($('hub-links').value)>0?{communityHubs:{minLinks:Math.round(Number($('hub-links').value))}}:{}),
   ...(domainGroups&&groups?{groups}:{}),...(collapseFirst!==''?{levelOfDetail:{depth:Number(collapseFirst)}}:{})};
  const importOptions=Object.keys(extra).length?{...(projected.options??{}),...extra}:projected.options;
  const limit=example==='default'&&!(budget>0)&&!abstracted?VIEW_LIMIT:EXAMPLE_LIMIT;
@@ -724,6 +724,7 @@ $('example').onchange=()=>{$('example-info').textContent='';reset();};
 // The node budget (experimental) applies to an import: a change imports the example again.
 $('node-budget').onchange=()=>{$('example-info').textContent='';reset();};
 $('communities').onchange=()=>{$('example-info').textContent='';reset();};
+$('hub-links').onchange=()=>{if(Number($('communities').value)>0){$('example-info').textContent='';reset();}};
 $('domain-groups').onchange=()=>{$('example-info').textContent='';reset();};
 $('initial-collapse').onchange=()=>{$('example-info').textContent='';reset();};
 // Scene geometry comes from the engine; the demo waits for it before the first draw.
