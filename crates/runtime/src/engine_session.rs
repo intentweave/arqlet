@@ -78,8 +78,8 @@ impl EngineSession {
             }
             Some(
                 "direction" | "strategy" | "routing" | "move" | "add" | "toggle" | "reveal"
-                | "configure" | "port" | "settle" | "restore" | "shape" | "measure" | "refine"
-                | "refineProgressive",
+                | "filter" | "configure" | "port" | "settle" | "restore" | "shape" | "measure"
+                | "refine" | "refineProgressive",
             ) => {
                 let current = self.current()?;
                 // The session's versions unless the request names its own (then a stale request is refused as always).
@@ -134,7 +134,7 @@ impl EngineSession {
 }
 
 fn scene_of(snapshot: &Snapshot) -> Result<Value, String> {
-    arqlet_scene::build_scene(snapshot)
+    crate::filter::scene_of(snapshot)
         .and_then(|scene| serde_json::to_value(scene).map_err(|e| e.to_string()))
 }
 

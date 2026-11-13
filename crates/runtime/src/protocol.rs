@@ -69,6 +69,12 @@ pub enum Request {
         on: Edit,
         node_id: String,
     },
+    /// Hide nodes by kind or id and edges by kind, keeping the place of the rest (`hide` replaces what was hidden).
+    Filter {
+        #[serde(flatten)]
+        on: Edit,
+        hide: arqlet_model::Hidden,
+    },
     /// Show the given nodes by opening the containers that hold them (`partial`, default true: only as far as needed).
     Reveal {
         #[serde(flatten)]
@@ -362,6 +368,7 @@ impl Request {
                     | "move"
                     | "toggle"
                     | "reveal"
+                    | "filter"
                     | "configure"
                     | "port"
                     | "settle"
@@ -418,6 +425,16 @@ impl Request {
             "toggle" => Request::Toggle {
                 on,
                 node_id: v["nodeId"].as_str().ok_or("Missing nodeId")?.into(),
+            },
+            "filter" => Request::Filter {
+                on,
+                hide: if v["hide"].is_null() {
+                    arqlet_model::Hidden::default()
+                } else {
+                    serde_json::from_value(v["hide"].clone()).map_err(|e| {
+                        format!("filter: hide must be {{nodeKinds?, nodes?, edgeKinds?}}: {e}")
+                    })?
+                },
             },
             "reveal" => Request::Reveal {
                 on,
@@ -580,6 +597,12 @@ pub fn handle(request: Request) -> Response {
             on.expected_revision,
             on.expected_layout_version,
             &node_id,
+        )),
+        Request::Filter { on, hide } => snapshot(crate::filter::filter_view(
+            &on.snapshot,
+            on.expected_revision,
+            on.expected_layout_version,
+            hide,
         )),
         Request::Reveal {
             on,

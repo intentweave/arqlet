@@ -186,6 +186,13 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  <div class="row"><input id="show-node" list="trace-nodes" placeholder="node id"><button id="show">Show</button></div>
 </div></details>
 
+<details class="section" open><summary>Filter</summary><div class="body">
+ <p class="hint">Hide nodes and edges by kind; what stays keeps its place (provisional).</p>
+ <div id="filter-node-kinds" class="row wrap" role="group" aria-label="Node kinds shown"></div>
+ <div id="filter-edge-kinds" class="row wrap" role="group" aria-label="Edge kinds shown"></div>
+ <div class="row"><button id="filter-show-all" disabled>Show all</button></div>
+</div></details>
+
 <details class="section" open><summary>Optimization</summary><div class="body">
  <p id="backend" role="status">After local changes the view is optimized.</p>
  <p id="profile-info" class="hint" role="status"></p>

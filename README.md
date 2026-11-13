@@ -206,6 +206,20 @@ await session.reveal(path.nodes);                            // only as far as n
 In the playground: section *Path* (from, to, *Trace*, *Reveal path*, *Fade others*,
 *Show a node*).
 
+### Filter
+
+`filter` hides nodes by kind or id (each with what it holds) and edges by kind, without
+a new import: what stays keeps its place, and a route that stands for collapsed content
+counts only the edges still shown. The next filter replaces it; `{}` shows everything.
+
+```js
+await session.filter({nodeKinds: ['test'], edgeKinds: ['imports']});
+await session.filter({nodes: ['vendor']});                   // a container with all it holds
+await session.filter({});                                    // everything again
+```
+
+In the playground: section *Filter* (a box per node kind and edge kind).
+
 ### Cluster overview
 
 For a whole graph of tens of thousands of nodes, `{op: 'overview', graph}` lays it out

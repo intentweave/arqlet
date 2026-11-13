@@ -110,6 +110,22 @@ test('a session traces a path and reveals it', {skip: !engine}, async () => {
   assert.ok(again.visible.nodes.includes('a') && again.visible.nodes.includes('b'));
 });
 
+test('a session hides by id and kind and keeps the place of the rest', {skip: !engine}, async () => {
+  for (const resident of [false, true]) {
+    const session = createSession(engine, {resident});
+    await session.import(graph);
+    const before = await session.scene();
+    const box = scene => Object.fromEntries(scene.nodes.map(n => [n.id, n.bounds]));
+    const hidden = await session.filter({nodes: ['b']});
+    assert.equal(hidden.ok, true, hidden.error);
+    const after = await session.scene();
+    assert.ok(!after.nodes.some(n => n.id === 'b'), 'b is hidden');
+    for (const [id, bounds] of Object.entries(box(after))) assert.deepEqual(bounds, box(before)[id], `${id} keeps its place`);
+    assert.equal((await session.filter({})).ok, true);
+    assert.deepEqual(box(await session.scene()), box(before), 'an empty filter shows everything again');
+  }
+});
+
 test('a resident session gives the same scenes and snapshot as one that sends the snapshot', {skip: !engine}, async () => {
   const sent = createSession(engine, {resident: false});
   const kept = createSession(engine);

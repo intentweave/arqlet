@@ -1568,6 +1568,30 @@ pub struct LevelOfDetail {
     pub kinds: Vec<String>,
 }
 
+/// What a view hides (provisional, view state set by the `filter` operation): nodes of these kinds, these nodes (each with
+/// everything below it) and edges of these kinds. The layout keeps their room, so what stays keeps its place; the scene
+/// leaves them out, and an edge that stands for collapsed content counts only the edges still shown.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default)]
+pub struct Hidden {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub node_kinds: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub nodes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub edge_kinds: Vec<String>,
+}
+
+impl Hidden {
+    pub fn is_empty(&self) -> bool {
+        self.node_kinds.is_empty() && self.nodes.is_empty() && self.edge_kinds.is_empty()
+    }
+}
+
 /// The edges one aggregated edge stands for, by direction (see `LayoutOptions::aggregate_weights`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -1740,6 +1764,10 @@ pub struct LayoutOptions {
     /// containers that `communities` and `groups` add, which start collapsed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub level_of_detail: Option<LevelOfDetail>,
+    /// Provisional (view state, set by `filter`): what the view hides, keeping the place of the rest. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Hidden::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Hidden>"))]
+    pub hidden: Hidden,
     /// The name before engine 0.4 (`initialCollapse`), refused with a message that names the new one.
     #[serde(
         default,
@@ -1916,6 +1944,7 @@ impl Default for LayoutOptions {
             communities: 0,
             groups: BTreeMap::new(),
             level_of_detail: None,
+            hidden: Hidden::default(),
             renamed_initial_collapse: (),
             partial: BTreeMap::new(),
             global_layering: false,

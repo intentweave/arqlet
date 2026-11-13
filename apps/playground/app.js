@@ -1333,7 +1333,7 @@ let tracePath=null,traceResult=null,traceSnapshot=null,traceListOf=null;
 function traceView(){
  if(snapshot&&snapshot!==traceListOf){
   // Every node of the source graph can be an end, also one inside a collapsed group.
-  traceListOf=snapshot;const list=$('trace-nodes');
+  traceListOf=snapshot;filterView();const list=$('trace-nodes');
   if(list)list.replaceChildren(...(snapshot.sourceGraph??snapshot.graph).nodes.map(n=>{const o=document.createElement('option');o.value=n.id;o.label=n.label;return o;}));
  }
  if(tracePath&&snapshot&&sceneRun&&traceSnapshot!==snapshot){
@@ -1353,6 +1353,29 @@ $('trace').onclick=()=>{
  tracePath={from,to,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();
 };
 $('trace-clear').onclick=()=>{tracePath=null;traceResult=null;traceSnapshot=null;$('trace-info').textContent='';$('trace-reveal').disabled=true;$('trace-clear').disabled=true;if(snapshot)draw();};
+// Filter (provisional): a checkbox per node kind and edge kind of the source graph, ticked while shown. A change sends
+// `filter` with what is unticked; the engine keeps the geometry, so what stays keeps its place.
+function filterView(){
+ const source=snapshot.sourceGraph??snapshot.graph,hidden=snapshot.options?.hidden??{};
+ const boxes=(id,kinds,off,label)=>$(id).replaceChildren(...[...new Set(kinds)].sort().map(kind=>{
+  const l=document.createElement('label'),c=document.createElement('input');
+  c.type='checkbox';c.checked=!(off??[]).includes(kind);c.dataset.kind=kind;c.onchange=applyFilter;
+  l.append(c,` ${label}${kind}`);return l;
+ }));
+ boxes('filter-node-kinds',source.nodes.map(n=>n.kind),hidden.nodeKinds,'');
+ boxes('filter-edge-kinds',source.edges.map(e=>e.kind),hidden.edgeKinds,'→ ');
+ $('filter-show-all').disabled=!(hidden.nodeKinds?.length||hidden.edgeKinds?.length||hidden.nodes?.length);
+}
+function applyFilter(){
+ if(!snapshot||pending)return;
+ const off=id=>[...$(id).querySelectorAll('input')].filter(c=>!c.checked).map(c=>c.dataset.kind);
+ const hide={...(snapshot.options?.hidden?.nodes?.length?{nodes:snapshot.options.hidden.nodes}:{})};
+ const nodeKinds=off('filter-node-kinds'),edgeKinds=off('filter-edge-kinds');
+ if(nodeKinds.length)hide.nodeKinds=nodeKinds;
+ if(edgeKinds.length)hide.edgeKinds=edgeKinds;
+ edit({op:'filter',snapshot,hide},{busy:'Filtering …',remember:'Filter'});
+}
+$('filter-show-all').onclick=()=>{if(snapshot&&!pending)edit({op:'filter',snapshot,hide:{}},{busy:'Showing everything …',remember:'Show all'});};
 $('trace-fade').onchange=()=>{if(snapshot)draw();};
 $('trace-mode').onchange=()=>{if(tracePath){tracePath={...tracePath,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();}};
 $('trace-from-selected').onclick=()=>{if(selected)$('trace-from').value=selected;};
