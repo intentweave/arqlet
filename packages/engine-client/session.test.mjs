@@ -287,4 +287,25 @@ test('an overview session that keeps the graph gets only the positions back and 
   const a = await kept.layOut(request), b = await plain.layOut(request);
   assert.deepEqual(a, b, 'the same whole overview either way');
   assert.deepEqual(sent.at(-1), {asked: true, whole: false}, 'only the positions crossed');
+
+test('a compacting filter lays the view out again without the hidden, in both kinds of session', {skip: !engine}, async () => {
+  const g = {nodes: [{id: 'p', kind: 'package', label: 'p'}, {id: 'q', kind: 'package', label: 'q'},
+    ...['a', 'b'].map(id => ({id, kind: 'file', label: id, parentId: 'p'})),
+    ...['c', 'd'].map(id => ({id, kind: 'file', label: id, parentId: 'q'}))],
+  edges: [{id: 'ab', kind: 'calls', source: 'a', target: 'b'}, {id: 'cd', kind: 'calls', source: 'c', target: 'd'}]};
+  const scenes = [];
+  for (const resident of [true, false]) {
+    const session = createSession(engine, {resident});
+    await session.import(g);
+    const full = await session.scene();
+    assert.equal((await session.filter({nodes: ['q'], compact: true})).ok, true);
+    const compact = await session.scene();
+    assert.ok(!compact.nodes.some(n => n.id === 'q' || n.id === 'c'));
+    assert.ok(compact.bounds.width * compact.bounds.height < full.bounds.width * full.bounds.height);
+    await session.filter({});
+    assert.ok((await session.scene()).nodes.some(n => n.id === 'd'), 'everything back');
+    scenes.push(compact);
+    await session.close();
+  }
+  assert.deepEqual(scenes[0], scenes[1]);
 });

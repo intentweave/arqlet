@@ -5,4 +5,9 @@
  * everything below it) and edges of these kinds. The layout keeps their room, so what stays keeps its place; the scene
  * leaves them out, and an edge that stands for collapsed content counts only the edges still shown.
  */
-export type Hidden = { nodeKinds?: Array<string>, nodes?: Array<string>, edgeKinds?: Array<string>, };
+export type Hidden = { nodeKinds?: Array<string>, nodes?: Array<string>, edgeKinds?: Array<string>,
+/**
+ * Lay the view out again without what is hidden, so that the rest closes up (positions change); off: the hidden keep
+ * their room and nothing else moves. Omitted when off.
+ */
+compact?: boolean, };

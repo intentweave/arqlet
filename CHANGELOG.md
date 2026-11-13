@@ -12,6 +12,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   overview, and the whole overview otherwise. `createOverviewSession` asks for it on the graph the engine keeps and
   merges it with its last overview, so its answers stay whole (on a synthetic 20 000-node graph: 0.37 instead of
   1.46 MB per continuation). Contract type `OverviewPositions`.
+- `filter` takes `compact: true` (provisional): the view is laid out again without what is hidden, so the rest closes
+  up instead of leaving gaps; a toggle or an edit keeps it, and showing everything lays the view out again. Playground:
+  *Close up* in the section *Filter*.
 - Hubs left out of communities (provisional): `communityHubs: {minLinks?, nodes?}` (layered view) and the overview
   option `hubs` (same value). Children with at least `minLinks` links in their container (by edge weight) or named in
   `nodes` stay out of Louvain and remain direct children, so one hub no longer pulls the others into one community
