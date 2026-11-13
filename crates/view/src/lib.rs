@@ -192,16 +192,28 @@ pub struct Trace {
 /// direction; unresolved ones are left out; cycles, self-loops and parallel edges are allowed). Without such a path, the
 /// paths from `to` to `from`, marked `reversed`; without either, an empty trace. Unknown ids are an error.
 pub fn trace(graph: &Graph, from: &str, to: &str, mode: TraceMode) -> Result<Trace, String> {
+    trace_along(graph, from, to, mode, |_| true)
+}
+
+/// Provisional: `trace` along the edges `follow` accepts only (for example the edges of some kinds); the others are not
+/// part of any path.
+pub fn trace_along(
+    graph: &Graph,
+    from: &str,
+    to: &str,
+    mode: TraceMode,
+    follow: impl Fn(&arqlet_model::Edge) -> bool,
+) -> Result<Trace, String> {
     for id in [from, to] {
         if !graph.nodes.iter().any(|n| n.id == id) {
             return Err(format!("Unknown node: {id}"));
         }
     }
-    let forward = trace_directed(graph, from, to, mode);
+    let forward = trace_directed(graph, from, to, mode, &follow);
     if forward.length.is_some() {
         return Ok(forward);
     }
-    let mut back = trace_directed(graph, to, from, mode);
+    let mut back = trace_directed(graph, to, from, mode, &follow);
     if back.length.is_some() {
         back.reversed = true;
         return Ok(back);
@@ -209,7 +221,13 @@ pub fn trace(graph: &Graph, from: &str, to: &str, mode: TraceMode) -> Result<Tra
     Ok(Trace::default())
 }
 
-fn trace_directed(graph: &Graph, from: &str, to: &str, mode: TraceMode) -> Trace {
+fn trace_directed(
+    graph: &Graph,
+    from: &str,
+    to: &str,
+    mode: TraceMode,
+    follow: &impl Fn(&arqlet_model::Edge) -> bool,
+) -> Trace {
     let index: BTreeMap<&str, usize> = graph
         .nodes
         .iter()
@@ -220,6 +238,7 @@ fn trace_directed(graph: &Graph, from: &str, to: &str, mode: TraceMode) -> Trace
     let edges: Vec<(usize, usize, &str)> = graph
         .edges
         .iter()
+        .filter(|e| follow(e))
         .filter_map(|e| {
             let t = *index.get(e.target.as_deref()?)?;
             Some((*index.get(e.source.as_str())?, t, e.id.as_str()))

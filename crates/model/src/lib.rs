@@ -1754,7 +1754,7 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "is_zero_count")]
     pub communities: usize,
     /// Provisional: groups given by the data or its domain, by node id: the path of groups the node belongs to inside its
-    /// container (`["ECU A", "X1"]`). They become containers of kind `group` in the view only, nested along the path,
+    /// container (`["Billing", "Invoices"]`). They become containers of kind `group` in the view only, nested along the path,
     /// before `communities` divides what is still large. Ids the graph does not have are ignored (a mapping may cover more
     /// than the imported view). Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -2501,6 +2501,169 @@ pub struct OverviewIntent {
     )]
     pub decisions: BTreeMap<String, Representation>,
 }
+/// Provisional (ADR 0018): the answer of the `overview` operation, `{ok, overview}`. Arrays are indexed by node: the
+/// graph's nodes in input order, then the clusters the overview added (communities, satellite groups).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Overview {
+    /// 1.
+    pub schema_version: u32,
+    /// The values of the order user, rules, zoom, as the engine checked them.
+    pub representation: OverviewRepresentation,
+    pub ids: Vec<String>,
+    /// Each node's label from the data; an added cluster is named after its most connected member (`≈ <name>` for a
+    /// community, `<name> +<n>` for a hub with its satellites).
+    pub labels: Vec<String>,
+    /// The parent's index, or -1 at the top level.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub parent: Vec<i64>,
+    pub x: Vec<f64>,
+    pub y: Vec<f64>,
+    /// Disc radii: leaves share the leaf radius, a container holds its children.
+    pub r: Vec<f64>,
+    /// The radius of the disc around everything, centred on the origin.
+    pub root_radius: f64,
+    /// Node kinds in order of first use (`community` for added clusters), and each node's kind as an index into them.
+    pub kinds: Vec<String>,
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub kind: Vec<u32>,
+    /// Resolved edges as index pairs, source first, in input order (flat).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub edges: Vec<u32>,
+    /// Per container, the links between its children: child, child, number of edges (flat triples).
+    pub links: Vec<f64>,
+    pub stats: OverviewStats,
+}
+
+/// Provisional: the counts of an overview.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewStats {
+    pub nodes: u32,
+    pub containers: u32,
+    pub communities: u32,
+    pub levels: u32,
+    pub edges: u32,
+    pub unresolved_edges: u32,
+    pub overlaps: u32,
+}
+
+/// Provisional (ADR 0018, addendum): the representation values of an overview request, as the engine checked them.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewRepresentation {
+    /// The user's decisions by node id.
+    pub decisions: BTreeMap<String, Representation>,
+    /// The rules by node kind.
+    pub rules: BTreeMap<String, Representation>,
+    /// Whether the zoom decides what neither a decision nor a rule does.
+    pub auto: bool,
+    /// Rule kinds the graph does not have (reported, not refused: a config set serves many graphs).
+    pub unknown_kinds: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub level_of_detail: Option<LevelOfDetail>,
+}
+
+/// Provisional (ADR 0018): a request of the `overview` operation. In a session `graph` may be left out after the
+/// first request, and `start` without positions continues from the last overview.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub graph: Option<Graph>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub options: Option<OverviewLayoutOptions>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub intent: Option<OverviewIntent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub config_set: Option<ConfigSet>,
+    /// Radii by node id, for clusters a host shows structured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub radii: Option<BTreeMap<String, f64>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub start: Option<OverviewStart>,
+    /// Worker threads (native only); the answer is the same for any number.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub threads: Option<u32>,
+}
+
+/// Provisional: the layout options of an overview (defaults in brackets).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewLayoutOptions {
+    /// The radius of a leaf (4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub node_radius: Option<f64>,
+    /// The gap between discs (2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub gap: Option<f64>,
+    /// The padding inside a container (6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub padding: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub charge: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub gravity: Option<f64>,
+    /// Children above which a container is divided into communities (120; 0: never).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub communities: Option<u32>,
+    /// The share of a hub's links a satellite must have to be gathered with it (0: never; at most 1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub satellites: Option<f64>,
+    /// Chains of single children share one disc (false).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub chains: Option<bool>,
+    /// Force steps per container (1..=10000).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub ticks: Option<u32>,
+    /// Groups the data gives: node id → path of group names.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub groups: Option<BTreeMap<String, Vec<String>>>,
+}
+
+/// Provisional: where an overview continues from. Positions (`x`, `y`, `r`) of a previous overview of the same
+/// clusters, or none in a session (its last overview); `settle` lets the changed containers settle again.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewStart {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub x: Option<Vec<f64>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub y: Option<Vec<f64>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub r: Option<Vec<f64>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub settle: Option<bool>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

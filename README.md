@@ -175,10 +175,10 @@ that carries their number in both directions (`weight`, `backWeight` in the scen
 ```js
 await session.import(graph, {options: {
   communities: 40,                       // divide containers of more than 40 children (Louvain)
-  groups: {'fn-1': ['ECU A', 'X1']},     // or groups the domain gives: a path of names per node
+  groups: {'fn-1': ['Billing', 'Invoices']}, // or groups the domain gives: a path of names per node
   levelOfDetail: {depth: 1},             // and/or collapse containers from a depth or by kind
 }});
-await session.toggle('group:#:ECU A');   // open a group in place; the others keep their place
+await session.toggle('group:#:Billing'); // open a group in place; the others keep their place
 ```
 
 Given groups come first; Louvain only divides what is still large. Groups exist only in
@@ -195,10 +195,12 @@ overview).
 `trace` finds the nodes and edges on the shortest (or all) directed paths between two
 nodes, also inside collapsed groups, and tells which boxes and routes of the current
 view carry them and how far every other node is. `reveal` opens only the groups on the
-way: the other children of an opened group wait in a collapsed `+N more` box.
+way: the other children of an opened group wait in a collapsed `+N more` box. With
+`edgeKinds` the paths follow only edges of those kinds (the data flow, say, not the calls).
 
 ```js
 const path = await session.trace('a', 'z');                 // read only; {mode: 'all'} for every path
+const flow = await session.trace('a', 'z', {edgeKinds: ['imports']});   // along these edge kinds only
 renderSvg(svg, await session.scene(), {trace: {...path.visible, distance: path.distance, fade: true}});
 await session.reveal(path.nodes);                            // only as far as needed; {partial: false} opens whole
 ```

@@ -4,7 +4,7 @@
 //! path, so that a renderer can highlight the path and fade the rest. Read only: the snapshot is not changed.
 use crate::structured;
 use arqlet_model::Snapshot;
-use arqlet_view::{trace, TraceMode};
+use arqlet_view::{trace_along, TraceMode};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -21,7 +21,8 @@ fn trace_of(v: &Value) -> Result<Value, String> {
     trace_on(&snapshot, v)
 }
 
-/// The trace of the request `v` (`from`, `to`, `mode`) on a snapshot the caller holds (a session's).
+/// The trace of the request `v` (`from`, `to`, `mode`, `edgeKinds`) on a snapshot the caller holds (a session's).
+/// `edgeKinds` (provisional): the paths follow only edges of these kinds (for example the data flow, not the calls).
 pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
     let from = v["from"].as_str().ok_or("Missing from")?;
     let to = v["to"].as_str().ok_or("Missing to")?;
@@ -30,8 +31,21 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
         Some("all") => TraceMode::All,
         Some(other) => return Err(format!("Unknown trace mode: {other}")),
     };
+    let kinds: Option<BTreeSet<String>> = match v.get("edgeKinds") {
+        None | Some(Value::Null) => None,
+        Some(k) => {
+            let kinds: BTreeSet<String> = serde_json::from_value(k.clone())
+                .map_err(|_| "Trace edgeKinds must be a list of edge kinds")?;
+            if kinds.is_empty() {
+                return Err("Trace edgeKinds must name at least one kind (leave it out to follow every edge)".into());
+            }
+            Some(kinds)
+        }
+    };
     let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
-    let path = trace(canonical, from, to, mode)?;
+    let path = trace_along(canonical, from, to, mode, |e| {
+        kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
+    })?;
     // The visible node of every node of the view: itself, or the outermost collapsed container above it.
     let view = structured(canonical, &snapshot.options)?;
     let parent: BTreeMap<&str, Option<&str>> = view
@@ -71,6 +85,17 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
         .iter()
         .filter_map(|e| Some((e.id.as_str(), (e.source.as_str(), e.target.as_deref()?))))
         .collect();
+    let drawn_kind: BTreeMap<&str, &str> = snapshot
+        .graph
+        .edges
+        .iter()
+        .map(|e| (e.id.as_str(), e.kind.as_str()))
+        .collect();
+    let followed = |id: &str| {
+        kinds
+            .as_ref()
+            .is_none_or(|k| drawn_kind.get(id).is_some_and(|kind| k.contains(*kind)))
+    };
     let mut routes = BTreeSet::new();
     for edge in &path.edges {
         let (s, Some(t)) = ends[edge.as_str()] else {
@@ -89,11 +114,16 @@ pub fn trace_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
             routes.insert(edge.clone());
             continue;
         }
-        let pair = drawn
+        // With edge kinds, a drawn edge of a followed kind first.
+        let mut between = drawn
             .iter()
             .filter(|(_, &(x, y))| (x == a && y == b) || (x == b && y == a))
-            .map(|(id, _)| id.to_string())
-            .next();
+            .map(|(id, _)| *id);
+        let pair = between
+            .clone()
+            .find(|id| followed(id))
+            .or_else(|| between.next())
+            .map(String::from);
         routes.extend(pair);
     }
     // Hops from the path through the drawn edges (both ways), for fading: the path's visible nodes and the containers

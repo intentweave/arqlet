@@ -1338,7 +1338,11 @@ function traceView(){
  }
  if(tracePath&&snapshot&&sceneRun&&traceSnapshot!==snapshot){
   traceSnapshot=snapshot;
-  const r=sceneRun({op:'trace',snapshot,...tracePath});
+  // With “Only shown edge kinds”, the paths follow the edge kinds the filter shows (provisional `edgeKinds`).
+  const hiddenKinds=snapshot.options?.hidden?.edgeKinds??[];
+  const along=tracePath.shownKinds&&hiddenKinds.length?{edgeKinds:[...new Set((snapshot.sourceGraph??snapshot.graph).edges.map(e=>e.kind))].filter(k=>!hiddenKinds.includes(k))}:{};
+  const {shownKinds,...path}=tracePath;
+  const r=along.edgeKinds&&!along.edgeKinds.length?{ok:false,error:'the filter hides every edge kind'}:sceneRun({op:'trace',snapshot,...path,...along});
   traceResult=r.ok?r:null;
   $('trace-info').textContent=!r.ok?`Not traced: ${r.error}`:!r.found?'No path between these nodes, in either direction.':
    `${r.length} step${r.length===1?'':'s'}${r.reversed?' (from “To” to “From”: no path the other way)':''} · ${r.nodes.length} nodes and ${r.edges.length} edges on the ${tracePath.mode==='all'?'paths':'shortest paths'}; ${r.visible.nodes.length} shown boxes carry them.`;
@@ -1350,7 +1354,7 @@ function traceView(){
 $('trace').onclick=()=>{
  const from=$('trace-from').value.trim(),to=$('trace-to').value.trim();
  if(!from||!to){$('trace-info').textContent='Choose a node for From and for To.';return;}
- tracePath={from,to,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();
+ tracePath={from,to,mode:$('trace-mode').value,shownKinds:$('trace-shown-kinds').checked};traceSnapshot=null;if(snapshot)draw();
 };
 $('trace-clear').onclick=()=>{tracePath=null;traceResult=null;traceSnapshot=null;$('trace-info').textContent='';$('trace-reveal').disabled=true;$('trace-clear').disabled=true;if(snapshot)draw();};
 // Filter (provisional): a checkbox per node kind and edge kind of the source graph, ticked while shown. A change sends

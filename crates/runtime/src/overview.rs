@@ -4,7 +4,10 @@
 use arqlet_layout::overview::{
     self, Arrangement, Container, OverviewHints, OverviewOptions, Previous,
 };
-use arqlet_model::{validate, ConfigSet, Graph, OverviewConfig, OverviewIntent};
+use arqlet_model::{
+    validate, ConfigSet, Graph, Overview, OverviewConfig, OverviewIntent, OverviewRepresentation,
+    OverviewStats,
+};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -123,7 +126,11 @@ fn hints_of(v: &Value, h: &overview::Hierarchy) -> Result<OverviewHints, String>
 /// and the `overview` part of `configSet` (rules by node kind, and whether the zoom decides the rest). A decision for a
 /// node the graph does not have is refused; a rule for a kind the graph does not have is reported, not refused (a config
 /// set serves many graphs).
-fn representation_of(v: &Value, h: &overview::Hierarchy, kinds: &[&str]) -> Result<Value, String> {
+fn representation_of(
+    v: &Value,
+    h: &overview::Hierarchy,
+    kinds: &[&str],
+) -> Result<OverviewRepresentation, String> {
     let intent: OverviewIntent = match v.get("intent") {
         Some(i) => {
             serde_json::from_value(i.clone()).map_err(|e| format!("Overview intent: {e}"))?
@@ -146,22 +153,20 @@ fn representation_of(v: &Value, h: &overview::Hierarchy, kinds: &[&str]) -> Resu
     {
         return Err(format!("Overview decision for an unknown node: {id}"));
     }
-    let unknown_kinds: Vec<&String> = config
+    let unknown_kinds = config
         .rules
         .keys()
         .filter(|k| !kinds.contains(&k.as_str()))
+        .cloned()
         .collect();
-    let mut out = json!({
-        "decisions": intent.decisions,
-        "rules": config.rules,
-        "auto": config.auto.unwrap_or(true),
-        "unknownKinds": unknown_kinds,
-    });
-    // The level of detail, when the config set gives one.
-    if let Some(level) = config.level_of_detail {
-        out["levelOfDetail"] = serde_json::to_value(level).map_err(|e| e.to_string())?;
-    }
-    Ok(out)
+    Ok(OverviewRepresentation {
+        decisions: intent.decisions,
+        rules: config.rules,
+        auto: config.auto.unwrap_or(true),
+        unknown_kinds,
+        // The level of detail, when the config set gives one.
+        level_of_detail: config.level_of_detail,
+    })
 }
 
 /// Rounds a coordinate to hundredths, which keeps the response small; the layout itself is computed in full precision.
@@ -177,7 +182,7 @@ pub fn overview_response(v: &Value, threads: usize) -> Value {
     }
 }
 
-fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
+fn overview_of(v: &Value, threads: usize) -> Result<Overview, String> {
     let graph = graph_of(v)?;
     let options = options_of(v)?;
     let (graph, h) = hierarchy_of(&graph, v, &options)?;
@@ -235,7 +240,7 @@ fn lay_out(
     v: &Value,
     options: &OverviewOptions,
     threads: usize,
-) -> Result<Value, String> {
+) -> Result<Overview, String> {
     let hints = hints_of(v, h)?;
     let levels = overview::levels(&h);
     let mut arrangements: BTreeMap<Container, Arrangement> = BTreeMap::new();
@@ -252,7 +257,11 @@ fn lay_out(
         .iter()
         .map(|p| p.map_or(-1, |p| p as i64))
         .collect();
-    let edges: Vec<usize> = h.edges.iter().flat_map(|&(a, b)| [a, b]).collect();
+    let edges: Vec<u32> = h
+        .edges
+        .iter()
+        .flat_map(|&(a, b)| [a as u32, b as u32])
+        .collect();
     // The links of every container between its children, flat: child, child, number of edges.
     let mut links: Vec<f64> = Vec::new();
     for l in &h.links {
@@ -263,9 +272,9 @@ fn lay_out(
     let containers = arrangements.len() - 1;
     // Node kinds as a table and an index per node, for rules of the data (ADR 0018, addendum).
     let mut kinds: Vec<&str> = Vec::new();
-    let mut kind_index: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    let mut kind_index: BTreeMap<&str, u32> = BTreeMap::new();
     // Clusters the overview added are of kind `community`.
-    let kind: Vec<usize> = graph
+    let kind: Vec<u32> = graph
         .nodes
         .iter()
         .map(|node| node.kind.as_str())
@@ -273,38 +282,43 @@ fn lay_out(
         .map(|k| {
             *kind_index.entry(k).or_insert_with(|| {
                 kinds.push(k);
-                kinds.len() - 1
+                kinds.len() as u32 - 1
             })
         })
         .collect();
-    let representation = representation_of(v, &h, &kinds)?;
+    let representation = representation_of(v, h, &kinds)?;
     let labels: Vec<&str> = graph.nodes.iter().map(|n| n.label.as_str()).collect();
-    Ok(json!({
-        "schemaVersion": 1,
-        "representation": representation,
-        "ids": h.ids,
+    let count = |n: usize| n as u32;
+    Ok(Overview {
+        schema_version: 1,
+        representation,
+        ids: h.ids.clone(),
         // Each node's label, so that a viewer names nodes as the data does; the clusters the overview added are named
         // after their most connected member (`cluster_labels`).
-        "labels": labels.iter().map(|l| l.to_string()).chain(overview::cluster_labels(&h, &labels)).collect::<Vec<_>>(),
-        "parent": parent,
-        "x": o.x.iter().map(|&x| round(x)).collect::<Vec<_>>(),
-        "y": o.y.iter().map(|&y| round(y)).collect::<Vec<_>>(),
-        "r": o.radius.iter().map(|&r| round(r)).collect::<Vec<_>>(),
-        "rootRadius": round(o.root_radius),
-        "kinds": kinds,
-        "kind": kind,
-        "edges": edges,
-        "links": links,
-        "stats": {
-            "nodes": h.ids.len(),
-            "containers": containers,
-            "communities": h.ids.len() - h.real,
-            "levels": levels.len(),
-            "edges": h.edges.len(),
-            "unresolvedEdges": graph.edges.len() - h.edges.len(),
-            "overlaps": o.overlaps,
+        labels: labels
+            .iter()
+            .map(|l| l.to_string())
+            .chain(overview::cluster_labels(h, &labels))
+            .collect(),
+        parent,
+        x: o.x.iter().map(|&x| round(x)).collect(),
+        y: o.y.iter().map(|&y| round(y)).collect(),
+        r: o.radius.iter().map(|&r| round(r)).collect(),
+        root_radius: round(o.root_radius),
+        kinds: kinds.iter().map(|k| k.to_string()).collect(),
+        kind,
+        edges,
+        links,
+        stats: OverviewStats {
+            nodes: count(h.ids.len()),
+            containers: count(containers),
+            communities: count(h.ids.len() - h.real),
+            levels: count(levels.len()),
+            edges: count(h.edges.len()),
+            unresolved_edges: count(graph.edges.len() - h.edges.len()),
+            overlaps: count(o.overlaps),
         },
-    }))
+    })
 }
 
 /// Provisional (ADR 0019 for the overview): what an engine session keeps of an overview between requests: the graph,
@@ -335,7 +349,7 @@ impl OverviewSession {
         }
     }
 
-    fn overview(&mut self, v: &Value, threads: usize) -> Result<Value, String> {
+    fn overview(&mut self, v: &Value, threads: usize) -> Result<Overview, String> {
         let options = options_of(v)?;
         let new_graph = if v.get("graph").is_some() {
             Some(graph_of(v)?)
@@ -390,7 +404,7 @@ impl OverviewSession {
         // Accepted: keep what the next request builds on.
         let last = (
             key.clone(),
-            json!({"x": overview["x"], "y": overview["y"], "r": overview["r"]}),
+            json!({"x": overview.x, "y": overview.y, "r": overview.r}),
         );
         if let Some((g, h)) = built {
             self.hierarchy = Some((key, g, h));

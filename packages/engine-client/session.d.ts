@@ -1,4 +1,4 @@
-import type {Graph, Hidden, Scene, Snapshot} from '@arqlet/contracts';
+import type {Graph, Hidden, Overview, OverviewRequest, Scene, Snapshot} from '@arqlet/contracts';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
@@ -39,8 +39,9 @@ export interface Session {
   /**
    * Provisional (path cut-out): the paths between two nodes of the current snapshot, read only. `visible` names the boxes
    * and routes of the current view that carry them; `distance` the hops of every visible node from the path.
+   * `edgeKinds`: the paths follow only edges of these kinds (default: every edge).
    */
-  trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'}): Promise<EngineResponse>;
+  trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<EngineResponse>;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<SessionResult>;
   /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest;
@@ -97,22 +98,15 @@ export function httpRun(
 ): ((request: EngineRequest) => Promise<EngineResponse>) & {openSession(): Promise<ResidentSession>};
 
 /**
- * An overview request without `op` and `graph`: layout `options`, the user's `intent`, a `configSet`, `radii` (node id →
- * radius) and `start` (`{settle}` without positions: continue from the last overview). Provisional.
+ * An overview request without `op` and `graph` (`OverviewRequest` in `@arqlet/contracts`): `start` without positions
+ * continues from the last overview.
  */
-export interface OverviewRequest {
-  options?: Record<string, unknown>;
-  intent?: {decisions?: Record<string, unknown>};
-  configSet?: Record<string, unknown>;
-  radii?: Record<string, number>;
-  start?: {settle?: boolean; x?: number[]; y?: number[]; r?: number[]};
-  threads?: number;
-}
+export type OverviewSessionRequest = Omit<OverviewRequest, 'graph'>;
 
 /** The answer to an overview request: `overview` (ids, parent, x, y, r, labels, kinds, …) when `ok`. */
 export interface OverviewAnswer {
   ok: boolean;
-  overview?: Record<string, unknown> & {ids: string[]; x: number[]; y: number[]; r: number[]};
+  overview?: Overview;
   error?: string;
   /** A new `open` overtook it; nothing was applied. */
   stale?: boolean;
@@ -121,9 +115,9 @@ export interface OverviewAnswer {
 /** Provisional: an overview of one graph, laid out again as the host asks; the graph stays in the engine where it can. */
 export interface OverviewSession {
   /** Lays out `graph`; replaces the graph the session had. */
-  open(graph: Graph, request?: OverviewRequest): Promise<OverviewAnswer>;
+  open(graph: Graph, request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options). */
-  layOut(request?: OverviewRequest): Promise<OverviewAnswer>;
+  layOut(request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** The last overview, or null. */
   readonly overview: OverviewAnswer['overview'] | null;
   /** Whether the graph stays in the engine. */

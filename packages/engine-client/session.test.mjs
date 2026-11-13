@@ -238,3 +238,16 @@ test('an overview session keeps the graph in the engine and answers as one that 
   assert.equal((await reopened).ok, true);
   await kept.close();
 });
+
+test('a trace follows only the edge kinds asked for', {skip: !engine}, async () => {
+  const kinds = {nodes: ['a', 'b', 'c'].map(id => ({id, kind: 'file', label: id})), edges: [
+    {id: 'ab', kind: 'calls', source: 'a', target: 'b'}, {id: 'bc', kind: 'imports', source: 'b', target: 'c'}]};
+  for (const resident of [true, false]) {
+    const session = createSession(engine, {resident});
+    await session.import(kinds);
+    assert.deepEqual((await session.trace('a', 'c')).edges, ['ab', 'bc']);
+    assert.equal((await session.trace('a', 'c', {edgeKinds: ['calls']})).found, false);
+    assert.deepEqual((await session.trace('a', 'b', {edgeKinds: ['calls']})).edges, ['ab']);
+    await session.close();
+  }
+});
