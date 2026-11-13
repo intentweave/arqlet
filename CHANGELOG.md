@@ -5,6 +5,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- Playground: `build.sh` builds the native binaries with the `fast` profile (optimised like release, without LTO), and
+  the backend runs `target/fast/layout-command` (`ARQLET_LAYOUT_COMMAND` overrides it; a debug build is the fallback).
+  On a synthetic 20 000-node overview: 0.56 instead of 4.08 s (single run, Apple M3).
+
 ### Added
 
 - Hubs left out of communities (provisional): `communityHubs: {minLinks?, nodes?}` (layered view) and the overview

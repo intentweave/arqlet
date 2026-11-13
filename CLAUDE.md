@@ -44,7 +44,7 @@ python3 apps/playground/server.py                  # http://127.0.0.1:8765
 python3 apps/playground/server.py --local-examples <folder outside the repo>   # also offers that folder's graphs
 ```
 
-`build.sh` also runs `smoke.mjs`, `revisions.test.mjs`, `server_test.py` and `ui-regression.mjs`. CI runs it on `examples/fixtures/small.json`.
+`build.sh` also runs `smoke.mjs`, `revisions.test.mjs`, `server_test.py` and `ui-regression.mjs`. CI runs it on `examples/fixtures/small.json`. It builds the native binaries with the `fast` profile (`target/fast`), which the backend runs; `ARQLET_LAYOUT_COMMAND` points it at another build.
 
 Export package: `cd tools/intentweave-export && npm test`.
 
