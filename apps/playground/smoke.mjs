@@ -3,12 +3,14 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {createEngine} from '@arqlet/engine-client/wasm-client.js';
+// The native engine build.sh makes (optimised, `fast` profile).
+const NATIVE=fileURLToPath(new URL('../../target/fast/layout-command',import.meta.url));
 const snapshot=JSON.parse(readFileSync(new URL('./generated/snapshot.json',import.meta.url)));
 const run=await createEngine(readFileSync(new URL('./generated/arqlet.wasm',import.meta.url)));
 const sourceId=snapshot.graph.edges[0]?.source ?? snapshot.graph.nodes.at(-1).id;
 const request={op:'add',snapshot,expectedRevision:snapshot.revision,sourceId,label:'WASM parity test'};
 const wasm=run(request);assert.equal(wasm.ok,true);
-const native=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(request),encoding:'utf8'});
+const native=spawnSync(NATIVE,[],{input:JSON.stringify(request),encoding:'utf8'});
 assert.equal(native.status,0,native.stderr);assert.deepEqual(wasm,JSON.parse(native.stdout));
 assert.equal(wasm.snapshot.revision,snapshot.revision+1);
 assert.equal(run({...request,snapshot:wasm.snapshot}).ok,false);
@@ -21,14 +23,14 @@ const legacyOptions={singlePassAuto:false,singlePass:false,abstractRouting:false
 const legacy=run({op:'import',graph:JSON.parse(readFileSync(new URL('./generated/graph.json',import.meta.url))),limit:40,options:legacyOptions}).snapshot;
 const refineRequest={op:'refine',snapshot:legacy,expectedRevision:legacy.revision,expectedLayoutVersion:legacy.layoutVersion??0};
 const refined=run(refineRequest);
-const nativeRefined=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(refineRequest),encoding:'utf8'});
+const nativeRefined=spawnSync(NATIVE,[],{input:JSON.stringify(refineRequest),encoding:'utf8'});
 assert.equal(refined.ok,true);assert.equal(nativeRefined.status,0,nativeRefined.stderr);
 assert.deepEqual(refined,JSON.parse(nativeRefined.stdout));
 // Baseline + five candidates, then one to three complete global routing rounds.
 assert.ok(refined.snapshot.optimization.candidatesEvaluated>=7 && refined.snapshot.optimization.candidatesEvaluated<=9);
 console.log('Refinement including global rounds has native/WASM parity.');
 const threadedRequest={...refineRequest,threads:4};
-const nativeThreaded=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(threadedRequest),encoding:'utf8'});
+const nativeThreaded=spawnSync(NATIVE,[],{input:JSON.stringify(threadedRequest),encoding:'utf8'});
 assert.equal(nativeThreaded.status,0,nativeThreaded.stderr);assert.equal(nativeThreaded.stdout,nativeRefined.stdout);
 assert.deepEqual(run(threadedRequest),refined);
 const imported=run({op:'import',graph:JSON.parse(readFileSync(new URL('./generated/graph.json',import.meta.url))),limit:40});
@@ -43,7 +45,7 @@ for(const operation of ['import','refine','add']){
  if(operation==='refine')abstractRequest={op:'refine',snapshot:abstractState,expectedRevision:abstractState.revision,expectedLayoutVersion:abstractState.layoutVersion,threads:4};
  if(operation==='add')abstractRequest={op:'add',snapshot:abstractState,expectedRevision:abstractState.revision,expectedLayoutVersion:abstractState.layoutVersion,sourceId:'b',label:'Abstract continuation'};
  const result=run(abstractRequest);
- const native=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(abstractRequest),encoding:'utf8'});
+ const native=spawnSync(NATIVE,[],{input:JSON.stringify(abstractRequest),encoding:'utf8'});
  assert.equal(result.ok,true,JSON.stringify(result));assert.equal(native.status,0,native.stderr);
  assert.deepEqual(result,JSON.parse(native.stdout));
  assert.notEqual(result.snapshot.options?.abstractRouting,false);
@@ -60,7 +62,7 @@ for(const operation of ['import','refine','pin','refine after the fallback']){
  const request=operation==='import'?{op:'import',graph:abstractGraph,limit:1000,options:{singlePassAuto:true}}
   :operation==='pin'?{op:'configure',...state,options:{pins:{[leaf]:{x:40,y:60}}}}:{op:'refine',...state,threads:1};
  const result=run(request);
- const native=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(request),encoding:'utf8',maxBuffer:64*1024*1024});
+ const native=spawnSync(NATIVE,[],{input:JSON.stringify(request),encoding:'utf8',maxBuffer:64*1024*1024});
  assert.equal(result.ok,true,JSON.stringify(result));assert.equal(native.status,0,native.stderr);
  assert.deepEqual(result,JSON.parse(native.stdout));
  autoState=result.snapshot;
@@ -77,7 +79,7 @@ console.log('Automatic single pass matches native/WASM, including its fallback.'
  for(const [seq,phase] of [[1,'begin'],[2,'update'],[3,'finish']]){
   const request={op:'move',snapshot:state,expectedRevision:state.revision,expectedLayoutVersion:state.layoutVersion??0,gestureId:'drag',node,release:true,seq,phase,position:{x:at.x+30,y:at.y+30}};
   const result=run(request);
-  const native=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(request),encoding:'utf8',maxBuffer:64*1024*1024});
+  const native=spawnSync(NATIVE,[],{input:JSON.stringify(request),encoding:'utf8',maxBuffer:64*1024*1024});
   assert.equal(result.ok,true,JSON.stringify(result));assert.equal(native.status,0,native.stderr);
   assert.deepEqual(result,JSON.parse(native.stdout));
   state=result.snapshot;assert.notEqual(state.options?.singlePass,false,phase);
@@ -90,7 +92,7 @@ const container=snapshot.graph.nodes.find(n=>snapshot.graph.nodes.some(c=>c.pare
 if(container){
  const request={op:'toggle',snapshot,expectedRevision:snapshot.revision,expectedLayoutVersion:snapshot.layoutVersion??0,nodeId:container.id};
  const closed=run(request);assert.equal(closed.ok,true);
- const native=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(request),encoding:'utf8'});
+ const native=spawnSync(NATIVE,[],{input:JSON.stringify(request),encoding:'utf8'});
  assert.equal(native.status,0,native.stderr);assert.deepEqual(closed,JSON.parse(native.stdout));
  const reopened=run({...request,snapshot:closed.snapshot,expectedLayoutVersion:closed.snapshot.layoutVersion});
  assert.equal(reopened.ok,true);assert.deepEqual(reopened.snapshot.graph,snapshot.graph);
@@ -99,19 +101,19 @@ if(container){
 
 const labelledRequest={op:'configure',snapshot,expectedRevision:snapshot.revision,expectedLayoutVersion:snapshot.layoutVersion??0,options:{edgeLabels:{[snapshot.graph.edges[0].id]:{text:'calls',width:48,height:22}},portLabels:{[snapshot.resolvedPorts[0].id]:{text:'out',width:32,height:22}}}};
 const labelled=run(labelledRequest);
-const nativeLabels=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(labelledRequest),encoding:'utf8'});
+const nativeLabels=spawnSync(NATIVE,[],{input:JSON.stringify(labelledRequest),encoding:'utf8'});
 assert.equal(labelled.ok,true);assert.equal(nativeLabels.status,0,nativeLabels.stderr);assert.deepEqual(labelled,JSON.parse(nativeLabels.stdout));
 console.log('Measured edge/port labels have native/WASM parity.');
 
 const configRequest={op:'configure',snapshot,expectedRevision:snapshot.revision,expectedLayoutVersion:snapshot.layoutVersion??0,options:{configSet:{schemaVersion:1,id:'smoke',layout:{algorithm:'hierarchical',candidates:[1,2,3,4],hybridBy:'compact'},routing:{style:'orthogonal',bundling:'none',routingCandidate:true},appearance:{showPorts:false}}}};
 const configResult=run(configRequest);
-const nativeConfig=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(configRequest),encoding:'utf8'});
+const nativeConfig=spawnSync(NATIVE,[],{input:JSON.stringify(configRequest),encoding:'utf8'});
 assert.equal(configResult.ok,true);assert.equal(nativeConfig.status,0,nativeConfig.stderr);assert.deepEqual(configResult,JSON.parse(nativeConfig.stdout));assert.deepEqual(configResult.snapshot.routes,snapshot.routes);
 console.log('Config sets have native/WASM parity; appearance preserves route geometry.');
 
 const overlapRequest={op:'configure',snapshot,expectedRevision:snapshot.revision,expectedLayoutVersion:snapshot.layoutVersion??0,options:{vpscOverlapRemoval:true}};
 const overlapWasm=run(overlapRequest);
-const nativeOverlap=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(overlapRequest),encoding:'utf8'});
+const nativeOverlap=spawnSync(NATIVE,[],{input:JSON.stringify(overlapRequest),encoding:'utf8'});
 assert.equal(overlapWasm.ok,true);assert.equal(nativeOverlap.status,0,nativeOverlap.stderr);assert.deepEqual(overlapWasm,JSON.parse(nativeOverlap.stdout));
 assert.equal(overlapWasm.snapshot.options.vpscOverlapRemoval,true);
 console.log('Constraint-overlap option configuration has native/WASM parity.');
@@ -119,11 +121,11 @@ console.log('Constraint-overlap option configuration has native/WASM parity.');
 // Curated references: the same operations give the same document and the same canonical bytes in both engines.
 const referenceCreate={op:'referenceCreate',snapshot,referenceId:'smoke'};
 const referenceWasm=run(referenceCreate);
-const nativeReference=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(referenceCreate),encoding:'utf8'});
+const nativeReference=spawnSync(NATIVE,[],{input:JSON.stringify(referenceCreate),encoding:'utf8'});
 assert.equal(referenceWasm.ok,true);assert.equal(nativeReference.status,0,nativeReference.stderr);assert.deepEqual(referenceWasm,JSON.parse(nativeReference.stdout));
 const canonicalRequest={op:'referenceCanonical',reference:referenceWasm.reference};
 const canonicalWasm=run(canonicalRequest);
-const nativeCanonical=spawnSync(fileURLToPath(new URL('../../target/debug/layout-command',import.meta.url)),[],{input:JSON.stringify(canonicalRequest),encoding:'utf8'});
+const nativeCanonical=spawnSync(NATIVE,[],{input:JSON.stringify(canonicalRequest),encoding:'utf8'});
 assert.equal(canonicalWasm.ok,true);assert.equal(nativeCanonical.status,0,nativeCanonical.stderr);assert.equal(canonicalWasm.canonical,JSON.parse(nativeCanonical.stdout).canonical);
 const validationWasm=run({op:'referenceValidate',reference:JSON.parse(canonicalWasm.canonical)});
 assert.equal(validationWasm.ok,true);assert.equal(validationWasm.report.payloadHash,referenceWasm.reference.integrity.payloadHash);
