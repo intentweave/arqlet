@@ -58,6 +58,8 @@ mod option_defaults;
 mod overlaps;
 #[path = "overview.rs"]
 mod overview;
+#[path = "pack_components.rs"]
+mod pack_components;
 #[path = "parallel_straight.rs"]
 mod parallel_straight;
 #[path = "petri_shapes.rs"]

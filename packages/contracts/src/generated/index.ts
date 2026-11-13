@@ -46,6 +46,7 @@ export * from './OverviewRepresentation';
 export * from './OverviewRequest';
 export * from './OverviewStart';
 export * from './OverviewStats';
+export * from './PackComponents';
 export * from './PlacedLabel';
 export * from './Point';
 export * from './Port';

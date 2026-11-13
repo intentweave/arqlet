@@ -676,7 +676,8 @@ async function loadInitial(){
  // Communities (provisional) apply to an import too: the graph is imported with them.
  const communities=Math.round(Number($('communities').value));
  const collapseFirst=$('initial-collapse').value,domainGroups=$('domain-groups').checked;
- const abstracted=communities>0||collapseFirst!==''||domainGroups;
+ const packed=$('pack-components').checked;
+ const abstracted=communities>0||collapseFirst!==''||domainGroups||packed;
  if(example==='default'&&mode()!=='browser'&&!(budget>0)&&!abstracted){
   const r=await fetch('./generated/snapshot.json',{cache:'no-store'});
   if(!r.ok)throw Error('Snapshot missing. Please run the demo build first.');
@@ -697,7 +698,7 @@ async function loadInitial(){
  // An example may bring its own groups (node id → path of group names); they travel as an option, not in the graph.
  const {groups,...plain}=graph;
  const projected=erProjection(plain);
- const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),...(communities>0&&Number($('hub-links').value)>0?{communityHubs:{minLinks:Math.round(Number($('hub-links').value))}}:{}),
+ const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),...(packed?{packComponents:{}}:{}),...(communities>0&&Number($('hub-links').value)>0?{communityHubs:{minLinks:Math.round(Number($('hub-links').value))}}:{}),
   ...(domainGroups&&groups?{groups}:{}),...(collapseFirst!==''?{levelOfDetail:{depth:Number(collapseFirst)}}:{})};
  const importOptions=Object.keys(extra).length?{...(projected.options??{}),...extra}:projected.options;
  const limit=example==='default'&&!(budget>0)&&!abstracted?VIEW_LIMIT:EXAMPLE_LIMIT;
@@ -725,6 +726,7 @@ $('example').onchange=()=>{$('example-info').textContent='';reset();};
 $('node-budget').onchange=()=>{$('example-info').textContent='';reset();};
 $('communities').onchange=()=>{$('example-info').textContent='';reset();};
 $('hub-links').onchange=()=>{if(Number($('communities').value)>0){$('example-info').textContent='';reset();}};
+$('pack-components').onchange=()=>{$('example-info').textContent='';reset();};
 $('domain-groups').onchange=()=>{$('example-info').textContent='';reset();};
 $('initial-collapse').onchange=()=>{$('example-info').textContent='';reset();};
 // Scene geometry comes from the engine; the demo waits for it before the first draw.
