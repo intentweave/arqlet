@@ -117,6 +117,13 @@ packComponents?: PackComponents,
  */
 isolatedGrid?: boolean,
 /**
+ * Experimental: free directions (`auto`) are chosen first, and the drawing is then laid out again with every area's
+ * chosen orientation fixed, so that single pass constructs the edges between areas of different axes (ADR 0017)
+ * instead of delegating them. The snapshot keeps the free directions and the chosen orientations. Omitted when off,
+ * so the default output does not change.
+ */
+directionsFirst?: boolean,
+/**
  * How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
  * Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
  */

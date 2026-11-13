@@ -18,6 +18,8 @@ mod curation_locks;
 mod curation_reroute;
 #[path = "directed_repair.rs"]
 mod directed_repair;
+#[path = "directions_first.rs"]
+mod directions_first;
 #[path = "drag_region.rs"]
 mod drag_region;
 #[path = "edge_weights.rs"]

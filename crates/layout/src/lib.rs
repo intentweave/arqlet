@@ -333,9 +333,45 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Experimental (`directionsFirst`): the free directions are chosen by a first layout, and the drawing is laid out
+    // again with those orientations fixed (single pass builds edges between fixed axes; it delegates them under a free
+    // direction, which decides its orientation only after its children are placed).
+    if options.directions_first && has_free_direction(graph) {
+        let (first, _) = compute_counted_inner(graph, previous, dirty, options)?;
+        let fixed = with_chosen_directions(graph, &first.area_orientations);
+        let (mut snapshot, stages) = compute_counted_inner(&fixed, previous, dirty, options)?;
+        snapshot.graph = graph.clone();
+        snapshot.area_orientations = first.area_orientations;
+        apply_aggregate_weights(&mut snapshot);
+        return Ok((snapshot, stages));
+    }
     let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
     apply_aggregate_weights(&mut snapshot);
     Ok((snapshot, stages))
+}
+
+/// Whether an area of the graph has a free direction (`auto`, or a choice of several).
+fn has_free_direction(graph: &Graph) -> bool {
+    let free = |d: &arqlet_model::DirectionConstraint| {
+        matches!(d, arqlet_model::DirectionConstraint::Free)
+            || matches!(d, arqlet_model::DirectionConstraint::Allowed(list) if list.len() > 1)
+    };
+    free(&graph.default_direction) || graph.container_directions.values().any(free)
+}
+
+/// The graph with the orientation each free area chose fixed (the root's as the default direction, the others per
+/// container).
+fn with_chosen_directions(graph: &Graph, chosen: &BTreeMap<String, Orientation>) -> Graph {
+    let mut fixed = graph.clone();
+    for (area, orientation) in chosen {
+        let constraint = arqlet_model::DirectionConstraint::Fixed(*orientation);
+        if area == "<root>" {
+            fixed.default_direction = constraint;
+        } else {
+            fixed.container_directions.insert(area.clone(), constraint);
+        }
+    }
+    fixed
 }
 
 /// Provisional (communities): a route that stands for collapsed content is as heavy as the edges it stands for in its own
