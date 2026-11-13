@@ -482,6 +482,7 @@ mod tests {
             kind: "e".into(),
             source: "c".into(),
             target: Some("d".into()),
+            weight: None,
         });
         fixed.push(route("remote", &[(10000., 10000.), (10100., 10000.)]));
         let mut baseline = Session::default();
@@ -596,6 +597,7 @@ mod tests {
             kind: "e".into(),
             source: "c".into(),
             target: Some("d".into()),
+            weight: None,
         });
         moving.push(route("second", &[(40., 23.), (70., 23.)]));
         let mut session = Session::default();

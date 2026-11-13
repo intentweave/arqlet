@@ -2206,6 +2206,7 @@ mod tests {
                     source: format!("a{i}"),
                     target: Some(format!("b{i}")),
                     kind: "calls".into(),
+                    weight: None,
                 });
                 routes.push(route);
             }
@@ -2271,6 +2272,7 @@ mod tests {
                 kind: "calls".into(),
                 source: "a".into(),
                 target: Some("a".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };
@@ -2344,6 +2346,7 @@ mod tests {
                     kind: "calls".into(),
                     source: (*source).into(),
                     target: Some((*target).into()),
+                    weight: None,
                 })
                 .collect(),
             buses: Vec::new(),
@@ -2462,6 +2465,7 @@ mod tests {
                 kind: "calls".into(),
                 source: "a".into(),
                 target: Some("b".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };
@@ -2514,6 +2518,7 @@ mod tests {
                 kind: "calls".into(),
                 source: format!("a{i}"),
                 target: Some(format!("b{i}")),
+                weight: None,
             });
             rects.insert(
                 format!("a{i}"),
@@ -2616,6 +2621,7 @@ mod tests {
                 kind: "calls".into(),
                 source: "a".into(),
                 target: Some("b".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };
@@ -2744,6 +2750,7 @@ mod channel_tests {
                 kind: "calls".into(),
                 source: "a".into(),
                 target: Some("b".into()),
+                weight: None,
             })
             .collect();
         let graph = Graph {
@@ -2883,6 +2890,7 @@ mod contour_acceptance {
                 kind: "flow".into(),
                 source: "a".into(),
                 target: Some("b".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };
@@ -3037,6 +3045,7 @@ mod contour_acceptance {
                 kind: "flow".into(),
                 source: "c".into(),
                 target: Some("d".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };
@@ -3167,6 +3176,7 @@ mod contour_acceptance {
                 kind: "flow".into(),
                 source: "a".into(),
                 target: Some("b".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };
@@ -3267,6 +3277,7 @@ mod search_corner_tests {
                 kind: "flow".into(),
                 source: "a".into(),
                 target: Some("b".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };

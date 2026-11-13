@@ -279,6 +279,7 @@ mod graph_tests {
             kind: "flow".into(),
             source: a.into(),
             target: Some(b.into()),
+            weight: None,
         }
     }
 

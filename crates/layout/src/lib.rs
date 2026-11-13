@@ -339,8 +339,17 @@ pub fn compute_counted(
 }
 
 /// Provisional (communities): a route that stands for collapsed content is as heavy as the edges it stands for in its own
-/// direction (`LayoutOptions::aggregate_weights`; the other direction reaches the scene as `backWeight`).
+/// direction (`LayoutOptions::aggregate_weights`; the other direction reaches the scene as `backWeight`). With input
+/// weights (`Edge::weight`), every route weighs its edges (`Snapshot::weighted_routes`).
 pub fn apply_aggregate_weights(snapshot: &mut Snapshot) {
+    if let Some(weights) = snapshot.weighted_routes() {
+        for route in &mut snapshot.routes {
+            if let Some(&w) = weights.get(&route.id) {
+                route.weight = w;
+            }
+        }
+        return;
+    }
     if snapshot.options.aggregate_weights.is_empty() {
         return;
     }
@@ -9084,6 +9093,7 @@ mod pin_tests {
             kind: "flow".into(),
             source: "a".into(),
             target: Some("b".into()),
+            weight: None,
         });
         let snapshot = compute(&graph, None, &BTreeSet::new(), &LayoutOptions::default()).unwrap();
         let eval = shadow_evaluation(&snapshot).unwrap();

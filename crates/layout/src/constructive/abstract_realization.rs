@@ -1184,6 +1184,7 @@ mod tests {
                     kind: "edge".into(),
                     source: from.to_string(),
                     target: Some(to.to_string()),
+                    weight: None,
                 })
                 .collect(),
             buses: Vec::new(),

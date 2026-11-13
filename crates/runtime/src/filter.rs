@@ -90,8 +90,10 @@ fn hide(snapshot: &Snapshot, scene: &mut Scene) -> Result<(), String> {
     // The edges still shown, counted between the nodes that stand for their ends.
     let mut count: BTreeMap<(String, String), usize> = BTreeMap::new();
     let mut edge_kind: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut edge_count: BTreeMap<&str, usize> = BTreeMap::new();
     for edge in &canonical.edges {
         edge_kind.insert(edge.id.as_str(), edge.kind.as_str());
+        edge_count.insert(edge.id.as_str(), edge.count());
         let Some(target) = edge.target.as_deref() else {
             continue;
         };
@@ -99,7 +101,9 @@ fn hide(snapshot: &Snapshot, scene: &mut Scene) -> Result<(), String> {
             continue;
         }
         if let (Some(a), Some(b)) = (shown_as(&edge.source), shown_as(target)) {
-            *count.entry((a, b)).or_default() += 1;
+            // By weight (`Edge::weight`); saturating, as `usize` is 32-bit in WASM.
+            let n = count.entry((a, b)).or_default();
+            *n = n.saturating_add(edge.count());
         }
     }
     let collapsed: BTreeSet<&str> = snapshot.collapsed_ids.iter().map(String::as_str).collect();
@@ -131,13 +135,22 @@ fn hide(snapshot: &Snapshot, scene: &mut Scene) -> Result<(), String> {
         } else {
             !edge_kinds.contains(route.kind.as_str())
         };
-        if keep {
+        if keep && !route.members.is_empty() {
+            let before = route.members.len();
             route.members.retain(|m| {
                 !edge_kind
                     .get(m.as_str())
                     .is_some_and(|k| edge_kinds.contains(k))
             });
-        } else {
+            // A bundle that lost members weighs what it still carries.
+            if route.members.len() < before {
+                let of = |id: &str| edge_count.get(id).copied().unwrap_or(1);
+                route.weight = route
+                    .members
+                    .iter()
+                    .fold(of(&route.id), |w, m| w.saturating_add(of(m)));
+            }
+        } else if !keep {
             dropped.insert(route.id.clone());
         }
         keep

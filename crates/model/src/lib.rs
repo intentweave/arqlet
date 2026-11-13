@@ -94,6 +94,19 @@ pub struct Edge {
     pub kind: String,
     pub source: String,
     pub target: Option<String>,
+    /// Provisional: how many edges this edge stands for (a pre-aggregated relation), at least 1; 1 when left out. It
+    /// counts where edges are counted: a bundled or aggregated route weighs the sum of its edges, and the overview and
+    /// the communities pull by it. Omitted from output when left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub weight: Option<u32>,
+}
+
+impl Edge {
+    /// The number of edges this edge stands for (`weight`, 1 when left out).
+    pub fn count(&self) -> usize {
+        self.weight.map_or(1, |w| w.max(1) as usize)
+    }
 }
 /// A graph as it is read: the legacy strategy values in the direction slots are translated here, so that earlier graphs keep
 /// their meaning. Anything else is parsed as it is.
@@ -479,6 +492,43 @@ pub struct Route {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_of: Option<String>,
 }
+impl Snapshot {
+    /// Provisional: the weight of every route when an edge of the view has a `weight` (else `None`, and the routes keep
+    /// their own): for a route that stands for collapsed content the edges it stands for in its own direction
+    /// (`aggregate_weights`, at least 1), else its edge's `weight` plus those of the routes bundled into it. Saturating:
+    /// `usize` is 32-bit in WASM.
+    pub fn weighted_routes(&self) -> Option<BTreeMap<String, usize>> {
+        if !self.graph.edges.iter().any(|e| e.weight.is_some()) {
+            return None;
+        }
+        let count: BTreeMap<&str, usize> = self
+            .graph
+            .edges
+            .iter()
+            .map(|e| (e.id.as_str(), e.count()))
+            .collect();
+        let of = |id: &str| count.get(id).copied().unwrap_or(1);
+        let mut weights: BTreeMap<String, usize> = BTreeMap::new();
+        for route in &self.routes {
+            if route.bundle_of.is_none() {
+                let own = match self.options.aggregate_weights.get(&route.id) {
+                    Some(w) => w.forward.max(1),
+                    None => of(&route.id),
+                };
+                weights.insert(route.id.clone(), own);
+            }
+        }
+        for route in &self.routes {
+            if let Some(leader) = &route.bundle_of {
+                if let Some(w) = weights.get_mut(leader) {
+                    *w = w.saturating_add(of(&route.id));
+                }
+            }
+        }
+        Some(weights)
+    }
+}
+
 impl Route {
     pub fn new(id: impl Into<String>, points: Vec<Point>) -> Self {
         Self {
@@ -653,6 +703,9 @@ pub fn validate(graph: &Graph) -> Result<(), String> {
     for e in &graph.edges {
         if !edges.insert(&e.id) {
             return Err(format!("Duplicate edge: {}", e.id));
+        }
+        if e.weight == Some(0) {
+            return Err(format!("Edge weight must be at least 1: {}", e.id));
         }
         if !nodes.contains_key(e.source.as_str()) {
             return Err(format!("Missing source: {}", e.id));

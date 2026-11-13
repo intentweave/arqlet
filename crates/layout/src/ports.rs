@@ -1413,6 +1413,7 @@ mod tests {
                 kind: "calls".into(),
                 source: "a".into(),
                 target: Some("b".into()),
+                weight: None,
             }],
             buses: Vec::new(),
         };
