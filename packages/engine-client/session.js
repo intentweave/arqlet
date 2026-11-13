@@ -247,7 +247,17 @@ export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
   let graph = null, started = false, last = null, clusters = null, generation = 0, queue = Promise.resolve();
 
   const send = async request => {
-    if (resident) return (await opened).run(request);
+    if (resident) {
+      // On the graph the engine has, only what moves comes back (`positionsOnly`) while the clusters stay; it is put
+      // together with the last overview here, so every answer is a whole overview.
+      const asked = !request.graph && last ? {...request, positionsOnly: true} : request;
+      const answer = await (await opened).run(asked);
+      if (answer.ok && answer.overview?.positionsOnly) {
+        const {positionsOnly: _moved, ...moved} = answer.overview;
+        return {...answer, overview: {...last, ...moved}};
+      }
+      return answer;
+    }
     const sent = {...request, graph: request.graph ?? graph};
     const start = request.start;
     if (start && start.x === undefined) {

@@ -269,3 +269,22 @@ test('a neighbourhood is read in both kinds of session alike', {skip: !engine}, 
   }
   assert.deepEqual(answers[0], answers[1]);
 });
+
+test('an overview session that keeps the graph gets only the positions back and still answers whole overviews', {skip: !engine}, async () => {
+  const sent = [];
+  const counting = Object.assign(request => engine(request), {
+    openSession: () => {
+      const inner = engine.openSession();
+      return {run: request => { const answer = inner.run(request); sent.push({asked: !!request.positionsOnly, whole: !!answer.overview?.ids}); return answer; }, close: () => inner.close()};
+    },
+  });
+  const kept = createOverviewSession(counting);
+  const plain = createOverviewSession(engine, {resident: false});
+  const options = {communities: 0};
+  await kept.open(graph, {options}); await plain.open(graph, {options});
+  const id = kept.overview.ids[0];
+  const request = {options, radii: {[id]: kept.overview.r[0] * 2}, start: {}};
+  const a = await kept.layOut(request), b = await plain.layOut(request);
+  assert.deepEqual(a, b, 'the same whole overview either way');
+  assert.deepEqual(sent.at(-1), {asked: true, whole: false}, 'only the positions crossed');
+});

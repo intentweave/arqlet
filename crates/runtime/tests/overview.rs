@@ -533,3 +533,39 @@ fn every_answer_is_the_typed_overview_contract() {
     let response: Value = serde_json::from_str(&dispatch(&v.to_string())).unwrap();
     assert_eq!(response["ok"], true, "{response}");
 }
+
+#[test]
+fn a_session_answers_only_what_moves_while_the_clusters_stay() {
+    use arqlet_runtime::engine_session::EngineSession;
+    let graph = hierarchical(4, 3, 6);
+    let options = json!({"communities": 0});
+    let mut session = EngineSession::new();
+    // With a new graph the answer is whole, positionsOnly or not.
+    let first = session.run_value(
+        &json!({"op": "overview", "graph": graph, "options": options, "positionsOnly": true}),
+    );
+    assert!(first["overview"]["ids"].is_array(), "whole: {first}");
+    // Same clusters, positionsOnly: only what moves, equal to the whole answer of the same request.
+    let request =
+        json!({"op": "overview", "options": options, "radii": {"g1": 120.0}, "start": {}});
+    let mut only = request.clone();
+    only["positionsOnly"] = json!(true);
+    let moved = session.run_value(&only);
+    assert_eq!(moved["ok"], true, "{moved}");
+    let o = &moved["overview"];
+    assert_eq!(o["positionsOnly"], true);
+    assert!(o.get("ids").is_none() && o.get("labels").is_none() && o.get("edges").is_none());
+    let _: arqlet_model::OverviewPositions = serde_json::from_value(o.clone()).unwrap();
+    let mut twin = EngineSession::new();
+    twin.run_value(&json!({"op": "overview", "graph": graph, "options": options}));
+    let whole = twin.run_value(&request);
+    for key in ["x", "y", "r", "rootRadius", "stats", "representation"] {
+        assert_eq!(o[key], whole["overview"][key], "{key}");
+    }
+    // Other clusters: whole again.
+    let other = session.run_value(
+        &json!({"op": "overview", "options": {"communities": 4}, "positionsOnly": true}),
+    );
+    assert!(other["overview"]["ids"].is_array());
+    assert!(other["overview"].get("positionsOnly").is_none());
+}

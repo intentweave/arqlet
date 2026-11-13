@@ -15,6 +15,11 @@ export type OverviewRequest = { graph?: Graph, options?: OverviewLayoutOptions, 
  */
 radii?: { [key in string]: number }, start?: OverviewStart,
 /**
+ * Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
+ * last overview; otherwise the whole overview.
+ */
+positionsOnly?: boolean,
+/**
  * Worker threads (native only); the answer is the same for any number.
  */
 threads?: number, };
