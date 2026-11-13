@@ -182,7 +182,7 @@ pub fn overview_response(v: &Value, threads: usize) -> Value {
     }
 }
 
-fn overview_of(v: &Value, threads: usize) -> Result<Overview, String> {
+pub(crate) fn overview_of(v: &Value, threads: usize) -> Result<Overview, String> {
     let graph = graph_of(v)?;
     let options = options_of(v)?;
     let (graph, h) = hierarchy_of(&graph, v, &options)?;

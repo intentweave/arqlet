@@ -5,6 +5,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- **`arqlet::protocol::Response` has typed answers** (provisional) for `scene`, `trace`, `neighbourhood`, `overview`,
+  `intent` and `metrics` (`Response::Scene`, `Trace`, `Neighbourhood`, `Overview`, `Intent`, `Metrics`) instead of
+  `Response::Encoded`; the JSON is unchanged byte for byte. A Rust host that matched `Encoded` for these operations
+  matches the new variants. Contract types `TraceAnswer`, `NeighbourhoodAnswer`, `VisibleParts`; `session.trace` and
+  `session.neighbourhood` return them (`ReadAnswer<T>` in `@arqlet/engine-client`).
+
 ### Added
 
 - Hubs left out of communities (provisional): `communityHubs: {minLinks?, nodes?}` (layered view) and the overview

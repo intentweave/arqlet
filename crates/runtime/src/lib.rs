@@ -3206,6 +3206,8 @@ const GLOBAL_ROUNDS: usize = 3;
 /// Scene v1 for a snapshot: `{ok, scene}`. The scene is a projection; it never changes the snapshot.
 /// Shared metric set for any drawing (see arqlet_scene::metrics). Engine-independent: the input is
 /// absolute node rectangles and edge polylines, whatever engine produced them.
+/// The legacy dispatcher's form (`dispatch_legacy`); the protocol answers with a typed value now.
+#[cfg(test)]
 fn metrics_response(v: &serde_json::Value) -> String {
     let result = serde_json::from_value::<arqlet_scene::metrics::Drawing>(v["drawing"].clone())
         .map_err(|e| e.to_string())
@@ -3484,6 +3486,8 @@ fn structured_result(v: &serde_json::Value) -> Result<serde_json::Value, String>
     }))
 }
 
+/// The legacy dispatcher's form (`dispatch_legacy`); the protocol answers with a typed value now.
+#[cfg(test)]
 fn scene_response(v: &serde_json::Value) -> String {
     let result = serde_json::from_value::<Snapshot>(v["snapshot"].clone())
         .map_err(|e| e.to_string())
