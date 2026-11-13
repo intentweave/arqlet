@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Overview sessions answer only what moves (provisional): a session's `overview` with `positionsOnly` returns
+  `OverviewPositions` (positions, root radius, counts, representation) while the clusters stay those of its last
+  overview, and the whole overview otherwise. `createOverviewSession` asks for it on the graph the engine keeps and
+  merges it with its last overview, so its answers stay whole (on a synthetic 20 000-node graph: 0.37 instead of
+  1.46 MB per continuation). Contract type `OverviewPositions`.
 - `filter` takes `compact: true` (provisional): the view is laid out again without what is hidden, so the rest closes
   up instead of leaving gaps; a toggle or an edit keeps it, and showing everything lays the view out again. Playground:
   *Close up* in the section *Filter*.

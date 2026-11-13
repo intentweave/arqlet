@@ -2650,6 +2650,40 @@ pub struct Overview {
     pub stats: OverviewStats,
 }
 
+/// Provisional (sessions): the part of an overview that changes while the clusters stay the same, answered for a request
+/// with `positionsOnly` laid out on the clusters of the session's last overview. The host keeps ids, labels, parents,
+/// kinds, edges and links from that answer.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewPositions {
+    pub schema_version: u32,
+    /// Always true: tells this answer from a whole `Overview`.
+    pub positions_only: bool,
+    pub representation: OverviewRepresentation,
+    pub x: Vec<f64>,
+    pub y: Vec<f64>,
+    pub r: Vec<f64>,
+    pub root_radius: f64,
+    pub stats: OverviewStats,
+}
+
+impl OverviewPositions {
+    /// The moving part of a whole overview.
+    pub fn of(overview: Overview) -> Self {
+        Self {
+            schema_version: overview.schema_version,
+            positions_only: true,
+            representation: overview.representation,
+            x: overview.x,
+            y: overview.y,
+            r: overview.r,
+            root_radius: overview.root_radius,
+            stats: overview.stats,
+        }
+    }
+}
+
 /// Provisional: the counts of an overview.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2707,6 +2741,11 @@ pub struct OverviewRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub start: Option<OverviewStart>,
+    /// Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
+    /// last overview; otherwise the whole overview.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub positions_only: Option<bool>,
     /// Worker threads (native only); the answer is the same for any number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
