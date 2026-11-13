@@ -32,6 +32,11 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
                     _ => options.padding = x,
                 }
             }
+            "satellites" => {
+                options.satellites = value.as_f64().filter(|x| (0. ..=1.).contains(x)).ok_or(
+                    "Overview option satellites must be a share between 0 and 1 (0: never)",
+                )?;
+            }
             "communities" => {
                 options.communities = value
                     .as_u64()
@@ -169,7 +174,10 @@ fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
     }
     validate(&graph)?;
     let options = options_of(v)?;
-    let h = overview::with_communities(overview::hierarchy(&graph), options.communities)?;
+    let h = overview::with_satellites(
+        overview::with_communities(overview::hierarchy(&graph), options.communities)?,
+        options.satellites,
+    )?;
     let hints = hints_of(v, &h)?;
     let levels = overview::levels(&h);
     let mut arrangements: BTreeMap<Container, Arrangement> = BTreeMap::new();
@@ -212,12 +220,14 @@ fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
         })
         .collect();
     let representation = representation_of(v, &h, &kinds)?;
+    let labels: Vec<&str> = graph.nodes.iter().map(|n| n.label.as_str()).collect();
     Ok(json!({
         "schemaVersion": 1,
         "representation": representation,
         "ids": h.ids,
-        // Each node's label (empty for the clusters the overview added), so that a viewer names nodes as the data does.
-        "labels": graph.nodes.iter().map(|n| n.label.as_str()).chain(std::iter::repeat_n("", h.ids.len() - h.real)).collect::<Vec<_>>(),
+        // Each node's label, so that a viewer names nodes as the data does; the clusters the overview added are named
+        // after their most connected member (`cluster_labels`).
+        "labels": labels.iter().map(|l| l.to_string()).chain(overview::cluster_labels(&h, &labels)).collect::<Vec<_>>(),
         "parent": parent,
         "x": o.x.iter().map(|&x| round(x)).collect::<Vec<_>>(),
         "y": o.y.iter().map(|&y| round(y)).collect::<Vec<_>>(),

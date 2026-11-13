@@ -32,6 +32,9 @@ pub struct OverviewOptions {
     pub gravity: f64,
     /// Containers with more children than this are split into communities (`with_communities`); 0 never.
     pub communities: usize,
+    /// Satellites are gathered with their hub (`with_satellites`) when at least this share of their edges goes to it;
+    /// 0 (the default) never.
+    pub satellites: f64,
 }
 
 impl Default for OverviewOptions {
@@ -44,6 +47,7 @@ impl Default for OverviewOptions {
             charge: 0.05,
             gravity: 0.1,
             communities: 120,
+            satellites: 0.,
         }
     }
 }
@@ -365,6 +369,197 @@ pub fn with_communities(h: Hierarchy, threshold: usize) -> Result<Hierarchy, Str
         }
     }
     Ok(build(ids, parent, h.edges, h.real))
+}
+
+/// For every node, the edges with exactly one end in its subtree.
+fn outward_edges(h: &Hierarchy) -> Vec<f64> {
+    let n = h.ids.len();
+    let mut outward = vec![0.; n];
+    let ancestors = |mut i: usize| {
+        let mut chain = vec![i];
+        while let Some(p) = h.parent[i] {
+            chain.push(p);
+            i = p;
+        }
+        chain
+    };
+    for &(a, b) in &h.edges {
+        if a == b {
+            continue;
+        }
+        let (up_a, up_b) = (ancestors(a), ancestors(b));
+        let common: std::collections::BTreeSet<usize> = up_a.iter().copied().collect();
+        let shared: std::collections::BTreeSet<usize> = up_b
+            .iter()
+            .copied()
+            .filter(|x| common.contains(x))
+            .collect();
+        for x in up_a.iter().chain(&up_b) {
+            if !shared.contains(x) {
+                outward[*x] += 1.;
+            }
+        }
+    }
+    outward
+}
+
+/// Gathers satellites with their hub (provisional, off by default): in every container (the root included), a child
+/// that has at least `share` of its edges (those leaving its subtree) to one sibling is a satellite of that sibling.
+/// Satellites of a satellite belong to its hub; in a ring of satellites the one with the most edges is the hub (ties to
+/// the smaller index). A hub with satellites becomes a cluster `community:<container>:sat.<k>` holding them, named by
+/// the hub (`cluster_labels`), unless it would hold the whole container. `share` 0 leaves the hierarchy as it is.
+pub fn with_satellites(h: Hierarchy, share: f64) -> Result<Hierarchy, String> {
+    if share <= 0. {
+        return Ok(h);
+    }
+    let n = h.ids.len();
+    let outward = outward_edges(&h);
+    let mut ids = h.ids.clone();
+    let mut parent = h.parent.clone();
+    let taken: std::collections::BTreeSet<String> = h.ids.iter().cloned().collect();
+    let containers: Vec<Container> = (0..n)
+        .filter(|&i| h.children[i].len() > 2)
+        .map(Container::Node)
+        .chain((h.roots.len() > 2).then_some(Container::Root))
+        .collect();
+    for container in containers {
+        let members = h.members(container);
+        // The strongest sibling of every member, with the number of edges to it.
+        let mut strongest: BTreeMap<usize, (usize, f64)> = BTreeMap::new();
+        for &(a, b, w) in h.container_links(container) {
+            for (from, to) in [(a, b), (b, a)] {
+                let best = strongest.entry(from).or_insert((to, 0.));
+                if w > best.1 || (w == best.1 && to < best.0) {
+                    *best = (to, w);
+                }
+            }
+        }
+        let satellite_of: BTreeMap<usize, usize> = strongest
+            .iter()
+            .filter(|(&m, &(_, w))| outward[m] > 0. && w >= share * outward[m])
+            .map(|(&m, &(to, _))| (m, to))
+            .collect();
+        // Each satellite's hub: follow the satellites until a node that is none, or round a ring to its strongest node.
+        let mut hub_of: BTreeMap<usize, usize> = BTreeMap::new();
+        for &m in satellite_of.keys() {
+            let mut path = vec![m];
+            let mut at = satellite_of[&m];
+            while let Some(&next) = satellite_of.get(&at) {
+                if let Some(start) = path.iter().position(|&x| x == at) {
+                    let ring = &path[start..];
+                    at = *ring
+                        .iter()
+                        .max_by(|&&x, &&y| outward[x].total_cmp(&outward[y]).then(y.cmp(&x)))
+                        .unwrap();
+                    break;
+                }
+                path.push(at);
+                at = next;
+            }
+            hub_of.insert(m, at);
+        }
+        let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for (&m, &hub) in &hub_of {
+            if m != hub {
+                groups.entry(hub).or_default().push(m);
+            }
+        }
+        let owner = match container {
+            Container::Root => None,
+            Container::Node(i) => Some(i),
+        };
+        let name = owner.map_or("#".to_string(), |i| h.ids[i].clone());
+        for (k, (hub, satellites)) in groups.into_iter().enumerate() {
+            if satellites.len() + 1 >= members.len() {
+                continue;
+            }
+            let cluster = add_cluster(
+                &mut ids,
+                &mut parent,
+                &taken,
+                &name,
+                &format!("sat.{k}"),
+                owner,
+            )?;
+            for m in std::iter::once(hub).chain(satellites) {
+                parent[m] = Some(cluster);
+            }
+        }
+    }
+    Ok(build(ids, parent, h.edges, h.real))
+}
+
+/// Names for the clusters the overview added (from index `h.real` on), after their most connected member: the node of
+/// the graph below the cluster, reached through added clusters only, with the most edges leaving its subtree (ties to the
+/// smaller index). A community reads `≈ <name>`, a hub with its satellites `<name> +<satellites>`. A community inside
+/// another named after the same member takes the next one, so that nested communities do not share a name.
+pub fn cluster_labels(h: &Hierarchy, labels: &[&str]) -> Vec<String> {
+    let outward = outward_edges(h);
+    let name = |i: usize| -> String {
+        match labels.get(i) {
+            Some(l) if !l.is_empty() => l.to_string(),
+            _ => h.ids[i].rsplit('/').next().unwrap_or(&h.ids[i]).to_string(),
+        }
+    };
+    let satellites = |c: usize| {
+        h.ids[c]
+            .rsplit(':')
+            .next()
+            .is_some_and(|l| l.starts_with("sat."))
+    };
+    let depth = |mut i: usize| {
+        let mut d = 0;
+        while let Some(p) = h.parent[i] {
+            d += 1;
+            i = p;
+        }
+        d
+    };
+    // Outer clusters first, so that an inner one knows the members its enclosing communities are named after.
+    let mut order: Vec<usize> = (h.real..h.ids.len()).collect();
+    order.sort_by_key(|&c| (depth(c), c));
+    let mut namesake: BTreeMap<usize, usize> = BTreeMap::new();
+    let mut out = vec![String::new(); h.ids.len() - h.real];
+    for c in order {
+        let mut members = Vec::new();
+        let mut stack = vec![c];
+        while let Some(x) = stack.pop() {
+            for &child in &h.children[x] {
+                if child < h.real {
+                    members.push(child);
+                } else {
+                    stack.push(child);
+                }
+            }
+        }
+        members.sort_by(|&x, &y| outward[y].total_cmp(&outward[x]).then(x.cmp(&y)));
+        let Some(&best) = members.first() else {
+            continue;
+        };
+        if satellites(c) {
+            namesake.insert(c, best);
+            out[c - h.real] = format!("{} +{}", name(best), h.children[c].len() - 1);
+            continue;
+        }
+        let mut taken = std::collections::BTreeSet::new();
+        let mut at = h.parent[c];
+        while let Some(a) = at {
+            if a >= h.real && !satellites(a) {
+                if let Some(&m) = namesake.get(&a) {
+                    taken.insert(m);
+                }
+            }
+            at = h.parent[a];
+        }
+        let chosen = members
+            .iter()
+            .copied()
+            .find(|m| !taken.contains(m))
+            .unwrap_or(best);
+        namesake.insert(c, chosen);
+        out[c - h.real] = format!("≈ {}", name(chosen));
+    }
+    out
 }
 
 /// Adds a cluster `community:<container>:<label>` under `under`; refused when the graph has a node of that id.
@@ -1006,6 +1201,18 @@ mod tests {
         g
     }
 
+    /// Top-level nodes and edges given as (source, target), ids e0, e1, ….
+    fn graph_of(nodes: &[&str], edges: &[(&str, &str)]) -> Graph {
+        graph(
+            nodes.iter().map(|n| node(n, None)).collect(),
+            edges
+                .iter()
+                .enumerate()
+                .map(|(k, (s, t))| edge(&format!("e{k}"), s, Some(t)))
+                .collect(),
+        )
+    }
+
     /// Two clusters of three leaves, linked inside, one edge between them, a cycle, a self-loop, a parallel edge, an
     /// unresolved edge and an edge from a container to its own child.
     fn sample() -> Graph {
@@ -1208,6 +1415,75 @@ mod tests {
             })
             .fold(0., f64::max);
         assert!(moved < 1e-6, "moved {moved}");
+    }
+
+    #[test]
+    fn satellites_gather_with_their_hub_and_clusters_are_named_after_it() {
+        // Hub h with satellites a, b (all their edges go to h); c and d are linked to h and to each other, so neither
+        // is a satellite at share 1.
+        let graph = graph_of(
+            &["h", "a", "b", "c", "d"],
+            &[
+                ("a", "h"),
+                ("b", "h"),
+                ("h", "a"),
+                ("c", "h"),
+                ("c", "d"),
+                ("d", "h"),
+                ("d", "c"),
+            ],
+        );
+        let h = with_satellites(hierarchy(&graph), 1.).unwrap();
+        assert_eq!(h.ids.len(), 6, "one cluster for h, a and b");
+        let cluster = 5;
+        assert_eq!(h.ids[cluster], "community:#:sat.0");
+        let mut held = h.children[cluster].clone();
+        held.sort();
+        assert_eq!(held, vec![0, 1, 2]);
+        assert_eq!(h.parent[3], None);
+        assert_eq!(
+            cluster_labels(&h, &["Hub", "", "", "", ""]),
+            vec!["Hub +2".to_string()]
+        );
+        // Off by default, and a share no satellite reaches changes nothing.
+        let off = with_satellites(hierarchy(&graph), 0.).unwrap();
+        assert_eq!((off.ids.len(), off.parent), (5, hierarchy(&graph).parent));
+        assert_eq!(OverviewOptions::default().satellites, 0.);
+    }
+
+    #[test]
+    fn a_nested_community_is_not_named_like_the_one_around_it() {
+        // Two levels of communities by hand: an outer cluster (index 3) holding c and an inner one (4) with hub and b;
+        // all three have two edges, so the smaller index wins.
+        let graph = graph_of(
+            &["hub", "b", "c"],
+            &[("b", "hub"), ("c", "hub"), ("c", "b")],
+        );
+        let mut ids: Vec<String> = ["hub", "b", "c"].iter().map(|s| s.to_string()).collect();
+        ids.push("community:#:2.0".into());
+        ids.push("community:#:1.0".into());
+        let parent = vec![Some(4), Some(4), Some(3), None, Some(3)];
+        let h = build(ids, parent, hierarchy(&graph).edges, 3);
+        assert_eq!(
+            cluster_labels(&h, &[]),
+            vec!["≈ hub".to_string(), "≈ b".to_string()],
+            "the inner one holds hub and b; hub names the outer one already"
+        );
+    }
+
+    #[test]
+    fn satellites_in_a_ring_go_to_the_strongest_and_never_take_the_whole_container() {
+        // a and b only link each other: a ring of two; with nothing else in the container no cluster is made.
+        let pair = graph_of(&["a", "b", "x"], &[("a", "b"), ("b", "a"), ("a", "b")]);
+        let h = with_satellites(hierarchy(&pair), 1.).unwrap();
+        assert_eq!(h.ids.len(), 4);
+        assert_eq!(cluster_labels(&h, &[]), vec!["a +1".to_string()]);
+        let only = graph_of(&["a", "b", "c"], &[("a", "b"), ("c", "b")]);
+        assert_eq!(
+            with_satellites(hierarchy(&only), 1.).unwrap().ids.len(),
+            3,
+            "b, a and c would be everything"
+        );
     }
 
     #[test]

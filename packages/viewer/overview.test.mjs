@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, SHAPE_STRIDE, LINE_STRIDE} from './overview.js';
+import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES} from './overview.js';
 
 // Two clusters: c (with leaves a, b) and d (with leaf e); edges a→b, b→a (a cycle) and a→e.
 const overview = {
@@ -156,6 +156,10 @@ test('the representation follows the user, then the rules of the data, then the 
   assert.equal(representationsOf(m, near, 400, 400, {rules: {dir: 'organic'}}).structured.size, 0);
   assert.deepEqual([...representationsOf(m, near, 400, 400, {rules: {dir: 'organic'}, decisions: new Map([['c', 'structured']])}).structured], [0]);
   assert.deepEqual([...representationsOf(m, near, 400, 400, {decisions: new Map([['c', 'collapsed']])}).collapsed], [0]);
+  // A level of detail collapses the clusters from that depth on, before the zoom; the user's decision opens one again.
+  assert.deepEqual([...representationsOf(m, near, 400, 400, {depth: 0}).collapsed].sort(), [0, 3]);
+  assert.deepEqual([...representationsOf(m, near, 400, 400, {depth: 0, decisions: new Map([['c', 'organic']])}).collapsed], [3]);
+  assert.equal(representationsOf(m, near, 400, 400, {depth: 1}).structured.size, 1, 'deeper levels leave the top to the zoom');
   // Without the automatic policy everything without a decision or rule stays organic.
   const off = representationsOf(m, far, 400, 400, {auto: false});
   assert.equal(off.collapsed.size + off.structured.size, 0);
@@ -313,3 +317,13 @@ test('a node is named by its label, else by the last part of its id', () => {
   assert.equal(nameOf(overviewModel(overview), 0), overview.ids[0].split('/').at(-1), 'without labels: the id');
 });
 
+
+test('an outline per kind travels as the tenths of the shape kind', () => {
+  const m = overviewModel({...overview, kinds: ['dir', 'fn'], kind: [0, 1, 1, 0, 1]});
+  const kinds = buffers => [...Array(buffers.count.discs / 6).keys()].map(k => buffers.discs[k * 6 * SHAPE_STRIDE + 10]);
+  const plain = kinds(overviewBuffers(m));
+  const shaped = kinds(overviewBuffers(m, new Map(), new Set(), -1, {shapes: {dir: 'square', fn: 'octagon'}}));
+  assert.deepEqual(OUTLINES, ['circle', 'square', 'octagon', 'diamond']);
+  // Containers (rings, kind 1) become squares (+0.1), leaves (fill, kind 0) octagons (+0.2); circles add nothing.
+  assert.deepEqual(shaped.map((k, i) => Math.round((k - plain[i]) * 10)), plain.map(k => (k >= 1 ? 1 : 2)));
+});

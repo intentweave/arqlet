@@ -21,6 +21,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   (re-exported by `arqlet`) is a backend as a `run` with `openSession()`, so `createSession` keeps the snapshot in the
   backend too.
 - `session.trace(from, to)` and `session.reveal(nodeIds)` in `@arqlet/engine-client` (provisional).
+- Overview (provisional): option `satellites` (a share, off by default) gathers a node with the siblings that send at
+  least that share of their edges to it, as a cluster named `<hub> +<n>`. Clusters the overview adds are named after
+  their most connected member (`overview.labels`: `≈ <name>` for a community). `representationsOf` takes a level of
+  detail `depth`: clusters from that depth on are collapsed until opened. Playground: *Satellites to their hub* and
+  *Collapse from level*; a double-click opens a collapsed cluster.
+- Overview: an outline per node kind (`circle`, `square`, `octagon`, `diamond`, inscribed in the disc, so the layout
+  stays as it is): `overviewBuffers(…, {shapes})`, renderer option `shapes` and `setShapes`. Playground: a shape column
+  in *Rules by kind*. A community inside another named after the same member is named after the next one.
 - Playground: `server.py --local-examples <folder>` offers the graphs of a folder outside the repository on both pages
   (served read-only at `/local/`, nothing copied into the repository); an ELK graph (`children`) is laid out through
   the ELK adapter.

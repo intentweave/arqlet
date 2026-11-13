@@ -31,7 +31,7 @@ table{width:100%;border-collapse:collapse}td{padding:3px 0}td select{width:100%}
 <aside id="panel">
 <h2>Cluster</h2>
 <div id="cluster-name">Click a cluster to select it.</div>
-<div class="hint" id="cluster-info">Double-click zooms into it. Shift-click collapses or opens it.</div>
+<div class="hint" id="cluster-info">Double-click zooms into it (and opens it when collapsed). Shift-click collapses or opens it.</div>
 <div class="row" role="group" aria-label="Representation">
 <button data-rep="collapsed" title="One disc; its edges bundled">Collapse</button>
 <button data-rep="organic" title="Its children as discs">Open</button>
@@ -40,7 +40,7 @@ table{width:100%;border-collapse:collapse}td{padding:3px 0}td select{width:100%}
 <div class="row"><label for="direction">Flow of a structured cluster</label><select id="direction"><option value="">faces its neighbours</option><option value="lr">left → right</option><option value="rl">right → left</option><option value="tb">top → bottom</option><option value="bt">bottom → top</option></select></div>
 <div class="row"><button id="zoom-cluster">Zoom to it</button><button id="reset">Reset all choices</button></div>
 <h2>Rules by kind</h2>
-<div class="hint">From the data's config set; your choice for a cluster comes first, the zoom last.</div>
+<div class="hint">From the data's config set; your choice for a cluster comes first, the zoom last. The second column draws a kind as a circle, square, octagon or diamond inside its disc (drawing only).</div>
 <table id="rules"></table>
 <h2>Lens</h2>
 <div class="row"><label><input id="lens" type="checkbox"> Fisheye lens at the pointer (key L)</label></div>
@@ -58,6 +58,7 @@ table{width:100%;border-collapse:collapse}td{padding:3px 0}td select{width:100%}
 <div class="row"><label><input id="auto" type="checkbox" checked> Collapse and structure by zoom</label></div>
 <div class="grid">
 <label for="collapse-px">Collapse below (px radius)</label><input id="collapse-px" type="number" min="0" step="1" value="14">
+<label for="levels">Collapse from level (0: top, empty: off)</label><input id="levels" type="number" min="0" step="1" value="">
 <label for="structure-share">Structure from (% of view)</label><input id="structure-share" type="number" min="5" max="100" step="5" value="35">
 <label for="limit">Structured at most (nodes)</label><input id="limit" type="number" min="10" max="2000" step="10" value="300">
 <label for="scene-unit">Size of a structured layout</label><input id="scene-unit" type="number" min="0.05" max="2" step="0.05" value="0.2">
@@ -70,6 +71,7 @@ table{width:100%;border-collapse:collapse}td{padding:3px 0}td select{width:100%}
 <label for="charge">Repulsion</label><input id="charge" type="number" min="0" step="0.01" value="0.05">
 <label for="gravity">Gravity</label><input id="gravity" type="number" min="0" step="0.05" value="0.1">
 <label for="communities">Communities above (children, 0 off)</label><input id="communities" type="number" min="0" step="10" value="120">
+<label for="satellites">Satellites to their hub (share of edges, 0 off)</label><input id="satellites" type="number" min="0" max="1" step="0.1" value="0">
 </div>
 <div class="row"><button id="relayout">Lay out again</button><button id="defaults">Defaults</button></div>
 </aside></main>

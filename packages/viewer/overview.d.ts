@@ -2,7 +2,8 @@
 export interface OverviewResult {
   schemaVersion: 1;
   ids: string[];
-  /** Each node's label from the data (empty for the clusters the overview added); see `nameOf`. */
+  /** Each node's label from the data; a cluster the overview added is named after its most connected member
+   * (`≈ <name>` for a community, `<name> +<n>` for a hub with its satellites); see `nameOf`. */
   labels?: string[];
   /** The parent's index, or -1 for a node at the top level. */
   parent: number[];
@@ -108,8 +109,18 @@ export function placeScene(
 ): {scale: number; apply(p: [number, number]): [number, number]; invert(p: [number, number]): [number, number]};
 /** For every node, the outermost structured or collapsed cluster it lies in, or -1. */
 export function ownersOf(model: OverviewModel, expanded?: Expanded, collapsed?: Set<number>): Int32Array;
-/** Vertex data; clusters of `expanded` drawn structured, of `collapsed` as one disc with their edges bundled per pair. */
-export function overviewBuffers(model: OverviewModel, expanded?: Expanded, collapsed?: Set<number>, selected?: number): OverviewBuffers;
+/** The outlines a disc can be drawn with (inscribed in its circle). */
+export type Outline = 'circle' | 'square' | 'octagon' | 'diamond';
+export const OUTLINES: Outline[];
+/** Vertex data; clusters of `expanded` drawn structured, of `collapsed` as one disc with their edges bundled per pair;
+ * `shapes` gives an outline per node kind (default: circle). */
+export function overviewBuffers(
+  model: OverviewModel,
+  expanded?: Expanded,
+  collapsed?: Set<number>,
+  selected?: number,
+  options?: {shapes?: Record<string, Outline>},
+): OverviewBuffers;
 
 /** How a container is shown; the engine's type (ADR 0018, addendum). */
 export type {Representation} from '@arqlet/contracts';
@@ -131,6 +142,9 @@ export interface RepresentationOptions {
   collapsePixels?: number;
   structureShare?: number;
   rulePixels?: number;
+  /** A level of detail: clusters at this depth (0: the top level) or deeper are collapsed, after the user's decisions and
+   * the rules, before the zoom. Default null (off). */
+  depth?: number | null;
 }
 /** The representation of every container for a view (ADR 0018, addendum): user, then rules, then zoom. */
 export function representationsOf(

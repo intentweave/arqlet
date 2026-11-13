@@ -92,6 +92,9 @@ function hsl(h, s, l) {
  * kind`; kind 0 a filled disc, 1 a ring, 2 a box with a border, 3 a box outline) and of a line or triangle vertex
  * (`x, y, red, green, blue, alpha`). */
 export const SHAPE_STRIDE = 11;
+
+/** The outlines a disc can be drawn with, inscribed in its circle so that the packing stays free of overlaps. */
+export const OUTLINES = ['circle', 'square', 'octagon', 'diamond'];
 export const LINE_STRIDE = 6;
 const CORNERS = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
 
@@ -155,7 +158,7 @@ export const REPRESENTATIONS = ['collapsed', 'organic', 'structured'];
  */
 export function representationsOf(model, view, width, height, {
   decisions = new Map(), rules = {}, auto = true, limit = 300, current = new Set(), focus = null,
-  collapsePixels = 14, structureShare = 0.35, rulePixels = 80,
+  collapsePixels = 14, structureShare = 0.35, rulePixels = 80, depth = null,
 } = {}) {
   const o = model.overview, collapsed = new Set(), structured = new Set();
   const screenRadius = i => o.r[i] * view.scale;
@@ -175,6 +178,8 @@ export function representationsOf(model, view, width, height, {
     const rule = o.kinds && o.kind ? rules[o.kinds[o.kind[i]]] : undefined;
     if (rule === 'collapsed' || rule === 'organic') return rule;
     if (rule === 'structured' && fits(i) && screenRadius(i) >= rulePixels && inView(i)) return 'structured';
+    // A level of detail: clusters from this depth on are shown collapsed until the user opens them.
+    if (depth !== null && model.depth[i] >= depth) return 'collapsed';
     if (!auto) return 'organic';
     const r = screenRadius(i);
     if (r < collapsePixels) return 'collapsed';
@@ -202,8 +207,14 @@ export function representationsOf(model, view, width, height, {
  * scene), and per structured cluster its `back` boxes (containers), `routes` (lines), `arrows` (triangles at each route's
  * target, so the logical direction shows) and `front` boxes (leaves).
  */
-export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1) {
+export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}} = {}) {
   const {overview: o, n, children, depth, cluster, tops} = model;
+  // The outline of a node by its kind, as a tenth added to the shape kind (the shader reads it back).
+  const outlineCode = OUTLINES.map((_, k) => k / 10);
+  const outline = i => {
+    const k = o.kinds && o.kind ? OUTLINES.indexOf(shapes[o.kinds[o.kind[i]]]) : -1;
+    return k > 0 ? outlineCode[k] : 0;
+  };
   const ordinal = new Map(tops.map((r, k) => [r, k]));
   const colour = i => clusterColour(ordinal.get(cluster[i]));
   const owner = ownersOf(model, expanded, collapsed);
@@ -215,10 +226,10 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     const ring = children[i].length > 0 && !collapsed.has(i);
     const shade = ring ? 0.35 + 0.1 * Math.min(depth[i], 4) : collapsed.has(i) ? 0.72 : 1;
     const [red, green, blue] = colour(i);
-    pushShape(discs, o.x[i], o.y[i], o.r[i], o.r[i], [red * shade, green * shade, blue * shade], collapsed.has(i) ? 0.9 : 1, ring ? 1 : 0);
+    pushShape(discs, o.x[i], o.y[i], o.r[i], o.r[i], [red * shade, green * shade, blue * shade], collapsed.has(i) ? 0.9 : 1, (ring ? 1 : 0) + outline(i));
   }
   // The selected cluster: a bright ring on top of its disc.
-  if (selected >= 0 && owner[selected] < 0) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1);
+  if (selected >= 0 && owner[selected] < 0) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
   // Scene geometry per structured cluster, where each of its nodes' boxes is, and the border port of each edge that
   // leaves it.
   const back = [], routes = [], arrows = [], front = [];
