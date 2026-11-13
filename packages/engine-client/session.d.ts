@@ -96,6 +96,50 @@ export function httpRun(
   init?: {fetchImpl?: typeof fetch},
 ): ((request: EngineRequest) => Promise<EngineResponse>) & {openSession(): Promise<ResidentSession>};
 
+/**
+ * An overview request without `op` and `graph`: layout `options`, the user's `intent`, a `configSet`, `radii` (node id →
+ * radius) and `start` (`{settle}` without positions: continue from the last overview). Provisional.
+ */
+export interface OverviewRequest {
+  options?: Record<string, unknown>;
+  intent?: {decisions?: Record<string, unknown>};
+  configSet?: Record<string, unknown>;
+  radii?: Record<string, number>;
+  start?: {settle?: boolean; x?: number[]; y?: number[]; r?: number[]};
+  threads?: number;
+}
+
+/** The answer to an overview request: `overview` (ids, parent, x, y, r, labels, kinds, …) when `ok`. */
+export interface OverviewAnswer {
+  ok: boolean;
+  overview?: Record<string, unknown> & {ids: string[]; x: number[]; y: number[]; r: number[]};
+  error?: string;
+  /** A new `open` overtook it; nothing was applied. */
+  stale?: boolean;
+}
+
+/** Provisional: an overview of one graph, laid out again as the host asks; the graph stays in the engine where it can. */
+export interface OverviewSession {
+  /** Lays out `graph`; replaces the graph the session had. */
+  open(graph: Graph, request?: OverviewRequest): Promise<OverviewAnswer>;
+  /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options). */
+  layOut(request?: OverviewRequest): Promise<OverviewAnswer>;
+  /** The last overview, or null. */
+  readonly overview: OverviewAnswer['overview'] | null;
+  /** Whether the graph stays in the engine. */
+  readonly resident: boolean;
+  /** Ends the session and frees the graph in the engine. */
+  close(): Promise<void>;
+}
+
+/** Creates an overview session on an engine `run`; `resident` as for `createSession`. */
+export function createOverviewSession(
+  run: (Run | ((request: EngineRequest) => Promise<EngineResponse>)) & {
+    openSession?: () => ResidentSession | Promise<ResidentSession>;
+  },
+  init?: {resident?: boolean | 'auto'},
+): OverviewSession;
+
 /** The most nodes an import selects for its view; the default of `Session.import`'s limit. */
 export const MAX_VIEW_LIMIT: number;
 

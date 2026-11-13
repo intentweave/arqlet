@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, existsSync} from 'node:fs';
-import {createSession, workerRun, httpRun} from './session.js';
+import {createSession, createOverviewSession, workerRun, httpRun} from './session.js';
 import {createEngine} from './wasm-client.js';
 
 // The engine shipped beside this module, or a release build of the workspace.
@@ -210,3 +210,31 @@ test('an engine can be created from a module compiled by the host', {skip: !engi
   assert.equal(run({op: 'optionDefaults'}).ok, true);
 });
 
+
+test('an overview session keeps the graph in the engine and answers as one that sends it', {skip: !engine}, async () => {
+  const kept = createOverviewSession(engine);
+  const sent = createOverviewSession(engine, {resident: false});
+  assert.equal(kept.resident, true);
+  assert.equal((await kept.layOut()).ok, false, 'nothing to lay out before open');
+  const options = {communities: 0};
+  const first = [await kept.open(graph, {options}), await sent.open(graph, {options})];
+  assert.equal(first[0].ok, true, first[0].error);
+  assert.deepEqual(first[0], first[1]);
+  const id = first[0].overview.ids.find(i => i === 'root') ?? first[0].overview.ids[0];
+  const r = first[0].overview.r[first[0].overview.ids.indexOf(id)];
+  const request = {options, radii: {[id]: r * 2}, start: {settle: true}};
+  const grown = [await kept.layOut(request), await sent.layOut(request)];
+  assert.equal(grown[0].ok, true, grown[0].error);
+  assert.deepEqual(grown[0], grown[1], 'a continuation from the last positions, the same either way');
+  assert.equal(kept.overview, grown[0].overview);
+  const other = {options: {communities: 3}, start: {}};
+  const refused = [await kept.layOut(other), await sent.layOut(other)];
+  assert.equal(refused[0].ok, false);
+  assert.equal(refused[0].error, refused[1].error, 'other clusters cannot continue');
+  // A new open overtakes a layout still under way.
+  const overtaken = kept.layOut({options});
+  const reopened = kept.open(graph, {options});
+  assert.equal((await overtaken).stale, true);
+  assert.equal((await reopened).ok, true);
+  await kept.close();
+});

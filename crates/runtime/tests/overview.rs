@@ -407,3 +407,84 @@ fn the_overview_takes_groups_and_a_level_of_detail() {
         json!({"depth": 0, "kinds": ["group"]})
     );
 }
+
+#[test]
+fn a_session_keeps_the_graph_and_answers_as_dispatch_does() {
+    use arqlet_runtime::engine_session::EngineSession;
+    let graph = hierarchical(5, 4, 8);
+    let options = json!({"communities": 6, "satellites": 0.5});
+    let mut session = EngineSession::new();
+    // Before any graph: refused, and nothing is kept.
+    let empty = session.run_value(&json!({"op": "overview"}));
+    assert!(
+        empty["error"].as_str().unwrap().contains("graph"),
+        "{empty}"
+    );
+    let first = session
+        .run_value(&json!({"op": "overview", "graph": graph, "options": options, "threads": 2}));
+    assert_eq!(first["ok"], true, "{first}");
+    assert_eq!(
+        first["overview"],
+        overview_with(&graph, &options),
+        "the same as dispatch"
+    );
+    // Later requests leave the graph out; `start` without positions continues from the last layout.
+    let ids: Vec<&str> = first["overview"]["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let file = ids.iter().position(|id| *id == "g2/f1").unwrap();
+    let r0 = first["overview"]["r"][file].as_f64().unwrap();
+    let radii = json!({"g2/f1": r0 * 3.});
+    let grown = session.run_value(
+        &json!({"op": "overview", "options": options, "radii": radii,
+        "start": {"settle": true}}),
+    );
+    assert_eq!(grown["ok"], true, "{grown}");
+    let o = &first["overview"];
+    let start = json!({"x": o["x"], "y": o["y"], "r": o["r"], "settle": true});
+    let full = json!({"op": "overview", "graph": graph, "options": options, "radii": radii, "start": start});
+    let expected: Value = serde_json::from_str(&dispatch(&full.to_string())).unwrap();
+    assert_eq!(
+        grown, expected,
+        "the same as dispatch given the graph and the positions"
+    );
+    // Other clusters (other options) cannot continue from the last positions; a request without start can.
+    let other = json!({"communities": 0});
+    let refused = session.run_value(&json!({"op": "overview", "options": other, "start": {}}));
+    assert!(
+        refused["error"]
+            .as_str()
+            .unwrap()
+            .contains("clusters changed"),
+        "{refused}"
+    );
+    let regrouped = session.run_value(&json!({"op": "overview", "options": other}));
+    assert_eq!(regrouped["overview"], overview_with(&graph, &other));
+    // The refused request changed nothing: continuing on the regrouped clusters works.
+    let next = session.run_value(&json!({"op": "overview", "options": other, "start": {}}));
+    assert_eq!(next["ok"], true, "{next}");
+    // A new graph replaces the old one; a start then needs a layout of the new graph first.
+    let small = hierarchical(2, 2, 3);
+    let fresh = session.run_value(&json!({"op": "overview", "graph": small, "start": {}}));
+    assert!(
+        fresh["error"].as_str().unwrap().contains("continue"),
+        "{fresh}"
+    );
+    let replaced = session.run_value(&json!({"op": "overview", "graph": small}));
+    assert_eq!(replaced["overview"], overview_with(&small, &json!({})));
+    // The layered view of the same session is unaffected.
+    assert!(session.run_value(&json!({"op": "scene"}))["error"]
+        .as_str()
+        .unwrap()
+        .contains("no view"));
+}
+
+fn overview_with(graph: &Value, options: &Value) -> Value {
+    let request = json!({"op": "overview", "graph": graph, "options": options});
+    let response: Value = serde_json::from_str(&dispatch(&request.to_string())).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    response["overview"].clone()
+}
