@@ -1341,10 +1341,14 @@ function traceView(){
   // With “Only shown edge kinds”, the paths follow the edge kinds the filter shows (provisional `edgeKinds`).
   const hiddenKinds=snapshot.options?.hidden?.edgeKinds??[];
   const along=tracePath.shownKinds&&hiddenKinds.length?{edgeKinds:[...new Set((snapshot.sourceGraph??snapshot.graph).edges.map(e=>e.kind))].filter(k=>!hiddenKinds.includes(k))}:{};
-  const {shownKinds,...path}=tracePath;
-  const r=along.edgeKinds&&!along.edgeKinds.length?{ok:false,error:'the filter hides every edge kind'}:sceneRun({op:'trace',snapshot,...path,...along});
+  // A neighbourhood (provisional `neighbourhood`) is shown like a path.
+  const {shownKinds,op='trace',...path}=tracePath;
+  const r=along.edgeKinds&&!along.edgeKinds.length?{ok:false,error:'the filter hides every edge kind'}:sceneRun({op,snapshot,...path,...along});
+  if(op==='neighbourhood'&&r.ok)r.found=true;
   traceResult=r.ok?r:null;
-  $('trace-info').textContent=!r.ok?`Not traced: ${r.error}`:!r.found?'No path between these nodes, in either direction.':
+  $('trace-info').textContent=!r.ok?`Not traced: ${r.error}`:op==='neighbourhood'?
+   `${r.nodes.length} nodes and ${r.edges.length} edges within ${path.hops} hop${path.hops===1?'':'s'} of ${path.nodeId} (${path.direction==='both'?'both ways':path.direction==='out'?'outgoing':'incoming'}); ${r.visible.nodes.length} shown boxes hold them.`:
+   !r.found?'No path between these nodes, in either direction.':
    `${r.length} step${r.length===1?'':'s'}${r.reversed?' (from “To” to “From”: no path the other way)':''} · ${r.nodes.length} nodes and ${r.edges.length} edges on the ${tracePath.mode==='all'?'paths':'shortest paths'}; ${r.visible.nodes.length} shown boxes carry them.`;
   $('trace-reveal').disabled=!traceResult?.found;$('trace-clear').disabled=false;
  }
@@ -1355,6 +1359,11 @@ $('trace').onclick=()=>{
  const from=$('trace-from').value.trim(),to=$('trace-to').value.trim();
  if(!from||!to){$('trace-info').textContent='Choose a node for From and for To.';return;}
  tracePath={from,to,mode:$('trace-mode').value,shownKinds:$('trace-shown-kinds').checked};traceSnapshot=null;if(snapshot)draw();
+};
+$('near').onclick=()=>{
+ const nodeId=$('trace-from').value.trim(),hops=Math.max(0,Math.min(20,Math.round(Number($('near-hops').value)||0)));
+ if(!nodeId){$('trace-info').textContent='Choose a node for From.';return;}
+ tracePath={op:'neighbourhood',nodeId,hops,direction:$('near-direction').value,shownKinds:$('trace-shown-kinds').checked};traceSnapshot=null;if(snapshot)draw();
 };
 $('trace-clear').onclick=()=>{tracePath=null;traceResult=null;traceSnapshot=null;$('trace-info').textContent='';$('trace-reveal').disabled=true;$('trace-clear').disabled=true;if(snapshot)draw();};
 // Filter (provisional): a checkbox per node kind and edge kind of the source graph, ticked while shown. A change sends
@@ -1381,7 +1390,7 @@ function applyFilter(){
 }
 $('filter-show-all').onclick=()=>{if(snapshot&&!pending)edit({op:'filter',snapshot,hide:{}},{busy:'Showing everything …',remember:'Show all'});};
 $('trace-fade').onchange=()=>{if(snapshot)draw();};
-$('trace-mode').onchange=()=>{if(tracePath){tracePath={...tracePath,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();}};
+$('trace-mode').onchange=()=>{if(tracePath&&!tracePath.op){tracePath={...tracePath,mode:$('trace-mode').value};traceSnapshot=null;if(snapshot)draw();}};
 $('trace-from-selected').onclick=()=>{if(selected)$('trace-from').value=selected;};
 $('trace-to-selected').onclick=()=>{if(selected)$('trace-to').value=selected;};
 $('trace-reveal').onclick=()=>{

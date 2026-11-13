@@ -251,3 +251,21 @@ test('a trace follows only the edge kinds asked for', {skip: !engine}, async () 
     await session.close();
   }
 });
+
+test('a neighbourhood is read in both kinds of session alike', {skip: !engine}, async () => {
+  const g = {nodes: ['a', 'b', 'c', 'd'].map(id => ({id, kind: 'file', label: id})), edges: [
+    {id: 'ab', kind: 'calls', source: 'a', target: 'b'}, {id: 'bc', kind: 'imports', source: 'b', target: 'c'},
+    {id: 'db', kind: 'calls', source: 'd', target: 'b'}]};
+  const answers = [];
+  for (const resident of [true, false]) {
+    const session = createSession(engine, {resident});
+    await session.import(g);
+    const n = await session.neighbourhood('b', {direction: 'out', hops: 2});
+    assert.deepEqual(n.nodes, ['b', 'c']);
+    assert.deepEqual((await session.neighbourhood(['a', 'd'], {hops: 1, edgeKinds: ['calls']})).nodes, ['a', 'b', 'd']);
+    assert.equal((await session.neighbourhood('b', {direction: 'sideways'})).ok, false);
+    answers.push(n);
+    await session.close();
+  }
+  assert.deepEqual(answers[0], answers[1]);
+});

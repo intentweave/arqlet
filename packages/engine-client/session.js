@@ -175,6 +175,17 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
       return call({op: 'trace', snapshot, from, to, mode, ...(edgeKinds ? {edgeKinds} : {})});
     },
 
+    /**
+     * Provisional: the nodes within `hops` edges (default 1) of `nodeId` (a node id or a list), read only:
+     * `{ok, nodes, edges, hops, visible: {nodes, routes}, distance}` as for `trace`; `nodes` can go to `reveal`.
+     * `direction`: `out`, `in` or `both` (default); `edgeKinds`: follow only edges of these kinds.
+     */
+    async neighbourhood(nodeId, {hops, direction, edgeKinds} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'neighbourhood', snapshot, ...(Array.isArray(nodeId) ? {nodeIds: nodeId} : {nodeId}),
+        ...(hops !== undefined ? {hops} : {}), ...(direction ? {direction} : {}), ...(edgeKinds ? {edgeKinds} : {})});
+    },
+
     /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default) only as far as needed. */
     reveal(nodeIds, {partial = true} = {}) { return change({op: 'reveal', nodeIds, partial}); },
 

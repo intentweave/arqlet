@@ -42,6 +42,15 @@ export interface Session {
    * `edgeKinds`: the paths follow only edges of these kinds (default: every edge).
    */
   trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<EngineResponse>;
+  /**
+   * Provisional: the nodes within `hops` edges (default 1) of a node or of each of a list, read only, answered as
+   * `trace` (`nodes`, `edges`, `visible`, `distance`) plus the `hops` of every node; `nodes` can go to `reveal`.
+   * `direction`: `out` (what it leads to), `in` (what leads to it) or `both` (default); `edgeKinds`: only these kinds.
+   */
+  neighbourhood(
+    nodeId: string | string[],
+    init?: {hops?: number; direction?: 'out' | 'in' | 'both'; edgeKinds?: string[]},
+  ): Promise<EngineResponse>;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<SessionResult>;
   /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest;

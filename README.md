@@ -200,10 +200,13 @@ nodes, also inside collapsed groups, and tells which boxes and routes of the cur
 view carry them and how far every other node is. `reveal` opens only the groups on the
 way: the other children of an opened group wait in a collapsed `+N more` box. With
 `edgeKinds` the paths follow only edges of those kinds (the data flow, say, not the calls).
+`neighbourhood` answers the same way for the nodes within some hops of a node.
 
 ```js
 const path = await session.trace('a', 'z');                 // read only; {mode: 'all'} for every path
 const flow = await session.trace('a', 'z', {edgeKinds: ['imports']});   // along these edge kinds only
+const near = await session.neighbourhood('a', {hops: 2, direction: 'out'}); // what a leads to, two hops; 'in', 'both'
+await session.reveal(near.nodes);
 renderSvg(svg, await session.scene(), {trace: {...path.visible, distance: path.distance, fade: true}});
 await session.reveal(path.nodes);                            // only as far as needed; {partial: false} opens whole
 ```

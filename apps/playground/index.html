@@ -180,6 +180,7 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  <datalist id="trace-nodes"></datalist>
  <div class="row"><select id="trace-mode" aria-label="Paths"><option value="shortest">Shortest paths</option><option value="all">All paths</option></select><label><input id="trace-fade" type="checkbox"> Fade others</label></div>
  <label title="The paths follow only the edge kinds the filter shows"><input id="trace-shown-kinds" type="checkbox"> Only shown edge kinds</label>
+ <div class="row"><label for="near-hops">Around From</label><input id="near-hops" type="number" min="0" max="20" value="1" style="width:4em" title="Hops"><select id="near-direction" aria-label="Direction"><option value="both">both ways</option><option value="out">outgoing</option><option value="in">incoming</option></select><button id="near">Neighbourhood</button></div>
  <div class="row"><button id="trace" class="primary">Trace</button><button id="trace-reveal" disabled title="Open exactly the groups that hold the path">Reveal path</button><button id="trace-clear" disabled>Clear</button></div>
  <div class="row"><label title="Opened groups show only the nodes on the way; the others wait in a dashed “+N more” box (click it to show them)."><input id="reveal-partial" type="checkbox" checked> Only the nodes asked for</label></div>
  <p id="trace-info" role="status"></p>

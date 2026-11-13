@@ -150,6 +150,11 @@ pub enum Request {
         #[serde(flatten)]
         body: Map<String, Value>,
     },
+    /// The nodes within some hops of nodes (read only, provisional).
+    Neighbourhood {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
     /// The cluster overview of a whole graph.
     Overview {
         #[serde(flatten)]
@@ -303,6 +308,7 @@ impl Request {
             Some("optionDefaults") => return Ok(Request::OptionDefaults),
             Some("scene") => return Ok(Request::Scene { body: body() }),
             Some("trace") => return Ok(Request::Trace { body: body() }),
+            Some("neighbourhood") => return Ok(Request::Neighbourhood { body: body() }),
             Some("componentRefine") => return Ok(Request::ComponentRefine { body: body() }),
             Some("elkLayout") => return Ok(Request::ElkLayout { body: body() }),
             Some("overview") => return Ok(Request::Overview { body: body() }),
@@ -685,6 +691,9 @@ pub fn handle(request: Request) -> Response {
         Request::Trace { body } => {
             Response::Encoded(trace::trace_response(&with_op("trace", body)).to_string())
         }
+        Request::Neighbourhood { body } => Response::Encoded(
+            trace::neighbourhood_response(&with_op("neighbourhood", body)).to_string(),
+        ),
         Request::Overview { body } => {
             let v = with_op("overview", body);
             let n = threads(v["threads"].as_u64());
@@ -808,6 +817,8 @@ mod tests {
             json!({"op": "scene"}),
             json!({"op": "trace", "snapshot": s, "from": "a", "to": "b"}),
             json!({"op": "trace", "snapshot": s, "from": "a"}),
+            json!({"op": "neighbourhood", "snapshot": s, "nodeId": "a", "hops": 2}),
+            json!({"op": "neighbourhood", "snapshot": s, "nodeId": "a", "direction": "sideways"}),
             json!({"op": "overview", "graph": graph}),
             json!({"op": "overview", "graph": graph, "threads": 2, "options": {"communities": 0}}),
             json!({"op": "elkLayout", "graph": {"id": "root", "children": [{"id": "a", "width": 40, "height": 30}, {"id": "b", "width": 40, "height": 30}], "edges": [{"id": "e", "sources": ["a"], "targets": ["b"]}]}}),
