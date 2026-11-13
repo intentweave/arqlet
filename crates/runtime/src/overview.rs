@@ -178,6 +178,14 @@ pub fn overview_response(v: &Value, threads: usize) -> Value {
 }
 
 fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
+    let graph = graph_of(v)?;
+    let options = options_of(v)?;
+    let (graph, h) = hierarchy_of(&graph, v, &options)?;
+    lay_out(&graph, &h, v, &options, threads)
+}
+
+/// The graph of a request, checked.
+fn graph_of(v: &Value) -> Result<Graph, String> {
     let graph: Graph = serde_json::from_value(v["graph"].clone()).map_err(|e| e.to_string())?;
     if graph.nodes.len() > MAX_OVERVIEW_NODES {
         return Err(format!(
@@ -185,7 +193,25 @@ fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
         ));
     }
     validate(&graph)?;
-    let options = options_of(v)?;
+    Ok(graph)
+}
+
+/// The options the cluster hierarchy depends on (and nothing else): a session lays out again on the hierarchy it has
+/// while they stay the same.
+fn hierarchy_key(v: &Value, options: &OverviewOptions) -> Value {
+    json!({
+        "communities": options.communities,
+        "satellites": options.satellites,
+        "groups": v["options"].get("groups"),
+    })
+}
+
+/// The graph with the groups the data gives, and its cluster hierarchy.
+fn hierarchy_of(
+    graph: &Graph,
+    v: &Value,
+    options: &OverviewOptions,
+) -> Result<(Graph, overview::Hierarchy), String> {
     // Groups the data gives (node id → path of group names), as containers of kind `group`, the same as an import's
     // `groups`; communities then divide what is still large.
     let groups: std::collections::BTreeMap<String, Vec<String>> = match v["options"].get("groups") {
@@ -194,12 +220,23 @@ fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
         })?,
         None => Default::default(),
     };
-    let graph = arqlet_layout::communities::with_given_groups(&graph, &groups)?;
+    let graph = arqlet_layout::communities::with_given_groups(graph, &groups)?;
     let h = overview::with_satellites(
         overview::with_communities(overview::hierarchy(&graph), options.communities)?,
         options.satellites,
     )?;
-    let hints = hints_of(v, &h)?;
+    Ok((graph, h))
+}
+
+/// Lays out a hierarchy (of `graph`, with its groups) as the request `v` says (options, hints, representation).
+fn lay_out(
+    graph: &Graph,
+    h: &overview::Hierarchy,
+    v: &Value,
+    options: &OverviewOptions,
+    threads: usize,
+) -> Result<Value, String> {
+    let hints = hints_of(v, h)?;
     let levels = overview::levels(&h);
     let mut arrangements: BTreeMap<Container, Arrangement> = BTreeMap::new();
     for level in &levels {
@@ -268,4 +305,100 @@ fn overview_of(v: &Value, threads: usize) -> Result<Value, String> {
             "overlaps": o.overlaps,
         },
     }))
+}
+
+/// Provisional (ADR 0019 for the overview): what an engine session keeps of an overview between requests: the graph,
+/// the cluster hierarchy with the options it was built with, and the last positions. A host sends the graph once; later
+/// requests leave it out, and a `start` without positions (`{"settle": …}` or `{}`) continues from the last layout, if
+/// the options the clusters depend on (`communities`, `satellites`, `groups`) are the same. The
+/// answers are the same as those of `dispatch` given the graph and the positions in full.
+#[derive(Default)]
+pub struct OverviewSession {
+    graph: Option<Graph>,
+    /// The options the hierarchy depends on, the graph with its groups, and the hierarchy.
+    hierarchy: Option<(Value, Graph, overview::Hierarchy)>,
+    /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout.
+    last: Option<(Value, Value)>,
+}
+
+impl OverviewSession {
+    /// Whether the session has a graph for an overview.
+    pub fn is_open(&self) -> bool {
+        self.graph.is_some()
+    }
+
+    /// Answers one `overview` request (`{ok, overview}`, or `{ok: false, error}`); a refused request changes nothing.
+    pub fn run(&mut self, v: &Value, threads: usize) -> Value {
+        match self.overview(v, threads) {
+            Ok(overview) => json!({"ok": true, "overview": overview}),
+            Err(e) => json!({"ok": false, "error": e}),
+        }
+    }
+
+    fn overview(&mut self, v: &Value, threads: usize) -> Result<Value, String> {
+        let options = options_of(v)?;
+        let new_graph = if v.get("graph").is_some() {
+            Some(graph_of(v)?)
+        } else {
+            None
+        };
+        let graph = match (&new_graph, &self.graph) {
+            (Some(g), _) | (None, Some(g)) => g,
+            (None, None) => {
+                return Err(
+                    "The session has no overview yet: send the first overview with its graph."
+                        .into(),
+                )
+            }
+        };
+        // The hierarchy the session has, while the graph and the options it depends on stay the same.
+        let key = hierarchy_key(v, &options);
+        let reuse =
+            new_graph.is_none() && self.hierarchy.as_ref().is_some_and(|(k, _, _)| *k == key);
+        let built = if reuse {
+            None
+        } else {
+            Some(hierarchy_of(graph, v, &options)?)
+        };
+        let (grouped, h) = match (&built, &self.hierarchy) {
+            (Some((g, h)), _) | (None, Some((_, g, h))) => (g, h),
+            (None, None) => return Err("The overview session lost its hierarchy".into()),
+        };
+        // A start without positions continues from the last layout of the same clusters.
+        let mut request = v.clone();
+        if let Some(start) = request.get_mut("start").and_then(Value::as_object_mut) {
+            if !start.contains_key("x") {
+                let last =
+                    match (&new_graph, &self.last) {
+                        (None, Some((clusters, last))) if *clusters == key => last,
+                        (None, Some(_)) => return Err(
+                            "The clusters changed since the last overview; lay out without start."
+                                .into(),
+                        ),
+                        _ => {
+                            return Err(
+                                "No overview to continue from: lay out without start first.".into(),
+                            )
+                        }
+                    };
+                for key in ["x", "y", "r"] {
+                    start.insert(key.into(), last[key].clone());
+                }
+            }
+        }
+        let overview = lay_out(grouped, h, &request, &options, threads)?;
+        // Accepted: keep what the next request builds on.
+        let last = (
+            key.clone(),
+            json!({"x": overview["x"], "y": overview["y"], "r": overview["r"]}),
+        );
+        if let Some((g, h)) = built {
+            self.hierarchy = Some((key, g, h));
+        }
+        if let Some(g) = new_graph {
+            self.graph = Some(g);
+        }
+        self.last = Some(last);
+        Ok(overview)
+    }
 }

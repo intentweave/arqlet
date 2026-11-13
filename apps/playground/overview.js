@@ -7,13 +7,13 @@
 import {overviewModel, viewOf, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES} from '@arqlet/viewer/overview.js';
 import {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
 import {createEngineWorker} from '@arqlet/engine-client/engine.js';
+import {createOverviewSession, workerRun, httpRun} from '@arqlet/engine-client/session.js';
 
 const $ = id => document.getElementById(id);
 /** Milliseconds of a move to a new layout, and of a blend between representations. */
 const MORPH = 480, FADE = 240;
 const status = text => { $('status').textContent = text; };
-let worker = null, requests = 0;
-const pending = new Map();
+let workerEngine = null, backendEngine = null;
 let graph = null, model = null, renderer = null, unbind = null, focus = -1, selected = -1;
 // `epoch` changes with every new overview: replies for an older one are dropped.
 let epoch = 0;
@@ -54,25 +54,38 @@ function saveSettings() {
 const number = id => Number($(id).value);
 const limit = () => number('limit');
 
-function engineWorker() {
-  if (worker) return worker;
-  worker = createEngineWorker('/generated/arqlet.wasm');
-  worker.onmessage = ({data}) => {
-    if (data.publication !== undefined) return;
-    pending.get(data.requestId)?.(data);
-    pending.delete(data.requestId);
-  };
-  return worker;
+/** The engine where the mode says: the WASM worker or the backend. */
+function engine() {
+  if ($('mode').value === 'backend') return backendEngine ??= httpRun('/api');
+  return workerEngine ??= workerRun(createEngineWorker('/generated/arqlet.wasm'));
 }
 
-/** Runs one engine request where the mode says: in the worker or through the backend. */
-async function execute(request) {
-  if ($('mode').value === 'backend') {
-    const r = await fetch('/api/op', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(request)});
-    return r.json();
-  }
-  const requestId = ++requests;
-  return new Promise(resolve => { pending.set(requestId, resolve); engineWorker().postMessage({requestId, request}); });
+/** Runs one engine request where the mode says. */
+const execute = request => engine()(request);
+
+// The overview session of the mode (ADR 0019 for the overview): the graph is sent once and stays in the engine; a
+// relayout and a change of room send only what changed.
+let overviews = null, overviewsMode = null, overviewsGraph = null;
+function overviewSession() {
+  const mode = $('mode').value;
+  if (overviews && overviewsMode === mode) return overviews;
+  overviews?.close().catch(() => {});
+  overviews = createOverviewSession(engine());
+  overviewsMode = mode;
+  overviewsGraph = null;
+  return overviews;
+}
+
+/** An overview of `graph`: on the graph the session has, else opening it (a continuation then sends the positions). */
+async function overviewOf(extra = {}) {
+  const session = overviewSession();
+  if (overviewsGraph === graph) return session.layOut(request(extra));
+  overviewsGraph = graph;
+  const o = model?.overview;
+  const start = extra.start && o ? {...extra.start, x: o.x, y: o.y, r: o.r} : undefined;
+  const result = await session.open(graph, request({...extra, ...(start ? {start} : {})}));
+  if (!result.ok && overviewsGraph === graph) overviewsGraph = null;
+  return result;
 }
 
 async function sources() {
@@ -113,7 +126,7 @@ function request(extra = {}) {
     charge: number('charge'), gravity: number('gravity'), communities: number('communities'),
     ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {}),
     ...($('chains').checked ? {chains: true} : {})};
-  const values = {op: 'overview', graph, threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
+  const values = {threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
   // The level of detail travels in the config set, so that the engine checks it (a config set needs its base: without
   // one it acts in the viewer only).
   const levelOfDetail = levelOfDetailOf();
@@ -131,8 +144,9 @@ async function layOut(fresh = true) {
     if (!graph) { graph = await (await fetch($('source').value)).json(); await loadConfig(); }
     status(`Laying out ${graph.nodes.length.toLocaleString()} nodes, ${graph.edges.length.toLocaleString()} edges …`);
     const started = performance.now();
-    const result = await execute(request());
-    if (ticket !== epoch) return;
+    if (fresh) overviewsGraph = null;
+    const result = await overviewOf();
+    if (ticket !== epoch || result.stale) return;
     if (!result.ok) throw Error(result.error);
     const elapsed = performance.now() - started;
     show(result.overview);
@@ -240,12 +254,11 @@ async function evaluate() {
     if (nextRoom !== roomKey) {
       // A decision of the user changed the room a cluster needs: the overview makes room, nothing else moves.
       const anchor = model.index.get([...shown.keys()].find(user) ?? add[0] ?? remove[0]);
-      const o = model.overview;
       const radii = Object.fromEntries([...shown].filter(([id]) => user(id)).map(([id, key]) => [id, radiusOf(id, key)]));
       // A cluster that gives room back lets its neighbours settle into it; the move is animated, so they may.
       const settle = [...grown].some(id => !(id in radii) || radii[id] < model.overview.r[model.index.get(id)] - 0.01);
-      const result = await execute(request({radii, start: {x: o.x, y: o.y, r: o.r, settle}}));
-      if (ticket !== epoch) return;
+      const result = await overviewOf({radii, start: {settle}});
+      if (ticket !== epoch || result.stale) return;
       if (!result.ok) { status(result.error); return; }
       roomKey = nextRoom;
       grown = new Set(Object.keys(radii));

@@ -6,7 +6,8 @@ The Arqlet engine as WebAssembly (`arqlet.wasm`, included) and its JavaScript ac
 - `wasm-client.js`: `createEngine(bytes, {onPublish})`, the raw binding;
 - `elk.js`: `createElkLayout(run)`, an `elk.layout(graph)`-style call;
 - `session.js`: `createSession(run)`, a layout session that keeps positions across changes (collapse, expand, …)
-  with revision checks, and `workerRun(worker)`, the worker as an asynchronous `run`;
+  with revision checks, `createOverviewSession(run)`, a cluster overview whose graph stays in the engine (later layouts
+  send only what changed), and `workerRun(worker)` / `httpRun(base)`, a worker or a backend as an asynchronous `run`;
 - `presets.js`: `presetState` and `applyPreset`.
 
 Most users want the [`arqlet`](https://www.npmjs.com/package/arqlet) package, which re-exports these.

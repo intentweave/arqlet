@@ -19,6 +19,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Resident overview sessions (provisional, ADR 0019): in a session, `overview` keeps the graph, its cluster hierarchy
+  and the last positions; later requests leave the graph out, and a `start` without positions (`{settle}`) continues
+  from the last overview (refused when `communities`, `satellites` or `groups` changed). The hierarchy is built again
+  only when those options change. `createOverviewSession(run)` in `@arqlet/engine-client` (re-exported by `arqlet`;
+  without a resident session it sends the graph and positions itself, with the same answers); the overview page uses
+  it in the worker and the backend.
 - `filter` (provisional, view state `hidden`): hides nodes by kind or id (each with what it holds) and edges by kind
   without a new import; what stays keeps its place, the scene leaves the hidden out, and a route for collapsed content
   counts only the edges still shown. `session.filter(hide)` in `@arqlet/engine-client`; playground section *Filter*.

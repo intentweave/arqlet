@@ -216,3 +216,76 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
     },
   };
 }
+
+// The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
+// Defaults as the engine's (`communities` 120, `satellites` 0); `groups` compared as given.
+const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null]);
+
+/**
+ * Provisional (ADR 0019 for the overview): an overview of one graph, laid out again as the host asks, with the graph kept
+ * in the engine where it can keep a session (`run.openSession`). `open(graph, request)` lays out a graph; `layOut(request)`
+ * lays it out again (other options, `radii`, `intent`, `configSet`); a `start` without positions (`{settle}` or `{}`)
+ * continues from the last overview. Without a resident session the graph and the last positions stay here and are sent
+ * along; the answers are the same. A new `open` overtakes what is still under way (`{ok: false, stale: true}`).
+ */
+export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
+  if (wanted === true && !run.openSession) throw Error('This engine has no resident sessions');
+  const resident = wanted === true || (wanted === 'auto' && typeof run.openSession === 'function');
+  const opened = resident ? Promise.resolve(run.openSession()) : null;
+  // `graph` is kept here only without a resident session; `started`: an `open` was asked for (it may still run).
+  let graph = null, started = false, last = null, clusters = null, generation = 0, queue = Promise.resolve();
+
+  const send = async request => {
+    if (resident) return (await opened).run(request);
+    const sent = {...request, graph: request.graph ?? graph};
+    const start = request.start;
+    if (start && start.x === undefined) {
+      if (!last || request.graph) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
+      if (clustersOf(request.options) !== clusters) return {ok: false, error: 'The clusters changed since the last overview; lay out without start.'};
+      sent.start = {...start, x: last.x, y: last.y, r: last.r};
+    }
+    return run(sent);
+  };
+  const enqueue = (request, fresh) => {
+    if (fresh) generation++;
+    const mine = generation;
+    const result = queue.then(async () => {
+      if (mine !== generation) return {ok: false, stale: true, error: 'A new graph overtook this overview.'};
+      const answer = await send(request);
+      if (mine !== generation) return {ok: false, stale: true, error: 'A new graph overtook this overview.'};
+      if (answer.ok) {
+        last = answer.overview;
+        clusters = clustersOf(request.options);
+        if (fresh && !resident) graph = request.graph;
+      }
+      return answer;
+    });
+    queue = result.catch(() => {});
+    return result;
+  };
+
+  return {
+    /** Lays out `graph` with `request` (`options`, `intent`, `configSet`, `radii`, `threads`). */
+    open(newGraph, request = {}) {
+      started = true;
+      return enqueue({...request, op: 'overview', graph: newGraph}, true);
+    },
+    /** Lays out the graph again; `start` without positions continues from the last overview. */
+    layOut(request = {}) {
+      if (!started) return Promise.resolve({ok: false, error: 'No graph yet: open one first.'});
+      const {graph: _ignored, ...rest} = request;
+      return enqueue({...rest, op: 'overview'}, false);
+    },
+    /** The last overview (`{ids, parent, x, y, r, …}`), or null. */
+    get overview() { return last; },
+    /** Whether the graph stays in the engine. */
+    get resident() { return resident; },
+    /** Ends the session (frees the graph in the engine). */
+    async close() {
+      generation++;
+      graph = last = null;
+      started = false;
+      if (resident) await (await opened).close();
+    },
+  };
+}

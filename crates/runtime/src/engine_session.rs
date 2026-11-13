@@ -14,7 +14,12 @@
 //! - `export`: the whole snapshot.
 //!
 //! Answers to `import`, `load` and the operations: `{ok, revision, layoutVersion, collapsedIds, scene}` (`"scene": false`
-//! in the request leaves the scene out). Every other operation (`overview`, `elkLayout`, …) goes to `dispatch` unchanged.
+//! in the request leaves the scene out).
+//!
+//! `overview` keeps its own state beside the snapshot (`overview::OverviewSession`): the first request carries the
+//! graph, later ones leave it out and lay out on the kept graph and cluster hierarchy; a `start` without positions
+//! continues from the last overview. The answer is that of `dispatch`. Every other operation (`elkLayout`, …) goes to
+//! `dispatch` unchanged.
 use crate::protocol::{handle, Request, Response};
 use arqlet_model::Snapshot;
 use serde_json::{json, Value};
@@ -23,6 +28,7 @@ use serde_json::{json, Value};
 #[derive(Default)]
 pub struct EngineSession {
     snapshot: Option<Snapshot>,
+    overview: crate::overview::OverviewSession,
 }
 
 impl EngineSession {
@@ -72,6 +78,13 @@ impl EngineSession {
             }
             Some("export") => Ok(json!({"ok": true, "snapshot": self.current()?})),
             Some("scene") => Ok(json!({"ok": true, "scene": scene_of(self.current()?)?})),
+            Some("overview") => {
+                let threads = v["threads"]
+                    .as_u64()
+                    .unwrap_or(1)
+                    .clamp(1, crate::MAX_THREADS as u64) as usize;
+                Ok(self.overview.run(v, threads))
+            }
             Some("trace") => crate::trace::trace_on(self.current()?, v),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))
