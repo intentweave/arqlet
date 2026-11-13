@@ -1781,10 +1781,10 @@ pub struct LayoutOptions {
     /// Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub isolated_grid: bool,
-    /// Experimental: free directions (`auto`) are chosen first, and the drawing is then laid out again with every area's
-    /// chosen orientation fixed, so that single pass constructs the edges between areas of different axes (ADR 0017)
-    /// instead of delegating them. The snapshot keeps the free directions and the chosen orientations. Omitted when off,
-    /// so the default output does not change.
+    /// Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
+    /// and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
+    /// delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the
+    /// chosen orientations. Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub directions_first: bool,
     /// How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.

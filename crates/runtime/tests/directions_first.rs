@@ -66,11 +66,22 @@ fn chosen_directions_are_laid_out_again_fixed_and_single_pass_builds_the_edges()
     let (built, delegated) = single_pass(&first);
     assert_eq!(delegated, 0, "every edge built ({built})");
     assert!(single_pass(&plain).1 >= delegated);
-    // The snapshot keeps the free directions and says which orientations were chosen; they are those of a plain layout.
+    // The snapshot keeps the free directions and says which orientations were chosen: one for every free area.
     assert_eq!(first["graph"]["defaultDirection"], "auto");
     assert_eq!(first["graph"]["containerDirections"]["c0"], "auto");
-    assert_eq!(first["areaOrientations"], plain["areaOrientations"]);
+    let chosen = first["areaOrientations"].as_object().unwrap();
+    assert_eq!(chosen.len(), 5, "the root and four containers: {chosen:?}");
     assert_eq!(first["options"]["directionsFirst"], true);
+    // Never worse than all left to right (one of the candidates), by the published key.
+    let mut lr = graph.clone();
+    lr["defaultDirection"] = json!("lr");
+    lr["containerDirections"] = json!({});
+    let fixed_lr: arqlet_model::Snapshot = serde_json::from_value(import(&lr, json!({}))).unwrap();
+    let chosen_snapshot: arqlet_model::Snapshot = serde_json::from_value(first.clone()).unwrap();
+    assert!(
+        arqlet_layout::published_key(&chosen_snapshot).unwrap()
+            <= arqlet_layout::published_key(&fixed_lr).unwrap()
+    );
     // Fixed directions are untouched by the option.
     let mut fixed = graph.clone();
     fixed["defaultDirection"] = json!("lr");

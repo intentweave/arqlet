@@ -336,12 +336,40 @@ pub fn compute_counted(
     // Experimental (`directionsFirst`): the free directions are chosen by a first layout, and the drawing is laid out
     // again with those orientations fixed (single pass builds edges between fixed axes; it delegates them under a free
     // direction, which decides its orientation only after its children are placed).
+    // The candidates are every free area left to right, and every free area top to bottom; each is laid out with its
+    // orientations fixed under single pass, and the drawing with the best published key wins (overlaps, lines through
+    // nodes, shared lines, crossings, …, bends before length), left to right on a tie. The compact choice per area (the
+    // plain free layout) was a third candidate: it never won on the layered examples and cost as much as the old free
+    // layout (benchmarks/results/free-directions-20261113.md), so it is not tried.
     if options.directions_first && has_free_direction(graph) {
-        let (first, _) = compute_counted_inner(graph, previous, dirty, options)?;
-        let fixed = with_chosen_directions(graph, &first.area_orientations);
-        let (mut snapshot, stages) = compute_counted_inner(&fixed, previous, dirty, options)?;
+        let free = free_areas(graph);
+        let mut candidates: Vec<BTreeMap<String, Orientation>> = Vec::new();
+        for orientation in [Orientation::Lr, Orientation::Tb] {
+            let all: BTreeMap<String, Orientation> = free
+                .iter()
+                .map(|area| (area.clone(), orientation))
+                .collect();
+            if !candidates.contains(&all) {
+                candidates.push(all);
+            }
+        }
+        let mut best: Option<(
+            Vec<i64>,
+            Snapshot,
+            SearchCounters,
+            BTreeMap<String, Orientation>,
+        )> = None;
+        for chosen in candidates {
+            let fixed = with_chosen_directions(graph, &chosen);
+            let (snapshot, stages) = compute_counted_inner(&fixed, previous, dirty, options)?;
+            let key = published_key(&snapshot)?;
+            if best.as_ref().is_none_or(|(b, ..)| key < *b) {
+                best = Some((key, snapshot, stages, chosen));
+            }
+        }
+        let (_, mut snapshot, stages, chosen) = best.expect("one candidate at least");
         snapshot.graph = graph.clone();
-        snapshot.area_orientations = first.area_orientations;
+        snapshot.area_orientations = chosen;
         apply_aggregate_weights(&mut snapshot);
         return Ok((snapshot, stages));
     }
@@ -357,6 +385,25 @@ fn has_free_direction(graph: &Graph) -> bool {
             || matches!(d, arqlet_model::DirectionConstraint::Allowed(list) if list.len() > 1)
     };
     free(&graph.default_direction) || graph.container_directions.values().any(free)
+}
+
+/// The areas whose direction is free (`auto`): `<root>` and the containers whose mode is a choice.
+fn free_areas(graph: &Graph) -> Vec<String> {
+    let mut out = Vec::new();
+    if matches!(graph.area_mode(None), Ok(Mode::Chooser(_))) {
+        out.push("<root>".to_string());
+    }
+    let containers: BTreeSet<&str> = graph
+        .nodes
+        .iter()
+        .filter_map(|n| n.parent_id.as_deref())
+        .collect();
+    for id in containers {
+        if matches!(graph.area_mode(Some(id)), Ok(Mode::Chooser(_))) {
+            out.push(id.to_string());
+        }
+    }
+    out
 }
 
 /// The graph with the orientation each free area chose fixed (the root's as the default direction, the others per

@@ -18,11 +18,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
-- `directionsFirst` (experimental, off): free directions (`auto`) are chosen by a first layout and the drawing is laid
-  out again with the chosen orientations fixed, so single pass builds the edges between areas of different axes instead
-  of delegating them. On the layered examples: no lines through nodes, 40 % fewer crossings than plain `auto`, still
-  more than a fixed `lr` ([measurement](benchmarks/results/free-directions-20261113.md)). Script
-  `benchmarks/eval/free-directions.mjs`.
+- `directionsFirst` (experimental, off): free directions (`auto`) are laid out with every free area left to right and
+  with every free area top to bottom, both fixed under single pass, and the drawing with the best published key wins.
+  Single pass then builds the edges between areas instead of delegating them: on the layered examples no lines through
+  nodes, never worse than a fixed `lr` by the key (better on two), about twice its time, where plain `auto` crossed
+  2–3× more and took 53 s on the largest example ([measurement](benchmarks/results/free-directions-20261113.md)).
+  Script `benchmarks/eval/free-directions.mjs`.
 - Overview sessions answer only what moves (provisional): a session's `overview` with `positionsOnly` returns
   `OverviewPositions` (positions, root radius, counts, representation) while the clusters stay those of its last
   overview, and the whole overview otherwise. `createOverviewSession` asks for it on the graph the engine keeps and
