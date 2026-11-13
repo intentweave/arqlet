@@ -190,8 +190,9 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
     reveal(nodeIds, {partial = true} = {}) { return change({op: 'reveal', nodeIds, partial}); },
 
     /**
-     * Provisional: hides nodes by kind or id (each with what it holds) and edges by kind, keeping the place of the rest.
-     * `hide` replaces what was hidden before; `{}` shows everything again.
+     * Provisional: hides nodes by kind or id (each with what it holds) and edges by kind, keeping the place of the rest;
+     * with `compact: true` the view is laid out again without them, so the rest closes up. `hide` replaces what was hidden
+     * before; `{}` shows everything again.
      */
     filter(hide = {}) { return change({op: 'filter', hide}); },
 

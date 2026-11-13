@@ -1642,11 +1642,21 @@ pub struct Hidden {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
     pub edge_kinds: Vec<String>,
+    /// Lay the view out again without what is hidden, so that the rest closes up (positions change); off: the hidden keep
+    /// their room and nothing else moves. Omitted when off.
+    #[serde(skip_serializing_if = "is_false")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<bool>"))]
+    pub compact: bool,
 }
 
 impl Hidden {
     pub fn is_empty(&self) -> bool {
         self.node_kinds.is_empty() && self.nodes.is_empty() && self.edge_kinds.is_empty()
+    }
+
+    /// Whether the view leaves the hidden out of its layout (`compact` with something hidden).
+    pub fn compacts(&self) -> bool {
+        self.compact && !self.is_empty()
     }
 }
 
