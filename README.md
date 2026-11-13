@@ -178,6 +178,7 @@ bundles, in the filter's recount and in the overview's pull, and does not move a
 ```js
 await session.import(graph, {options: {
   communities: 40,                       // divide containers of more than 40 children (Louvain)
+  communityHubs: {minLinks: 50},         // but leave hubs out: they stay as themselves
   groups: {'fn-1': ['Billing', 'Invoices']}, // or groups the domain gives: a path of names per node
   levelOfDetail: {depth: 1},             // and/or collapse containers from a depth or by kind
 }});

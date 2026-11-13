@@ -2,7 +2,7 @@
 //! (`overview::with_communities`) become nodes of kind `community` that hold their members, so the structured layout can
 //! collapse and open them like any container. The result is a derived graph for the view projection; the source graph
 //! the runtime keeps is never changed.
-use crate::overview::{hierarchy, with_communities};
+use crate::overview::{hierarchy, with_communities_except, Hubs};
 use arqlet_model::{Graph, Node};
 use std::collections::BTreeMap;
 
@@ -116,10 +116,20 @@ pub fn with_given_groups(
 /// one that gathers children without links is `unlinked (12)`.
 /// `threshold` 0, or a graph without communities, returns the graph as it is.
 pub fn with_community_containers(graph: &Graph, threshold: usize) -> Result<Graph, String> {
+    with_community_containers_except(graph, threshold, &Hubs::default())
+}
+
+/// `with_community_containers`, leaving the `hubs` out of Louvain (`with_communities_except`): a hub stays a direct
+/// child of its container instead of pulling the others into one community.
+pub fn with_community_containers_except(
+    graph: &Graph,
+    threshold: usize,
+    hubs: &Hubs,
+) -> Result<Graph, String> {
     if threshold == 0 {
         return Ok(graph.clone());
     }
-    let h = with_communities(hierarchy(graph), threshold)?;
+    let h = with_communities_except(hierarchy(graph), threshold, hubs)?;
     if h.ids.len() == h.real {
         return Ok(graph.clone());
     }

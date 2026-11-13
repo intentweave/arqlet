@@ -229,8 +229,8 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
 }
 
 // The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
-// Defaults as the engine's (`communities` 120, `satellites` 0); `groups` compared as given.
-const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null]);
+// Defaults as the engine's (`communities` 120, `satellites` 0); `groups` and `hubs` compared as given.
+const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null, options?.hubs ?? null]);
 
 /**
  * Provisional (ADR 0019 for the overview): an overview of one graph, laid out again as the host asks, with the graph kept

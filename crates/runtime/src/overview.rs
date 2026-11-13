@@ -35,8 +35,8 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
                     _ => options.padding = x,
                 }
             }
-            // Groups the data gives are read by `overview_of`, which adds them to the graph before the hierarchy.
-            "groups" => {}
+            // Groups the data gives and hubs are read by `hierarchy_of`, which builds the clusters with them.
+            "groups" | "hubs" => {}
             "chains" => {
                 options.chains = value
                     .as_bool()
@@ -208,6 +208,7 @@ fn hierarchy_key(v: &Value, options: &OverviewOptions) -> Value {
         "communities": options.communities,
         "satellites": options.satellites,
         "groups": v["options"].get("groups"),
+        "hubs": v["options"].get("hubs"),
     })
 }
 
@@ -225,9 +226,19 @@ fn hierarchy_of(
         })?,
         None => Default::default(),
     };
+    // Hubs: left out of Louvain, so that one hub does not pull its container into one community.
+    let hubs: arqlet_model::CommunityHubs = match v["options"].get("hubs") {
+        Some(h) => serde_json::from_value(h.clone())
+            .map_err(|e| format!("Overview option hubs must be {{minLinks?, nodes?}}: {e}"))?,
+        None => Default::default(),
+    };
     let graph = arqlet_layout::communities::with_given_groups(graph, &groups)?;
     let h = overview::with_satellites(
-        overview::with_communities(overview::hierarchy(&graph), options.communities)?,
+        overview::with_communities_except(
+            overview::hierarchy(&graph),
+            options.communities,
+            &crate::hubs_of(&hubs),
+        )?,
         options.satellites,
     )?;
     Ok((graph, h))

@@ -1650,6 +1650,27 @@ impl Hidden {
     }
 }
 
+/// Provisional: the children that `communities` leaves out of Louvain, so that one hub does not pull a whole container
+/// into one community: those with at least `min_links` links in their container (by edge weight, as Louvain counts them)
+/// and those named in `nodes`. A hub stays a direct child of its container. Ids the graph lacks are ignored.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct CommunityHubs {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub min_links: Option<u32>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub nodes: Vec<String>,
+}
+
+impl CommunityHubs {
+    pub fn is_empty(&self) -> bool {
+        self.min_links.is_none() && self.nodes.is_empty()
+    }
+}
+
 /// The edges one aggregated edge stands for, by direction (see `LayoutOptions::aggregate_weights`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -1826,6 +1847,10 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "Hidden::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Hidden>"))]
     pub hidden: Hidden,
+    /// Provisional: the children `communities` leaves out of Louvain (hubs). Omitted when empty.
+    #[serde(default, skip_serializing_if = "CommunityHubs::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<CommunityHubs>"))]
+    pub community_hubs: CommunityHubs,
     /// The name before engine 0.4 (`initialCollapse`), refused with a message that names the new one.
     #[serde(
         default,
@@ -2003,6 +2028,7 @@ impl Default for LayoutOptions {
             groups: BTreeMap::new(),
             level_of_detail: None,
             hidden: Hidden::default(),
+            community_hubs: CommunityHubs::default(),
             renamed_initial_collapse: (),
             partial: BTreeMap::new(),
             global_layering: false,
@@ -2700,6 +2726,10 @@ pub struct OverviewLayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub groups: Option<BTreeMap<String, Vec<String>>>,
+    /// Children left out of Louvain (hubs), as `LayoutOptions::community_hubs`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub hubs: Option<CommunityHubs>,
 }
 
 /// Provisional: where an overview continues from. Positions (`x`, `y`, `r`) of a previous overview of the same

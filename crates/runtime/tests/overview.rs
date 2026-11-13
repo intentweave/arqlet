@@ -519,6 +519,10 @@ fn every_answer_is_the_typed_overview_contract() {
             chains: Some(true),
             ticks: Some(50),
             groups: Some([("g0/f0".to_string(), vec!["A".to_string()])].into()),
+            hubs: Some(arqlet_model::CommunityHubs {
+                min_links: Some(10),
+                nodes: vec!["g1".into()],
+            }),
         }),
         radii: Some([("g1".to_string(), 80.)].into()),
         threads: Some(2),

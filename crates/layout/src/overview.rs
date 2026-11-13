@@ -252,6 +252,31 @@ pub const COMMUNITY_PREFIX: &str = "community:";
 /// cluster; children without links are gathered in one cluster. Added clusters come after the graph's nodes, with ids `community:<container>:<level>.<k>`.
 /// `threshold` 0 leaves the hierarchy as it is.
 pub fn with_communities(h: Hierarchy, threshold: usize) -> Result<Hierarchy, String> {
+    with_communities_except(h, threshold, &Hubs::default())
+}
+
+/// Provisional: the children Louvain leaves out (`with_communities_except`): those with at least `min_links` links in
+/// their container (by weight, as Louvain counts them), and those named. A hub stays a direct child of its container;
+/// its links do not pull the others into one community.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Hubs {
+    pub min_links: Option<f64>,
+    pub nodes: std::collections::BTreeSet<String>,
+}
+
+impl Hubs {
+    pub fn is_empty(&self) -> bool {
+        self.min_links.is_none() && self.nodes.is_empty()
+    }
+}
+
+/// `with_communities`, leaving the `hubs` out of Louvain: they stay direct children of their container, and their links
+/// count for no community. Without hubs the same as `with_communities`.
+pub fn with_communities_except(
+    h: Hierarchy,
+    threshold: usize,
+    hubs: &Hubs,
+) -> Result<Hierarchy, String> {
     if threshold == 0 {
         return Ok(h);
     }
@@ -273,10 +298,27 @@ pub fn with_communities(h: Hierarchy, threshold: usize) -> Result<Hierarchy, Str
         let name = owner.map_or("#".to_string(), |i| h.ids[i].clone());
         let local: BTreeMap<usize, usize> =
             members.iter().enumerate().map(|(k, &m)| (m, k)).collect();
-        let links: Vec<(usize, usize, f64)> = h
+        let all_links: Vec<(usize, usize, f64)> = h
             .container_links(container)
             .iter()
             .map(|&(a, b, w)| (local[&a], local[&b], w))
+            .collect();
+        // Hubs: named, or with at least `min_links` links here; their links are left out of Louvain.
+        let mut hub = vec![false; members.len()];
+        if !hubs.is_empty() {
+            let mut strength = vec![0.; members.len()];
+            for &(a, b, w) in &all_links {
+                strength[a] += w;
+                strength[b] += w;
+            }
+            for (k, &m) in members.iter().enumerate() {
+                hub[k] = hubs.nodes.contains(&h.ids[m])
+                    || hubs.min_links.is_some_and(|min| strength[k] >= min);
+            }
+        }
+        let links: Vec<(usize, usize, f64)> = all_links
+            .into_iter()
+            .filter(|&(a, b, _)| !hub[a] && !hub[b])
             .collect();
         let mut linked = vec![false; members.len()];
         for &(a, b, _) in &links {
@@ -285,7 +327,8 @@ pub fn with_communities(h: Hierarchy, threshold: usize) -> Result<Hierarchy, Str
         }
         // A container whose children are mostly without links (a file of type declarations, say) has no communities
         // to find: splitting it would only add a level that gathers the unlinked ones.
-        if linked.iter().filter(|l| **l).count() * 2 < members.len() {
+        let others = members.len() - hub.iter().filter(|h| **h).count();
+        if linked.iter().filter(|l| **l).count() * 2 < others {
             continue;
         }
         // The levels of Louvain, from the members up: `levels[l][c]` is the community at level l + 1 of community c at
@@ -354,8 +397,14 @@ pub fn with_communities(h: Hierarchy, threshold: usize) -> Result<Hierarchy, Str
         // Members: under their community's cluster at the lowest level, if any; members without links together.
         let lowest = cluster_of.last();
         let mut unlinked = None;
-        let alone = linked.iter().filter(|l| !**l).count();
+        let alone = (0..members.len())
+            .filter(|&k| !linked[k] && !hub[k])
+            .count();
         for (k, &m) in members.iter().enumerate() {
+            // A hub stays a direct child of the container.
+            if hub[k] {
+                continue;
+            }
             if !linked[k] {
                 if alone >= 2 {
                     if unlinked.is_none() {
