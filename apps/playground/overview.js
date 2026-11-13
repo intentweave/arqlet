@@ -4,7 +4,7 @@
 // zoom (`representationsOf`). Only a decision of the user makes a structured cluster grow and its neighbours make room;
 // what the zoom or a rule structures is fitted into the disc it has, so that zooming never makes the drawing jump.
 // Stale replies are dropped.
-import {overviewModel, viewOf, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, displayName, nameOf} from '@arqlet/viewer/overview.js';
+import {overviewModel, viewOf, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES} from '@arqlet/viewer/overview.js';
 import {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
 import {createEngineWorker} from '@arqlet/engine-client/engine.js';
 
@@ -19,6 +19,8 @@ let graph = null, model = null, renderer = null, unbind = null, focus = -1, sele
 let epoch = 0;
 /** The user's decisions (node id → collapsed, organic or structured) and flow directions (node id → lr, rl, tb, bt). */
 const decisions = new Map(), directions = new Map();
+/** The outline per node kind (drawing only), kept across graphs of the same kinds. */
+const shapes = {};
 /** Layered layouts by `id|direction`, and the keys whose layout failed. */
 const scenes = new Map(), failed = new Set();
 /** Clusters drawn structured now (id → layout key), clusters the overview gave the room of their layout (ids), clusters
@@ -29,21 +31,22 @@ let baseConfig = null, rules = {};
 const undo = [], redo = [];
 
 // Settings of the panel, remembered in this browser (a convenience; the page works without).
-const LAYOUT = ['node-radius', 'gap', 'padding', 'charge', 'gravity', 'communities'];
-const ZOOM = ['collapse-px', 'structure-share', 'limit', 'scene-unit'];
-const DEFAULTS = {'node-radius': 4, gap: 2, padding: 6, charge: 0.05, gravity: 0.1, communities: 120,
-  'collapse-px': 14, 'structure-share': 35, limit: 300, 'scene-unit': 0.2};
+const LAYOUT = ['node-radius', 'gap', 'padding', 'charge', 'gravity', 'communities', 'satellites'];
+const ZOOM = ['levels', 'collapse-px', 'structure-share', 'limit', 'scene-unit'];
+const DEFAULTS = {'node-radius': 4, gap: 2, padding: 6, charge: 0.05, gravity: 0.1, communities: 120, satellites: 0,
+  levels: '', 'collapse-px': 14, 'structure-share': 35, limit: 300, 'scene-unit': 0.2};
 const STORE = 'arqlet-overview-settings';
 function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) ?? '{}');
     for (const id of [...LAYOUT, ...ZOOM]) if (saved[id] !== undefined) $(id).value = saved[id];
     if (saved.auto !== undefined) $('auto').checked = saved.auto;
+    if (saved.chains !== undefined) $('chains').checked = saved.chains;
   } catch { /* no storage: the defaults */ }
 }
 function saveSettings() {
   try {
-    const out = {auto: $('auto').checked};
+    const out = {auto: $('auto').checked, chains: $('chains').checked};
     for (const id of [...LAYOUT, ...ZOOM]) out[id] = $(id).value;
     localStorage.setItem(STORE, JSON.stringify(out));
   } catch { /* no storage */ }
@@ -107,7 +110,9 @@ async function loadConfig(url = $('source').selectedOptions[0]?.dataset.config) 
 /** The layout options, the config set and the intent a request carries; the engine checks them (ADR 0015). */
 function request(extra = {}) {
   const options = {nodeRadius: number('node-radius'), gap: number('gap'), padding: number('padding'),
-    charge: number('charge'), gravity: number('gravity'), communities: number('communities')};
+    charge: number('charge'), gravity: number('gravity'), communities: number('communities'),
+    ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {}),
+    ...($('chains').checked ? {chains: true} : {})};
   const values = {op: 'overview', graph, threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
   if (baseConfig) values.configSet = {...baseConfig, overview: {rules, auto: $('auto').checked}};
   return values;
@@ -164,7 +169,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   }
   unbind?.(); renderer?.destroy();
   model = next;
-  renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule});
+  renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes});
   unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, lens: lensSettings, idle: idleSettings()});
   focus = -1;
   zoomTo(-1);
@@ -198,7 +203,7 @@ async function evaluate() {
   const focusPoint = pointer ? renderer.world(...pointer) : null;
   const wanted = representationsOf(model, renderer.view, c.clientWidth, c.clientHeight, {
     decisions, rules, auto: $('auto').checked, limit: limit(), current, focus: focusPoint,
-    collapsePixels: number('collapse-px'), structureShare: number('structure-share') / 100,
+    collapsePixels: number('collapse-px'), structureShare: number('structure-share') / 100, depth: levelOfDetail(),
   });
   if (!sameSet(wanted.collapsed, collapsed)) { collapsed = wanted.collapsed; redraw(FADE); }
   const want = new Map([...wanted.structured].map(i => [model.overview.ids[i], sceneKey(model.overview.ids[i])]));
@@ -216,7 +221,7 @@ async function evaluate() {
     for (const id of add.slice(0, 4)) {
       const key = want.get(id);
       if (!scenes.has(key)) {
-        status(`${displayName(id)}: layered layout …`);
+        status(`${nameOf(model, model.index.get(id))}: layered layout …`);
         const scene = await layered(id, key);
         if (ticket !== epoch) return;
         if (!scene) { failed.add(key); continue; }
@@ -246,7 +251,7 @@ async function evaluate() {
       show(result.overview, true, anchor, into);
     }
     zoomAfter = null;
-    const changes = [...add.slice(0, 4).map(id => `${displayName(id)}: structured`), ...remove.map(id => `${displayName(id)}: open`)];
+    const changes = [...add.slice(0, 4).map(id => `${nameOf(model, model.index.get(id))}: structured`), ...remove.map(id => `${nameOf(model, model.index.get(id))}: open`)];
     if (changes.length) status(changes.join(' · '));
     renderPanel();
   } finally {
@@ -261,7 +266,7 @@ async function layered(id, key) {
   const {graph: excerpt, options} = structuredExcerpt(graph, model, id, {direction});
   const imported = await execute({op: 'import', graph: excerpt, limit: excerpt.nodes.length, options});
   const scene = imported.ok ? await execute({op: 'scene', snapshot: imported.snapshot}) : imported;
-  if (!scene.ok) { status(`${displayName(id)}: ${scene.error}`); return null; }
+  if (!scene.ok) { status(`${nameOf(model, model.index.get(id))}: ${scene.error}`); return null; }
   return scene.scene;
 }
 
@@ -287,13 +292,25 @@ function zoomTo(i, smooth = false) {
 
 function label(i) { return model.overview.ids[i]; }
 function kindOf(i) { const o = model.overview; return o.kinds && o.kind ? o.kinds[o.kind[i]] : null; }
-function clusterOf(i) { return i < 0 ? -1 : model.children[i].length ? i : model.overview.parent[i]; }
+/** The cluster a click on node `i` means: the node if it is a cluster (else its parent), as the top of its chain. */
+function clusterOf(i) {
+  const c = i < 0 ? -1 : model.children[i].length ? i : model.overview.parent[i];
+  return c < 0 ? -1 : model.chainTop[c];
+}
+
+/** The level from which clusters are collapsed until opened, or null. */
+function levelOfDetail() {
+  const value = $('levels').value.trim();
+  return value === '' || !(Number(value) >= 0) ? null : Math.floor(Number(value));
+}
 
 /** How cluster `i` is shown now, and why. */
 function representationOf(i) {
   const id = label(i);
   const now = shown.has(id) ? 'structured' : collapsed.has(i) ? 'collapsed' : 'open';
-  const why = decisions.has(id) ? 'your choice' : rules[kindOf(i)] ? `rule for ${kindOf(i)}` : $('auto').checked ? 'by zoom' : 'default';
+  const level = levelOfDetail();
+  const why = decisions.has(id) ? 'your choice' : rules[kindOf(i)] ? `rule for ${kindOf(i)}`
+    : level !== null && model.depth[i] >= level ? `level of detail ${level}` : $('auto').checked ? 'by zoom' : 'default';
   return {now, why};
 }
 
@@ -304,7 +321,7 @@ function hover(i, e) {
   if (scene?.node) text = `${scene.node.label || scene.node.id} · ${scene.node.kind}`;
   else if (i >= 0) {
     const kids = model.children[i].length;
-    const name = label(i).startsWith('community:') ? `community ${displayName(label(i))}` : nameOf(model, i);
+    const name = nameOf(model, i);
     const {now, why} = kids ? representationOf(i) : {};
     text = kids ? `${name} · ${model.size[i].toLocaleString()} nodes · ${now}, ${why}` : nameOf(model, i);
   }
@@ -327,10 +344,11 @@ function select(i, event) {
   renderPanel();
 }
 
-/** A double-click zooms into a cluster. */
+/** A double-click zooms into a cluster, and opens it when it is collapsed (one level more). */
 function zoomInto(i) {
   const cluster = clusterOf(i);
   if (cluster < 0) return;
+  if (collapsed.has(cluster)) decide(cluster, 'organic');
   selected = focus = cluster;
   redraw();
   zoomTo(cluster, true);
@@ -367,12 +385,13 @@ function renderPanel() {
   updateHistory();
   if (i < 0 || !model) {
     $('cluster-name').textContent = 'Click a cluster to select it.';
-    $('cluster-info').textContent = 'Double-click zooms into it. Shift-click collapses or opens it.';
+    $('cluster-info').textContent = 'Double-click zooms into it (and opens it when collapsed). Shift-click collapses or opens it.';
     for (const b of buttons) { b.disabled = true; b.setAttribute('aria-pressed', 'false'); }
     return;
   }
   const id = label(i), {now, why} = representationOf(i), decided = decisions.get(id) ?? '';
-  $('cluster-name').textContent = id.startsWith('community:') ? `Community ${displayName(id)}` : id;
+  $('cluster-name').textContent = nameOf(model, i);
+  $('cluster-name').title = id;
   $('cluster-info').textContent = `${model.size[i].toLocaleString()} nodes, ${model.children[i].length} children` +
     (kindOf(i) ? `, kind ${kindOf(i)}` : '') + ` · now ${now}, ${why}`;
   for (const b of buttons) {
@@ -384,26 +403,43 @@ function renderPanel() {
 
 /** One row per kind of container in the graph: automatic, or a representation for every cluster of that kind. */
 function renderRules() {
-  const o = model.overview, kinds = new Set();
-  for (let i = 0; i < model.n; i++) if (model.children[i].length && o.kinds) kinds.add(o.kinds[o.kind[i]]);
+  const o = model.overview, kinds = new Set(), containers = new Set();
+  for (let i = 0; i < model.n; i++) {
+    if (!o.kinds) break;
+    kinds.add(o.kinds[o.kind[i]]);
+    if (model.children[i].length) containers.add(o.kinds[o.kind[i]]);
+  }
   for (const kind of Object.keys(rules)) kinds.add(kind);
   $('rules').replaceChildren(...[...kinds].sort().map(kind => {
     const row = document.createElement('tr'), name = document.createElement('td'), cell = document.createElement('td');
+    const form = document.createElement('td');
     name.textContent = kind;
+    // The outline of this kind's discs: drawing only, the layout stays the same.
+    const outline = document.createElement('select');
+    outline.setAttribute('aria-label', `Shape of ${kind}`);
+    for (const value of OUTLINES) outline.add(new Option(value, value));
+    outline.value = shapes[kind] ?? 'circle';
+    outline.onchange = () => {
+      if (outline.value === 'circle') delete shapes[kind]; else shapes[kind] = outline.value;
+      renderer?.setShapes(shapes);
+    };
+    form.append(outline);
     const choice = document.createElement('select');
+    choice.disabled = !containers.has(kind);
     choice.setAttribute('aria-label', `Rule for ${kind}`);
     for (const [value, text] of [['', 'automatic'], ['collapsed', 'collapsed'], ['organic', 'open'], ['structured', 'structured']]) choice.add(new Option(text, value));
     choice.value = rules[kind] ?? '';
     choice.onchange = () => { if (choice.value) rules[kind] = choice.value; else delete rules[kind]; schedule(); renderPanel(); };
     cell.append(choice);
-    row.append(name, cell);
+    row.append(name, cell, form);
     return row;
   }));
 }
 
 function crumbs() {
   const path = [];
-  for (let i = focus; i >= 0; i = model.overview.parent[i]) path.unshift(i);
+  // A chain is one step, named by its top.
+  for (let i = focus; i >= 0; i = model.overview.parent[i]) if (model.chainTop[i] === i) path.unshift(i);
   const button = (text, i) => { const b = document.createElement('button'); b.textContent = text; b.onclick = () => { focus = i; zoomTo(i, true); crumbs(); }; return b; };
   $('crumbs').replaceChildren(button('All', -1), ...path.map(i => button(nameOf(model, i), i)));
 }
@@ -423,6 +459,7 @@ $('run').onclick = () => layOut(true);
 $('relayout').onclick = () => { saveSettings(); layOut(false); };
 $('defaults').onclick = () => {
   for (const [id, value] of Object.entries(DEFAULTS)) $(id).value = value;
+  $('chains').checked = false;
   saveSettings();
   schedule();
 };

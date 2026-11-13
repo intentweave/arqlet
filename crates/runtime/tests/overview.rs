@@ -282,3 +282,85 @@ fn a_flat_graph_is_split_into_communities_that_drill_down_can_use() {
     .unwrap();
     assert_eq!(flat["overview"]["stats"]["communities"], 0);
 }
+
+#[test]
+fn satellites_are_gathered_with_their_hub_and_added_clusters_are_named() {
+    // A hub with three satellites, and a pair linked to each other and to the hub.
+    let mut nodes = vec![json!({"id": "hub", "kind": "service", "label": "Hub"})];
+    let mut edges = Vec::new();
+    for s in ["s1", "s2", "s3"] {
+        nodes.push(json!({"id": s, "kind": "service", "label": s}));
+        edges.push(json!({"id": format!("{s}-hub"), "kind": "e", "source": s, "target": "hub"}));
+    }
+    for a in ["p", "q"] {
+        nodes.push(json!({"id": a, "kind": "service", "label": a}));
+    }
+    for (a, b) in [("p", "q"), ("q", "p"), ("p", "hub"), ("q", "hub")] {
+        edges.push(json!({"id": format!("{a}-{b}"), "kind": "e", "source": a, "target": b}));
+    }
+    let graph = json!({"nodes": nodes, "edges": edges});
+    let request = |options: Value| {
+        let out: Value = serde_json::from_str(&dispatch(
+            &json!({"op": "overview", "graph": graph, "threads": 1, "options": options})
+                .to_string(),
+        ))
+        .unwrap();
+        out
+    };
+    let plain = request(json!({}));
+    assert_eq!(
+        plain["overview"]["stats"]["communities"], 0,
+        "off by default"
+    );
+    let gathered = request(json!({"satellites": 1}));
+    let o = &gathered["overview"];
+    let ids: Vec<&str> = o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let cluster = ids
+        .iter()
+        .position(|id| id.ends_with(":sat.0"))
+        .expect("a cluster for the hub");
+    assert_eq!(o["labels"][cluster], "Hub +3");
+    for s in ["hub", "s1", "s2", "s3"] {
+        let i = ids.iter().position(|id| *id == s).unwrap();
+        assert_eq!(
+            o["parent"][i], cluster as i64,
+            "{s} lies in the hub's cluster"
+        );
+    }
+    let p = ids.iter().position(|id| *id == "p").unwrap();
+    assert_eq!(
+        o["parent"][p], -1,
+        "p has half of its edges to q: no satellite at share 1"
+    );
+    let refused = request(json!({"satellites": 1.5}));
+    assert_eq!(refused["ok"], false);
+}
+
+#[test]
+fn chains_of_single_children_share_a_disc_when_asked() {
+    let graph = json!({"nodes": [
+        {"id": "f", "kind": "package", "label": "f"},
+        {"id": "p", "kind": "module", "label": "p", "parentId": "f"},
+        {"id": "s1", "kind": "file", "label": "s1", "parentId": "p"},
+        {"id": "s2", "kind": "file", "label": "s2", "parentId": "p"},
+        {"id": "x", "kind": "package", "label": "x"}
+    ], "edges": []});
+    let run = |options: Value| -> Value {
+        serde_json::from_str(&dispatch(
+            &json!({"op": "overview", "graph": graph, "threads": 1, "options": options})
+                .to_string(),
+        ))
+        .unwrap()
+    };
+    let r = |o: &Value, i: usize| o["overview"]["r"][i].as_f64().unwrap();
+    let chained = run(json!({"chains": true}));
+    assert_eq!(r(&chained, 0), r(&chained, 1));
+    let plain = run(json!({}));
+    assert!(r(&plain, 0) > r(&plain, 1), "off by default");
+    assert_eq!(run(json!({"chains": 1}))["ok"], false);
+}

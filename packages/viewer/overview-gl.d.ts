@@ -9,6 +9,8 @@ export interface OverviewRendererOptions {
   edgeAlpha?: number;
   /** Clear colour, RGBA in 0..1. */
   background?: [number, number, number, number];
+  /** The outline per node kind; kinds not named are circles. */
+  shapes?: Record<string, import('./overview.js').Outline>;
 }
 
 export interface OverviewRenderer {
@@ -18,6 +20,8 @@ export interface OverviewRenderer {
   setView(view: OverviewView): void;
   /** Draws these clusters structured, in their discs. */
   setExpanded(expanded: Expanded): void;
+  /** The outline per node kind (inscribed in each disc); kinds not named are circles. */
+  setShapes(shapes: Record<string, import('./overview.js').Outline>): void;
   /** Draws clusters structured (`expanded`) or collapsed into one disc (`collapsed`, indices); omitted parts are kept.
    * With `fade` (milliseconds) the old drawing blends into the new one. */
   setState(state: {expanded?: Expanded; collapsed?: Set<number>; selected?: number}, animation?: {fade?: number}): void;

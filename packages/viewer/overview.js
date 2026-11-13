@@ -47,8 +47,17 @@ export function overviewModel(overview, edgeIds = null) {
     const p = overview.parent[i];
     cluster[i] = colourOf.has(i) ? i : p >= 0 ? cluster[p] : i;
   }
+  // Chains: a node that is the only child of its parent and has the same disc (the overview's option `chains`) is drawn,
+  // named and picked with that parent; `chainTop` is the outermost node of each node's chain (the node itself if none).
+  const chainTop = new Int32Array(n);
+  const same = (a, b) => Math.abs(overview.x[a] - overview.x[b]) + Math.abs(overview.y[a] - overview.y[b]) +
+    Math.abs(overview.r[a] - overview.r[b]) <= 1e-6 * Math.max(overview.r[a], 1);
+  for (const i of order) {
+    const p = overview.parent[i];
+    chainTop[i] = p >= 0 && children[p].length === 1 && same(p, i) ? chainTop[p] : i;
+  }
   const index = new Map(overview.ids.map((id, i) => [id, i]));
-  return {overview, n, children, roots, tops, depth, cluster, leaves, size, index, edgeIds};
+  return {overview, n, children, roots, tops, depth, cluster, leaves, size, index, edgeIds, chainTop};
 }
 
 /** The ids of a graph's resolved edges, in input order: the edges of its `overview` result. */
@@ -64,8 +73,24 @@ export const COMMUNITY_PREFIX = 'community:';
  * The name of node `i` of an overview model: its label from the data (`overview.labels`), else `displayName` of its id.
  */
 export function nameOf(model, i) {
-  const label = model.overview.labels?.[i];
-  return label ? label : displayName(model.overview.ids[i]);
+  const own = j => model.overview.labels?.[j] || displayName(model.overview.ids[j]);
+  // The top of a chain names the chain: its members' names in order, a name repeated only once.
+  const names = [own(i)];
+  for (let j = i; model.chainTop && model.children[j].length === 1 && model.chainTop[model.children[j][0]] === i;) {
+    j = model.children[j][0];
+    if (own(j) !== names.at(-1)) names.push(own(j));
+  }
+  return names.join(' › ');
+}
+
+/** The nodes of `i`'s chain from its top down (just `i` without one); see `chainTop` of the model. */
+export function chainOf(model, i) {
+  const top = model.chainTop ? model.chainTop[i] : i, out = [top];
+  for (let j = top; model.chainTop && model.children[j].length === 1 && model.chainTop[model.children[j][0]] === top;) {
+    j = model.children[j][0];
+    out.push(j);
+  }
+  return out;
 }
 
 export function displayName(id) {
@@ -92,6 +117,9 @@ function hsl(h, s, l) {
  * kind`; kind 0 a filled disc, 1 a ring, 2 a box with a border, 3 a box outline) and of a line or triangle vertex
  * (`x, y, red, green, blue, alpha`). */
 export const SHAPE_STRIDE = 11;
+
+/** The outlines a disc can be drawn with, inscribed in its circle so that the packing stays free of overlaps. */
+export const OUTLINES = ['circle', 'square', 'octagon', 'diamond'];
 export const LINE_STRIDE = 6;
 const CORNERS = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
 
@@ -155,7 +183,7 @@ export const REPRESENTATIONS = ['collapsed', 'organic', 'structured'];
  */
 export function representationsOf(model, view, width, height, {
   decisions = new Map(), rules = {}, auto = true, limit = 300, current = new Set(), focus = null,
-  collapsePixels = 14, structureShare = 0.35, rulePixels = 80,
+  collapsePixels = 14, structureShare = 0.35, rulePixels = 80, depth = null,
 } = {}) {
   const o = model.overview, collapsed = new Set(), structured = new Set();
   const screenRadius = i => o.r[i] * view.scale;
@@ -172,9 +200,12 @@ export function representationsOf(model, view, width, height, {
     const decided = decisions.get(o.ids[i]);
     if (decided === 'collapsed' || decided === 'organic') return decided;
     if (decided === 'structured' && fits(i)) return 'structured';
-    const rule = o.kinds && o.kind ? rules[o.kinds[o.kind[i]]] : undefined;
+    // A chain follows the first rule of its members' kinds, from its top down.
+    const rule = o.kinds && o.kind ? chainOf(model, i).map(j => rules[o.kinds[o.kind[j]]]).find(r => r) : undefined;
     if (rule === 'collapsed' || rule === 'organic') return rule;
     if (rule === 'structured' && fits(i) && screenRadius(i) >= rulePixels && inView(i)) return 'structured';
+    // A level of detail: clusters from this depth on are shown collapsed until the user opens them.
+    if (depth !== null && model.depth[i] >= depth) return 'collapsed';
     if (!auto) return 'organic';
     const r = screenRadius(i);
     if (r < collapsePixels) return 'collapsed';
@@ -187,6 +218,8 @@ export function representationsOf(model, view, width, height, {
   while (stack.length) {
     const i = stack.pop();
     if (!model.children[i].length) continue;
+    // A node inside a chain is shown as its top is: open, since the walk reached it.
+    if (model.chainTop && model.chainTop[i] !== i) { stack.push(...model.children[i]); continue; }
     const representation = choose(i);
     if (representation === 'collapsed') collapsed.add(i);
     else if (representation === 'structured') structured.add(i);
@@ -202,12 +235,20 @@ export function representationsOf(model, view, width, height, {
  * scene), and per structured cluster its `back` boxes (containers), `routes` (lines), `arrows` (triangles at each route's
  * target, so the logical direction shows) and `front` boxes (leaves).
  */
-export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1) {
+export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}} = {}) {
   const {overview: o, n, children, depth, cluster, tops} = model;
+  // The outline of a node by its kind, as a tenth added to the shape kind (the shader reads it back).
+  const outlineCode = OUTLINES.map((_, k) => k / 10);
+  const outline = i => {
+    const k = o.kinds && o.kind ? OUTLINES.indexOf(shapes[o.kinds[o.kind[i]]]) : -1;
+    return k > 0 ? outlineCode[k] : 0;
+  };
   const ordinal = new Map(tops.map((r, k) => [r, k]));
   const colour = i => clusterColour(ordinal.get(cluster[i]));
   const owner = ownersOf(model, expanded, collapsed);
-  const order = [...Array(n).keys()].filter(i => owner[i] < 0).sort((a, b) =>
+  // A container inside a chain shares its top's disc: only the top's ring is drawn.
+  const folded = i => model.chainTop && model.chainTop[i] !== i && children[i].length > 0;
+  const order = [...Array(n).keys()].filter(i => owner[i] < 0 && !folded(i)).sort((a, b) =>
     (children[b].length > 0) - (children[a].length > 0) || depth[a] - depth[b] || a - b);
   const discs = [];
   for (const i of order) {
@@ -215,10 +256,10 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     const ring = children[i].length > 0 && !collapsed.has(i);
     const shade = ring ? 0.35 + 0.1 * Math.min(depth[i], 4) : collapsed.has(i) ? 0.72 : 1;
     const [red, green, blue] = colour(i);
-    pushShape(discs, o.x[i], o.y[i], o.r[i], o.r[i], [red * shade, green * shade, blue * shade], collapsed.has(i) ? 0.9 : 1, ring ? 1 : 0);
+    pushShape(discs, o.x[i], o.y[i], o.r[i], o.r[i], [red * shade, green * shade, blue * shade], collapsed.has(i) ? 0.9 : 1, (ring ? 1 : 0) + outline(i));
   }
   // The selected cluster: a bright ring on top of its disc.
-  if (selected >= 0 && owner[selected] < 0) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1);
+  if (selected >= 0 && owner[selected] < 0) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
   // Scene geometry per structured cluster, where each of its nodes' boxes is, and the border port of each edge that
   // leaves it.
   const back = [], routes = [], arrows = [], front = [];
@@ -410,6 +451,7 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
   const owner = ownersOf(model, expanded, collapsed);
   for (let i = 0; i < model.n; i++) {
     if (!model.children[i].length || owner[i] >= 0) continue;
+    if (model.chainTop && model.chainTop[i] !== i) continue;
     const [cx, cy, factor] = screen(o.x[i], o.y[i]);
     const r = o.r[i] * view.scale * factor, text = nameOf(model, i);
     if (collapsed.has(i)) {
@@ -473,7 +515,7 @@ export function pickNode(model, x, y, collapsed = new Set()) {
   let found = -1, candidates = roots;
   for (;;) {
     const next = candidates.find(inside);
-    if (next === undefined) return found;
+    if (next === undefined) return found >= 0 && model.chainTop ? model.chainTop[found] : found;
     found = next;
     // A collapsed cluster is picked as a whole.
     if (collapsed.has(next)) return found;

@@ -48,13 +48,23 @@ const SHAPE_FS = `
 precision mediump float;
 varying vec2 v_local; varying vec4 v_colour; varying float v_kind; varying vec2 v_pixels;
 uniform float u_fade;
+// The distance from the middle, 1 on the outline: a circle, or a square, octagon or diamond inscribed in it. The
+// outline is the tenths of the kind (0 to 3).
+float outlineDistance(vec2 p, float outline) {
+  vec2 a = abs(p);
+  if (outline < 0.5) return length(p);
+  if (outline < 1.5) return max(a.x, a.y) * 1.4142136;
+  if (outline < 2.5) return max(max(a.x, a.y), (a.x + a.y) * 0.7071068) / 0.9238795;
+  return a.x + a.y;
+}
 void main() {
   vec4 colour;
   if (v_kind < 1.5) {
-    float d = length(v_local);
+    float base = floor(v_kind + 0.05);
+    float d = outlineDistance(v_local, floor((v_kind - base) * 10.0 + 0.5));
     if (d > 1.0) discard;
     float edge = 1.0 / max(v_pixels.x, 1.0);
-    if (v_kind < 0.5) {
+    if (base < 0.5) {
       colour = vec4(v_colour.rgb, v_colour.a * (1.0 - smoothstep(1.0 - edge, 1.0, d)));
     } else {
       // A ring about 1.2 pixels wide, and a faint fill so that a cluster reads as an area.
@@ -157,7 +167,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     if (!l) return;
     for (const p of PARTS) { gl.deleteBuffer(l.buffers[p].a); if (l.buffers[p].b !== l.buffers[p].a) gl.deleteBuffer(l.buffers[p].b); }
   };
-  const data = () => overviewBuffers(model, expanded, collapsed, selected);
+  let outlines = options.shapes ?? {};
+  const data = () => overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines});
   let current = layer(data()), previous = null;
   // The running animation: a morph (`t` of the current layer, and the view) and a fade (of the previous layer).
   let morphing = null, fading = null, frame = 0;
@@ -292,6 +303,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       if (!frame) frame = requestAnimationFrame(() => { frame = 0; renderer.draw(); if (morphing || fading || breath) animate(); });
     },
     setExpanded(map) { renderer.setState({expanded: map}); },
+    /** The outline per node kind (`circle`, `square`, `octagon`, `diamond`); kinds not named are circles. */
+    setShapes(next) { outlines = {...next}; renderer.setState({}); },
     /**
      * Draws clusters structured (`expanded`, index → {scene}), collapsed into one disc (`collapsed`, indices) and marks
      * `selected` (-1: none); omitted parts are kept. With `fade` (milliseconds) the old drawing blends into the new one.

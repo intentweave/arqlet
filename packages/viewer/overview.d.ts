@@ -2,7 +2,8 @@
 export interface OverviewResult {
   schemaVersion: 1;
   ids: string[];
-  /** Each node's label from the data (empty for the clusters the overview added); see `nameOf`. */
+  /** Each node's label from the data; a cluster the overview added is named after its most connected member
+   * (`≈ <name>` for a community, `<name> +<n>` for a hub with its satellites); see `nameOf`. */
   labels?: string[];
   /** The parent's index, or -1 for a node at the top level. */
   parent: number[];
@@ -46,6 +47,9 @@ export interface OverviewModel {
   index: Map<string, number>;
   /** The result's edge ids (see `resolvedEdgeIds`), or null. */
   edgeIds: string[] | null;
+  /** The outermost node of every node's chain: a node that is its parent's only child and has the same disc (overview
+   * option `chains`) is drawn, named and picked with its parent. The node itself when it is in no chain. */
+  chainTop: Int32Array;
 }
 
 export interface OverviewView {
@@ -64,9 +68,12 @@ export const BORDER_PREFIX: 'border:';
 /** The id prefix of the clusters the overview adds for communities. */
 export const COMMUNITY_PREFIX: 'community:';
 /** A short name: the last part of a path-like id; `≈ <level>.<k>` for a community. */
-/** The name of node `i`: its label from the data (`overview.labels`), else `displayName` of its id. */
+/** The name of node `i`: its label from the data (`overview.labels`), else `displayName` of its id; the top of a chain
+ * names the chain (`A › B`, a repeated name once). */
 export function nameOf(model: OverviewModel, i: number): string;
 export function displayName(id: string): string;
+/** The nodes of node `i`'s chain from its top down (just `i` when it is in none). */
+export function chainOf(model: OverviewModel, i: number): number[];
 /** RGB in 0..1 for the n-th top-level cluster. */
 export function clusterColour(rootOrdinal: number): [number, number, number];
 /** Floats per shape vertex and per line or triangle vertex of `overviewBuffers`. */
@@ -108,8 +115,18 @@ export function placeScene(
 ): {scale: number; apply(p: [number, number]): [number, number]; invert(p: [number, number]): [number, number]};
 /** For every node, the outermost structured or collapsed cluster it lies in, or -1. */
 export function ownersOf(model: OverviewModel, expanded?: Expanded, collapsed?: Set<number>): Int32Array;
-/** Vertex data; clusters of `expanded` drawn structured, of `collapsed` as one disc with their edges bundled per pair. */
-export function overviewBuffers(model: OverviewModel, expanded?: Expanded, collapsed?: Set<number>, selected?: number): OverviewBuffers;
+/** The outlines a disc can be drawn with (inscribed in its circle). */
+export type Outline = 'circle' | 'square' | 'octagon' | 'diamond';
+export const OUTLINES: Outline[];
+/** Vertex data; clusters of `expanded` drawn structured, of `collapsed` as one disc with their edges bundled per pair;
+ * `shapes` gives an outline per node kind (default: circle). */
+export function overviewBuffers(
+  model: OverviewModel,
+  expanded?: Expanded,
+  collapsed?: Set<number>,
+  selected?: number,
+  options?: {shapes?: Record<string, Outline>},
+): OverviewBuffers;
 
 /** How a container is shown; the engine's type (ADR 0018, addendum). */
 export type {Representation} from '@arqlet/contracts';
@@ -131,6 +148,9 @@ export interface RepresentationOptions {
   collapsePixels?: number;
   structureShare?: number;
   rulePixels?: number;
+  /** A level of detail: clusters at this depth (0: the top level) or deeper are collapsed, after the user's decisions and
+   * the rules, before the zoom. Default null (off). */
+  depth?: number | null;
 }
 /** The representation of every container for a view (ADR 0018, addendum): user, then rules, then zoom. */
 export function representationsOf(
