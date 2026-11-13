@@ -34,6 +34,8 @@ mod force_directed;
 mod geometry_update;
 #[path = "graph_roundtrip.rs"]
 mod graph_roundtrip;
+#[path = "import_limit.rs"]
+mod import_limit;
 #[path = "interactive_continuation.rs"]
 mod interactive_continuation;
 #[path = "layered_construction.rs"]

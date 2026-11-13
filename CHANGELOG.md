@@ -13,6 +13,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   in sessions: `session.neighbourhood(nodeId, {hops, direction, edgeKinds})`; `arqlet_view::neighbourhood` in Rust.
   Playground: *Neighbourhood* around the *From* node.
 
+### Fixed
+
+- With a level of detail, communities or groups, an import's `limit` counted every node below a collapsed container, so
+  a first view with many collapsed containers showed only those whose whole content fit (20 containers of 50 nodes,
+  `limit: 100`: 2 shown, the rest left out silently). The limit now counts what the first view shows: a collapsed
+  container counts once and keeps all it holds, so it can be opened. A container that an edge brings into the view
+  while none of its content is selected (an aggregated edge between containers) keeps its content and starts
+  collapsed, instead of becoming a plain node that cannot be opened ("Not a container"). Imports without such a view,
+  or within the limit, are unchanged byte for byte.
+
 ## 0.4.0 — 2026-11-13
 
 Views that change without a new import: a filter that keeps positions, sessions whose state stays in the engine (also
