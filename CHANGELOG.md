@@ -13,6 +13,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- ELK adapter: `elk.layered.considerModelOrder.strategy` (other than `NONE`) makes ties follow the input order instead
+  of the node ids (provisional), as ELK follows its model order; renaming nodes no longer changes the drawing. The
+  answer carries the given ids. Off by default; without it the output is unchanged.
 - Overview sessions answer only what moves (provisional): a session's `overview` with `positionsOnly` returns
   `OverviewPositions` (positions, root radius, counts, representation) while the clusters stay those of its last
   overview, and the whole overview otherwise. `createOverviewSession` asks for it on the graph the engine keeps and

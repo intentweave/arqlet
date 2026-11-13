@@ -545,3 +545,79 @@ fn a_bus_survives_collapsing_an_ecu_and_carries_its_label() {
         .iter()
         .any(|l| l["kind"] == "bus"));
 }
+
+/// Twelve nodes in two chains and some cross edges, named by `name(i)` for the i-th node of the input.
+fn ordered(name: impl Fn(usize) -> String, model_order: bool) -> Value {
+    let children: Vec<Value> = (0..12)
+        .map(|i| json!({"id": name(i), "width": 120, "height": 40}))
+        .collect();
+    let mut edges = Vec::new();
+    for i in 0..12 {
+        if i % 6 != 5 {
+            edges.push(json!({"id": format!("{}-next", name(i)), "sources": [name(i)], "targets": [name(i + 1)]}));
+        }
+    }
+    for (a, b) in [(0, 8), (2, 7), (3, 10), (6, 4)] {
+        edges.push(json!({"id": format!("x{a}{b}"), "sources": [name(a)], "targets": [name(b)]}));
+    }
+    let mut options = json!({"elk.algorithm": "layered", "elk.direction": "RIGHT"});
+    if model_order {
+        options["elk.layered.considerModelOrder.strategy"] = json!("NODES_AND_EDGES");
+    }
+    json!({"id": "root", "layoutOptions": options, "children": children, "edges": edges})
+}
+
+/// The place of the i-th node of the input.
+fn places(answer: &Value, name: impl Fn(usize) -> String) -> Vec<(f64, f64)> {
+    let children = answer["graph"]["children"].as_array().unwrap();
+    (0..12)
+        .map(|i| {
+            let c = children
+                .iter()
+                .find(|c| c["id"] == name(i))
+                .expect("the given id comes back");
+            (c["x"].as_f64().unwrap(), c["y"].as_f64().unwrap())
+        })
+        .collect()
+}
+
+#[test]
+fn with_model_order_ties_follow_the_input_not_the_names() {
+    // Names whose order is not the input order, and other names in the same input order.
+    let scrambled = |i: usize| format!("n{}", (i * 7) % 12);
+    let plain = |i: usize| format!("node-{i:02}");
+    let a = run(json!({"op": "elkLayout", "graph": ordered(scrambled, true)}));
+    let b = run(json!({"op": "elkLayout", "graph": ordered(plain, true)}));
+    assert_eq!(a["ok"], true, "{a}");
+    assert_eq!(
+        places(&a, scrambled),
+        places(&b, plain),
+        "the same drawing whatever the names"
+    );
+    // The answer carries the given ids everywhere: no id of the renaming is left.
+    for answer in [&a, &b] {
+        assert!(!answer.to_string().contains("arqlet-order-"), "{answer}");
+        assert!(answer["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|d| !d.as_str().unwrap().contains("considerModelOrder")));
+    }
+    let edges = a["graph"]["edges"].as_array().unwrap();
+    assert!(edges
+        .iter()
+        .any(|e| e["id"] == "n0-next" && e["sources"][0] == "n0"));
+    // Without the option nothing changes: ties are broken by id, as before.
+    let off = run(json!({"op": "elkLayout", "graph": ordered(scrambled, false)}));
+    assert_eq!(off["ok"], true);
+    let none = {
+        let mut g = ordered(scrambled, false);
+        g["layoutOptions"]["elk.layered.considerModelOrder.strategy"] = json!("NONE");
+        run(json!({"op": "elkLayout", "graph": g}))
+    };
+    assert_eq!(
+        off["graph"]["children"], none["graph"]["children"],
+        "NONE is the default"
+    );
+    assert_eq!(off["graph"]["edges"], none["graph"]["edges"]);
+}
