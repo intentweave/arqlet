@@ -22,6 +22,7 @@ Arqlet (formerly the working name Layerweave) is an incremental hierarchical gra
 - `docs/`: `specification.md` (product requirements and implementation status, in English), `architecture.md`, `roadmap.md`, `adr/`.
 - `benchmarks/README.md`: measurement plan only. No harness or results exist yet.
 - `exports/`, `apps/playground/generated/`, `target/`: generated, git-ignored. Don't commit them.
+- Data that must not be published (evaluation exports, customer graphs) never goes into the repository folder, not even ignored: keep it outside and serve it with `server.py --local-examples`. Stage named paths, never `git add -A`.
 
 ## Commands
 
@@ -40,6 +41,7 @@ Browser/WASM end-to-end (needs Rust with `wasm32-unknown-unknown`, Node 24+, Pyt
 ```sh
 sh apps/playground/build.sh [path/to/graph.json]   # default: exports/intentweave-initial/graph.json
 python3 apps/playground/server.py                  # http://127.0.0.1:8765
+python3 apps/playground/server.py --local-examples <folder outside the repo>   # also offers that folder's graphs
 ```
 
 `build.sh` also runs `smoke.mjs`, `revisions.test.mjs`, `server_test.py` and `ui-regression.mjs`. CI runs it on `examples/fixtures/small.json`.

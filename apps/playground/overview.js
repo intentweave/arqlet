@@ -81,6 +81,11 @@ async function sources() {
         config: d.configSet ? `/generated/overview/${d.configSet}` : null});
     }
   } catch { /* no generated datasets: the demo graph only */ }
+  try {
+    // Local examples (server.py --local-examples, data kept outside the repository) that ask for the overview.
+    const local = await (await fetch('/local/index.json')).json();
+    for (const d of local.filter(d => d.overview).reverse()) list.splice(1, 0, {label: `${d.title} (${d.nodes.toLocaleString()} nodes)`, url: d.url});
+  } catch { /* no local examples */ }
   $('source').replaceChildren(...list.map(s => {
     const option = new Option(s.label, s.url);
     option.dataset.config = s.config ?? '';

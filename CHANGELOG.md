@@ -21,6 +21,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   (re-exported by `arqlet`) is a backend as a `run` with `openSession()`, so `createSession` keeps the snapshot in the
   backend too.
 - `session.trace(from, to)` and `session.reveal(nodeIds)` in `@arqlet/engine-client` (provisional).
+- Playground: `server.py --local-examples <folder>` offers the graphs of a folder outside the repository on both pages
+  (served read-only at `/local/`, nothing copied into the repository); an ELK graph (`children`) is laid out through
+  the ELK adapter.
 - Resident sessions (provisional, ADR 0019 step 3): `arqlet::Session` keeps a view's snapshot inside the engine;
   requests carry only the change and answers bring the scene. In WASM through `lw_session_open/run/close`, in the
   worker by message, and in JavaScript through `createSession` (by default, see above); `exportSnapshot()` and `load`
