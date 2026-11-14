@@ -425,6 +425,11 @@ Measured in `benchmarks/results/organic-forces-20261114.md`; the fingerprint vie
 forces takes preview steps and repairs the converged one, so it converges (5 to 24 calls on the organic examples); the
 playground's **Live** option follows every change with such calls, one animated frame each, in all three deployment modes.
 
+`sharedBorderRanks` and `alignStacked` are on by default (after 0.5.0): containers across their parent's flow share the
+border rank with side nodes, and stacks of containers (one edge between them, the only one on each side) are aligned as
+priority blocks of the placement across the flow, so the stack stands flush with straight edges
+(`benchmarks/results/cross-axis-space-20261115.md`).
+
 Single pass against the default gate (2026-11-08): over five seeds single pass is better
 than the refined default on all 16 datasets the automatic choice takes (11 mixed, 5 of one
 axis). Explicit ports on their flow side are constructed, and areas that choose their

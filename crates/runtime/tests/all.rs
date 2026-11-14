@@ -104,6 +104,8 @@ mod single_pass;
 mod single_pass_reversed;
 #[path = "sparse_stress.rs"]
 mod sparse_stress;
+#[path = "stacked_containers.rs"]
+mod stacked_containers;
 #[path = "straight_detours.rs"]
 mod straight_detours;
 #[path = "structured_communities.rs"]

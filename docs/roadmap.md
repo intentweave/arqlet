@@ -45,6 +45,22 @@ Specified in [recursive-optimization.md](recursive-optimization.md) §13, with t
 Performance work and algorithm replacements per layout family are planned step by step in
 [layout-improvement-plan.md](layout-improvement-plan.md).
 
+## 6. Memberships across the hierarchy (proposed)
+
+Today a node belongs to one container (`parentId`); `groups` and communities nest inside that one hierarchy. A node
+that belongs to a zone, a team and a security domain at once cannot be shown. Planned (needs an ADR, 0021):
+
+- Model: memberships separate from `parentId`, as groups with a dimension (`zone`, `team`, `layer`, …); the canonical
+  graph keeps its hierarchy.
+- View: each dimension is shown as the hierarchy (containers, as now), as lanes (one dimension across the flow, a grid
+  like pools and lanes; in layered areas a partition of every rank's order), or as an overlay (hulls around the members,
+  kept together softly: adjacent order in layered areas, a group force in organic ones). Proxies (copies) only where a
+  group cannot be kept together.
+- Hard parts: contiguity is not always possible (Euler diagrams); hulls cross container borders and must not obstruct
+  the routing; a measure of group contiguity and overlap is needed before any default.
+- Open questions for the ADR: the concrete dimensions of the exports, how many groups and dimensions, and whether the
+  extra memberships shape the layout or are only drawn at first.
+
 ## Open decisions (not blocking the scaffold)
 
 - Final project name and package availability.

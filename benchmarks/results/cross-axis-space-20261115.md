@@ -45,3 +45,32 @@ Giving the placement the side ports as drawn (instead of a share of the child's 
 A prototype ranked strongly connected sibling containers as one (their edges delegated to the general router): the zones of cloud-architecture stood one above the other, 8 bends fewer, but 9 % more area and a much taller drawing; dropped in favour of the two options above.
 
 Default fingerprints identical on all 15 views; 852 tests.
+
+## Replaced: `alignStacked` instead of `straightenOffsets` (decided in the plan)
+
+The pass that moved containers after the placement was replaced by a decision of the plan: a stack edge (the upper
+container's only edge toward the next rank and the lower one's only edge from the previous rank) forms a block of the
+placement across the flow (`block_placement`) with priority, at the containers' exact ports (side port as drawn, border
+node lane); crossing segments give way as for segments between dummies. Without the stack condition (any single edge
+between two containers) uml-class got 2 bends and layerweave-code 6 crossings and 64 bends more.
+
+`alignStacked` alone:
+
+```
+arqlet-pipeline              DIFF  default h0 c22 b80 a3380k | variant h0 c22 b78 a3390k
+cloud-architecture           DIFF  default h0 c22 b114 a4637k | variant h0 c22 b108 a4569k
+synthetic-2k                 DIFF  default h0 c2792 b1613 a61421k | variant h0 c2788 b1601 a61421k
+```
+
+With `sharedBorderRanks` (the new default):
+
+```
+arqlet-pipeline              DIFF  default h0 c22 b80 a3380k | variant h0 c22 b78 a3390k
+cloud-architecture           DIFF  default h0 c22 b114 a4637k | variant h0 c22 b108 a4308k
+org-chart                    DIFF  default h0 c37 b337 a19821k | variant h0 c37 b335 a17884k
+synthetic-2k                 DIFF  default h0 c2792 b1613 a61421k | variant h0 c2780 b1578 a62193k
+```
+
+No crossing and no bend more on any dataset. Fingerprints: 4 of 15 views changed (cloud-architecture, arqlet-pipeline,
+org-chart, synthetic-2k), new reference `fingerprints-20261115-stacked-default.jsonl`; with both options `false` the
+geometry equals `fingerprints-20261114-channels-by-demand-default.jsonl` (metadata only); threads 1 and 4 identical.

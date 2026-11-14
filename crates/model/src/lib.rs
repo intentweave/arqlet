@@ -1775,17 +1775,19 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub pack_components: Option<PackComponents>,
-    /// Experimental: in a container across its parent's flow, the border nodes of edges that cross it share the first or
-    /// last rank with the side nodes of edges that enter or leave on its sides, when that rank holds only side nodes,
-    /// instead of opening a rank of their own (which left a rank of one long-edge dummy before the first child). Off by
-    /// default.
-    #[serde(default, skip_serializing_if = "is_false")]
+    /// In a container across its parent's flow, the border nodes of edges that cross it share the first or last rank with
+    /// the side nodes of edges that enter or leave on its sides, when that rank holds only side nodes, instead of opening a
+    /// rank of their own (which left a rank of one long-edge dummy before the first child). On by default since 0.6.0;
+    /// written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub shared_border_ranks: bool,
-    /// Experimental: after the placement across the flow, an element (a leaf or a container) moves across the flow where
-    /// that straightens one of its edges to the neighbouring rank at the ports as they are drawn, when it fits in the gap
-    /// between its neighbours in the rank, the drawing does not grow, and fewer segments stay bent. Off by default.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub straighten_offsets: bool,
+    /// An edge between two containers of adjacent ranks that is the upper one's only edge toward the next rank and the lower
+    /// one's only edge from the previous rank (a stack of containers, such as the subnets of a zone) forms a block of the
+    /// placement across the flow with priority, at its ports as the containers' own plans place them: the two containers
+    /// stand so that the edge runs straight, before the median alignment and with crossing segments giving way, as for
+    /// segments between dummies. On by default since 0.6.0; written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub align_stacked: bool,
     /// Experimental: the children of a layered area that have no edge to another child (a file of unrelated functions)
     /// are spread over the ranks as a grid instead of all standing in the first rank, one long column. They fill the
     /// ranks the connected children use, and more when there are many of them, so the grid comes out about square.
@@ -2112,8 +2114,8 @@ impl Default for LayoutOptions {
             strict_clearance: false,
             component_packing: false,
             pack_components: None,
-            shared_border_ranks: false,
-            straighten_offsets: false,
+            shared_border_ranks: true,
+            align_stacked: true,
             isolated_grid: false,
             single_pass_reversed: true,
             straight_detours: true,

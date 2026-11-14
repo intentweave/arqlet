@@ -9,6 +9,8 @@
 //! either side) are combined by the average of the two median places of every element, when that keeps every rank's
 //! order and gaps; otherwise the narrowest variant is used.
 
+use std::collections::BTreeSet;
+
 /// A segment between elements of adjacent ranks (in either order), each with its port's offset from its start. Others
 /// are ignored.
 #[derive(Clone, Copy, Debug)]
@@ -17,6 +19,9 @@ pub(crate) struct Segment {
     pub upper_offset: f64,
     pub lower: usize,
     pub lower_offset: f64,
+    /// Experimental (`alignStacked`): the segment forms its block before the median ones, and segments that cross it give
+    /// way, as for a segment between two dummies.
+    pub priority: bool,
 }
 
 pub(crate) struct Input<'a> {
@@ -196,6 +201,7 @@ fn variant(input: &Input<'_>, rank_of: &[usize], downwards: bool, leftwards: boo
     let offset = |id: usize, o: f64| if leftwards { o } else { input.size[id] - o };
     // For every element, its neighbours in the previous rank of the sweep: (neighbour, own offset, neighbour's offset).
     let mut previous: Vec<Vec<(usize, f64, f64)>> = vec![Vec::new(); n];
+    let mut first: BTreeSet<(usize, usize)> = BTreeSet::new();
     for s in input.segments {
         let (mut u, mut v, mut u_o, mut v_o) = (s.upper, s.lower, s.upper_offset, s.lower_offset);
         if rank_of[u] == usize::MAX || rank_of[v] == usize::MAX {
@@ -208,6 +214,9 @@ fn variant(input: &Input<'_>, rank_of: &[usize], downwards: bool, leftwards: boo
             continue;
         }
         let (u_o, v_o) = (offset(u, u_o), offset(v, v_o));
+        if s.priority {
+            first.insert((u, v));
+        }
         if downwards {
             previous[v].push((u, v_o, u_o));
         } else {
@@ -217,7 +226,9 @@ fn variant(input: &Input<'_>, rank_of: &[usize], downwards: bool, leftwards: boo
     for list in &mut previous {
         list.sort_by(|a, b| pos[a.0].cmp(&pos[b.0]).then(a.2.total_cmp(&b.2)));
     }
-    let inner = |a: usize, b: usize| input.dummy[a] && input.dummy[b];
+    let inner = |a: usize, b: usize| {
+        input.dummy[a] && input.dummy[b] || first.contains(&(a, b)) || first.contains(&(b, a))
+    };
     // Type 1 conflicts: a non-inner segment that crosses an inner segment between the same ranks gives way.
     let mut marked: Vec<Vec<bool>> = previous.iter().map(|l| vec![false; l.len()]).collect();
     let pos_ref = &pos;
@@ -258,7 +269,14 @@ fn variant(input: &Input<'_>, rank_of: &[usize], downwards: bool, leftwards: boo
             if d == 0 {
                 continue;
             }
-            for m in [(d - 1) / 2, d / 2] {
+            // A segment with priority first, then the medians.
+            let preferred: Vec<usize> = (0..d)
+                .filter(|&k| {
+                    let u = previous[v][k].0;
+                    first.contains(&(u, v)) || first.contains(&(v, u))
+                })
+                .collect();
+            for m in preferred.into_iter().chain([(d - 1) / 2, d / 2]) {
                 if align[v] != v {
                     break;
                 }
@@ -474,6 +492,7 @@ mod tests {
             upper_offset,
             lower,
             lower_offset,
+            priority: false,
         }
     }
 
