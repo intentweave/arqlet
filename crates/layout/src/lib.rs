@@ -7442,6 +7442,7 @@ fn place(
                 options.sparse_stress,
                 options.size_aware_stress,
                 options.scalable_stress,
+                options.organic_forces,
                 counters,
             )
         }
@@ -8290,7 +8291,7 @@ fn bend_count(points: &[Point]) -> usize {
         .count()
 }
 
-fn proper_crossing(a: (f64, f64), b: (f64, f64), c: (f64, f64), d: (f64, f64)) -> bool {
+pub(crate) fn proper_crossing(a: (f64, f64), b: (f64, f64), c: (f64, f64), d: (f64, f64)) -> bool {
     let orient = |p: (f64, f64), q: (f64, f64), r: (f64, f64)| {
         (q.0 - p.0) * (r.1 - p.1) - (q.1 - p.1) * (r.0 - p.0)
     };

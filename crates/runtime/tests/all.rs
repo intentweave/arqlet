@@ -62,6 +62,8 @@ mod nested_edges_by_detour;
 mod objectives;
 #[path = "option_defaults.rs"]
 mod option_defaults;
+#[path = "organic_forces.rs"]
+mod organic_forces;
 #[path = "overlaps.rs"]
 mod overlaps;
 #[path = "overview.rs"]

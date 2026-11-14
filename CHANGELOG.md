@@ -5,6 +5,18 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- `organicForces` (experimental, off): a fresh organic placement continues after the stress with forces in the manner of
+  d3-force (springs, many-body repulsion, box collision, a push off straight edges, and a pull toward the centroid that
+  weakens with the number of children), taken only where the children are connected and the straight edges cross no more
+  often. petri-net-shapes 41 % smaller and 5× faster, mixed-layouts 5 crossings to 0 and 25 % smaller, organic-50 40 %
+  smaller; self-loops twice the area and organic-25 one crossing more (benchmarks/results/organic-forces-20261114.md).
+- `repairCompaction` (experimental, off): in a flat organic drawing, the nodes the geometric repair pushed out are pulled
+  back toward their stress places as far as no conflict comes back and no crossing is added (petri-net-shapes 23 %
+  smaller, organic-25 9 %; every other dataset unchanged).
+- `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
+
 ## 0.5.0 — 2026-11-14
 
 Every area in single pass, smaller drawings and valid geometry on every dataset. Reversed flows (`rl`, `bt`) draw as the

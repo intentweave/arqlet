@@ -192,6 +192,18 @@ vpscOverlapRemoval?: boolean,
  */
 directedRepair?: boolean,
 /**
+ * Experimental: after the geometric repair of an organic area has resolved every conflict, each node it moved is pulled
+ * back toward its place from the stress placement, as far as no conflict comes back. Edges stay straight; the drawing
+ * only shrinks where the repair had pushed nodes out. Off by default.
+ */
+repairCompaction?: boolean,
+/**
+ * Experimental: a fresh organic placement continues after the stress with forces in the manner of d3-force (springs one
+ * node spacing long, many-body repulsion, box collision, a push off the straight edges, and a pull toward the centroid),
+ * which closes the gaps the stress leaves and leaves the repair little to resolve. Off by default.
+ */
+organicForces?: boolean,
+/**
  * Experimental bounded repulsion from projected edge chords at the end of organic stress. Off by default.
  */
 nodeEdgeRepulsion?: boolean,
