@@ -1812,11 +1812,12 @@ pub struct LayoutOptions {
     /// when turned off.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub channels_by_demand: bool,
-    /// Experimental: with `straightDetours`, the geometric repair of organic areas does not move nodes to clear a straight
-    /// edge whose end lies inside a container of the area; the edge's detour draws it around the nodes in its way. The
-    /// repair still clears the lines between children of organic areas. Omitted when off, so the default output does not
-    /// change.
-    #[serde(default, skip_serializing_if = "is_false")]
+    /// With `straightDetours`, the geometric repair of an organic area that cannot clear every straight line within a
+    /// bounded budget clears the lines between children of organic areas first and those into its containers within a
+    /// bounded budget of their own; their detours draw what remains around the nodes in its way. A repair that finishes
+    /// within the bounded budget is as without the option. On by default since engine 0.5; written as `false` when
+    /// turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub nested_edges_by_detour: bool,
     /// Internal (`regionChildPorts`): by container and edge (`"{container}\u{1}{edge}"`), whether the edge's border node
     /// stands at the end of the container's flow (its last rank) rather than at its start: the side that faces the edge's
@@ -2093,7 +2094,7 @@ impl Default for LayoutOptions {
             region_ports: true,
             region_child_ports: false,
             channels_by_demand: true,
-            nested_edges_by_detour: false,
+            nested_edges_by_detour: true,
             region_child_sides: BTreeMap::new(),
             directions_first: false,
             force_directed: false,

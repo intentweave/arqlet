@@ -352,7 +352,15 @@ fn an_area_with_another_layout_than_its_surroundings_leaves_no_silent_conflict()
                 graph.area_mode(None),
                 "{name}: the container follows the root"
             );
-            let snapshot = import_graph(graph, 500).expect("imports");
+            // The repair clears every line it can (`nestedEdgesByDetour` off): this test checks that what it cannot clear
+            // is reported, not bent. With the option on (the default) the lines into containers that a bounded repair
+            // leaves are drawn around the nodes in their way instead (tests/nested_edges_by_detour.rs).
+            let options = arqlet_model::LayoutOptions {
+                nested_edges_by_detour: false,
+                ..Default::default()
+            };
+            let snapshot =
+                arqlet_runtime::import_graph_with(graph, 500, &options).expect("imports");
             assert_honest(&snapshot, &format!("{name}, seed {seed}"));
             // Moving a node in the organic part continues from the previous arrangement and leaves no silent conflict.
             let moved = move_by(&snapshot, "n9", 50., 20.);

@@ -1866,8 +1866,62 @@ pub(crate) fn repair_areas(
     port_resolution_nanos: &Cell<u64>,
     port_context: &ports::PortContext<'_>,
 ) -> Vec<GeometryIssue> {
-    for _ in 0..FIT_ROUNDS {
-        let issues = repair_once(
+    // Experimental (`nestedEdgesByDetour`, with `straightDetours`): first the lines between children of organic areas, then
+    // the lines into containers within a bounded budget of their own; the detours draw what remains around the nodes in
+    // its way. Clearing the lines into containers by moving whole containers apart took the whole scan budget on an organic
+    // root over layered containers (benchmarks/results/nested-edges-by-detour-20261114.md).
+    // A repair that clears every line within the bounded budget is as without the option (small areas keep their drawing);
+    // only one that would spend more goes in the two phases.
+    // The probe's moves are those of the first repair without the option when it ends within its budget (the search is
+    // deterministic and its end does not depend on the budget then), so its boxes and findings stand for that repair.
+    let mut probed: Option<Vec<GeometryIssue>> = None;
+    // Without a straight edge into a container of an organic area the two phases are the repair without the option.
+    let nested_lines = || {
+        let organic = |parent: Option<&str>| graph.area_mode(parent) == Ok(Mode::Organic);
+        let parent_of = |id: &str| {
+            graph
+                .nodes
+                .iter()
+                .find(|n| n.id == id)
+                .and_then(|n| n.parent_id.as_deref())
+        };
+        let straight = styles::straight_candidates(graph, options);
+        graph
+            .edges
+            .iter()
+            .filter(|e| straight.contains(&e.id))
+            .any(|e| {
+                e.target.as_deref().is_some_and(|t| {
+                    e.source != t && !(organic(parent_of(&e.source)) && organic(parent_of(t)))
+                })
+            })
+    };
+    let phased = options.nested_edges_by_detour && options.straight_detours && nested_lines() && {
+        let mut probe = boxes.clone();
+        let own = Cell::new(0);
+        let found = repair_once(
+            graph,
+            options,
+            &mut probe,
+            reference,
+            &own,
+            grow,
+            effort,
+            port_resolution_nanos,
+            port_context,
+            Lines::Bounded,
+        );
+        scans.set(scans.get() + own.get());
+        let exhausted = own.get() >= NESTED_SCAN_BUDGET;
+        if !exhausted {
+            *boxes = probe;
+            probed = Some(found);
+        }
+        exhausted
+    };
+    let first = if phased { Lines::Siblings } else { Lines::All };
+    let once = |boxes: &mut BTreeMap<String, Rect>, scans: &Cell<usize>, lines: Lines| {
+        repair_once(
             graph,
             options,
             boxes,
@@ -1877,23 +1931,32 @@ pub(crate) fn repair_areas(
             effort,
             port_resolution_nanos,
             port_context,
-        );
+            lines,
+        )
+    };
+    let mut issues = None;
+    for _ in 0..FIT_ROUNDS {
+        let found = match probed.take() {
+            Some(found) => found,
+            None => once(boxes, scans, first),
+        };
         if !grow || !fit_containers(graph, options, boxes, reference) {
-            return issues;
+            issues = Some(found);
+            break;
         }
     }
     // The last fit grew a container after the issues were read: read them again on the final boxes.
-    repair_once(
-        graph,
-        options,
-        boxes,
-        reference,
-        scans,
-        grow,
-        effort,
-        port_resolution_nanos,
-        port_context,
-    )
+    let issues = issues.unwrap_or_else(|| once(boxes, scans, first));
+    if !phased {
+        return issues;
+    }
+    let own = Cell::new(0);
+    let issues = once(boxes, &own, Lines::Bounded);
+    scans.set(scans.get() + own.get());
+    if grow && fit_containers(graph, options, boxes, reference) {
+        return once(boxes, scans, Lines::Siblings);
+    }
+    issues
 }
 
 /// Grows every container whose size follows its content to hold its children with the geometry padding, deepest first.
@@ -2027,6 +2090,19 @@ fn fit_containers(
     grew
 }
 
+/// Which straight edges a repair clears (`nestedEdgesByDetour`): all of them, only those between children of organic areas,
+/// or all of them within `NESTED_SCAN_BUDGET` scans of their own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Lines {
+    All,
+    Siblings,
+    Bounded,
+}
+
+/// The scans the second phase of `nestedEdgesByDetour` may spend on clearing the lines into containers, after the first
+/// cleared the rest: what it does not clear is left to the detours.
+const NESTED_SCAN_BUDGET: usize = MODERATE_SCAN_BUDGET;
+
 /// One repair of the organic areas on the current boxes (see `repair_areas`).
 fn repair_once(
     graph: &Graph,
@@ -2038,6 +2114,7 @@ fn repair_once(
     effort: Effort,
     port_resolution_nanos: &Cell<u64>,
     port_context: &ports::PortContext<'_>,
+    lines: Lines,
 ) -> Vec<GeometryIssue> {
     let organic = |parent: Option<&str>| graph.area_mode(parent) == Ok(Mode::Organic);
     let parents_with_children: BTreeSet<&str> = graph
@@ -2155,8 +2232,7 @@ fn repair_once(
         // its detour (`straightDetours`), which draws it around the nodes in its way; the repair clears only the lines
         // between children of organic areas, which it moves directly. Moving whole containers to clear lines through their
         // inside cost the most time and area (benchmarks/results/nested-edges-by-detour-20261114.md).
-        if options.nested_edges_by_detour
-            && options.straight_detours
+        if lines == Lines::Siblings
             && !(organic(graph.nodes[s].parent_id.as_deref())
                 && organic(graph.nodes[t].parent_id.as_deref()))
         {
@@ -2245,7 +2321,9 @@ fn repair_once(
         scratch: RefCell::new(TrialScratch::new(boxes, ids.len(), edges.len())),
         scans,
         port_resolution_nanos,
-        budget: if effort == Effort::Local {
+        budget: if lines == Lines::Bounded {
+            NESTED_SCAN_BUDGET
+        } else if effort == Effort::Local {
             LOCAL_SCAN_BUDGET
         } else if effort == Effort::Moderate {
             MODERATE_SCAN_BUDGET

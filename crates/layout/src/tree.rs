@@ -318,10 +318,13 @@ pub fn tree_arrange(
     let mut placed: BTreeMap<String, Rect> = lr
         .into_iter()
         .map(|(id, r)| {
+            // The left-to-right frame keeps 48 at its top for the container's header and 24 elsewhere; transposed, that room
+            // would lie on the left and the children would start in the header. They move down by 24 and left by 24, so a
+            // vertical tree keeps the same margins (nested-tree-radial: 24 children in their containers' headers).
             let rect = if vertical {
                 Rect {
-                    x: r.y,
-                    y: r.x,
+                    x: r.y - 24.,
+                    y: r.x + 24.,
                     width: r.height,
                     height: r.width,
                 }
@@ -351,7 +354,7 @@ pub fn tree_arrange(
         }
     }
     let size = if vertical {
-        (lr_size.1, lr_size.0)
+        (lr_size.1 - 24., lr_size.0 + 24.)
     } else {
         lr_size
     };
@@ -538,6 +541,43 @@ mod tests {
             "a centred over c and d"
         );
         assert!(size.0 > 0. && size.1 > 0.);
+    }
+
+    /// Every orientation keeps the container's margins: the header (36) above the children and the padding (12) on the
+    /// other sides, in a vertical tree too (it was computed left to right and transposed, which put the header room on
+    /// the left).
+    #[test]
+    fn a_tree_of_every_orientation_leaves_the_header_free() {
+        let names = ["r", "a", "b", "c"];
+        let links = links_of(&[("r", "a"), ("r", "b"), ("a", "c")]);
+        let rules = arqlet_scene::GeometryRules::default();
+        for o in [
+            Orientation::Lr,
+            Orientation::Rl,
+            Orientation::Tb,
+            Orientation::Bt,
+        ] {
+            let (placed, size) =
+                tree_arrange(o, &ids(&names), &links, &sizes(&names), 64., 24., 0.);
+            for (id, r) in &placed {
+                assert!(
+                    r.y >= rules.header - 1e-6,
+                    "{o:?}: {id} below the header: {r:?}"
+                );
+                assert!(
+                    r.x >= rules.padding - 1e-6,
+                    "{o:?}: {id} inside the padding: {r:?}"
+                );
+                assert!(
+                    r.x + r.width <= size.0 - rules.padding + 1e-6,
+                    "{o:?}: {id} within the width"
+                );
+                assert!(
+                    r.y + r.height <= size.1 - rules.padding + 1e-6,
+                    "{o:?}: {id} within the height"
+                );
+            }
+        }
     }
 
     /// Every orientation is the same arrangement: tb puts the depths in rows, and the reversed ones point the other way.

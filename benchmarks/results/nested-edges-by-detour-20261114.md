@@ -64,3 +64,20 @@ Reading:
   self-loops 26 % more area.
 - Without a measured gain in crossings and bends it stays an option; it is the lever for the time of organic roots over
   containers and part of their area.
+
+## Default (later the same day)
+
+The first version moved the lines into containers out of the repair altogether: mixed-layouts and self-loops then crossed
+twice more. Now, with `straightDetours`:
+
+- when the graph has no straight edge into a container of an organic area, the repair is as without the option;
+- otherwise a probe repairs every line within a bounded budget (8000 scans); a probe that ends within it is the repair
+  without the option (the search is deterministic and does not end on its budget then), and its result is kept;
+- only a repair that would spend more goes in two phases: the lines between children of organic areas first, then the
+  lines into containers within a bounded budget of their own; the detours draw what remains around the nodes in its way.
+
+Every dataset (32), the default's views, against `nestedEdgesByDetour: false`: 31 identical (the same import times
+within a few milliseconds), mixed-large changed: valid geometry (10 issues before: container bounds and areas left),
+import 7.7 s → 1.1 s and refinement 31 s → 4.9 s (`bench`, median of 3), 42 % of the area, crossings 976 against 811,
+bends 150 against 68. Valid geometry comes first in the quality order, so it is the default; the fingerprint views are
+identical.

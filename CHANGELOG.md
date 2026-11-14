@@ -13,6 +13,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   ([measurement](benchmarks/results/channels-by-demand-20261114.md), [area breakdown](benchmarks/results/area-breakdown-20261114.md)).
   New reference fingerprints: `benchmarks/results/fingerprints-20261114-channels-by-demand-default.jsonl`. The spacing
   options and what they cost are measured in `docs/configuration.md` (*Spacing and area*).
+- **Default:** `nestedEdgesByDetour` is on: a repair of an organic area that cannot clear every straight line within a
+  bounded budget clears the lines between its children first and those into its containers within a bounded budget of
+  their own, and the detours draw what remains around the nodes in its way. 31 of 32 datasets draw as before; on an
+  organic root over layered containers (mixed-large) the geometry becomes valid, the import takes 1.1 s instead of 7.7 s
+  and the refinement 4.9 s instead of 31 s, at more crossings and bends
+  ([measurement](benchmarks/results/nested-edges-by-detour-20261114.md)).
 - **Default (ADR 0020, S1-4):** `regionPorts`, `straightDetours` and `singlePassReversed` are on by default (written as
   `false` when turned off). Measured on every dataset: 30 of 31 draw exactly as before (the sweep fingerprints are
   identical to 0.4.0), mixed-large draws no line through a node (44 before) at 90 more crossings, and a graph that flows
@@ -31,10 +37,6 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
-- `nestedEdgesByDetour` (experimental, off): the repair of an organic area leaves straight edges into its containers to their
-  detours; on an organic root over layered containers (mixed-large) the import takes 0.29 s instead of 7.6 s and the
-  refinement 2.9 s instead of 31 s, with valid geometry and a quarter of the area, at more crossings and bends
-  ([measurement](benchmarks/results/nested-edges-by-detour-20261114.md)).
 - `singlePassReversed` covers `bt` too (ADR 0020 S1-0b): every area is mirrored within its box and a container's header
   stays at its top; a bottom-to-top graph draws as its top-to-bottom mirror
   ([measurement](benchmarks/results/reversed-flows-20261114.md)).
@@ -103,6 +105,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- A tree area that flows top to bottom (or bottom to top) put its first rank into its container's header: the
+  arrangement is computed left to right and transposed, which moved the header room to the left. It now keeps the
+  same margins as the other orientations; nested-tree-radial had 24 such geometry issues and has none. With this and
+  `nestedEdgesByDetour`, no dataset in `benchmarks/datasets` has a geometry issue in the default layout.
 - With a level of detail, communities or groups, an import's `limit` counted every node below a collapsed container, so
   a first view with many collapsed containers showed only those whose whole content fit (20 containers of 50 nodes,
   `limit: 100`: 2 shown, the rest left out silently). The limit now counts what the first view shows: a collapsed
