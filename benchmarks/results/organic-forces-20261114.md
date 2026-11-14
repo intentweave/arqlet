@@ -58,3 +58,20 @@ synthetic-2k                 DIFF  default h0 c2792 b1613 a61421k g0 147ms | var
 ```
 
 Default fingerprints: identical on all 15 views. Tests: 850 passed.
+
+## Third version, the default
+
+A fresh layout that keeps a geometry issue is laid out again without the forces (mixed-large: identical to before); the
+loop corner rule acts in organic areas only. "default" below is the new default (forces on), "variant" is
+`organicForces: false`:
+
+```
+can-bus                      DIFF  default h0 c0 b32 a1210k g0 11ms | variant h0 c0 b32 a1207k g0 9ms
+mixed-layouts                DIFF  default h0 c0 b0 a1038k g0 36ms | variant h0 c5 b0 a1330k g0 22ms
+organic-200                  DIFF  default h0 c2 b0 a11125k g0 97ms | variant h0 c5 b0 a12848k g0 305ms
+organic-50                   DIFF  default h0 c2 b0 a2290k g0 25ms | variant h0 c2 b0 a3826k g0 44ms
+petri-net-shapes             DIFF  default h0 c26 b0 a946k g0 114ms | variant h0 c27 b0 a1614k g0 568ms
+self-loops                   DIFF  default h0 c0 b30 a245k g0 5ms | variant h0 c0 b30 a255k g0 5ms
+```
+
+Default fingerprints: identical on all 15 views. Tests: 851 passed. `apps/playground/build.sh`: passed.

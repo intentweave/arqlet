@@ -1472,6 +1472,10 @@ fn organic_stages_full(
     // With `relax` steps a warm start is not held: the stress is relaxed from the positions for that many steps, which is the
     // force-directed behaviour (pinned children stay, the others move toward their targets).
     let iterations = if warm.is_some() { relax } else { iterations };
+    // With `organicForces` a force-directed continuation relaxes with the same forces as the fresh placement, not with the
+    // stress: the stress equilibrium is wider than the forces' and would push a dropped node away from its neighbours.
+    let forces_relax = warm.is_some() && relax > 0 && anchors.is_some();
+    let iterations = if forces_relax { 0 } else { iterations };
     let mut x: Vec<(f64, f64)> = match warm {
         Some(start) => ids.iter().map(|id| start[id]).collect(),
         None => {
@@ -1624,6 +1628,39 @@ fn organic_stages_full(
     // A force-directed continuation moves toward the relaxed positions by a fraction, and by a bounded distance: each step of a
     // drag nudges the neighbours the way a spring would, instead of jumping to the equilibrium (which is far off after a big
     // drag and made the drawing jump and swim).
+    if let (true, Some(anchors)) = (forces_relax, anchors) {
+        let index: BTreeMap<&str, usize> = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.as_str(), i))
+            .collect();
+        let edges: Vec<(usize, usize)> = links
+            .iter()
+            .map(|(a, b)| (index[a.as_str()], index[b.as_str()]))
+            .collect();
+        let ends: Vec<((f64, f64), (f64, f64))> = links
+            .iter()
+            .map(|link| {
+                anchors
+                    .ends
+                    .get(link)
+                    .copied()
+                    .unwrap_or(((0., 0.), (0., 0.)))
+            })
+            .collect();
+        let extents: Vec<_> = ids.iter().map(|id| sizes[id]).collect();
+        let gravity = FORCES_GRAVITY * (FORCES_GRAVITY_NODES / n.max(1) as f64).sqrt().min(1.);
+        used += force_refine_with(
+            &mut x,
+            &edges,
+            &extents,
+            &fixed_flags,
+            length,
+            FORCES_SPRING,
+            gravity,
+            &ends,
+        );
+    }
     if let (Some(start), true) = (warm, relax > 0) {
         for (i, id) in ids.iter().enumerate() {
             if fixed_flags[i] {

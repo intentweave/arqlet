@@ -63,7 +63,7 @@ pub(crate) struct PortContext<'g> {
     /// Experimental (plan section 4a, `layeredConstruction`): an automatic port of an edge that runs forward through areas
     /// of one fixed flow sits on the side the flow leaves (source) or enters (target). Off by default.
     flow_sides: bool,
-    /// Experimental (`organicForces`): the loops of a node take a corner where no other box lies in their way.
+    /// With `organicForces`: the loops of a node in an organic area take a corner where no other box lies in their way.
     loop_space: bool,
     /// Experimental (plan section 4a, step 3): order keys of automatic ports by (edge, source end), from the layered plan
     /// (`layered_plan::port_keys`). A node side whose ports all have a key is ordered by them instead of by the geometry.
@@ -378,7 +378,8 @@ impl<'g> PortContext<'g> {
                 // ancestors and descendants. The loops are drawn at the end and do not take part in the placement; a corner
                 // that a neighbour blocks makes the router take them around it, with bends.
                 let blocked = |(a, b): (PortSide, PortSide)| -> usize {
-                    if !self.loop_space {
+                    // Only in organic areas: a layered area keeps its loop sides (another proposal there).
+                    if !self.loop_space || graph.area_mode(parents[node]) != Ok(Mode::Organic) {
                         return 0;
                     }
                     let reach = LOOP_REACH + LOOP_STEP * self.loop_counts[node] as f64;

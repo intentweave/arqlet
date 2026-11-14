@@ -198,9 +198,12 @@ directedRepair?: boolean,
  */
 repairCompaction?: boolean,
 /**
- * Experimental: a fresh organic placement continues after the stress with forces in the manner of d3-force (springs one
- * node spacing long, many-body repulsion, box collision, a push off the straight edges, and a pull toward the centroid),
- * which closes the gaps the stress leaves and leaves the repair little to resolve. Off by default.
+ * A fresh organic placement continues after the stress with forces in the manner of d3-force (springs one node spacing
+ * long between where the edges end, many-body repulsion, box collision, a push off the straight edges, and a pull
+ * toward the centroid), which closes the gaps the stress leaves and leaves the repair little to resolve. Taken per area
+ * only where the straight edges cross no more often and pass through no more boxes; a drawing that keeps a geometry
+ * issue is laid out again without the forces. A node's loops take a corner where no neighbour lies. On by default
+ * since 0.6.0; written as `false` when turned off.
  */
 organicForces?: boolean,
 /**

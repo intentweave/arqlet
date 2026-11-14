@@ -2996,7 +2996,11 @@ mod root_tests {
     }
 
     fn options(pins: &[(&str, f64, f64)]) -> LayoutOptions {
-        let mut options = LayoutOptions::default();
+        // The repair itself is under test: without the forces, which leave it nothing to resolve here.
+        let mut options = LayoutOptions {
+            organic_forces: false,
+            ..LayoutOptions::default()
+        };
         for (id, x, y) in pins {
             options.pins.insert(id.to_string(), Point { x: *x, y: *y });
         }

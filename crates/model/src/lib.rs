@@ -1855,10 +1855,13 @@ pub struct LayoutOptions {
     /// only shrinks where the repair had pushed nodes out. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub repair_compaction: bool,
-    /// Experimental: a fresh organic placement continues after the stress with forces in the manner of d3-force (springs one
-    /// node spacing long, many-body repulsion, box collision, a push off the straight edges, and a pull toward the centroid),
-    /// which closes the gaps the stress leaves and leaves the repair little to resolve. Off by default.
-    #[serde(default, skip_serializing_if = "is_false")]
+    /// A fresh organic placement continues after the stress with forces in the manner of d3-force (springs one node spacing
+    /// long between where the edges end, many-body repulsion, box collision, a push off the straight edges, and a pull
+    /// toward the centroid), which closes the gaps the stress leaves and leaves the repair little to resolve. Taken per area
+    /// only where the straight edges cross no more often and pass through no more boxes; a drawing that keeps a geometry
+    /// issue is laid out again without the forces. A node's loops take a corner where no neighbour lies. On by default
+    /// since 0.6.0; written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub organic_forces: bool,
     /// Experimental bounded repulsion from projected edge chords at the end of organic stress. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
@@ -2113,7 +2116,7 @@ impl Default for LayoutOptions {
             vpsc_overlap_removal: false,
             directed_repair: false,
             repair_compaction: false,
-            organic_forces: false,
+            organic_forces: true,
             node_edge_repulsion: false,
             sparse_stress: false,
             scalable_stress: false,

@@ -1640,7 +1640,22 @@ pub fn move_node(
             &ended
         }
     };
-    let mut result = recompute_with(from, &options)?;
+    // The end of a gesture that changes no pin (no release) would be answered without a layout (`recompute_with` sees the
+    // same options), and the conflicts the local repair of the last step left would stand. The end repairs them: the
+    // dragged node and its ancestors are laid out again, which the moderate repair of an ending gesture follows.
+    // A force-directed drag settles after the drop by its own steps instead.
+    let unresolved = matches!(step.phase, MovePhase::Finish | MovePhase::Cancel)
+        && !options.force_directed
+        && !snapshot.geometry_issues.is_empty();
+    let mut result = if unresolved && options == snapshot.options {
+        recompute_layout(
+            from,
+            &options,
+            Some(dirty_with_ancestors(&snapshot.graph, [step.node.clone()])),
+        )?
+    } else {
+        recompute_with(from, &options)?
+    };
     result.gesture = Some(gesture);
     Ok(result)
 }

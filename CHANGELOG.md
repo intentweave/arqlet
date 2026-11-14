@@ -5,15 +5,26 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- **Default:** `organicForces` is on: a fresh organic placement continues after the stress with forces in the manner of
+  d3-force (springs between where the edges end, many-body repulsion, box collision, a push off straight edges, and a pull
+  toward the centroid that weakens with the number of children). Taken per area only where the children are connected
+  and the straight edges cross no more often and pass through no more boxes, nested ones included; a fresh layout that
+  keeps a geometry issue is laid out again without the forces. A node's loops in an organic area take a corner where no
+  neighbour lies. A force-directed drag and `settle` relax with the same forces. petri-net-shapes 41 % smaller and 5×
+  faster, mixed-layouts 5 crossings to 0 and 22 % smaller, organic-50 40 % smaller, organic-200 5 crossings to 2,
+  self-loops 4 % smaller; can-bus 0.25 % larger; every other dataset and every fingerprint view unchanged
+  ([measurement](benchmarks/results/organic-forces-20261114.md)). `organicForces: false` restores the earlier placement.
+
+### Fixed
+
+- The end of a drag that changes no pin repaired nothing: the engine saw unchanged options and answered without a layout,
+  so conflicts the local repair of the last drag step left stood. The end of a gesture now lays out the dragged node
+  again when geometry issues remain (not for a force-directed drag, which settles by its own steps).
+
 ### Added
 
-- `organicForces` (experimental, off): a fresh organic placement continues after the stress with forces in the manner of
-  d3-force (springs, many-body repulsion, box collision, a push off straight edges, and a pull toward the centroid that
-  weakens with the number of children), taken only where the children are connected and the straight edges cross no more
-  often and pass through no more boxes. An edge into a container pulls toward the node it ends at inside, and a node's
-  loops take a corner where no neighbour lies. petri-net-shapes 41 % smaller and 5× faster, mixed-layouts 5 crossings to 0
-  and 22 % smaller, organic-50 40 % smaller, self-loops 4 % smaller; mixed-large has fewer crossings but one straight edge
-  through a node (benchmarks/results/organic-forces-20261114.md).
 - `repairCompaction` (experimental, off): in a flat organic drawing, the nodes the geometric repair pushed out are pulled
   back toward their stress places as far as no conflict comes back and no crossing is added (petri-net-shapes 23 %
   smaller, organic-25 9 %; every other dataset unchanged).

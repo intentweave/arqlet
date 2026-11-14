@@ -335,6 +335,34 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    let forced = compute_counted_body(graph, previous, dirty, options)?;
+    // Experimental (`organicForces`): the forces are chosen per area before the repair, which cannot be foreseen there. A
+    // drawing that keeps a geometry issue is laid out again without them, and the one with fewer issues is kept (mixed-large:
+    // one straight edge through a node in a deeply nested container). Only then does the layout run twice.
+    // Only a fresh layout: the forces act on fresh placements only, and a continuation (a drag step reports its conflicts
+    // on purpose) gains nothing from a second layout.
+    if !options.organic_forces || previous.is_some() || forced.0.geometry_issues.is_empty() {
+        return Ok(forced);
+    }
+    let without = LayoutOptions {
+        organic_forces: false,
+        ..options.clone()
+    };
+    let (mut plain, stages) = compute_counted_body(graph, previous, dirty, &without)?;
+    if plain.geometry_issues.len() < forced.0.geometry_issues.len() {
+        // The option stays in the snapshot: a later layout of it goes on as configured.
+        plain.options.organic_forces = true;
+        return Ok((plain, stages));
+    }
+    Ok(forced)
+}
+
+fn compute_counted_body(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
     // Experimental (`regionPorts`, ADR 0020 S1-2): edges that leave a region of another strategy in a layered parent end at
     // the region's box for the layout; their inner legs are joined afterwards.
     if options.region_ports {
@@ -4457,6 +4485,25 @@ fn compute_once(
         &mut ordering,
         &mut run.capacity_seeds,
     );
+    // With `organicForces` the drawings are denser, and the moderate repair at the end of a drag can be left with a node
+    // that has no room within two spacings. The end of the gesture then repairs fully, as a fresh layout does; the steps of
+    // the drag stay local.
+    if options.organic_forces && effort == repair::Effort::Moderate && !repair_issues.is_empty() {
+        let mut full = repair::Memo::new(repair::Effort::Full);
+        repair_issues = repair_and_replace(
+            graph,
+            &index,
+            &port_context,
+            options,
+            &mut boxes,
+            &mut full,
+            (optimize, minimum, &gaps, &mut orientations),
+            &mut run.search,
+            &mut run.plans,
+            &mut ordering,
+            &mut run.capacity_seeds,
+        );
+    }
     if options.abstract_routing {
         if (run.stop)() {
             return Err(Abort::Stopped);
