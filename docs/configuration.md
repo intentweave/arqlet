@@ -16,13 +16,14 @@ The historical execution options below live in `LayoutOptions`. Authored regiona
 | `singlePassMixed` | bool | `false` (omitted) | provisional: graphs with areas of no fixed flow (organic, tree, radial) or straight routing stay in single pass instead of falling back; those areas keep their own placement, their edges go to the completing router, and channel growth moves their overlapping children apart. Better on `can-bus`, equal on two views, worse on `mixed-large`; off. See [results](../benchmarks/results/single-pass-mixed-20261109.md). |
 | `orderSeed` | integer | `0` (omitted) | provisional, for measurement: the seed of the shuffled starts of the hierarchical order (its runs from the fourth on). 0 keeps the order used before the option existed. `benchmarks/eval/single-pass.mjs --seeds N` averages each metric over seeds 0..N-1, as the gate of ADR 0016 asks. |
 | `orderHints` | map node → `{after}` | empty (omitted) | provisional: the node stands after the named sibling in its rank, or first with `after: null`; set by a released drag on a single-pass drawing. See [results](../benchmarks/results/single-pass-drag-20261107.md). |
-| `nodeSpacing` | number ≥ 0 | 24 (omitted) | provisional: the base gap between neighbours of a rank, across the flow; label room and the clearance minimum are added as before. The ELK adapter maps `elk.spacing.nodeNode` to it. |
-| `layerSpacing` | number ≥ 0 | 64 (omitted) | provisional: the base gap between ranks, along the flow; label room, the clearance minimum and channel widening are added as before. The ELK adapter maps `elk.spacing.nodeNodeBetweenLayers` to it. |
+| `nodeSpacing` | number ≥ 0 | 24 (omitted) | provisional: the base gap between neighbours of a rank, across the flow; label room and the clearance minimum are added as before. The ELK adapter maps `elk.spacing.nodeNode` to it. 16 measured: 10 % less area, fewer crossings, a few more bends on the layered views in one direction, but lines through nodes on views with mixed directions or organic areas (see *Spacing and area* below), so the default stays 24. |
+| `layerSpacing` | number ≥ 0 | 64 (omitted) | provisional: the base gap between ranks, along the flow; label room, the clearance minimum and channel widening are added as before. The ELK adapter maps `elk.spacing.nodeNodeBetweenLayers` to it. With `channelsByDemand` (the default) the channels take what their tracks need, and this gap mostly sets the positions the lanes are planned on: smaller values save little area and cost bends (see *Spacing and area* below). |
 | `isolatedGrid` | bool | `false` (omitted) | provisional: the children of a layered area without an edge to another child (a file of unrelated functions) stand in a grid of their own ranks after the connected children, instead of all in the first rank (one long column). The grid takes about √(k·pitch) ranks for k children (`pitch`: the gap of two neighbours over that of two ranks), so it comes out about square; the connected children are placed exactly as without them. The cluster overview's structured clusters use it. See [results](../benchmarks/results/isolated-grid-20261111.md). |
 | `singlePassReversed` | bool | `true` (omitted; written `false` when off) | on by default since S1-4 (ADR 0020, S1-0 and S1-0b): a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`) is laid out with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header at its top); logical edge direction is kept, the drawing equals the mirror of `lr` / `tb`. Not for graphs with pins, label places, explicit ports or buses (those keep the earlier pipeline). Measured: [reversed-flows-20261114.md](../benchmarks/results/reversed-flows-20261114.md). |
 | `straightDetours` | bool | `true` (omitted; written `false` when off) | on by default since S1-4 (ADR 0020, S1-1b): a straight edge (organic, radial or straight routing) that would pass through a node it does not end at is drawn around it, on its orthogonal route pulled taut around the nodes it does not lie in; edges with a free line stay one segment, the placement does not change, and the `straight-through-node` findings follow the drawn routes. Measured: [straight-detours-20261114.md](../benchmarks/results/straight-detours-20261114.md). |
 | `regionPorts` | bool | `true` (omitted; written `false` when off) | on by default since S1-4 (ADR 0020, S1-2): an edge that leaves a region of another strategy (organic, tree, radial) in a layered parent is routed by the parent to a port on the region's border on the side its flow uses, and drawn inside the region from that port to its node (straight, or axis-parallel in a tree, around the region's nodes where needed). Two layouts (automatic ports, ports at the nodes' places in their order) and the better by the published key, so about twice the time; the parent's order sees a region at its ports and keeps that order. Not for graphs with buses or explicit edge ports. Measured: [region-ports-20261114.md](../benchmarks/results/region-ports-20261114.md). |
 | `regionChildPorts` | bool | `false` (omitted) | experimental (ADR 0020, S1-3): a container with a fixed flow inside an organic or radial area gets border nodes in its own flow (on the side that faces the other end in the area's abstract placement); its edges to the outside run inside it along its ranks and leave it there, and the area draws them on straight or around the container's corner. Keeps the border contract; more bends (about sevenfold on the measured graphs). Measured: [region-child-ports-20261114.md](../benchmarks/results/region-child-ports-20261114.md). |
+| `channelsByDemand` | bool | `true` (omitted; written `false` when off) | on by default (single pass): every channel between two ranks is as wide as its tracks need (at least the margin on both sides and a track) instead of at least the layer gap; the order and the places across the flow are chosen on the layer gap as before; only in areas with a fixed flow along their parent's axis below fixed flows. On the 15 layered views the same crossings and bends with 3 to 17 % less area; on every dataset no change in lines through nodes, crossings or bends. Measured: [channels-by-demand-20261114.md](../benchmarks/results/channels-by-demand-20261114.md). |
 | `nestedEdgesByDetour` | bool | `false` (omitted) | experimental: with `straightDetours`, the geometric repair of organic areas does not move nodes to clear a straight edge whose end lies inside a container of the area (its detour draws it around the nodes in its way); lines between children of organic areas are still cleared by the repair. mixed-large: valid geometry, import 26× and refinement 11× faster, a quarter of the area, more crossings and bends; flat organic areas unchanged. Measured: [nested-edges-by-detour-20261114.md](../benchmarks/results/nested-edges-by-detour-20261114.md). |
 | `directionsFirst` | bool | `false` (omitted) | experimental: free directions (`auto`) are laid out with their orientations fixed under single pass — every free area left to right, and every free area top to bottom — and the drawing with the best published key wins, so single pass builds the edges instead of delegating them and the result is never worse than left to right by that key; the snapshot keeps the free directions and `areaOrientations`. About twice the layout time of a fixed direction. Measured: [free-directions-20261113.md](../benchmarks/results/free-directions-20261113.md). |
 | `packComponents` | `{aspect?}` | unset (omitted) | experimental: the weakly connected components of a layered container's children (a lone child is one) keep their own ranks and are packed in rank space towards `aspect` (width over height on the drawing, default 1): components stand across the flow in columns of rank ranges, the deepest first, so the arrangement, ordering and routing stay one layered drawing. Replaces `isolatedGrid` where both are set. Fewer than two components: unchanged. Measured on synthetic shapes: [pack-components-20261113.md](../benchmarks/results/pack-components-20261113.md). |
@@ -127,6 +128,40 @@ source/binary/input hashes, native import/core-refinement/Optimize clocks,
 public two-process calls, full quality and actual abstract-pass/search counts.
 `bench --pipeline-only 1` omits ancillary interaction probes (such as pins) and
 marks their results as `null`; it does not skip candidates or routing rounds.
+
+## Spacing and area (measured 2026-11-14)
+
+The base gaps are options, so a host can trade area against crossings and bends for its own drawings. Measured with
+`node benchmarks/eval/area-breakdown.mjs --options JSON` on the 15 layered datasets (the default's views, every area in the
+view's default direction, bounded to 150 nodes), with `channelsByDemand` on (the default), in sum over the 15 views; elk-rs
+(`@openedges/elk-layout`) on the same views for reference
+([breakdown](../benchmarks/results/area-breakdown-20261114.md),
+[channels by demand](../benchmarks/results/channels-by-demand-20261114.md)):
+
+| options | lines through nodes | crossings | bends | area (millions) |
+|---|---|---|---|---|
+| default (`nodeSpacing` 24, `layerSpacing` 64) | 0 | 2730 | 3734 | 223.7 |
+| `nodeSpacing` 16 | 0 | 2706 | 3740 | 200.7 (−10 %) |
+| `nodeSpacing` 12 | 0 | 2706 | 3740 | 200.7 (a minimum holds below 16) |
+| `layerSpacing` 40 | 0 | 2755 | 4144 (+11 %) | 219.9 (−2 %) |
+| `layerSpacing` 32 | 0 | 2757 | 4146 (+11 %) | 218.5 (−2 %) |
+| `layerSpacing` 32, `nodeSpacing` 16 | 1 | 2707 | 4152 (+11 %) | 196.0 (−12 %) |
+| `channelsByDemand: false` | 0 | 2730 | 3734 | 234.1 (+5 %) |
+| elk-rs (reference) | 0 | 4621 | 4078 | 146.5 |
+
+Reading:
+
+- **`nodeSpacing`** is the cheap lever on layered views in one direction: at 16 the area drops by a tenth at fewer crossings
+  and six more bends in sum. On the default's own views of every dataset (32, per-container directions and organic areas
+  included) it also draws lines through nodes (synthetic-2k 8, mixed-large 21, can-bus 1) and more bends on uml-class
+  and workflow-dag, so it is not the default: a host whose drawings are layered in one direction can set it.
+- **`layerSpacing`** below 64 does not pay since `channelsByDemand`: the channels take what their tracks need anyway, and
+  the lanes are planned on the positions this gap gives, so a smaller gap lays border nodes off their ports' lines and
+  costs a tenth more bends for 2 % of area.
+- What remains of the gap to elk-rs (about 1.4 times its area at the default) is in the gaps within ranks (the minimum
+  distances the block placement keeps for long-edge dummies, port leads and corridors between siblings), container margins
+  (header 36, padding 12 per side, a rank of border nodes 36 per side) and channels wider than elk-rs' for the same
+  tracks; crossings stay well below elk-rs' at every setting above.
 
 ## Measurements
 

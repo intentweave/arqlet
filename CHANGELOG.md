@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **Default:** `channelsByDemand` is on: channels between ranks are as wide as their tracks need instead of at least the
+  layer gap (in areas with a fixed flow along their parent's axis below fixed flows). Every measured dataset keeps its
+  lines through nodes, crossings and bends; the layered views take 3 to 17 % less area
+  ([measurement](benchmarks/results/channels-by-demand-20261114.md), [area breakdown](benchmarks/results/area-breakdown-20261114.md)).
+  New reference fingerprints: `benchmarks/results/fingerprints-20261114-channels-by-demand-default.jsonl`. The spacing
+  options and what they cost are measured in `docs/configuration.md` (*Spacing and area*).
 - **Default (ADR 0020, S1-4):** `regionPorts`, `straightDetours` and `singlePassReversed` are on by default (written as
   `false` when turned off). Measured on every dataset: 30 of 31 draw exactly as before (the sweep fingerprints are
   identical to 0.4.0), mixed-large draws no line through a node (44 before) at 90 more crossings, and a graph that flows

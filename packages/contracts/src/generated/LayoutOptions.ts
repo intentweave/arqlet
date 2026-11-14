@@ -145,6 +145,14 @@ regionPorts?: boolean,
  */
 regionChildPorts?: boolean,
 /**
+ * Single pass: every channel between two ranks is as wide as its tracks need (at least the margin on both sides and a
+ * track), narrower than the layer gap where it carries few tracks; the order and the places across the flow are chosen
+ * on the layer gap as before. Only in areas with a fixed flow along their parent's axis below fixed flows. On by
+ * default since engine 0.5 (no change in crossings or bends on any measured dataset, less area); written as `false`
+ * when turned off.
+ */
+channelsByDemand?: boolean,
+/**
  * Experimental: with `straightDetours`, the geometric repair of organic areas does not move nodes to clear a straight
  * edge whose end lies inside a container of the area; the edge's detour draws it around the nodes in its way. The
  * repair still clears the lines between children of organic areas. Omitted when off, so the default output does not

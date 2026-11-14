@@ -5156,13 +5156,19 @@ mod tests {
         graph.default_direction = DirectionConstraint::Free;
         graph.default_strategy = StrategyConstraint::Fixed(LayoutStrategy::Shortest);
         let snapshot = import_graph(graph, 10).unwrap();
-        // Both layouts are valid; the chosen one must not have a longer end-to-end sum than the other.
+        // Both layouts are valid; the chosen one must not have a longer end-to-end sum than the other. The candidates of a
+        // free direction keep channels at least the layer gap wide (`channelsByDemand` narrows only fixed flows), so they
+        // are compared with fixed directions laid out the same way.
+        let wide = arqlet_model::LayoutOptions {
+            channels_by_demand: false,
+            ..Default::default()
+        };
         let mut lr: Graph = serde_json::from_value(parallel_graph()).unwrap();
         lr.default_direction = DirectionConstraint::Fixed(Orientation::Lr);
-        let lr_snapshot = import_graph(lr, 10).unwrap();
+        let lr_snapshot = import_graph_with(lr, 10, &wide).unwrap();
         let mut tb: Graph = serde_json::from_value(parallel_graph()).unwrap();
         tb.default_direction = DirectionConstraint::Fixed(Orientation::Tb);
-        let tb_snapshot = import_graph(tb, 10).unwrap();
+        let tb_snapshot = import_graph_with(tb, 10, &wide).unwrap();
         let span = |s: &Snapshot| {
             let c = |id: &str| {
                 (
