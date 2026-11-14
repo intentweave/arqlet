@@ -1787,6 +1787,12 @@ pub struct LayoutOptions {
     /// does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub single_pass_reversed: bool,
+    /// Experimental (ADR 0020, S1-1b): a straight edge that would pass through a node it does not end at is drawn around it
+    /// instead: its orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment
+    /// where nothing is in the way and bends at the blockers' corners elsewhere. Omitted when off, so the default output
+    /// does not change.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub straight_detours: bool,
     /// How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
     /// Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2046,6 +2052,7 @@ impl Default for LayoutOptions {
             pack_components: None,
             isolated_grid: false,
             single_pass_reversed: false,
+            straight_detours: false,
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,

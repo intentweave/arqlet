@@ -314,6 +314,46 @@ pub(crate) const STRAIGHT_ISSUE: &str = "straight edge ";
 
 /// Replaces the routes of the straight edges by one segment between their ports, in edge order. Orthogonal routes are kept.
 /// Foreign nodes that a segment enters are routing issues. Nothing changes when no edge is straight.
+/// The detour of a straight edge (`straightDetours`): its current route in the snapshot (the orthogonal one on the first
+/// application, the detour itself on a later one) pulled taut around the boxes of every node it does not lie in, its own
+/// ends included (it leaves and reaches them along their border, as the scene's pulled routes do), if that route has a
+/// bend and the result enters none of the other nodes' outlines.
+fn detour(
+    snapshot: &Snapshot,
+    edge: &str,
+    ends: (&str, &str),
+    holding: &BTreeSet<&str>,
+    absolute: &BTreeMap<String, Rect>,
+    outlines: &BTreeMap<&str, Outline>,
+) -> Option<Vec<Point>> {
+    let route = snapshot
+        .routes
+        .iter()
+        .find(|r| r.id == edge && r.bundle_of.is_none())?;
+    if route.points.len() < 3 {
+        return None;
+    }
+    let obstacles: Vec<arqlet_scene::geom::Rect> = absolute
+        .iter()
+        .filter(|(id, _)| {
+            !holding.contains(id.as_str()) || id.as_str() == ends.0 || id.as_str() == ends.1
+        })
+        .map(|(_, r)| arqlet_scene::geom::Rect {
+            x0: r.x,
+            y0: r.y,
+            x1: r.x + r.width,
+            y1: r.y + r.height,
+        })
+        .collect();
+    let points = arqlet_scene::geom::pull_taut(&route.points, &obstacles);
+    let clear = points.windows(2).all(|w| {
+        outlines.iter().all(|(node, outline)| {
+            holding.contains(node) || !outline.segment_enters(w[0].x, w[0].y, w[1].x, w[1].y, 0.)
+        })
+    });
+    clear.then_some(points)
+}
+
 pub fn apply_straight_edges(
     snapshot: &mut Snapshot,
     straight: &BTreeSet<String>,
@@ -377,17 +417,36 @@ pub fn apply_straight_edges(
             let (Some(start), Some(end)) = (position("source"), position("target")) else {
                 continue;
             };
-            for (node, outline) in &outlines {
-                if holding.contains(node) {
-                    continue;
-                }
-                if outline.segment_enters(start.x, start.y, end.x, end.y, 0.) {
+            let blocked: Vec<&str> = outlines
+                .iter()
+                .filter(|(node, outline)| {
+                    !holding.contains(*node)
+                        && outline.segment_enters(start.x, start.y, end.x, end.y, 0.)
+                })
+                .map(|(node, _)| *node)
+                .collect();
+            // Experimental (`straightDetours`, ADR 0020 S1-1b): around the blockers, on the edge's earlier route pulled taut
+            // around every node the edge does not end at or lie in; kept only when that route is clear of them.
+            let detour = (snapshot.options.straight_detours && !blocked.is_empty())
+                .then(|| {
+                    detour(
+                        snapshot,
+                        &e.id,
+                        (e.source.as_str(), target),
+                        &holding,
+                        &absolute,
+                        &outlines,
+                    )
+                })
+                .flatten();
+            if detour.is_none() {
+                for node in blocked {
                     issues.push(format!("straight edge {} passes through node {node}", e.id));
                 }
             }
             routes.push(Route {
                 id: e.id.clone(),
-                points: vec![start, end],
+                points: detour.unwrap_or_else(|| vec![start, end]),
                 weight: 1,
                 bundle_of: None,
             });
@@ -405,6 +464,61 @@ pub fn apply_straight_edges(
             }
             routes.push(route.clone());
         }
+    }
+    // With `straightDetours` the findings for the straight edges follow their drawn routes: the placement's finding for a
+    // pair of a straight edge is replaced by one per node that edge's route actually enters, so a detour withdraws it and a
+    // later application without one (the route drawn straight again) reports it again. Findings for other pairs stay.
+    if snapshot.options.straight_detours {
+        let pairs: BTreeSet<(&str, &str)> = graph
+            .edges
+            .iter()
+            .filter(|e| straight.contains(&e.id))
+            .filter_map(|e| e.target.as_deref().map(|t| (e.source.as_str(), t)))
+            .flat_map(|(a, b)| [(a, b), (b, a)])
+            .collect();
+        let mut derived: Vec<GeometryIssue> = Vec::new();
+        for e in graph.edges.iter().filter(|e| straight.contains(&e.id)) {
+            let (Some(target), Some(route)) =
+                (e.target.as_deref(), routes.iter().find(|r| r.id == e.id))
+            else {
+                continue;
+            };
+            let holding: BTreeSet<&str> = [e.source.as_str(), target]
+                .into_iter()
+                .flat_map(|id| {
+                    std::iter::successors(Some(id), |id| {
+                        graph
+                            .nodes
+                            .iter()
+                            .find(|n| n.id == *id)
+                            .and_then(|n| n.parent_id.as_deref())
+                    })
+                })
+                .collect();
+            for (node, outline) in &outlines {
+                let entered = !holding.contains(node)
+                    && route
+                        .points
+                        .windows(2)
+                        .any(|w| outline.segment_enters(w[0].x, w[0].y, w[1].x, w[1].y, 0.));
+                let issue = GeometryIssue {
+                    kind: "straight-through-node".into(),
+                    node_ids: vec![e.source.clone(), target.to_string(), node.to_string()],
+                    message: format!(
+                        "straight edge between {} and {target} passes through node {node}",
+                        e.source
+                    ),
+                };
+                if entered && !derived.iter().any(|d| d.node_ids == issue.node_ids) {
+                    derived.push(issue);
+                }
+            }
+        }
+        snapshot.geometry_issues.retain(|issue| {
+            issue.kind != "straight-through-node"
+                || !matches!(issue.node_ids.as_slice(), [a, b, _] if pairs.contains(&(a.as_str(), b.as_str())))
+        });
+        snapshot.geometry_issues.extend(derived);
     }
     snapshot.routes = routes;
     snapshot.straight_edges = straight.iter().cloned().collect();

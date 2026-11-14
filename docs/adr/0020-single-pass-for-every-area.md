@@ -67,7 +67,12 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   mixed-layouts and self-loops have none; every hit left on mixed-large is a straight one-segment edge of the organic root
   through another node (`straight-through-node`), 44 in the pipeline before single pass and 67 with `singlePassMixed`.
 - **S1-1b: straight edges inside a region avoid nodes**: a straight edge that would pass through a node is drawn around it
-  (bent at the node's corner) or the region's placement moves the node off the line; measured on mixed-large.
+  (bent at the node's corner) or the region's placement moves the node off the line; measured on mixed-large. Done as
+  `straightDetours` (2026-11-14, [results](../../benchmarks/results/straight-detours-20261114.md)): the blockers were
+  siblings of the ends inside their layered containers, which the root's placement cannot move, so the edge takes its
+  orthogonal route pulled taut around the nodes it does not lie in: 44 lines through nodes become 0, for 68 bends and 90
+  crossings more, at the same placement. Under `singlePassMixed` 4 remain (edges that arrive without an orthogonal
+  route); that is part of S1-2, whose border ports replace these routes for edges that leave a container.
 - **S1-2: border ports for regions in a layered parent** (decision 4), behind `singlePassMixed`.
 - **S1-3: layered areas inside regions** (decision 5) and an organic root.
 - **S1-4: the default decision** for `singlePassMixed` on the mixed corpus (can-bus, mixed-layouts, mixed-large, self-loops,

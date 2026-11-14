@@ -92,5 +92,7 @@ mod single_pass;
 mod single_pass_reversed;
 #[path = "sparse_stress.rs"]
 mod sparse_stress;
+#[path = "straight_detours.rs"]
+mod straight_detours;
 #[path = "structured_communities.rs"]
 mod structured_communities;

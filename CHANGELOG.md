@@ -18,6 +18,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `straightDetours` (experimental, off; ADR 0020 S1-1b): a straight edge that would pass through a node is drawn around it
+  (its orthogonal route pulled taut), so an organic root over layered containers has no line through a node; the
+  placement does not change ([measurement](benchmarks/results/straight-detours-20261114.md)).
 - `metrics` measures node shapes (provisional `shape` on a drawing node): a circle is its disc, so an edge that ends on a
   circle's outline no longer counts as a line through the node. Rectangles measure as before
   ([measurement](benchmarks/results/single-pass-mixed-20261114.md)).
