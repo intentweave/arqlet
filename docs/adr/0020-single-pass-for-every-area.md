@@ -73,7 +73,14 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   orthogonal route pulled taut around the nodes it does not lie in: 44 lines through nodes become 0, for 68 bends and 90
   crossings more, at the same placement. Under `singlePassMixed` 4 remain (edges that arrive without an orthogonal
   route); that is part of S1-2, whose border ports replace these routes for edges that leave a container.
-- **S1-2: border ports for regions in a layered parent** (decision 4), behind `singlePassMixed`.
+- **S1-2: border ports for regions in a layered parent** (decision 4), behind `singlePassMixed`. Done as `regionPorts`
+  (2026-11-14, [results](../../benchmarks/results/region-ports-20261114.md)): an edge that leaves a region is laid out
+  with the region's box as its end, so the parent's routing builds its outer leg to a port on the flow side; a second
+  layout puts each port at the height of its node (beside the middle where the region routes axis-parallel, so the leg
+  does not share the tree's own line), and the better of the two by the published key is kept. The inner leg is one
+  segment where it is free, else the shortest polyline around the region's nodes. On synthetic regions every border end
+  is on the flow side and no line runs through a node; bends drop against both earlier pipelines, crossings against
+  `singlePassMixed` only on trees. The port order (inside against outside) is the open lever.
 - **S1-3: layered areas inside regions** (decision 5) and an organic root.
 - **S1-4: the default decision** for `singlePassMixed` on the mixed corpus (can-bus, mixed-layouts, mixed-large, self-loops,
   nested-tree-radial, petri-net-shapes) against the pipeline before single pass and elk-rs.

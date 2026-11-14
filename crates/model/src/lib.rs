@@ -1793,6 +1793,12 @@ pub struct LayoutOptions {
     /// does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub straight_detours: bool,
+    /// Experimental (ADR 0020, S1-2): an edge that leaves a region of another strategy (organic, tree, radial) in a layered
+    /// parent is routed by the parent to a port on the region's border, on the side its flow uses, and drawn inside the
+    /// region from that port to its node by the region's routing. Not for graphs with buses or explicit edge ports. Omitted
+    /// when off, so the default output does not change.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub region_ports: bool,
     /// How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
     /// Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2053,6 +2059,7 @@ impl Default for LayoutOptions {
             isolated_grid: false,
             single_pass_reversed: false,
             straight_detours: false,
+            region_ports: false,
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,

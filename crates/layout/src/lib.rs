@@ -26,6 +26,7 @@ mod placement_geometry;
 mod placement_order;
 mod placement_region;
 mod placement_structure;
+mod region_ports;
 mod repair;
 mod spatial;
 mod tree;
@@ -334,6 +335,40 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Experimental (`regionPorts`, ADR 0020 S1-2): edges that leave a region of another strategy in a layered parent end at
+    // the region's box for the layout; their inner legs are joined afterwards.
+    if options.region_ports {
+        if let Some((split, moved)) = region_ports::split(graph) {
+            let earlier = previous.map(|p| {
+                let mut back = p.clone();
+                if let Some((g, _)) = region_ports::split(&p.graph) {
+                    back.graph = g;
+                }
+                back
+            });
+            let inner = LayoutOptions {
+                region_ports: false,
+                ..options.clone()
+            };
+            // A first layout gives the nodes inside the regions their places and the ports the order of the routes outside;
+            // the second puts each port at its node, in the order of the nodes. The better of the two by the published key
+            // is kept: ports in the order of the nodes keep the inner legs straight and apart, ports in the order outside
+            // cross less there.
+            let (mut first, first_stages) =
+                compute_counted(&split, earlier.as_ref(), dirty, &inner)?;
+            let placed = region_ports::with_ports(&split, &moved, &first);
+            let (mut second, stages) = compute_counted(&placed, earlier.as_ref(), dirty, &inner)?;
+            for snapshot in [&mut first, &mut second] {
+                snapshot.options = options.clone();
+                region_ports::join(snapshot, graph, &moved);
+            }
+            return Ok(if published_key(&first)? < published_key(&second)? {
+                (first, first_stages)
+            } else {
+                (second, stages)
+            });
+        }
+    }
     // Experimental (`singlePassReversed`, ADR 0020 S1-0): a drawing that flows against its axis everywhere is laid out
     // with the positive flow, where single pass runs, and mirrored; an earlier drawing is mirrored back to start from.
     if options.single_pass_reversed {

@@ -1,0 +1,16 @@
+{"shape":"organic-only","variant":"default","nodes":27,"edges":37,"lineNodeHits":0,"crossings":12,"bends":52,"areaK":1265,"borderEdges":14,"offSide":0,"singlePass":false,"ms":36,"geometry":0}
+{"shape":"organic-only","variant":"singlePassMixed","nodes":27,"edges":37,"lineNodeHits":0,"crossings":12,"bends":34,"areaK":1374,"borderEdges":14,"offSide":3,"singlePass":true,"ms":21,"geometry":0}
+{"shape":"organic-only","variant":"regionPorts","nodes":27,"edges":37,"lineNodeHits":0,"crossings":13,"bends":57,"areaK":1265,"borderEdges":14,"offSide":0,"singlePass":false,"ms":25,"geometry":0}
+{"shape":"organic-only","variant":"singlePassMixed + regionPorts","nodes":27,"edges":37,"lineNodeHits":0,"crossings":13,"bends":48,"areaK":1374,"borderEdges":14,"offSide":0,"singlePass":true,"ms":32,"geometry":0}
+{"shape":"tree-only","variant":"default","nodes":25,"edges":28,"lineNodeHits":0,"crossings":13,"bends":70,"areaK":943,"borderEdges":14,"offSide":0,"singlePass":false,"ms":4,"geometry":0}
+{"shape":"tree-only","variant":"singlePassMixed","nodes":25,"edges":28,"lineNodeHits":0,"crossings":19,"bends":58,"areaK":1046,"borderEdges":14,"offSide":2,"singlePass":true,"ms":5,"geometry":0}
+{"shape":"tree-only","variant":"regionPorts","nodes":25,"edges":28,"lineNodeHits":0,"crossings":10,"bends":71,"areaK":943,"borderEdges":14,"offSide":0,"singlePass":false,"ms":5,"geometry":0}
+{"shape":"tree-only","variant":"singlePassMixed + regionPorts","nodes":25,"edges":28,"lineNodeHits":0,"crossings":10,"bends":63,"areaK":1046,"borderEdges":14,"offSide":0,"singlePass":true,"ms":5,"geometry":0}
+{"shape":"radial-only","variant":"default","nodes":25,"edges":28,"lineNodeHits":0,"crossings":11,"bends":48,"areaK":2019,"borderEdges":14,"offSide":0,"singlePass":false,"ms":6,"geometry":0}
+{"shape":"radial-only","variant":"singlePassMixed","nodes":25,"edges":28,"lineNodeHits":0,"crossings":9,"bends":38,"areaK":2190,"borderEdges":14,"offSide":3,"singlePass":true,"ms":9,"geometry":0}
+{"shape":"radial-only","variant":"regionPorts","nodes":25,"edges":28,"lineNodeHits":0,"crossings":11,"bends":50,"areaK":2019,"borderEdges":14,"offSide":0,"singlePass":false,"ms":9,"geometry":0}
+{"shape":"radial-only","variant":"singlePassMixed + regionPorts","nodes":25,"edges":28,"lineNodeHits":0,"crossings":11,"bends":42,"areaK":2190,"borderEdges":14,"offSide":0,"singlePass":true,"ms":9,"geometry":0}
+{"shape":"mixed-chain","variant":"default","nodes":60,"edges":80,"lineNodeHits":0,"crossings":49,"bends":140,"areaK":5814,"borderEdges":36,"offSide":2,"singlePass":false,"ms":83,"geometry":0}
+{"shape":"mixed-chain","variant":"singlePassMixed","nodes":60,"edges":80,"lineNodeHits":0,"crossings":40,"bends":118,"areaK":6068,"borderEdges":36,"offSide":11,"singlePass":true,"ms":86,"geometry":0}
+{"shape":"mixed-chain","variant":"regionPorts","nodes":60,"edges":80,"lineNodeHits":0,"crossings":46,"bends":128,"areaK":5814,"borderEdges":36,"offSide":0,"singlePass":false,"ms":128,"geometry":0}
+{"shape":"mixed-chain","variant":"singlePassMixed + regionPorts","nodes":60,"edges":80,"lineNodeHits":0,"crossings":46,"bends":112,"areaK":6068,"borderEdges":36,"offSide":0,"singlePass":true,"ms":150,"geometry":0}
