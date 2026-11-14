@@ -145,6 +145,13 @@ regionPorts?: boolean,
  */
 regionChildPorts?: boolean,
 /**
+ * Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
+ * and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
+ * delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the
+ * chosen orientations. Omitted when off, so the default output does not change.
+ */
+directionsFirst?: boolean,
+/**
  * How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
  * Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
  */

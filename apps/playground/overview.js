@@ -4,7 +4,7 @@
 // zoom (`representationsOf`). Only a decision of the user makes a structured cluster grow and its neighbours make room;
 // what the zoom or a rule structures is fitted into the disc it has, so that zooming never makes the drawing jump.
 // Stale replies are dropped.
-import {overviewModel, viewOf, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES} from '@arqlet/viewer/overview.js';
+import {overviewModel, viewOf, viewOfNodes, pathOf, revealPathDecisions, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES} from '@arqlet/viewer/overview.js';
 import {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
 import {createEngineWorker} from '@arqlet/engine-client/engine.js';
 import {createOverviewSession, workerRun, httpRun} from '@arqlet/engine-client/session.js';
@@ -293,8 +293,55 @@ function sameSet(a, b) { return a.size === b.size && [...a].every(x => b.has(x))
 function redraw(fade = 0) {
   const expanded = new Map();
   for (const [id, key] of shown) if (scenes.has(key)) expanded.set(model.index.get(id), {scene: scenes.get(key)});
-  renderer.setState({expanded, collapsed, selected}, {fade});
+  renderer.setState({expanded, collapsed, selected, trace: pathAnswer ? pathOf(model, pathAnswer, {fade: $('path-fade').checked}) : null}, {fade});
 }
+
+// Path (provisional): a trace or neighbourhood on the whole graph, from the overview session; drawn in amber over the
+// discs that show it now, and revealed by opening the clusters on the way.
+let pathAnswer = null;
+async function runPath(request) {
+  const session = overviewSession();
+  if (overviewsGraph !== graph) { $('path-info').textContent = 'Lay the graph out first.'; return; }
+  const answer = request.op === 'trace'
+    ? await session.trace(request.from, request.to, {mode: request.mode})
+    : await session.neighbourhood(request.nodeId, {hops: request.hops, direction: request.direction});
+  if (!answer.ok) { $('path-info').textContent = `Not traced: ${answer.error}`; return; }
+  const found = request.op !== 'trace' || answer.found;
+  pathAnswer = found ? answer : null;
+  $('path-info').textContent = !found ? 'No path between these nodes, in either direction.'
+    : request.op === 'trace'
+      ? `${answer.length} step${answer.length === 1 ? '' : 's'}${answer.reversed ? ' (from To to From)' : ''} · ${answer.nodes.length} nodes, ${answer.edges.length} edges.`
+      : `${answer.nodes.length} nodes and ${answer.edges.length} edges within ${request.hops} hop${request.hops === 1 ? '' : 's'}.`;
+  $('path-reveal').disabled = !pathAnswer; $('path-clear').disabled = false;
+  redraw(FADE);
+  if (pathAnswer) {
+    const path = pathOf(model, pathAnswer);
+    const c = $('canvas');
+    renderer.morph(model, {duration: MORPH, view: viewOfNodes(model, path.nodes, c.clientWidth, c.clientHeight)});
+  }
+}
+$('path-trace').onclick = () => {
+  const from = $('path-from').value.trim(), to = $('path-to').value.trim();
+  if (!from || !to) { $('path-info').textContent = 'Choose a node for From and for To.'; return; }
+  runPath({op: 'trace', from, to, mode: $('path-mode').value});
+};
+$('path-near').onclick = () => {
+  const nodeId = $('path-from').value.trim();
+  if (!nodeId) { $('path-info').textContent = 'Choose a node for From.'; return; }
+  runPath({op: 'neighbourhood', nodeId, hops: Math.max(0, Math.min(20, Math.round(Number($('path-hops').value) || 0))), direction: $('path-direction').value});
+};
+$('path-from-selected').onclick = () => { if (selected >= 0) $('path-from').value = label(selected); };
+$('path-to-selected').onclick = () => { if (selected >= 0) $('path-to').value = label(selected); };
+$('path-fade').onchange = () => { if (pathAnswer) redraw(); };
+$('path-clear').onclick = () => { pathAnswer = null; $('path-info').textContent = ''; $('path-reveal').disabled = $('path-clear').disabled = true; redraw(FADE); };
+// Reveal: every cluster that holds a node of the path is opened (the user's decision, with undo), then the view follows.
+$('path-reveal').onclick = () => {
+  if (!pathAnswer) return;
+  remember();
+  for (const [id, representation] of revealPathDecisions(model, pathOf(model, pathAnswer))) decisions.set(id, representation);
+  schedule();
+  renderPanel();
+};
 
 /** Shows cluster `i` (-1: everything); `smooth` moves there over the morph's time. */
 function zoomTo(i, smooth = false) {

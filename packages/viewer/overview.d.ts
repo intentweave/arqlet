@@ -95,14 +95,34 @@ export function ownersOf(model: OverviewModel, expanded?: Expanded, collapsed?: 
 export type Outline = 'circle' | 'square' | 'octagon' | 'diamond';
 export const OUTLINES: Outline[];
 /** Vertex data; clusters of `expanded` drawn structured, of `collapsed` as one disc with their edges bundled per pair;
- * `shapes` gives an outline per node kind (default: circle). */
+ * `shapes` gives an outline per node kind (default: circle); `trace` (from `pathOf`) draws a path in amber. */
 export function overviewBuffers(
   model: OverviewModel,
   expanded?: Expanded,
   collapsed?: Set<number>,
   selected?: number,
-  options?: {shapes?: Record<string, Outline>},
+  options?: {shapes?: Record<string, Outline>; trace?: OverviewPath | null},
 ): OverviewBuffers;
+
+/** Provisional: a path or neighbourhood in model indices (`pathOf`). */
+export interface OverviewPath {
+  /** The indices of its nodes. */
+  nodes: Set<number>;
+  /** Its edges, as indices into `overview.edges` (through the model's `edgeIds`). */
+  edges: Set<number>;
+  /** The clusters that hold its nodes. */
+  clusters: Set<number>;
+  nodeIds: Set<string>;
+  edgeIds: Set<string>;
+  /** Dim everything else. */
+  fade: boolean;
+}
+/** Provisional: an `overviewTrace` / `overviewNeighbourhood` answer (`GraphTrace`, `GraphNeighbourhood`) as model indices. */
+export function pathOf(model: OverviewModel, answer: {nodes: string[]; edges: string[]}, options?: {fade?: boolean}): OverviewPath;
+/** Provisional: the decisions that open every cluster holding a node of the path (id → `organic`). */
+export function revealPathDecisions(model: OverviewModel, path: OverviewPath): Map<string, Representation>;
+/** The view that shows the discs of the nodes `indices` whole (the whole overview without any). */
+export function viewOfNodes(model: OverviewModel, indices: Iterable<number>, width: number, height: number, margin?: number): OverviewView;
 
 /** How a container is shown; the engine's type (ADR 0018, addendum). */
 export type {Representation} from '@arqlet/contracts';

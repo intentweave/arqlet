@@ -1811,6 +1811,12 @@ pub struct LayoutOptions {
     #[serde(skip)]
     #[cfg_attr(feature = "ts", ts(skip))]
     pub region_child_sides: BTreeMap<String, bool>,
+    /// Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
+    /// and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
+    /// delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the
+    /// chosen orientations. Omitted when off, so the default output does not change.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub directions_first: bool,
     /// How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
     /// Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2074,6 +2080,7 @@ impl Default for LayoutOptions {
             region_ports: false,
             region_child_ports: false,
             region_child_sides: BTreeMap::new(),
+            directions_first: false,
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,
@@ -2787,6 +2794,30 @@ impl OverviewPositions {
             stats: overview.stats,
         }
     }
+}
+
+/// Provisional: the paths between two nodes of a graph (`overviewTrace`), without a view: the overview's viewer maps them
+/// to its discs. `reversed`: no path from `from` to `to`, the paths are those back; `length` is null without a path.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphTrace {
+    pub found: bool,
+    pub reversed: bool,
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
+    pub length: Option<usize>,
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+}
+
+/// Provisional: the nodes within some hops of nodes of a graph (`overviewNeighbourhood`), without a view.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphNeighbourhood {
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+    pub hops: BTreeMap<String, usize>,
 }
 
 /// Provisional: the counts of an overview.
