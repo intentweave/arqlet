@@ -79,8 +79,10 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   layout puts each port at the height of its node (beside the middle where the region routes axis-parallel, so the leg
   does not share the tree's own line), and the better of the two by the published key is kept. The inner leg is one
   segment where it is free, else the shortest polyline around the region's nodes. On synthetic regions every border end
-  is on the flow side and no line runs through a node; bends drop against both earlier pipelines, crossings against
-  `singlePassMixed` only on trees. The port order (inside against outside) is the open lever.
+  is on the flow side and no line runs through a node. Port order: the ports follow the nodes inside, and the parent's
+  hierarchical order sees the region at these ports (fixed sub-places, as for a container's border nodes) and is kept
+  by the placement for the areas holding such a region; against `singlePassMixed` alone that crosses less on trees and
+  radial regions and slightly more on organic ones and the mixed chain.
 - **S1-3: layered areas inside regions** (decision 5) and an organic root.
 - **S1-4: the default decision** for `singlePassMixed` on the mixed corpus (can-bus, mixed-layouts, mixed-large, self-loops,
   nested-tree-radial, petri-net-shapes) against the pipeline before single pass and elk-rs.

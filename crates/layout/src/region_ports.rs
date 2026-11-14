@@ -460,8 +460,8 @@ pub(crate) fn with_ports(
     first: &Snapshot,
 ) -> Graph {
     let absolute = crate::absolute_all(split, &first.boxes);
-    // Per region and side: (desired place along the side, the first layout's place, edge, endpoint).
-    let mut sides: BTreeMap<(String, u8), Vec<(f64, f64, String, &'static str)>> = BTreeMap::new();
+    // Per region and side: the moved ends with the places of their nodes along the side.
+    let mut sides: BTreeMap<(String, u8), Vec<Entry>> = BTreeMap::new();
     for (edge, m) in moved {
         for (end, endpoint) in [(&m.source, "source"), (&m.target, "target")] {
             let Some((region, node)) = end else { continue };
@@ -482,18 +482,18 @@ pub(crate) fn with_ports(
             } else {
                 0.25
             };
-            let (along, placed) = match port.side {
-                PortSide::Left | PortSide::Right => {
-                    (n.y + n.height * (0.5 + beside), port.position.y)
-                }
-                PortSide::Top | PortSide::Bottom => {
-                    (n.x + n.width * (0.5 + beside), port.position.x)
-                }
+            let along = match port.side {
+                PortSide::Left | PortSide::Right => n.y + n.height * (0.5 + beside),
+                PortSide::Top | PortSide::Bottom => n.x + n.width * (0.5 + beside),
             };
             sides
                 .entry((region.clone(), port.side as u8))
                 .or_default()
-                .push((along, placed, edge.clone(), endpoint));
+                .push(Entry {
+                    along,
+                    edge: edge.clone(),
+                    endpoint,
+                });
         }
     }
     let side_of = |code: u8| match code {
@@ -504,21 +504,16 @@ pub(crate) fn with_ports(
     };
     let mut out = split.clone();
     let mut edge_ports: BTreeMap<String, arqlet_model::EdgePorts> = BTreeMap::new();
-    for ((region, code), mut list) in sides {
+    for ((region, code), list) in sides {
         let side = side_of(code);
         let r = &absolute[&region];
         let (start, length) = match side {
             PortSide::Left | PortSide::Right => (r.y, r.height),
             PortSide::Top | PortSide::Bottom => (r.x, r.width),
         };
-        // In the order of the nodes inside, so that the inner legs do not cross; the places: the nodes' places, pushed apart
-        // forwards and then backwards within the side.
-        list.sort_by(|a, b| {
-            a.0.total_cmp(&b.0)
-                .then_with(|| a.2.cmp(&b.2))
-                .then(a.3.cmp(b.3))
-        });
-        let places: Vec<f64> = list.iter().map(|e| e.0).collect();
+        // The places: the nodes' places in their order, pushed apart forwards and then backwards within the side.
+        let mut places: Vec<f64> = list.iter().map(|e| e.along).collect();
+        places.sort_by(f64::total_cmp);
         let (lo, hi) = (start + PORT_GAP, start + length - PORT_GAP);
         let mut at: Vec<f64> = places.iter().map(|d| d.clamp(lo, hi.max(lo))).collect();
         for i in 1..at.len() {
@@ -530,7 +525,19 @@ pub(crate) fn with_ports(
         for i in (0..at.len().saturating_sub(1)).rev() {
             at[i] = at[i].min(at[i + 1] - PORT_GAP);
         }
-        for ((_, _, edge, endpoint), place) in list.iter().zip(at) {
+        // In the order of the nodes inside, so that the inner legs run straight on and do not cross; the order of the
+        // parent's elements follows these ports (`hierarchical_sweep` sees the region at them), so the routes outside do
+        // not cross for them either where the parent's order allows.
+        let mut order: Vec<usize> = (0..list.len()).collect();
+        order.sort_by(|&a, &b| {
+            list[a]
+                .along
+                .total_cmp(&list[b].along)
+                .then_with(|| list[a].edge.cmp(&list[b].edge))
+                .then(list[a].endpoint.cmp(list[b].endpoint))
+        });
+        for (e, place) in order.iter().map(|&k| &list[k]).zip(at) {
+            let (edge, endpoint) = (&e.edge, &e.endpoint);
             let offset = if length > 0. {
                 ((place - start) / length).clamp(0., 1.)
             } else {
@@ -560,4 +567,12 @@ pub(crate) fn with_ports(
     }
     out.edge_ports.extend(edge_ports.into_values());
     out
+}
+
+/// A moved end on one side of a region: the place of its node along the side, and its edge and endpoint.
+#[derive(Clone, Debug)]
+struct Entry {
+    along: f64,
+    edge: String,
+    endpoint: &'static str,
 }

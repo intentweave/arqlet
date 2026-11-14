@@ -346,10 +346,9 @@ pub fn compute_counted(
                 }
                 back
             });
-            let inner = LayoutOptions {
-                region_ports: false,
-                ..options.clone()
-            };
+            // The option stays on inside: the split graph has no edge that leaves a region (no recursion), and the order
+            // reads the regions' explicit ports of the second layout as their sub-places.
+            let inner = options.clone();
             // A first layout gives the nodes inside the regions their places and the ports the order of the routes outside;
             // the second puts each port at its node, in the order of the nodes. The better of the two by the published key
             // is kept: ports in the order of the nodes keep the inner legs straight and apart, ports in the order outside
@@ -664,6 +663,21 @@ fn compute_mode_plain(
         .layout_diagnostics
         .push(format!("Single pass was not used: {reason}"));
     Ok(snapshot)
+}
+
+/// Experimental (`regionPorts`): the areas that hold an element with fixed sub-places (a region's explicit border ports) take
+/// the hierarchical order as it is: the placement's own ordering sees every element at its middle and would undo the order
+/// the sub-places gave. Nothing changes without such elements.
+fn fix_areas_with_ports(
+    plans: &mut layered_plan::LayeredPlans,
+    fixed: &BTreeMap<String, BTreeMap<String, f64>>,
+    parent_of: &BTreeMap<String, String>,
+) {
+    for element in fixed.keys() {
+        if let Some(plan) = parent_of.get(element).and_then(|area| plans.get_mut(area)) {
+            plan.fixed = true;
+        }
+    }
 }
 
 /// Why single pass cannot run on this graph, where the graph already says so. Without this check the attempt fails only after
@@ -4047,6 +4061,25 @@ fn compute_once(
             .iter()
             .filter_map(|e| Some((e.id.clone(), (e.source.clone(), e.target.clone()?))))
             .collect();
+        // Experimental (`regionPorts`): the explicit ports of a node, by edge, as its fixed sub-places in the order (their
+        // offsets across the flow); without the option every element is seen at its middle, as before.
+        let fixed_places: BTreeMap<String, BTreeMap<String, f64>> = if options.region_ports {
+            let by_id: BTreeMap<&str, &arqlet_model::Port> =
+                graph.ports.iter().map(|p| (p.id.as_str(), p)).collect();
+            let mut out: BTreeMap<String, BTreeMap<String, f64>> = BTreeMap::new();
+            for ep in &graph.edge_ports {
+                for port in [&ep.source_port, &ep.target_port].into_iter().flatten() {
+                    if let Some(p) = by_id.get(port.as_str()) {
+                        out.entry(p.node_id.clone())
+                            .or_default()
+                            .insert(ep.edge_id.clone(), p.offset);
+                    }
+                }
+            }
+            out
+        } else {
+            BTreeMap::new()
+        };
         // A backward edge between containers takes its border nodes on the other sides (`reversed_above`), which the
         // first placement could not know: its areas above were not placed yet. When there is such an edge, the drawing is
         // placed again with the plans of the first placement at hand (the ranks of every area are the same).
@@ -4104,6 +4137,7 @@ fn compute_once(
                 runs,
                 idle_limit,
                 options.order_seed,
+                &fixed_places,
             );
             let hierarchy_improved = after < before;
             if hierarchy_improved {
@@ -4115,6 +4149,7 @@ fn compute_once(
                         plan.fixed_borders = true;
                     }
                 }
+                fix_areas_with_ports(&mut ordered, &fixed_places, &parent_of);
                 run.plans = ordered;
             }
             if backward_between || hierarchy_improved || order_only {
@@ -4180,10 +4215,12 @@ fn compute_once(
                 hierarchy_order::RUNS,
                 hierarchy_order::IDLE_SWEEPS,
                 options.order_seed,
+                &fixed_places,
             );
             if after < before {
                 // The orders start the placement, which still improves each area's order from there (measured: following
                 // them as they are drew more crossings).
+                fix_areas_with_ports(&mut ordered, &fixed_places, &parent_of);
                 run.plans = ordered;
                 boxes = BTreeMap::new();
                 changed.clear();
