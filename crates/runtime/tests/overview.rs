@@ -569,3 +569,51 @@ fn a_session_answers_only_what_moves_while_the_clusters_stay() {
     assert!(other["overview"]["ids"].is_array());
     assert!(other["overview"].get("positionsOnly").is_none());
 }
+
+#[test]
+fn paths_and_neighbourhoods_on_the_overview_graph() {
+    use arqlet_runtime::engine_session::EngineSession;
+    let graph = hierarchical(3, 3, 4);
+    // Without a session, the request brings the graph.
+    let r: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overviewTrace", "graph": graph, "from": "g0/f1/n0", "to": "g0/f0/n2"})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(r["ok"], true, "{r}");
+    assert_eq!(r["found"], true);
+    let typed: arqlet_model::GraphTrace = serde_json::from_value({
+        let mut a = r.clone();
+        a.as_object_mut().unwrap().remove("ok");
+        a
+    })
+    .unwrap();
+    assert!(
+        typed.nodes.contains(&"g0/f1/n0".to_string())
+            && typed.nodes.contains(&"g0/f0/n2".to_string())
+    );
+    assert!(typed.edges.contains(&"g0/f1/up".to_string()), "{typed:?}");
+    // In a session the graph the overview keeps is used, and the answer is the same.
+    let mut session = EngineSession::new();
+    session.run_value(&json!({"op": "overview", "graph": graph}));
+    let s =
+        session.run_value(&json!({"op": "overviewTrace", "from": "g0/f1/n0", "to": "g0/f0/n2"}));
+    assert_eq!(s, r);
+    let n = session.run_value(
+        &json!({"op": "overviewNeighbourhood", "nodeId": "g0/f0/n0", "hops": 1, "direction": "out"}),
+    );
+    assert_eq!(n["ok"], true, "{n}");
+    assert_eq!(n["hops"]["g0/f0/n0"], 0);
+    assert!(n["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|x| x == "g0/f0/n1"));
+    // Errors: no overview yet in a session, an unknown node.
+    let empty =
+        EngineSession::new().run_value(&json!({"op": "overviewTrace", "from": "a", "to": "b"}));
+    assert!(empty["error"].as_str().unwrap().contains("no overview yet"));
+    let unknown =
+        session.run_value(&json!({"op": "overviewTrace", "from": "nowhere", "to": "g0/f0/n2"}));
+    assert_eq!(unknown["ok"], false);
+}

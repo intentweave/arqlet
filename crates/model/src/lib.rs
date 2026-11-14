@@ -2657,6 +2657,35 @@ pub struct Overview {
     pub stats: OverviewStats,
 }
 
+/// Provisional: a change of the source graph of a view (`patch`): nodes and edges to add, and nodes (each with what it
+/// holds and its edges) and edges to remove. Removals apply first.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct GraphPatch {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<Node>>"))]
+    pub nodes: Vec<Node>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<Edge>>"))]
+    pub edges: Vec<Edge>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub remove_nodes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub remove_edges: Vec<String>,
+}
+
+impl GraphPatch {
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+            && self.edges.is_empty()
+            && self.remove_nodes.is_empty()
+            && self.remove_edges.is_empty()
+    }
+}
+
 /// Provisional: what of some source-graph nodes and edges the current view shows (`trace`, `neighbourhood`): the visible
 /// boxes that hold the nodes, and the routes that carry the edges.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -2730,6 +2759,30 @@ impl OverviewPositions {
             stats: overview.stats,
         }
     }
+}
+
+/// Provisional: the paths between two nodes of a graph (`overviewTrace`), without a view: the overview's viewer maps them
+/// to its discs. `reversed`: no path from `from` to `to`, the paths are those back; `length` is null without a path.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphTrace {
+    pub found: bool,
+    pub reversed: bool,
+    #[cfg_attr(feature = "ts", ts(type = "number | null"))]
+    pub length: Option<usize>,
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+}
+
+/// Provisional: the nodes within some hops of nodes of a graph (`overviewNeighbourhood`), without a view.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GraphNeighbourhood {
+    pub nodes: Vec<String>,
+    pub edges: Vec<String>,
+    pub hops: BTreeMap<String, usize>,
 }
 
 /// Provisional: the counts of an overview.

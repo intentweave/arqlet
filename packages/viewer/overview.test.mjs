@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES} from './overview.js';
+import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES, pathOf, revealPathDecisions, viewOfNodes} from './overview.js';
 
 // Two clusters: c (with leaves a, b) and d (with leaf e); edges a→b, b→a (a cycle) and a→e.
 const overview = {
@@ -359,4 +359,33 @@ test('a chain of single children is drawn, named, picked and decided as one', ()
   // Opened by the level of detail, the whole chain opens: p is not collapsed again one level deeper.
   const opened = representationsOf(m, far, 400, 400, {levelOfDetail: {depth: 0}, decisions: new Map([['f', 'organic']])});
   assert.deepEqual([...opened.collapsed], [4]);
+});
+
+test('a path is mapped to the model, drawn in amber with the rest dimmed, and revealed by opening its clusters', () => {
+  // A root cluster g holding f (holding a, b) and c; edges a→b, b→c.
+  const o = {
+    schemaVersion: 1, ids: ['g', 'f', 'a', 'b', 'c'], labels: ['g', 'f', 'a', 'b', 'c'],
+    parent: [-1, 0, 1, 1, 0], x: [0, -10, -14, -6, 12], y: [0, 0, 0, 0, 0], r: [30, 12, 3, 3, 3],
+    rootRadius: 40, edges: [2, 3, 3, 4], links: [], kinds: ['k'], kind: [0, 0, 0, 0, 0],
+  };
+  const m = overviewModel(o, ['ab', 'bc']);
+  const path = pathOf(m, {nodes: ['b', 'c'], edges: ['bc']});
+  assert.deepEqual([...path.nodes].sort(), [3, 4]);
+  assert.deepEqual([...path.edges], [1]);
+  assert.deepEqual([...path.clusters].sort(), [0, 1]);
+  assert.deepEqual([...revealPathDecisions(m, path)].sort(), [['f', 'organic'], ['g', 'organic']]);
+  // Amber appears only with a trace; the edge on the path is amber, the other is dimmed.
+  const amber = buffers => { const e = buffers.edges, out = []; for (let k = 0; k < e.length; k += 6) out.push(Math.abs(e[k + 3] - 0.78) < 1e-6 && Math.abs(e[k + 2] - 1) < 1e-6); return out; };
+  const plain = overviewBuffers(m);
+  assert.ok(!amber(plain).some(Boolean));
+  const lit = overviewBuffers(m, new Map(), new Set(), -1, {trace: path});
+  assert.ok(amber(lit).some(Boolean), 'the path edge is amber');
+  assert.ok(lit.count.discs > plain.count.discs, 'rings on the path');
+  // A collapsed cluster holding a path node carries the ring for it.
+  const collapsedRing = overviewBuffers(m, new Map(), new Set([1]), -1, {trace: path});
+  assert.ok(collapsedRing.count.discs > overviewBuffers(m, new Map(), new Set([1])).count.discs);
+  // The view that shows the path's discs.
+  const view = viewOfNodes(m, path.nodes, 200, 100);
+  assert.ok(view.centreX > -10 && view.centreX < 12 && view.scale > 1);
+  assert.deepEqual(viewOfNodes(m, [], 200, 100), viewOf(m, -1, 200, 100));
 });

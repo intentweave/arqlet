@@ -232,6 +232,20 @@ await session.filter({});                                    // everything again
 
 In the playground: section *Filter* (a box per node kind and edge kind, *Close up*).
 
+### Graph changes
+
+`patch` changes the graph of a view without a new import: `{nodes, edges, removeNodes,
+removeEdges}` (removals first; a removed node takes what it holds and its edges). The
+view keeps its state (collapsed containers, filter); a view with a level of detail,
+communities or groups is laid out as a toggle lays it out (the drawing depends only on
+the graph and the view). A host can start with aggregated edges between collapsed
+containers and load the member edges of a container when it is opened:
+
+```js
+await session.expand('billing');
+await session.patch({edges: memberEdgesOf('billing'), removeEdges: aggregatedEdgesOf('billing')});
+```
+
 ### Cluster overview
 
 For a whole graph of tens of thousands of nodes, `{op: 'overview', graph}` lays it out
@@ -244,6 +258,15 @@ bindOverviewNavigation(canvas, renderer, {
   lens: () => ({radius: 180, magnification: 3}),
   idle: {after: 8000, breathe: {amplitude: 0.06}},   // off under reduced motion
 });
+```
+
+Paths and neighbourhoods work there too: the overview session traces on its graph, and
+the viewer draws the path over the discs that show it and opens the clusters on the way:
+
+```js
+const answer = await overview.trace('a', 'z');               // or overview.neighbourhood('a', {hops: 2})
+renderer.setState({trace: pathOf(model, answer)});           // amber path, the rest dimmed
+for (const [id, r] of revealPathDecisions(model, pathOf(model, answer))) decisions.set(id, r);
 ```
 
 For hierarchical exports the overview can gather and fold what adds little (all off by
