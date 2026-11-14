@@ -311,6 +311,26 @@ test('a compacting filter lays the view out again without the hidden, in both ki
   assert.deepEqual(scenes[0], scenes[1]);
 });
 
+test('an overview session traces on its graph, resident or sending it', {skip: !engine}, async () => {
+  const g = {nodes: [{id: 'p', kind: 'package', label: 'p'}, ...['a', 'b', 'c'].map(id => ({id, kind: 'file', label: id, parentId: 'p'}))],
+    edges: [{id: 'ab', kind: 'calls', source: 'a', target: 'b'}, {id: 'bc', kind: 'imports', source: 'b', target: 'c'}]};
+  const answers = [];
+  for (const resident of [true, false]) {
+    const o = createOverviewSession(engine, {resident});
+    assert.equal((await o.trace('a', 'c')).ok, false, 'nothing opened yet');
+    await o.open(g);
+    const t = await o.trace('a', 'c');
+    assert.equal(t.ok, true, t.error);
+    assert.deepEqual(t.edges, ['ab', 'bc']);
+    assert.equal((await o.trace('a', 'c', {edgeKinds: ['calls']})).found, false);
+    const n = await o.neighbourhood('b', {hops: 1, direction: 'out'});
+    assert.deepEqual(n.nodes, ['b', 'c']);
+    answers.push([t, n]);
+    await o.close();
+  }
+  assert.deepEqual(answers[0], answers[1]);
+});
+
 test('a session patches the graph without a new import and keeps its view', {skip: !engine}, async () => {
   const g = {nodes: [{id: 'p', kind: 'package', label: 'p'}, {id: 'q', kind: 'package', label: 'q'},
     ...['a', 'b'].map(id => ({id, kind: 'file', label: id, parentId: 'p'})), {id: 'c', kind: 'file', label: 'c', parentId: 'q'}],

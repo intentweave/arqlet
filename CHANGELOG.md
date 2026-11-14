@@ -27,6 +27,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   the changed graph with that view), other views from their earlier positions. A host can start with aggregated edges
   between collapsed containers and load a container's member edges when it is opened. `session.patch(patch)`; contract
   type `GraphPatch`.
+- Trace in the cluster overview (provisional): `overviewTrace` and `overviewNeighbourhood` find paths and neighbourhoods
+  on the overview's graph (the one an overview session keeps, or the request's), answered as `GraphTrace` /
+  `GraphNeighbourhood`; `createOverviewSession` gets `trace` and `neighbourhood`. `@arqlet/viewer`: `pathOf` maps an
+  answer to the model, `overviewBuffers` / the renderer's `setState({trace})` draw it in amber over the discs that show
+  it (the rest dimmed), `revealPathDecisions` opens the clusters on the way, `viewOfNodes` frames it. Playground: section
+  *Path* on the overview page.
 - Overview sessions answer only what moves (provisional): a session's `overview` with `positionsOnly` returns
   `OverviewPositions` (positions, root radius, counts, representation) while the clusters stay those of its last
   overview, and the whole overview otherwise. `createOverviewSession` asks for it on the graph the engine keeps and

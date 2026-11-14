@@ -239,8 +239,12 @@ export function representationsOf(model, view, width, height, {
  * scene), and per structured cluster its `back` boxes (containers), `routes` (lines), `arrows` (triangles at each route's
  * target, so the logical direction shows) and `front` boxes (leaves).
  */
-export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}} = {}) {
+export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null} = {}) {
   const {overview: o, n, children, depth, cluster, tops} = model;
+  // A path (`pathOf`): its discs and lines are drawn in amber; with `fade` everything else is dimmed.
+  const AMBER = [1, 0.78, 0.38];
+  const onPath = i => !!trace && (trace.nodes.has(i) || trace.clusters.has(i));
+  const dim = (rgb, i) => (trace?.fade && !onPath(i) ? rgb.map(v => v * 0.35) : rgb);
   // The outline of a node by its kind, as a tenth added to the shape kind (the shader reads it back).
   const outlineCode = OUTLINES.map((_, k) => k / 10);
   const outline = i => {
@@ -259,8 +263,18 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     // A collapsed cluster is one filled disc, a little darker than a leaf.
     const ring = children[i].length > 0 && !collapsed.has(i);
     const shade = ring ? 0.35 + 0.1 * Math.min(depth[i], 4) : collapsed.has(i) ? 0.72 : 1;
-    const [red, green, blue] = colour(i);
+    const [red, green, blue] = dim(colour(i), i);
     pushShape(discs, o.x[i], o.y[i], o.r[i], o.r[i], [red * shade, green * shade, blue * shade], collapsed.has(i) ? 0.9 : 1, (ring ? 1 : 0) + outline(i));
+  }
+  // The path's nodes as amber rings on the disc that shows them now (themselves, or the collapsed cluster that holds them).
+  if (trace) {
+    const ringed = new Set();
+    for (const i of trace.nodes) {
+      const shown = owner[i] >= 0 && !expanded.has(owner[i]) ? owner[i] : i;
+      if (owner[shown] >= 0 || ringed.has(shown)) continue;
+      ringed.add(shown);
+      pushShape(discs, o.x[shown], o.y[shown], o.r[shown], o.r[shown], AMBER, 1, 1 + outline(shown));
+    }
   }
   // The selected cluster: a bright ring on top of its disc.
   if (selected >= 0 && owner[selected] < 0) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
@@ -277,8 +291,9 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
       const [cx, cy] = place.apply([b.x + b.width / 2, b.y + b.height / 2]);
       const hx = (b.width / 2) * place.scale, hy = (b.height / 2) * place.scale;
       boxCentre.set(node.id, [cx, cy]);
+      const lit = trace?.nodeIds.has(node.id);
       if (node.container) pushShape(back, cx, cy, hx, hy, c.map(v => v * 0.5), 0.12, 3);
-      else pushShape(front, cx, cy, hx, hy, c, 1, 2);
+      else pushShape(front, cx, cy, hx, hy, lit ? AMBER : trace?.fade ? c.map(v => v * 0.35) : c, 1, 2);
     }
     for (const route of scene.routes) {
       const outward = route.target.startsWith(BORDER_PREFIX), inward = route.source.startsWith(BORDER_PREFIX);
@@ -291,13 +306,15 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
         for (const id of new Set([route.id, ...(route.members ?? [])])) ports.set(`${i}:${id}`, place.apply(clipped.port));
       }
       const points = inner.map(place.apply);
-      for (let k = 1; k < points.length; k++) routes.push(...points[k - 1], 0.6, 0.85, 0.75, 0.9, ...points[k], 0.6, 0.85, 0.75, 0.9);
+      const litRoute = trace && [route.id, ...(route.members ?? [])].some(id => trace.edgeIds.has(id));
+      const [rr, rg, rb, ra] = litRoute ? [...AMBER, 1] : trace?.fade ? [0.6, 0.85, 0.75, 0.25] : [0.6, 0.85, 0.75, 0.9];
+      for (let k = 1; k < points.length; k++) routes.push(...points[k - 1], rr, rg, rb, ra, ...points[k], rr, rg, rb, ra);
       if (points.length >= 2 && !outward) arrowHead(arrows, points.at(-2), points.at(-1), Math.max(4 * place.scale, 0.6));
     }
   }
   const edges = [];
   // Edges between collapsed clusters are drawn once per pair and direction, stronger the more they stand for.
-  const bundled = new Map();
+  const bundled = new Map(), litBundles = new Set();
   for (let k = 0; k < o.edges.length / 2; k++) {
     const a = o.edges[2 * k], b = o.edges[2 * k + 1];
     if (owner[a] >= 0 && owner[a] === owner[b]) continue;
@@ -306,6 +323,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     if ((ra !== a || rb !== b) && !(owner[a] >= 0 && expanded.has(owner[a])) && !(owner[b] >= 0 && expanded.has(owner[b]))) {
       const key = `${ra}>${rb}`;
       bundled.set(key, (bundled.get(key) ?? 0) + 1);
+      if (trace?.edges.has(k)) litBundles.add(key);
       continue;
     }
     // An end inside a structured cluster is its border port there (or, without one, its box); in a collapsed cluster,
@@ -320,8 +338,10 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     const [red, green, blue] = cluster[a] === cluster[b] ? colour(a) : [0.62, 0.7, 0.82];
     // An edge that leaves a structured cluster is drawn stronger: it is one of few. It ends in an arrow at a disc outside.
     const leg = owner[a] >= 0 || owner[b] >= 0;
-    const alpha = leg ? 0.3 : 0.06;
-    edges.push(...from, red, green, blue, alpha, ...to, red, green, blue, alpha);
+    const lit = trace?.edges.has(k);
+    const alpha = lit ? 0.95 : (leg ? 0.3 : 0.06) * (trace?.fade ? 0.3 : 1);
+    const [er, eg, eb] = lit ? AMBER : [red, green, blue];
+    edges.push(...from, er, eg, eb, alpha, ...to, er, eg, eb, alpha);
     if (leg && owner[a] >= 0 && expanded.has(owner[a]) && !(owner[b] >= 0 && expanded.has(owner[b]))) {
       const target = owner[b] >= 0 ? owner[b] : b;
       const l = Math.hypot(to[0] - from[0], to[1] - from[1]);
@@ -333,8 +353,9 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   for (const [key, count] of bundled) {
     const [ra, rb] = key.split('>').map(Number);
     if (ra === rb) continue;
-    const [red, green, blue] = cluster[ra] === cluster[rb] ? colour(ra) : [0.62, 0.7, 0.82];
-    const alpha = Math.min(0.55, 0.06 + 0.04 * Math.sqrt(count));
+    const lit = litBundles.has(key);
+    const [red, green, blue] = lit ? AMBER : cluster[ra] === cluster[rb] ? colour(ra) : [0.62, 0.7, 0.82];
+    const alpha = lit ? 0.95 : Math.min(0.55, 0.06 + 0.04 * Math.sqrt(count)) * (trace?.fade ? 0.3 : 1);
     edges.push(o.x[ra], o.y[ra], red, green, blue, alpha, o.x[rb], o.y[rb], red, green, blue, alpha);
   }
   const f = a => new Float32Array(a);
@@ -613,4 +634,42 @@ export function structuredExcerpt(graph, model, id, {direction = null} = {}) {
   const excerpt = {nodes: [...nodes, ...standIns.values()], edges, ...(direction ? {defaultDirection: direction} : {})};
   // The options to import the excerpt with: a file's unrelated functions stand in a grid, not in one long row.
   return {graph: excerpt, options: {isolatedGrid: true}, leaving, inner: edges.length - leaving, standIns: standIns.size};
+}
+
+/**
+ * Provisional: an `overviewTrace` or `overviewNeighbourhood` answer as the model's indices, for `overviewBuffers`'
+ * `trace`: the path's nodes, its edges (indices into `overview.edges`, through `edgeIds`), the clusters that hold the
+ * nodes, and the ids of nodes and edges. `fade` dims everything else.
+ */
+export function pathOf(model, answer, {fade = true} = {}) {
+  const nodes = new Set(), clusters = new Set();
+  for (const id of answer.nodes ?? []) {
+    const i = model.index.get(id);
+    if (i === undefined) continue;
+    nodes.add(i);
+    for (let p = model.overview.parent[i]; p >= 0; p = model.overview.parent[p]) clusters.add(p);
+  }
+  const edgeIds = new Set(answer.edges ?? []), edges = new Set();
+  (model.edgeIds ?? []).forEach((id, k) => { if (edgeIds.has(id)) edges.add(k); });
+  return {nodes, edges, clusters, nodeIds: new Set(answer.nodes ?? []), edgeIds, fade};
+}
+
+/**
+ * Provisional (reveal in the overview): the decisions that open every cluster holding a node of `path` down to it — each
+ * such cluster `organic` (shown open) — as id → representation, to merge into the user's decisions.
+ */
+export function revealPathDecisions(model, path) {
+  return new Map([...path.clusters].map(i => [model.overview.ids[i], 'organic']));
+}
+
+/** The view that shows the discs of the nodes `indices` whole (all of the overview when there are none). */
+export function viewOfNodes(model, indices, width, height, margin = 0.85) {
+  const o = model.overview;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const i of indices) {
+    x0 = Math.min(x0, o.x[i] - o.r[i]); y0 = Math.min(y0, o.y[i] - o.r[i]);
+    x1 = Math.max(x1, o.x[i] + o.r[i]); y1 = Math.max(y1, o.y[i] + o.r[i]);
+  }
+  if (!(x1 > x0)) return viewOf(model, -1, width, height);
+  return {centreX: (x0 + x1) / 2, centreY: (y0 + y1) / 2, scale: margin * Math.min(width / (x1 - x0), height / Math.max(y1 - y0, 1e-6))};
 }
