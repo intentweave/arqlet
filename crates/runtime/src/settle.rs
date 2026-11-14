@@ -4,12 +4,14 @@
 //! This is a continuation of the placement from its positions, not of a solver state: no solver state is kept. Provisional.
 use super::{check_current, recompute_layout, uses_organic};
 use arqlet_model::math::PortableMath;
-use arqlet_model::{EditReport, Settle, Snapshot};
+use arqlet_model::{EditReport, Gesture, Settle, Snapshot};
 
 /// The damped steps a call runs at most (each is one complete recomputation of the view from the positions before it).
 pub const CONTINUATION_STEPS: usize = 3;
 /// A node that moves less than this in a step (layout units) counts as settled.
 pub const CONVERGED_BELOW: f64 = 0.5;
+/// The id of the preview gesture the steps of a settle run under (`organicForces`); never in a published snapshot.
+const SETTLE_GESTURE: &str = "settle";
 
 /// The largest distance any node's box moved between two snapshots of the same view.
 fn residual(before: &Snapshot, after: &Snapshot) -> f64 {
@@ -46,8 +48,25 @@ pub fn settle_snapshot(
     }
     let mut current = snapshot.clone();
     current.gesture = None;
+    // With `organicForces` the steps are previews, as the steps of a force-directed drag: the forces move the nodes and the
+    // repair does not run, so the two do not work against each other from step to step (with a repair in every step the
+    // drawing swung by 80 units and more without converging). The step that converges is repaired, as the end of a drag.
+    let forces = snapshot.options.organic_forces;
+    let preview = |ending: bool| Gesture {
+        id: SETTLE_GESTURE.into(),
+        seq: 0,
+        node: String::new(),
+        active: true,
+        previous: None,
+        previous_others: Default::default(),
+        ending,
+        origin: None,
+    };
     let (mut steps, mut moved) = (0, f64::INFINITY);
     while steps < CONTINUATION_STEPS {
+        if forces {
+            current.gesture = Some(preview(false));
+        }
         let next = recompute_layout(&current, &snapshot.options, None)?;
         moved = residual(&current, &next);
         current = next;
@@ -56,6 +75,14 @@ pub fn settle_snapshot(
             break;
         }
     }
+    // The forces have converged: the repair ends the settling, as the drop ends a drag. Its moves are not the forces' and
+    // would start them again (the repaired drawing is not their equilibrium), so the settling counts as converged and the
+    // host stops asking; the residual reports the forces' last step.
+    if forces && moved < CONVERGED_BELOW {
+        current.gesture = Some(preview(true));
+        current = recompute_layout(&current, &snapshot.options, None)?;
+    }
+    current.gesture = None;
     current.edit_report = Some(EditReport {
         settle: Some(Settle {
             steps,

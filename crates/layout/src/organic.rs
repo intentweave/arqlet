@@ -619,6 +619,8 @@ const FORCE_TICKS: usize = 300;
 /// the spring length in node spacings (the scalable placement's springs are √2 spacings long, with no pull).
 const FORCES_GRAVITY: f64 = 0.05;
 const FORCES_SPRING: f64 = 1.;
+/// Experimental (`organicForces`): a centroid shift of a continuation below this is rounding (layout units).
+const CENTROID_TOLERANCE: f64 = 1e-6;
 /// Experimental (`organicForces`): up to this many children the pull has its full strength; beyond, it falls with the square
 /// root of their number.
 const FORCES_GRAVITY_NODES: f64 = 25.;
@@ -1650,6 +1652,7 @@ fn organic_stages_full(
             .collect();
         let extents: Vec<_> = ids.iter().map(|id| sizes[id]).collect();
         let gravity = FORCES_GRAVITY * (FORCES_GRAVITY_NODES / n.max(1) as f64).sqrt().min(1.);
+        let before = x.clone();
         used += force_refine_with(
             &mut x,
             &edges,
@@ -1660,6 +1663,22 @@ fn organic_stages_full(
             gravity,
             &ends,
         );
+        // Without a held node nothing anchors the drawing: it keeps its centroid, so that repeated steps (`settle`) do not
+        // shift it (a continuation translates the drawing only when a node passes the margin, and never back: the drawing
+        // crept by 30 to 70 units a step). A shift below `CENTROID_TOLERANCE` is rounding and is left alone, so a step that
+        // moves nothing keeps every coordinate exactly.
+        if !fixed_flags.iter().any(|&f| f) && n > 0 {
+            let centroid = |p: &[(f64, f64)]| {
+                let (sx, sy) = p.iter().fold((0., 0.), |(a, b), q| (a + q.0, b + q.1));
+                (sx / n as f64, sy / n as f64)
+            };
+            let (a, b) = (centroid(&before), centroid(&x));
+            if (a.0 - b.0).p_hypot(a.1 - b.1) > CENTROID_TOLERANCE {
+                for p in x.iter_mut() {
+                    *p = (p.0 + a.0 - b.0, p.1 + a.1 - b.1);
+                }
+            }
+        }
     }
     if let (Some(start), true) = (warm, relax > 0) {
         for (i, id) in ids.iter().enumerate() {

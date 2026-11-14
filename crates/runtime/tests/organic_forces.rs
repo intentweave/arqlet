@@ -92,3 +92,57 @@ fn the_forces_are_on_by_default_and_written_only_when_off() {
             .contains("organicForces")
     );
 }
+
+#[test]
+fn settling_with_the_forces_converges_to_a_valid_drawing() {
+    // Each settle call takes bounded preview steps of the forces and repairs the step that converges: the live mode of the
+    // playground asks again until then. petri-net-shapes converged in 5 calls, mixed-layouts in 8 (measured 2026-11-14).
+    for (dataset, calls) in [
+        ("petri-net-shapes", 10),
+        ("mixed-layouts", 15),
+        ("self-loops", 10),
+    ] {
+        let graph: Value = serde_json::from_str(
+            &std::fs::read_to_string(format!(
+                "{}/../../benchmarks/datasets/{dataset}.json",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut snapshot = import(&graph, json!({"forceDirected": true}));
+        let mut converged = false;
+        for _ in 0..calls {
+            let r: Value = serde_json::from_str(&dispatch(
+                &json!({"op": "settle", "snapshot": snapshot,
+                        "expectedRevision": snapshot.revision,
+                        "expectedLayoutVersion": snapshot.layout_version})
+                .to_string(),
+            ))
+            .unwrap();
+            assert_eq!(r["ok"], true, "{r}");
+            snapshot = serde_json::from_value(r["snapshot"].clone()).unwrap();
+            if snapshot
+                .edit_report
+                .as_ref()
+                .and_then(|e| e.settle.as_ref())
+                .is_some_and(|s| s.converged)
+            {
+                converged = true;
+                break;
+            }
+        }
+        assert!(converged, "{dataset} did not converge in {calls} calls");
+        assert!(
+            snapshot.gesture.is_none(),
+            "{dataset}: the preview gesture is published"
+        );
+        assert!(
+            snapshot.geometry_issues.is_empty(),
+            "{dataset}: {:?}",
+            snapshot.geometry_issues
+        );
+        let metrics = arqlet_layout::published_metrics(&snapshot).unwrap();
+        assert_eq!(metrics.line_node_hits, 0, "{dataset}");
+    }
+}

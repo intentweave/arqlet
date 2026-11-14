@@ -331,6 +331,8 @@ async function edit(request,{busy,fit=false,chained=false,remember=null,anchor=n
  else draw(fit);
  animateFrom(places);
  if(!chained)scheduleRefinement();
+ // Live mode: a change other than a settle step is followed by settling (after this edit has returned).
+ if(!chained&&request.op!=='settle'&&$('live').checked)setTimeout(live,0);
  // A new node changes the graph itself: what was remembered no longer describes it. A decision is remembered as one entry.
  if(request.op==='add')history.clear();
  else if(remember)recordHistory(typeof remember==='string'?remember:remember.label,baseSnapshot,snapshot,{merge:!!remember.merge});
@@ -446,7 +448,18 @@ function finishLabel(){
 }
 // After a drag with force-directed behaviour the other nodes settle: a few bounded calls, each of at most three damped steps, until
 // the largest move is below the threshold. The status says whether the placement converged or was only refined.
+// Live mode (organic areas keep settling): every change is followed by up to LIVE_CALLS bounded settle calls, each drawn as
+// one animated frame, until the largest move is below the engine's threshold. The host only decides when to ask; each call
+// goes through execute() like any edit, so it runs in every deployment mode and a stale answer is discarded.
+const LIVE_CALLS=60;
+let living=false;
+async function live(){
+ if(living||!$('live').checked||!snapshot?.options?.forceDirected)return;
+ living=true;
+ try{await settle(LIVE_CALLS);}finally{living=false;}
+}
 async function settle(calls=3){
+ if($('live').checked)calls=Math.max(calls,LIVE_CALLS);
  for(let call=0;call<calls;call++){
   if(!snapshot||pending||drag||resize||containerResize||portDrag||labelDrag||curation)return;
   const result=await edit({op:'settle',snapshot},{busy:'Settling …',chained:true});
@@ -1076,6 +1089,13 @@ numberOption('archive-refinement','archiveRefinement','archive refinement',{min:
 // On/off options and optional numbers; an empty number field clears its option, so the engine default applies.
 const FLAGS=[['component-packing','componentPacking'],['vpsc-overlap-removal','vpscOverlapRemoval'],['directed-repair','directedRepair'],['node-edge-repulsion','nodeEdgeRepulsion'],['sparse-stress','sparseStress'],['scalable-stress','scalableStress'],['force-directed','forceDirected'],['strict-clearance','strictClearance'],['extended-conflict-selection','extendedConflictSelection'],['routed-candidates','routedCandidates'],['flat-region','flatRegion'],['global-layering','globalLayering'],['simplex-ranks','simplexRanks']];
 for(const [id,key] of FLAGS)$(id).onchange=()=>setOption({[key]:$(id).checked},key);
+// Live needs force-directed behaviour: turning it on turns that on (the configure edit then starts the settling).
+$('live').onchange=()=>{
+ if(!$('live').checked)return;
+ if(snapshot?.options?.forceDirected){live();return;}
+ $('force-directed').checked=true;
+ setOption({forceDirected:true},'forceDirected');
+};
 $('layered-construction').onchange=()=>{
  const enabled=$('layered-construction').checked;
  setOption({layeredConstruction:enabled,hierarchicalOrdering:enabled},enabled?'Hierarchical layered pipeline':'Previous layout pipeline');

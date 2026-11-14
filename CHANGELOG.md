@@ -17,6 +17,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   self-loops 4 % smaller; can-bus 0.25 % larger; every other dataset and every fingerprint view unchanged
   ([measurement](benchmarks/results/organic-forces-20261114.md)). `organicForces: false` restores the earlier placement.
 
+- With `organicForces`, `settle` takes its steps as previews of the forces (no repair in between, as the steps of a
+  force-directed drag) and repairs the step that converges; the settling then counts as converged. Without a held node a
+  step keeps the drawing's centroid. Before, the repair and the relaxation worked against each other and a continuation
+  shifted the drawing at every step (it is translated when a node passes the margin, never back), so settling did not
+  converge (petri-net-shapes swung by 80 units, mixed-layouts crept by 70 a step; with the stress model up to 1300). Now
+  petri-net-shapes converges in 5 calls, mixed-layouts in 8, organic-50 in 24, each call 8 to 40 ms.
+
 ### Fixed
 
 - The end of a drag that changes no pin repaired nothing: the engine saw unchanged options and answered without a layout,
@@ -28,6 +35,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - `repairCompaction` (experimental, off): in a flat organic drawing, the nodes the geometric repair pushed out are pulled
   back toward their stress places as far as no conflict comes back and no crossing is added (petri-net-shapes 23 %
   smaller, organic-25 9 %; every other dataset unchanged).
+- Playground: **Live** (organic areas keep settling, animated): turns on force-directed behaviour and follows every change
+  with bounded `settle` calls, one animated frame each, until the engine reports convergence (at most 60 calls). Each
+  call goes through `execute()`, so it runs in the split, browser-only and backend-only modes, and a stale answer is
+  discarded as for any edit. Each frame is a preview; the converged one is repaired.
 - `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
 
 ## 0.5.0 — 2026-11-14
