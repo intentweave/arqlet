@@ -289,3 +289,86 @@ pub fn neighbourhood_answer_on(
         distance,
     })
 }
+
+/// Provisional (`overviewTrace`): the paths between `from` and `to` in a graph, without a view (`mode`, `edgeKinds` as for
+/// `trace`). The overview's viewer maps them to its discs.
+pub fn graph_trace(
+    graph: &arqlet_model::Graph,
+    v: &Value,
+) -> Result<arqlet_model::GraphTrace, String> {
+    let from = v["from"].as_str().ok_or("Missing from")?;
+    let to = v["to"].as_str().ok_or("Missing to")?;
+    let mode = match v["mode"].as_str() {
+        None | Some("shortest") => TraceMode::Shortest,
+        Some("all") => TraceMode::All,
+        Some(other) => return Err(format!("Unknown trace mode: {other}")),
+    };
+    let kinds = edge_kinds_of(v, "Trace")?;
+    let path = trace_along(graph, from, to, mode, |e| {
+        kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
+    })?;
+    Ok(arqlet_model::GraphTrace {
+        found: path.length.is_some(),
+        reversed: path.reversed,
+        length: path.length,
+        nodes: path.nodes,
+        edges: path.edges,
+    })
+}
+
+/// Provisional (`overviewNeighbourhood`): the nodes within `hops` of `nodeId` or `nodeIds` in a graph, without a view
+/// (`direction`, `edgeKinds` as for `neighbourhood`).
+pub fn graph_neighbourhood(
+    graph: &arqlet_model::Graph,
+    v: &Value,
+) -> Result<arqlet_model::GraphNeighbourhood, String> {
+    let starts: Vec<&str> = match (v.get("nodeId"), v.get("nodeIds")) {
+        (Some(id), None) => vec![id
+            .as_str()
+            .ok_or("Neighbourhood nodeId must be a node id")?],
+        (None, Some(ids)) => ids
+            .as_array()
+            .filter(|ids| !ids.is_empty())
+            .ok_or("Neighbourhood nodeIds must be a non-empty list of node ids")?
+            .iter()
+            .map(|id| id.as_str().ok_or("Neighbourhood nodeIds must be node ids"))
+            .collect::<Result<_, _>>()?,
+        _ => return Err("Neighbourhood needs nodeId or nodeIds (one of them)".into()),
+    };
+    let hops = match v.get("hops") {
+        None => 1,
+        Some(h) => h
+            .as_u64()
+            .filter(|h| *h <= 1_000)
+            .ok_or("Neighbourhood hops must be a whole number from 0 to 1000")?
+            as usize,
+    };
+    let reach = match v["direction"].as_str() {
+        None | Some("both") => Reach::Both,
+        Some("out") => Reach::Out,
+        Some("in") => Reach::In,
+        Some(other) => {
+            return Err(format!(
+                "Unknown neighbourhood direction: {other} (out, in or both)"
+            ))
+        }
+    };
+    let kinds = edge_kinds_of(v, "Neighbourhood")?;
+    let found = neighbourhood(graph, &starts, hops, reach, |e| {
+        kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
+    })?;
+    Ok(arqlet_model::GraphNeighbourhood {
+        nodes: found.nodes,
+        edges: found.edges,
+        hops: found.hops,
+    })
+}
+
+/// A graph read answer as JSON (`{ok: true, …}`), or the error.
+pub(crate) fn graph_read_response(graph: Result<arqlet_model::Graph, String>, v: &Value) -> Value {
+    let result = graph.and_then(|g| match v["op"].as_str() {
+        Some("overviewTrace") => graph_trace(&g, v).and_then(|a| answered(&a)),
+        _ => graph_neighbourhood(&g, v).and_then(|a| answered(&a)),
+    });
+    result.unwrap_or_else(|e| json!({"ok": false, "error": e}))
+}

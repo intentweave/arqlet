@@ -260,6 +260,15 @@ bindOverviewNavigation(canvas, renderer, {
 });
 ```
 
+Paths and neighbourhoods work there too: the overview session traces on its graph, and
+the viewer draws the path over the discs that show it and opens the clusters on the way:
+
+```js
+const answer = await overview.trace('a', 'z');               // or overview.neighbourhood('a', {hops: 2})
+renderer.setState({trace: pathOf(model, answer)});           // amber path, the rest dimmed
+for (const [id, r] of revealPathDecisions(model, pathOf(model, answer))) decisions.set(id, r);
+```
+
 For hierarchical exports the overview can gather and fold what adds little (all off by
 default): `satellites` gathers a node with the siblings that send most of their edges to it
 (`<hub> +<n>`), `chains` draws a chain of single children (a package with one module

@@ -190,7 +190,7 @@ pub(crate) fn overview_of(v: &Value, threads: usize) -> Result<Overview, String>
 }
 
 /// The graph of a request, checked.
-fn graph_of(v: &Value) -> Result<Graph, String> {
+pub(crate) fn graph_of(v: &Value) -> Result<Graph, String> {
     let graph: Graph = serde_json::from_value(v["graph"].clone()).map_err(|e| e.to_string())?;
     if graph.nodes.len() > MAX_OVERVIEW_NODES {
         return Err(format!(
@@ -350,6 +350,11 @@ impl OverviewSession {
     /// Whether the session has a graph for an overview.
     pub fn is_open(&self) -> bool {
         self.graph.is_some()
+    }
+
+    /// The graph of the session's overview, if it has one.
+    pub fn graph(&self) -> Option<&Graph> {
+        self.graph.as_ref()
     }
 
     /// Answers one `overview` request (`{ok, overview}`, or `{ok: false, error}`); a refused request changes nothing.

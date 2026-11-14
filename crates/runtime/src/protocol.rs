@@ -166,6 +166,16 @@ pub enum Request {
         #[serde(flatten)]
         body: Map<String, Value>,
     },
+    /// The paths between two nodes of a graph, without a view (for the overview).
+    OverviewTrace {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
+    /// The nodes within some hops of nodes of a graph, without a view (for the overview).
+    OverviewNeighbourhood {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
     /// An ELK-style one-shot layout.
     ElkLayout {
         #[serde(flatten)]
@@ -352,6 +362,10 @@ impl Request {
             Some("componentRefine") => return Ok(Request::ComponentRefine { body: body() }),
             Some("elkLayout") => return Ok(Request::ElkLayout { body: body() }),
             Some("overview") => return Ok(Request::Overview { body: body() }),
+            Some("overviewTrace") => return Ok(Request::OverviewTrace { body: body() }),
+            Some("overviewNeighbourhood") => {
+                return Ok(Request::OverviewNeighbourhood { body: body() })
+            }
             Some("containerRefine") => return Ok(Request::ContainerRefine { body: body() }),
             Some("structuredRefine") => return Ok(Request::StructuredRefine { body: body() }),
             Some("metrics") => return Ok(Request::Metrics { body: body() }),
@@ -762,6 +776,18 @@ pub fn handle(request: Request) -> Response {
             typed_answer(overview::overview_of(&v, n), |o| {
                 Response::Overview(Box::new(o))
             })
+        }
+        Request::OverviewTrace { body } => {
+            let v = with_op("overviewTrace", body);
+            Response::Encoded(
+                crate::trace::graph_read_response(overview::graph_of(&v), &v).to_string(),
+            )
+        }
+        Request::OverviewNeighbourhood { body } => {
+            let v = with_op("overviewNeighbourhood", body);
+            Response::Encoded(
+                crate::trace::graph_read_response(overview::graph_of(&v), &v).to_string(),
+            )
         }
         Request::ElkLayout { body } => Response::Encoded(elk_response(&with_op("elkLayout", body))),
         Request::Metrics { body } => {
