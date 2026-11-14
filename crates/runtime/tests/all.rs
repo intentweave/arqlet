@@ -76,6 +76,8 @@ mod pins;
 mod reference;
 #[path = "reference_corpus.rs"]
 mod reference_corpus;
+#[path = "region_child_ports.rs"]
+mod region_child_ports;
 #[path = "region_ports.rs"]
 mod region_ports;
 #[path = "reproduce.rs"]

@@ -83,7 +83,13 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   hierarchical order sees the region at these ports (fixed sub-places, as for a container's border nodes) and is kept
   by the placement for the areas holding such a region; against `singlePassMixed` alone that crosses less on trees and
   radial regions and slightly more on organic ones and the mixed chain.
-- **S1-3: layered areas inside regions** (decision 5) and an organic root.
+- **S1-3: layered areas inside regions** (decision 5) and an organic root. Done as `regionChildPorts` (2026-11-14,
+  [results](../../benchmarks/results/region-child-ports-20261114.md)): a container with a fixed flow in an organic or
+  radial area gets border nodes in its own flow, on the side facing the other end in the area's abstract placement (pivot
+  MDS of the area's children, where the organic placement starts); the inner leg follows the plan to the border node, the
+  outer leg runs straight or around the container's corner. The border contract holds (5 of 124 synthetic ends off the
+  axis, 81 without), crossings drop on the synthetic graphs and rise on mixed-large, and the bends rise about sevenfold,
+  most of them inherent to leaving along the flow into an area without one; off by default.
 - **S1-4: the default decision** for `singlePassMixed` on the mixed corpus (can-bus, mixed-layouts, mixed-large, self-loops,
   nested-tree-radial, petri-net-shapes) against the pipeline before single pass and elk-rs.
 

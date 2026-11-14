@@ -177,6 +177,18 @@ fn compute_distances(ids: &[String], links: &BTreeSet<(String, String)>) -> Vec<
     d
 }
 
+/// The start of an organic placement of `ids` over `links` without sizes (`regionChildPorts`): the pivot MDS of their graph
+/// distances, in hop units, as `organic_stages` begins from it.
+pub(crate) fn abstract_positions(
+    ids: &[String],
+    links: &BTreeSet<(String, String)>,
+) -> Vec<(f64, f64)> {
+    if ids.is_empty() {
+        return vec![];
+    }
+    pivot_mds(&compute_distances(ids, links), ids.len())
+}
+
 /// Pivot MDS: farthest-point pivots (the first is index 0), the squared distances to them double-centred, and the two
 /// leading eigenvectors by power iteration. Returns coordinates in hop units.
 fn pivot_mds(d: &[f64], n: usize) -> Vec<(f64, f64)> {

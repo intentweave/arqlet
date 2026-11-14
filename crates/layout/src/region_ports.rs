@@ -576,3 +576,522 @@ struct Entry {
     edge: String,
     endpoint: &'static str,
 }
+
+/// Experimental (`regionChildPorts`, ADR 0020 S1-3): the straight edges of an organic or radial area that end inside one
+/// of its containers with a fixed flow run inside that container along its ranks to the border node its plan gave the
+/// edge, and leave it there: the inner leg passes the dummies of the edge's chain (each on its lane, changing lanes in the
+/// channels between ranks), and the area's leg runs straight from the container's border to the other end. An edge keeps
+/// its route where an end has no border node or the straight leg would enter a node it does not end in.
+pub(crate) fn child_legs(snapshot: &mut Snapshot) {
+    let graph = snapshot.graph.clone();
+    let parent: BTreeMap<&str, Option<&str>> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let absolute = crate::absolute_all(&graph, &snapshot.boxes);
+    let shape: BTreeMap<&str, arqlet_model::NodeShape> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.shape))
+        .collect();
+    let straight: BTreeSet<&str> = snapshot.straight_edges.iter().map(String::as_str).collect();
+    let ancestors = |id: &str| -> Vec<&str> {
+        std::iter::successors(parent.get(id).copied().flatten(), |c| {
+            parent.get(c).copied().flatten()
+        })
+        .collect()
+    };
+    let mut changed: BTreeMap<String, Vec<Point>> = BTreeMap::new();
+    let mut new_ports: Vec<ResolvedPort> = Vec::new();
+    for edge in &graph.edges {
+        let Some(target) = edge.target.as_deref() else {
+            continue;
+        };
+        if edge.source == target || !straight.contains(edge.id.as_str()) {
+            continue;
+        }
+        let Some(route) = snapshot.routes.iter().find(|r| r.id == edge.id) else {
+            continue;
+        };
+        if route.points.len() < 2 {
+            continue;
+        }
+        let (up_s, up_t) = (ancestors(&edge.source), ancestors(target));
+        // The outermost container with a fixed flow inside an organic or radial area, below the edge's area, for each end.
+        let lift = |chain: &[&str], other: &[&str], other_id: &str| -> Option<String> {
+            chain
+                .iter()
+                .take_while(|c| !other.contains(c) && **c != other_id)
+                .filter(|c| layered_child(&graph, c, &parent).is_some())
+                .last()
+                .map(|c| c.to_string())
+        };
+        let ends = [
+            (edge.source.as_str(), lift(&up_s, &up_t, target), true),
+            (target, lift(&up_t, &up_s, &edge.source), false),
+        ];
+        if ends.iter().all(|(_, c, _)| c.is_none()) {
+            continue;
+        }
+        // The legs inside, each from the node to the container's border.
+        let mut legs: Vec<Option<Vec<Point>>> = Vec::new();
+        let mut ok = true;
+        for (node, container, _) in &ends {
+            let Some(c) = container else {
+                legs.push(None);
+                continue;
+            };
+            match chain_leg(snapshot, &edge.id, node, c, &absolute, &parent, &shape) {
+                Some(leg) => legs.push(Some(leg)),
+                None => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if !ok {
+            continue;
+        }
+        // An end without a leg inside is met on its outline towards the other end's border point (its earlier port faced
+        // the earlier line).
+        let border_s = legs[0].as_ref().map(|l| l.last().unwrap().clone());
+        let border_t = legs[1].as_ref().map(|l| l.last().unwrap().clone());
+        let meet = |id: &str, towards_point: &Point| {
+            let r = &absolute[id];
+            let centre = Point {
+                x: r.x + r.width / 2.,
+                y: r.y + r.height / 2.,
+            };
+            towards(towards_point, &centre, r, shape[id])
+        };
+        let start = match (&border_s, &border_t) {
+            (Some(p), _) => p.clone(),
+            (None, Some(q)) => meet(&edge.source, q),
+            (None, None) => route.points[0].clone(),
+        };
+        let end = match (&border_t, &border_s) {
+            (Some(q), _) => q.clone(),
+            (None, Some(p)) => meet(target, p),
+            (None, None) => route.points.last().unwrap().clone(),
+        };
+        // The straight leg must enter no node, the edge's own ends and their containers included: it starts on a
+        // container's border (or an end's outline) and leaves it. Only the containers that hold an end without a leg
+        // inside may be crossed, as by any straight edge.
+        let holding: BTreeSet<&str> = ends
+            .iter()
+            .zip(&legs)
+            .filter(|(_, leg)| leg.is_none())
+            .flat_map(|((id, _, _), _)| {
+                std::iter::successors(parent.get(id).copied().flatten(), |c| {
+                    parent.get(c).copied().flatten()
+                })
+            })
+            .collect();
+        let free = |a: &Point, b: &Point| {
+            absolute.iter().all(|(id, r)| {
+                holding.contains(id.as_str())
+                    || !Outline::of(shape[id.as_str()], r).segment_enters(a.x, a.y, b.x, b.y, 0.)
+            })
+        };
+        // Straight where that is free; else around the corners of the containers the edge leaves (the other end may lie
+        // across the container's flow, or on the side the abstract placement did not foresee).
+        let lifted: Vec<&Rect> = ends
+            .iter()
+            .zip(&legs)
+            .filter_map(|((_, c, _), leg)| leg.as_ref().and(c.as_ref()))
+            .map(|c| &absolute[c])
+            .collect();
+        let Some(middle) = around_boxes(&start, &end, &lifted, &free) else {
+            continue;
+        };
+        let mut points: Vec<Point> = match &legs[0] {
+            Some(l) => l.clone(),
+            None => vec![start.clone()],
+        };
+        points.extend(middle);
+        match &legs[1] {
+            Some(l) => points.extend(l.iter().rev().cloned()),
+            None => points.push(end.clone()),
+        }
+        points.dedup_by(|a, b| (a.x - b.x).abs() < 1e-9 && (a.y - b.y).abs() < 1e-9);
+        for ((node, container, _), leg) in ends.iter().zip(&legs) {
+            if let (Some(_), Some(l)) = (container, leg) {
+                new_ports.push(resolved(
+                    &edge.id,
+                    node,
+                    if *node == edge.source.as_str() {
+                        "source"
+                    } else {
+                        "target"
+                    },
+                    &l[0],
+                    &absolute[*node],
+                ));
+            }
+        }
+        changed.insert(edge.id.clone(), points);
+    }
+    if changed.is_empty() {
+        return;
+    }
+    for route in &mut snapshot.routes {
+        if let Some(points) = changed.remove(&route.id) {
+            route.points = points;
+        }
+    }
+    snapshot.resolved_ports.retain(|p| {
+        !new_ports
+            .iter()
+            .any(|n| n.edge_id == p.edge_id && n.endpoint == p.endpoint)
+    });
+    snapshot.resolved_ports.extend(new_ports);
+    let straight: BTreeSet<String> = snapshot.straight_edges.iter().cloned().collect();
+    let drawn: Vec<arqlet_model::Route> = snapshot
+        .routes
+        .iter()
+        .filter(|r| r.bundle_of.is_none())
+        .cloned()
+        .collect();
+    snapshot.boundary_crossings =
+        crate::ports::boundaries(&snapshot.graph, &snapshot.boxes, &drawn, &straight);
+}
+
+/// The leg of `edge` from `node` to the border of `container` along the container's plan: from the node (or the child of the
+/// container that holds it) through the dummies of the chain to the edge's border node, changing lanes in the channels, and
+/// on to the container's border. Starts on the node's outline. `None` when the plan has no border node for the edge.
+#[allow(clippy::too_many_arguments)]
+fn chain_leg(
+    snapshot: &Snapshot,
+    edge: &str,
+    node: &str,
+    container: &str,
+    absolute: &BTreeMap<String, Rect>,
+    parent: &BTreeMap<&str, Option<&str>>,
+    shape: &BTreeMap<&str, arqlet_model::NodeShape>,
+) -> Option<Vec<Point>> {
+    let plan = snapshot.layered_plans.get(container)?;
+    if plan.reversed {
+        return None;
+    }
+    let border = plan.borders.get(edge)?;
+    // The leg runs to the end of the flow when the border node stands in the last rank, else to its start (the side the
+    // abstract placement chose, `child_sides`, or the flow's own).
+    let leaving = plan.ranks.last().is_some_and(|rank| rank.contains(border));
+    let c = &absolute[container];
+    let at = |r: &Rect| Rect {
+        x: c.x + r.x,
+        y: c.y + r.y,
+        width: r.width,
+        height: r.height,
+    };
+    let border_rect = at(plan.dummies.get(border)?);
+    // The child of the container that holds the node (the node itself when it is a child).
+    let top = std::iter::successors(Some(node), |id| parent.get(id).copied().flatten())
+        .find(|id| parent.get(id).copied().flatten() == Some(container))?;
+    let chain = plan.chains.iter().find(|ch| {
+        (ch.source == top && ch.target == *border) || (ch.source == *border && ch.target == top)
+    })?;
+    // In the frame of the flow: `u` along it, `v` across it.
+    let vertical = plan.vertical;
+    let to_u = |r: &Rect| {
+        if vertical {
+            (r.y, r.y + r.height)
+        } else {
+            (r.x, r.x + r.width)
+        }
+    };
+    let to_v = |r: &Rect| {
+        if vertical {
+            (r.x, r.x + r.width)
+        } else {
+            (r.y, r.y + r.height)
+        }
+    };
+    let point = |uu: f64, vv: f64| {
+        if vertical {
+            Point { x: vv, y: uu }
+        } else {
+            Point { x: uu, y: vv }
+        }
+    };
+    // The elements from the top child to the border node, in the order away from the child.
+    let mut lanes: Vec<Rect> = chain
+        .dummies
+        .iter()
+        .filter_map(|d| plan.dummies.get(d).map(at))
+        .collect();
+    if chain.source == *border {
+        lanes.reverse();
+    }
+    lanes.push(border_rect.clone());
+    let lane = |r: &Rect| {
+        let (a, b) = to_v(r);
+        (a + b) / 2.
+    };
+    let top_rect = &absolute[top];
+    // The start: on the node's side towards the border, at the first lane where it lies across from the node, else at the
+    // node's middle with a change of lane in the first channel.
+    let n = &absolute[node];
+    let (nu0, nu1) = to_u(n);
+    let (nv0, nv1) = to_v(n);
+    let first_lane = lane(&lanes[0]);
+    let start_v = if first_lane > nv0 + 2. && first_lane < nv1 - 2. {
+        first_lane
+    } else {
+        (nv0 + nv1) / 2.
+    };
+    let start_u = if leaving { nu1 } else { nu0 };
+    let (c0, c1) = to_u(c);
+    let border_u = if leaving { c1 } else { c0 };
+    // A straight lane from the node to the container's border, free of every other node inside the container: the one
+    // closest to the border node's lane, without changes of lane.
+    if top == node {
+        let holding: BTreeSet<&str> =
+            std::iter::successors(Some(node), |id| parent.get(id).copied().flatten()).collect();
+        let inside = |id: &str| {
+            std::iter::successors(parent.get(id).copied().flatten(), |x| {
+                parent.get(x).copied().flatten()
+            })
+            .any(|x| x == container)
+        };
+        let obstacles: Vec<geom::Rect> = absolute
+            .iter()
+            .filter(|(id, _)| !holding.contains(id.as_str()) && inside(id))
+            .map(|(_, r)| geom::Rect {
+                x0: r.x,
+                y0: r.y,
+                x1: r.x + r.width,
+                y1: r.y + r.height,
+            })
+            .collect();
+        let goal = lane(lanes.last().unwrap());
+        let mut candidates: Vec<f64> = Vec::new();
+        let mut t = nv0 + 4.;
+        while t <= nv1 - 4. + 1e-9 {
+            candidates.push(t);
+            t += 2.;
+        }
+        candidates.sort_by(|a, b| {
+            (a - goal)
+                .abs()
+                .total_cmp(&(b - goal).abs())
+                .then(a.total_cmp(b))
+        });
+        if let Some(v) = candidates.into_iter().find(|&v| {
+            let (p, q) = (point(start_u, v), point(border_u, v));
+            !obstacles.iter().any(|o| geom::enters(&p, &q, o))
+        }) {
+            return Some(vec![point(start_u, v), point(border_u, v)]);
+        }
+    }
+    let mut points = vec![point(start_u, start_v)];
+    let mut previous_u = if leaving {
+        to_u(top_rect).1
+    } else {
+        to_u(top_rect).0
+    };
+    let mut current_v = start_v;
+    // A nested child: from the node straight to the child's side along the flow first (inside the child, around its nodes).
+    if top != node {
+        let side_u = previous_u;
+        let side = point(side_u, current_v);
+        let inner = inner_leg(&side, node, top, absolute, parent, shape, false);
+        points = inner.into_iter().rev().collect();
+    }
+    // The extent along the flow of every rank: its children's boxes and its dummies, so that a change of lane happens in
+    // the free channel between two ranks, clear of the widest element of each.
+    let extent = |rank: &Vec<String>| -> Option<(f64, f64)> {
+        rank.iter()
+            .filter_map(|id| {
+                plan.dummies
+                    .get(id)
+                    .map(at)
+                    .or_else(|| absolute.get(id).cloned())
+            })
+            .map(|r| to_u(&r))
+            .reduce(|(a0, a1), (b0, b1)| (a0.min(b0), a1.max(b1)))
+    };
+    let rank_of = |id: &str| {
+        plan.ranks
+            .iter()
+            .position(|rank| rank.iter().any(|x| x == id))
+    };
+    let mut previous_rank = rank_of(top);
+    let mut elements: Vec<&str> = chain.dummies.iter().map(String::as_str).collect();
+    if chain.source == *border {
+        elements.reverse();
+    }
+    elements.push(border.as_str());
+    for (r, id) in lanes.iter().zip(&elements) {
+        let (r0, r1) = to_u(r);
+        let (near, far) = if leaving { (r0, r1) } else { (r1, r0) };
+        let here = rank_of(id);
+        let channel = match (
+            previous_rank.and_then(|p| extent(&plan.ranks[p])),
+            here.and_then(|h| extent(&plan.ranks[h])),
+        ) {
+            (Some((p0, p1)), Some((h0, h1))) => {
+                if leaving {
+                    (p1 + h0) / 2.
+                } else {
+                    (p0 + h1) / 2.
+                }
+            }
+            _ => (previous_u + near) / 2.,
+        };
+        let target_v = lane(r);
+        if (target_v - current_v).abs() > 1e-6 {
+            points.push(point(channel, current_v));
+            points.push(point(channel, target_v));
+            current_v = target_v;
+        }
+        previous_u = far;
+        previous_rank = here;
+    }
+    // On to the container's border.
+    points.push(point(border_u, current_v));
+    Some(points)
+}
+
+/// Whether `c` has a fixed flow and its parent area is organic or radial (`regionChildPorts`); its flow's axis, if so.
+fn layered_child(graph: &Graph, c: &str, parent: &BTreeMap<&str, Option<&str>>) -> Option<bool> {
+    match (
+        graph.area_mode(Some(c)),
+        graph.area_mode(parent.get(c).copied().flatten()),
+    ) {
+        (Ok(Mode::Orientation(o)), Ok(Mode::Organic | Mode::Radial)) if !o.reversed() => {
+            Some(o.vertical())
+        }
+        _ => None,
+    }
+}
+
+/// For every edge that leaves a container with a fixed flow inside an organic or radial area towards another child of that
+/// area, whether its border node stands at the end of the container's flow: when the other end's child lies after the
+/// container along the container's axis in the area's abstract placement (the pivot MDS of the area's children over their
+/// links, where the organic placement starts). Keyed `"{container}\u{1}{edge}"`.
+pub(crate) fn child_sides(graph: &Graph) -> BTreeMap<String, bool> {
+    let parent: BTreeMap<&str, Option<&str>> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let mut out = BTreeMap::new();
+    let mut areas: BTreeSet<Option<&str>> = BTreeSet::new();
+    for n in &graph.nodes {
+        if layered_child(graph, &n.id, &parent).is_some() {
+            areas.insert(n.parent_id.as_deref());
+        }
+    }
+    for area in areas {
+        let ids: Vec<String> = graph
+            .nodes
+            .iter()
+            .filter(|n| n.parent_id.as_deref() == area)
+            .map(|n| n.id.clone())
+            .collect();
+        // The child of the area that holds a node (the node itself when it is a child).
+        let child_of = |id: &str| -> Option<String> {
+            std::iter::successors(Some(id), |x| parent.get(x).copied().flatten())
+                .find(|x| parent.get(x).copied().flatten() == area)
+                .map(str::to_string)
+        };
+        let mut links: BTreeSet<(String, String)> = BTreeSet::new();
+        for e in &graph.edges {
+            let Some(t) = e.target.as_deref() else {
+                continue;
+            };
+            if let (Some(a), Some(b)) = (child_of(&e.source), child_of(t)) {
+                if a != b {
+                    links.insert((a, b));
+                }
+            }
+        }
+        let positions: BTreeMap<&str, (f64, f64)> = ids
+            .iter()
+            .map(String::as_str)
+            .zip(crate::organic::abstract_positions(&ids, &links))
+            .collect();
+        for e in &graph.edges {
+            let Some(t) = e.target.as_deref() else {
+                continue;
+            };
+            let (Some(a), Some(b)) = (child_of(&e.source), child_of(t)) else {
+                continue;
+            };
+            if a == b {
+                continue;
+            }
+            for (c, other) in [(&a, &b), (&b, &a)] {
+                let Some(vertical) = layered_child(graph, c, &parent) else {
+                    continue;
+                };
+                let (pc, po) = (positions[c.as_str()], positions[other.as_str()]);
+                let after = if vertical { po.1 >= pc.1 } else { po.0 >= pc.0 };
+                out.insert(format!("{c}\u{1}{}", e.id), after);
+            }
+        }
+    }
+    out
+}
+
+/// The distance a leg keeps from the corner of a container it goes around.
+const CORNER_MARGIN: f64 = 12.;
+
+/// The corners between `start` and `end` (both excluded) of the shortest free way with the fewest corners: none (the
+/// straight line), one or two of the corners of `boxes`, each `CORNER_MARGIN` out; `None` when none of these is free.
+fn around_boxes(
+    start: &Point,
+    end: &Point,
+    boxes: &[&Rect],
+    free: &dyn Fn(&Point, &Point) -> bool,
+) -> Option<Vec<Point>> {
+    if free(start, end) {
+        return Some(vec![]);
+    }
+    let corners: Vec<Point> = boxes
+        .iter()
+        .flat_map(|r| {
+            let (x0, y0) = (r.x - CORNER_MARGIN, r.y - CORNER_MARGIN);
+            let (x1, y1) = (
+                r.x + r.width + CORNER_MARGIN,
+                r.y + r.height + CORNER_MARGIN,
+            );
+            [(x0, y0), (x1, y0), (x0, y1), (x1, y1)]
+        })
+        .map(|(x, y)| Point { x, y })
+        .collect();
+    let length = |path: &[&Point]| -> f64 {
+        path.windows(2)
+            .map(|w| (w[0].x - w[1].x).p_hypot(w[0].y - w[1].y))
+            .sum()
+    };
+    let mut best: Option<(f64, Vec<Point>)> = None;
+    for c in &corners {
+        if free(start, c) && free(c, end) {
+            let l = length(&[start, c, end]);
+            if best.as_ref().is_none_or(|(b, _)| l < *b) {
+                best = Some((l, vec![c.clone()]));
+            }
+        }
+    }
+    if best.is_some() {
+        return best.map(|(_, p)| p);
+    }
+    for c in &corners {
+        if !free(start, c) {
+            continue;
+        }
+        for d in &corners {
+            if std::ptr::eq(c, d) || !free(c, d) || !free(d, end) {
+                continue;
+            }
+            let l = length(&[start, c, d, end]);
+            if best.as_ref().is_none_or(|(b, _)| l < *b) {
+                best = Some((l, vec![c.clone(), d.clone()]));
+            }
+        }
+    }
+    best.map(|(_, p)| p)
+}

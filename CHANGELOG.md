@@ -18,6 +18,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `regionChildPorts` (experimental, off; ADR 0020 S1-3): layered containers inside an organic or radial area get border
+  nodes in their own flow, so their edges leave them along the flow and the area draws them on from there
+  ([measurement](benchmarks/results/region-child-ports-20261114.md)).
 - `regionPorts` (experimental, off; ADR 0020 S1-2): edges that leave an organic, tree or radial region in a layered parent
   enter and leave it through ports on the sides of the parent's flow, with the inner leg drawn by the region
   ([measurement](benchmarks/results/region-ports-20261114.md)).

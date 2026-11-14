@@ -393,7 +393,25 @@ pub fn compute_counted(
             return Ok((snapshot, stages));
         }
     }
+    if options.region_child_ports && options.region_child_sides.is_empty() {
+        let sides = region_ports::child_sides(graph);
+        if !sides.is_empty() {
+            let with_sides = LayoutOptions {
+                region_child_sides: sides,
+                ..options.clone()
+            };
+            let (mut snapshot, stages) =
+                compute_counted_inner(graph, previous, dirty, &with_sides)?;
+            snapshot.options = options.clone();
+            region_ports::child_legs(&mut snapshot);
+            apply_aggregate_weights(&mut snapshot);
+            return Ok((snapshot, stages));
+        }
+    }
     let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
+    if options.region_child_ports {
+        region_ports::child_legs(&mut snapshot);
+    }
     apply_aggregate_weights(&mut snapshot);
     Ok((snapshot, stages))
 }
@@ -5809,7 +5827,17 @@ fn place(
                         _ => false,
                     }
                 });
-            if same_axis_container || cross_axis_container {
+            // Experimental (`regionChildPorts`, ADR 0020 S1-3): a container with a fixed flow inside an organic or radial area
+            // gets border nodes as in a parent of the same axis, so that its edges to the outside leave it in its own flow;
+            // the area draws them straight from there (`region_ports::child_legs`).
+            let region_child_container = options.region_child_ports && parent.is_some_and(|p| {
+                let outer = index.node(p).and_then(|n| n.parent_id.as_deref());
+                matches!(
+                    (direction_for(graph, parent), direction_for(graph, outer)),
+                    (Mode::Orientation(inner), Mode::Organic | Mode::Radial) if !inner.reversed()
+                )
+            });
+            if same_axis_container || cross_axis_container || region_child_container {
                 let mut leaving: Vec<(String, Option<String>)> = Vec::new();
                 let mut entering: Vec<(String, Option<String>)> = Vec::new();
                 for (edge, &ends) in graph.edges.iter().zip(&index.edge_ends) {
@@ -5835,6 +5863,27 @@ fn place(
                     }
                     let backward = options.hierarchical_ordering
                         && reversed_above(index, plans, &reversals, &edge.source, target);
+                    // A container in an organic or radial area: the border node stands on the side of the flow that faces
+                    // the edge's other end in the area's abstract placement (`region_child_sides`).
+                    if region_child_container {
+                        let key = format!("{}\u{1}{}", parent.unwrap_or_default(), edge.id);
+                        let child = match (from, to) {
+                            (Some(a), None) => Some(a),
+                            (None, Some(b)) => Some(b),
+                            _ => None,
+                        };
+                        if let (Some(c), Some(&at_end)) =
+                            (child, options.region_child_sides.get(&key))
+                        {
+                            let entry = (edge.id.clone(), Some(children[c].id.clone()));
+                            if at_end {
+                                leaving.push(entry);
+                            } else {
+                                entering.push(entry);
+                            }
+                            continue;
+                        }
+                    }
                     match (from, to) {
                         (Some(a), None) if backward => {
                             entering.push((edge.id.clone(), Some(children[a].id.clone())))

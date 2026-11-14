@@ -138,6 +138,13 @@ straightDetours?: boolean,
  */
 regionPorts?: boolean,
 /**
+ * Experimental (ADR 0020, S1-3): a container with a fixed flow inside an organic or radial area gets border nodes in
+ * its own flow, as in a parent of the same axis: its edges to the outside run inside it along its ranks to its border
+ * and leave it there, and the area draws them straight from that point. Omitted when off, so the default output does
+ * not change.
+ */
+regionChildPorts?: boolean,
+/**
  * How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
  * Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
  */
