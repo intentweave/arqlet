@@ -99,6 +99,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- A tree area that flows top to bottom (or bottom to top) put its first rank into its container's header: the
+  arrangement is computed left to right and transposed, which moved the header room to the left. It now keeps the
+  same margins as the other orientations; nested-tree-radial had 24 such geometry issues and has none. With this and
+  `nestedEdgesByDetour`, no dataset in `benchmarks/datasets` has a geometry issue in the default layout.
 - With a level of detail, communities or groups, an import's `limit` counted every node below a collapsed container, so
   a first view with many collapsed containers showed only those whose whole content fit (20 containers of 50 nodes,
   `limit: 100`: 2 shown, the rest left out silently). The limit now counts what the first view shows: a collapsed
