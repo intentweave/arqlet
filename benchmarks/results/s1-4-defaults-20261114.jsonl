@@ -1,0 +1,186 @@
+{"dataset":"activity-order","variant":"default","nodes":31,"edges":40,"lineNodeHits":0,"crossings":69,"bends":79,"areaK":1939,"geometryIssues":0,"singlePass":true,"ms":7}
+{"dataset":"activity-order","variant":"A","nodes":31,"edges":40,"lineNodeHits":0,"crossings":69,"bends":79,"areaK":1939,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"activity-order","variant":"A + regionChildPorts","nodes":31,"edges":40,"lineNodeHits":0,"crossings":69,"bends":79,"areaK":1939,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"activity-order","variant":"B","nodes":31,"edges":40,"lineNodeHits":0,"crossings":69,"bends":79,"areaK":1939,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"activity-order","variant":"directionsFirst","nodes":31,"edges":40,"lineNodeHits":0,"crossings":69,"bends":79,"areaK":1939,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"activity-order","variant":"elk-rs","nodes":31,"edges":40,"lineNodeHits":0,"crossings":29,"bends":90,"areaK":1623,"geometryIssues":null,"singlePass":null,"ms":5}
+{"dataset":"arqlet-pipeline","variant":"default","nodes":32,"edges":33,"lineNodeHits":0,"crossings":22,"bends":80,"areaK":3535,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"arqlet-pipeline","variant":"A","nodes":32,"edges":33,"lineNodeHits":0,"crossings":22,"bends":80,"areaK":3535,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"arqlet-pipeline","variant":"A + regionChildPorts","nodes":32,"edges":33,"lineNodeHits":0,"crossings":22,"bends":80,"areaK":3535,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"arqlet-pipeline","variant":"B","nodes":32,"edges":33,"lineNodeHits":0,"crossings":22,"bends":80,"areaK":3535,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"arqlet-pipeline","variant":"directionsFirst","nodes":32,"edges":33,"lineNodeHits":0,"crossings":22,"bends":80,"areaK":3535,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"arqlet-pipeline","variant":"elk-rs","nodes":32,"edges":33,"lineNodeHits":0,"crossings":5,"bends":56,"areaK":1957,"geometryIssues":null,"singlePass":null,"ms":3}
+{"dataset":"bpmn-pools","variant":"default","nodes":26,"edges":24,"lineNodeHits":0,"crossings":10,"bends":59,"areaK":1971,"geometryIssues":0,"singlePass":true,"ms":5}
+{"dataset":"bpmn-pools","variant":"A","nodes":26,"edges":24,"lineNodeHits":0,"crossings":10,"bends":59,"areaK":1971,"geometryIssues":0,"singlePass":true,"ms":5}
+{"dataset":"bpmn-pools","variant":"A + regionChildPorts","nodes":26,"edges":24,"lineNodeHits":0,"crossings":10,"bends":59,"areaK":1971,"geometryIssues":0,"singlePass":true,"ms":5}
+{"dataset":"bpmn-pools","variant":"B","nodes":26,"edges":24,"lineNodeHits":0,"crossings":10,"bends":59,"areaK":1971,"geometryIssues":0,"singlePass":true,"ms":5}
+{"dataset":"bpmn-pools","variant":"directionsFirst","nodes":26,"edges":24,"lineNodeHits":0,"crossings":10,"bends":59,"areaK":1971,"geometryIssues":0,"singlePass":true,"ms":5}
+{"dataset":"bpmn-pools","variant":"elk-rs","nodes":26,"edges":24,"lineNodeHits":0,"crossings":3,"bends":32,"areaK":853,"geometryIssues":null,"singlePass":null,"ms":3}
+{"dataset":"can-bus","variant":"default","nodes":21,"edges":22,"lineNodeHits":0,"crossings":0,"bends":32,"areaK":1315,"geometryIssues":0,"singlePass":false,"ms":8}
+{"dataset":"can-bus","variant":"A","nodes":21,"edges":22,"lineNodeHits":0,"crossings":0,"bends":27,"areaK":1305,"geometryIssues":0,"singlePass":true,"ms":12}
+{"dataset":"can-bus","variant":"A + regionChildPorts","nodes":21,"edges":22,"lineNodeHits":0,"crossings":0,"bends":27,"areaK":1305,"geometryIssues":0,"singlePass":true,"ms":12}
+{"dataset":"can-bus","variant":"B","nodes":21,"edges":22,"lineNodeHits":0,"crossings":0,"bends":32,"areaK":1315,"geometryIssues":0,"singlePass":false,"ms":7}
+{"dataset":"can-bus","variant":"directionsFirst","nodes":21,"edges":22,"lineNodeHits":0,"crossings":0,"bends":32,"areaK":1315,"geometryIssues":0,"singlePass":false,"ms":7}
+{"dataset":"can-bus","variant":"elk-rs","nodes":21,"edges":22,"lineNodeHits":0,"crossings":5,"bends":30,"areaK":714,"geometryIssues":null,"singlePass":null,"ms":2}
+{"dataset":"cloud-architecture","variant":"default","nodes":34,"edges":32,"lineNodeHits":0,"crossings":22,"bends":114,"areaK":4816,"geometryIssues":0,"singlePass":true,"ms":8}
+{"dataset":"cloud-architecture","variant":"A","nodes":34,"edges":32,"lineNodeHits":0,"crossings":22,"bends":114,"areaK":4816,"geometryIssues":0,"singlePass":true,"ms":8}
+{"dataset":"cloud-architecture","variant":"A + regionChildPorts","nodes":34,"edges":32,"lineNodeHits":0,"crossings":22,"bends":114,"areaK":4816,"geometryIssues":0,"singlePass":true,"ms":8}
+{"dataset":"cloud-architecture","variant":"B","nodes":34,"edges":32,"lineNodeHits":0,"crossings":22,"bends":114,"areaK":4816,"geometryIssues":0,"singlePass":true,"ms":8}
+{"dataset":"cloud-architecture","variant":"directionsFirst","nodes":34,"edges":32,"lineNodeHits":0,"crossings":22,"bends":114,"areaK":4816,"geometryIssues":0,"singlePass":true,"ms":8}
+{"dataset":"cloud-architecture","variant":"elk-rs","nodes":34,"edges":32,"lineNodeHits":0,"crossings":15,"bends":106,"areaK":1884,"geometryIssues":null,"singlePass":null,"ms":5}
+{"dataset":"deployment-cluster","variant":"default","nodes":33,"edges":56,"lineNodeHits":0,"crossings":95,"bends":227,"areaK":5038,"geometryIssues":0,"singlePass":true,"ms":11}
+{"dataset":"deployment-cluster","variant":"A","nodes":33,"edges":56,"lineNodeHits":0,"crossings":95,"bends":227,"areaK":5038,"geometryIssues":0,"singlePass":true,"ms":11}
+{"dataset":"deployment-cluster","variant":"A + regionChildPorts","nodes":33,"edges":56,"lineNodeHits":0,"crossings":95,"bends":227,"areaK":5038,"geometryIssues":0,"singlePass":true,"ms":11}
+{"dataset":"deployment-cluster","variant":"B","nodes":33,"edges":56,"lineNodeHits":0,"crossings":95,"bends":227,"areaK":5038,"geometryIssues":0,"singlePass":true,"ms":11}
+{"dataset":"deployment-cluster","variant":"directionsFirst","nodes":33,"edges":56,"lineNodeHits":0,"crossings":95,"bends":227,"areaK":5038,"geometryIssues":0,"singlePass":true,"ms":10}
+{"dataset":"deployment-cluster","variant":"elk-rs","nodes":33,"edges":56,"lineNodeHits":0,"crossings":68,"bends":162,"areaK":2332,"geometryIssues":null,"singlePass":null,"ms":6}
+{"dataset":"er-diagram","variant":"default","nodes":44,"edges":12,"lineNodeHits":0,"crossings":0,"bends":23,"areaK":1664,"geometryIssues":0,"singlePass":true,"ms":4}
+{"dataset":"er-diagram","variant":"A","nodes":44,"edges":12,"lineNodeHits":0,"crossings":0,"bends":23,"areaK":1664,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"er-diagram","variant":"A + regionChildPorts","nodes":44,"edges":12,"lineNodeHits":0,"crossings":0,"bends":23,"areaK":1664,"geometryIssues":0,"singlePass":true,"ms":4}
+{"dataset":"er-diagram","variant":"B","nodes":44,"edges":12,"lineNodeHits":0,"crossings":0,"bends":23,"areaK":1664,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"er-diagram","variant":"directionsFirst","nodes":44,"edges":12,"lineNodeHits":0,"crossings":0,"bends":15,"areaK":1829,"geometryIssues":0,"singlePass":true,"ms":5}
+{"dataset":"er-diagram","variant":"elk-rs","nodes":44,"edges":12,"lineNodeHits":0,"crossings":1,"bends":14,"areaK":1364,"geometryIssues":null,"singlePass":null,"ms":2}
+{"dataset":"fixed-ports","variant":"default","nodes":5,"edges":7,"lineNodeHits":0,"crossings":0,"bends":12,"areaK":148,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"fixed-ports","variant":"A","nodes":5,"edges":7,"lineNodeHits":0,"crossings":0,"bends":12,"areaK":148,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"fixed-ports","variant":"A + regionChildPorts","nodes":5,"edges":7,"lineNodeHits":0,"crossings":0,"bends":12,"areaK":148,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"fixed-ports","variant":"B","nodes":5,"edges":7,"lineNodeHits":0,"crossings":0,"bends":12,"areaK":148,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"fixed-ports","variant":"directionsFirst","nodes":5,"edges":7,"lineNodeHits":0,"crossings":0,"bends":12,"areaK":148,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"fixed-ports","variant":"elk-rs","nodes":5,"edges":7,"lineNodeHits":0,"crossings":0,"bends":12,"areaK":110,"geometryIssues":null,"singlePass":null,"ms":1}
+{"dataset":"layerweave-code","variant":"default","nodes":203,"edges":277,"lineNodeHits":0,"crossings":597,"bends":1155,"areaK":94974,"geometryIssues":0,"singlePass":true,"ms":68}
+{"dataset":"layerweave-code","variant":"A","nodes":203,"edges":277,"lineNodeHits":0,"crossings":597,"bends":1155,"areaK":94974,"geometryIssues":0,"singlePass":true,"ms":68}
+{"dataset":"layerweave-code","variant":"A + regionChildPorts","nodes":203,"edges":277,"lineNodeHits":0,"crossings":597,"bends":1155,"areaK":94974,"geometryIssues":0,"singlePass":true,"ms":70}
+{"dataset":"layerweave-code","variant":"B","nodes":203,"edges":277,"lineNodeHits":0,"crossings":597,"bends":1155,"areaK":94974,"geometryIssues":0,"singlePass":true,"ms":69}
+{"dataset":"layerweave-code","variant":"directionsFirst","nodes":203,"edges":277,"lineNodeHits":0,"crossings":597,"bends":1155,"areaK":94974,"geometryIssues":0,"singlePass":true,"ms":69}
+{"dataset":"layerweave-code","variant":"elk-rs","nodes":203,"edges":277,"lineNodeHits":0,"crossings":780,"bends":1316,"areaK":46021,"geometryIssues":null,"singlePass":null,"ms":40}
+{"dataset":"mixed-large","variant":"default","nodes":96,"edges":95,"lineNodeHits":44,"crossings":721,"bends":0,"areaK":50888,"geometryIssues":61,"singlePass":false,"ms":7931}
+{"dataset":"mixed-large","variant":"A","nodes":96,"edges":95,"lineNodeHits":4,"crossings":954,"bends":120,"areaK":27185,"geometryIssues":17,"singlePass":true,"ms":12786}
+{"dataset":"mixed-large","variant":"A + regionChildPorts","nodes":96,"edges":95,"lineNodeHits":2,"crossings":1145,"bends":336,"areaK":63950,"geometryIssues":11,"singlePass":true,"ms":10626}
+{"dataset":"mixed-large","variant":"B","nodes":96,"edges":95,"lineNodeHits":0,"crossings":811,"bends":68,"areaK":50888,"geometryIssues":10,"singlePass":false,"ms":7971}
+{"dataset":"mixed-large","variant":"directionsFirst","nodes":96,"edges":95,"lineNodeHits":44,"crossings":721,"bends":0,"areaK":50888,"geometryIssues":61,"singlePass":false,"ms":7914}
+{"dataset":"mixed-large","variant":"elk-rs","nodes":96,"edges":95,"lineNodeHits":0,"crossings":591,"bends":368,"areaK":16544,"geometryIssues":null,"singlePass":null,"ms":13}
+{"dataset":"mixed-layouts","variant":"default","nodes":18,"edges":16,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"mixed-layouts","variant":"A","nodes":18,"edges":16,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"geometryIssues":0,"singlePass":true,"ms":21}
+{"dataset":"mixed-layouts","variant":"A + regionChildPorts","nodes":18,"edges":16,"lineNodeHits":0,"crossings":7,"bends":4,"areaK":1372,"geometryIssues":0,"singlePass":true,"ms":24}
+{"dataset":"mixed-layouts","variant":"B","nodes":18,"edges":16,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"mixed-layouts","variant":"directionsFirst","nodes":18,"edges":16,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"mixed-layouts","variant":"elk-rs","nodes":18,"edges":16,"lineNodeHits":0,"crossings":0,"bends":14,"areaK":420,"geometryIssues":null,"singlePass":null,"ms":1}
+{"dataset":"nested-tree-radial","variant":"default","nodes":160,"edges":121,"lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"geometryIssues":24,"singlePass":false,"ms":9}
+{"dataset":"nested-tree-radial","variant":"A","nodes":160,"edges":121,"lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"geometryIssues":24,"singlePass":false,"ms":9}
+{"dataset":"nested-tree-radial","variant":"A + regionChildPorts","nodes":160,"edges":121,"lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"geometryIssues":24,"singlePass":false,"ms":9}
+{"dataset":"nested-tree-radial","variant":"B","nodes":160,"edges":121,"lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"geometryIssues":24,"singlePass":false,"ms":9}
+{"dataset":"nested-tree-radial","variant":"directionsFirst","nodes":160,"edges":121,"lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"geometryIssues":24,"singlePass":false,"ms":10}
+{"dataset":"nested-tree-radial","variant":"elk-rs","nodes":160,"edges":121,"lineNodeHits":0,"crossings":0,"bends":62,"areaK":7207,"geometryIssues":null,"singlePass":null,"ms":5}
+{"dataset":"network-vlan","variant":"default","nodes":37,"edges":47,"lineNodeHits":0,"crossings":23,"bends":106,"areaK":3173,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"network-vlan","variant":"A","nodes":37,"edges":47,"lineNodeHits":0,"crossings":23,"bends":106,"areaK":3173,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"network-vlan","variant":"A + regionChildPorts","nodes":37,"edges":47,"lineNodeHits":0,"crossings":23,"bends":106,"areaK":3173,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"network-vlan","variant":"B","nodes":37,"edges":47,"lineNodeHits":0,"crossings":23,"bends":106,"areaK":3173,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"network-vlan","variant":"directionsFirst","nodes":37,"edges":47,"lineNodeHits":0,"crossings":23,"bends":106,"areaK":3173,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"network-vlan","variant":"elk-rs","nodes":37,"edges":47,"lineNodeHits":0,"crossings":26,"bends":94,"areaK":3185,"geometryIssues":null,"singlePass":null,"ms":3}
+{"dataset":"org-chart","variant":"default","nodes":104,"edges":82,"lineNodeHits":0,"crossings":37,"bends":337,"areaK":20080,"geometryIssues":0,"singlePass":true,"ms":15}
+{"dataset":"org-chart","variant":"A","nodes":104,"edges":82,"lineNodeHits":0,"crossings":37,"bends":337,"areaK":20080,"geometryIssues":0,"singlePass":true,"ms":15}
+{"dataset":"org-chart","variant":"A + regionChildPorts","nodes":104,"edges":82,"lineNodeHits":0,"crossings":37,"bends":337,"areaK":20080,"geometryIssues":0,"singlePass":true,"ms":15}
+{"dataset":"org-chart","variant":"B","nodes":104,"edges":82,"lineNodeHits":0,"crossings":37,"bends":337,"areaK":20080,"geometryIssues":0,"singlePass":true,"ms":14}
+{"dataset":"org-chart","variant":"directionsFirst","nodes":104,"edges":82,"lineNodeHits":0,"crossings":37,"bends":337,"areaK":20080,"geometryIssues":0,"singlePass":true,"ms":14}
+{"dataset":"org-chart","variant":"elk-rs","nodes":104,"edges":82,"lineNodeHits":0,"crossings":22,"bends":148,"areaK":10448,"geometryIssues":null,"singlePass":null,"ms":8}
+{"dataset":"organic-100","variant":"default","nodes":100,"edges":119,"lineNodeHits":0,"crossings":1,"bends":0,"areaK":10903,"geometryIssues":0,"singlePass":false,"ms":56}
+{"dataset":"organic-100","variant":"A","nodes":100,"edges":119,"lineNodeHits":0,"crossings":1,"bends":0,"areaK":10903,"geometryIssues":0,"singlePass":false,"ms":61}
+{"dataset":"organic-100","variant":"A + regionChildPorts","nodes":100,"edges":119,"lineNodeHits":0,"crossings":1,"bends":0,"areaK":10903,"geometryIssues":0,"singlePass":false,"ms":61}
+{"dataset":"organic-100","variant":"B","nodes":100,"edges":119,"lineNodeHits":0,"crossings":1,"bends":0,"areaK":10903,"geometryIssues":0,"singlePass":false,"ms":61}
+{"dataset":"organic-100","variant":"directionsFirst","nodes":100,"edges":119,"lineNodeHits":0,"crossings":1,"bends":0,"areaK":10903,"geometryIssues":0,"singlePass":false,"ms":56}
+{"dataset":"organic-100","variant":"elk-rs","nodes":100,"edges":119,"lineNodeHits":0,"crossings":0,"bends":72,"areaK":1839,"geometryIssues":null,"singlePass":null,"ms":4}
+{"dataset":"organic-200","variant":"default","nodes":150,"edges":177,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":12848,"geometryIssues":0,"singlePass":false,"ms":282}
+{"dataset":"organic-200","variant":"A","nodes":150,"edges":177,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":12848,"geometryIssues":0,"singlePass":false,"ms":293}
+{"dataset":"organic-200","variant":"A + regionChildPorts","nodes":150,"edges":177,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":12848,"geometryIssues":0,"singlePass":false,"ms":294}
+{"dataset":"organic-200","variant":"B","nodes":150,"edges":177,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":12848,"geometryIssues":0,"singlePass":false,"ms":295}
+{"dataset":"organic-200","variant":"directionsFirst","nodes":150,"edges":177,"lineNodeHits":0,"crossings":5,"bends":0,"areaK":12848,"geometryIssues":0,"singlePass":false,"ms":283}
+{"dataset":"organic-200","variant":"elk-rs","nodes":150,"edges":177,"lineNodeHits":0,"crossings":0,"bends":108,"areaK":4820,"geometryIssues":null,"singlePass":null,"ms":7}
+{"dataset":"organic-25","variant":"default","nodes":25,"edges":29,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1487,"geometryIssues":0,"singlePass":false,"ms":9}
+{"dataset":"organic-25","variant":"A","nodes":25,"edges":29,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1487,"geometryIssues":0,"singlePass":false,"ms":9}
+{"dataset":"organic-25","variant":"A + regionChildPorts","nodes":25,"edges":29,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1487,"geometryIssues":0,"singlePass":false,"ms":9}
+{"dataset":"organic-25","variant":"B","nodes":25,"edges":29,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1487,"geometryIssues":0,"singlePass":false,"ms":9}
+{"dataset":"organic-25","variant":"directionsFirst","nodes":25,"edges":29,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1487,"geometryIssues":0,"singlePass":false,"ms":9}
+{"dataset":"organic-25","variant":"elk-rs","nodes":25,"edges":29,"lineNodeHits":0,"crossings":0,"bends":20,"areaK":453,"geometryIssues":null,"singlePass":null,"ms":1}
+{"dataset":"organic-50","variant":"default","nodes":50,"edges":59,"lineNodeHits":0,"crossings":2,"bends":0,"areaK":3826,"geometryIssues":0,"singlePass":false,"ms":40}
+{"dataset":"organic-50","variant":"A","nodes":50,"edges":59,"lineNodeHits":0,"crossings":2,"bends":0,"areaK":3826,"geometryIssues":0,"singlePass":false,"ms":42}
+{"dataset":"organic-50","variant":"A + regionChildPorts","nodes":50,"edges":59,"lineNodeHits":0,"crossings":2,"bends":0,"areaK":3826,"geometryIssues":0,"singlePass":false,"ms":42}
+{"dataset":"organic-50","variant":"B","nodes":50,"edges":59,"lineNodeHits":0,"crossings":2,"bends":0,"areaK":3826,"geometryIssues":0,"singlePass":false,"ms":42}
+{"dataset":"organic-50","variant":"directionsFirst","nodes":50,"edges":59,"lineNodeHits":0,"crossings":2,"bends":0,"areaK":3826,"geometryIssues":0,"singlePass":false,"ms":41}
+{"dataset":"organic-50","variant":"elk-rs","nodes":50,"edges":59,"lineNodeHits":0,"crossings":0,"bends":40,"areaK":1088,"geometryIssues":null,"singlePass":null,"ms":2}
+{"dataset":"petri-net","variant":"default","nodes":24,"edges":41,"lineNodeHits":0,"crossings":32,"bends":84,"areaK":1512,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"petri-net","variant":"A","nodes":24,"edges":41,"lineNodeHits":0,"crossings":32,"bends":84,"areaK":1512,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"petri-net","variant":"A + regionChildPorts","nodes":24,"edges":41,"lineNodeHits":0,"crossings":32,"bends":84,"areaK":1512,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"petri-net","variant":"B","nodes":24,"edges":41,"lineNodeHits":0,"crossings":32,"bends":84,"areaK":1512,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"petri-net","variant":"directionsFirst","nodes":24,"edges":41,"lineNodeHits":0,"crossings":32,"bends":84,"areaK":1512,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"petri-net","variant":"elk-rs","nodes":24,"edges":41,"lineNodeHits":0,"crossings":58,"bends":66,"areaK":650,"geometryIssues":null,"singlePass":null,"ms":2}
+{"dataset":"petri-net-shapes","variant":"default","nodes":24,"edges":41,"lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"geometryIssues":0,"singlePass":false,"ms":548}
+{"dataset":"petri-net-shapes","variant":"A","nodes":24,"edges":41,"lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"geometryIssues":0,"singlePass":false,"ms":557}
+{"dataset":"petri-net-shapes","variant":"A + regionChildPorts","nodes":24,"edges":41,"lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"geometryIssues":0,"singlePass":false,"ms":555}
+{"dataset":"petri-net-shapes","variant":"B","nodes":24,"edges":41,"lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"geometryIssues":0,"singlePass":false,"ms":552}
+{"dataset":"petri-net-shapes","variant":"directionsFirst","nodes":24,"edges":41,"lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"geometryIssues":0,"singlePass":false,"ms":555}
+{"dataset":"petri-net-shapes","variant":"elk-rs","nodes":24,"edges":41,"lineNodeHits":0,"crossings":58,"bends":66,"areaK":650,"geometryIssues":null,"singlePass":null,"ms":2}
+{"dataset":"self-loops","variant":"default","nodes":9,"edges":20,"lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"geometryIssues":0,"singlePass":false,"ms":5}
+{"dataset":"self-loops","variant":"A","nodes":9,"edges":20,"lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"geometryIssues":0,"singlePass":true,"ms":5}
+{"dataset":"self-loops","variant":"A + regionChildPorts","nodes":9,"edges":20,"lineNodeHits":0,"crossings":0,"bends":33,"areaK":262,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"self-loops","variant":"B","nodes":9,"edges":20,"lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"geometryIssues":0,"singlePass":false,"ms":6}
+{"dataset":"self-loops","variant":"directionsFirst","nodes":9,"edges":20,"lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"geometryIssues":0,"singlePass":false,"ms":5}
+{"dataset":"self-loops","variant":"elk-rs","nodes":9,"edges":20,"lineNodeHits":0,"crossings":0,"bends":24,"areaK":228,"geometryIssues":null,"singlePass":null,"ms":1}
+{"dataset":"state-order","variant":"default","nodes":11,"edges":14,"lineNodeHits":0,"crossings":0,"bends":19,"areaK":470,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-order","variant":"A","nodes":11,"edges":14,"lineNodeHits":0,"crossings":0,"bends":19,"areaK":470,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-order","variant":"A + regionChildPorts","nodes":11,"edges":14,"lineNodeHits":0,"crossings":0,"bends":19,"areaK":470,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-order","variant":"B","nodes":11,"edges":14,"lineNodeHits":0,"crossings":0,"bends":19,"areaK":470,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-order","variant":"directionsFirst","nodes":11,"edges":14,"lineNodeHits":0,"crossings":0,"bends":19,"areaK":470,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-order","variant":"elk-rs","nodes":11,"edges":14,"lineNodeHits":0,"crossings":1,"bends":16,"areaK":277,"geometryIssues":null,"singlePass":null,"ms":1}
+{"dataset":"state-tcp","variant":"default","nodes":11,"edges":19,"lineNodeHits":0,"crossings":0,"bends":26,"areaK":396,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-tcp","variant":"A","nodes":11,"edges":19,"lineNodeHits":0,"crossings":0,"bends":26,"areaK":396,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-tcp","variant":"A + regionChildPorts","nodes":11,"edges":19,"lineNodeHits":0,"crossings":0,"bends":26,"areaK":396,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-tcp","variant":"B","nodes":11,"edges":19,"lineNodeHits":0,"crossings":0,"bends":26,"areaK":396,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-tcp","variant":"directionsFirst","nodes":11,"edges":19,"lineNodeHits":0,"crossings":0,"bends":26,"areaK":396,"geometryIssues":0,"singlePass":true,"ms":3}
+{"dataset":"state-tcp","variant":"elk-rs","nodes":11,"edges":19,"lineNodeHits":0,"crossings":0,"bends":30,"areaK":310,"geometryIssues":null,"singlePass":null,"ms":1}
+{"dataset":"synthetic-2k","variant":"default","nodes":231,"edges":318,"lineNodeHits":0,"crossings":2792,"bends":1613,"areaK":61421,"geometryIssues":0,"singlePass":true,"ms":154}
+{"dataset":"synthetic-2k","variant":"A","nodes":231,"edges":318,"lineNodeHits":0,"crossings":2792,"bends":1613,"areaK":61421,"geometryIssues":0,"singlePass":true,"ms":152}
+{"dataset":"synthetic-2k","variant":"A + regionChildPorts","nodes":231,"edges":318,"lineNodeHits":0,"crossings":2792,"bends":1613,"areaK":61421,"geometryIssues":0,"singlePass":true,"ms":152}
+{"dataset":"synthetic-2k","variant":"B","nodes":231,"edges":318,"lineNodeHits":0,"crossings":2792,"bends":1613,"areaK":61421,"geometryIssues":0,"singlePass":true,"ms":153}
+{"dataset":"synthetic-2k","variant":"directionsFirst","nodes":231,"edges":318,"lineNodeHits":0,"crossings":2430,"bends":1606,"areaK":105694,"geometryIssues":0,"singlePass":true,"ms":410}
+{"dataset":"synthetic-2k","variant":"elk-rs","nodes":231,"edges":318,"lineNodeHits":0,"crossings":3416,"bends":1558,"areaK":72677,"geometryIssues":null,"singlePass":null,"ms":38}
+{"dataset":"tree-100","variant":"default","nodes":100,"edges":99,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":7754,"geometryIssues":0,"singlePass":false,"ms":7}
+{"dataset":"tree-100","variant":"A","nodes":100,"edges":99,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":7754,"geometryIssues":0,"singlePass":false,"ms":11}
+{"dataset":"tree-100","variant":"A + regionChildPorts","nodes":100,"edges":99,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":7754,"geometryIssues":0,"singlePass":false,"ms":12}
+{"dataset":"tree-100","variant":"B","nodes":100,"edges":99,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":7754,"geometryIssues":0,"singlePass":false,"ms":11}
+{"dataset":"tree-100","variant":"directionsFirst","nodes":100,"edges":99,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":7754,"geometryIssues":0,"singlePass":false,"ms":7}
+{"dataset":"tree-100","variant":"elk-rs","nodes":100,"edges":99,"lineNodeHits":0,"crossings":0,"bends":98,"areaK":4786,"geometryIssues":null,"singlePass":null,"ms":4}
+{"dataset":"tree-200","variant":"default","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":10}
+{"dataset":"tree-200","variant":"A","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"tree-200","variant":"A + regionChildPorts","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"tree-200","variant":"B","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"tree-200","variant":"directionsFirst","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":10}
+{"dataset":"tree-200","variant":"elk-rs","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":148,"areaK":8243,"geometryIssues":null,"singlePass":null,"ms":4}
+{"dataset":"tree-25","variant":"default","nodes":25,"edges":24,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1382,"geometryIssues":0,"singlePass":false,"ms":3}
+{"dataset":"tree-25","variant":"A","nodes":25,"edges":24,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1382,"geometryIssues":0,"singlePass":false,"ms":3}
+{"dataset":"tree-25","variant":"A + regionChildPorts","nodes":25,"edges":24,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1382,"geometryIssues":0,"singlePass":false,"ms":3}
+{"dataset":"tree-25","variant":"B","nodes":25,"edges":24,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1382,"geometryIssues":0,"singlePass":false,"ms":3}
+{"dataset":"tree-25","variant":"directionsFirst","nodes":25,"edges":24,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":1382,"geometryIssues":0,"singlePass":false,"ms":3}
+{"dataset":"tree-25","variant":"elk-rs","nodes":25,"edges":24,"lineNodeHits":0,"crossings":0,"bends":24,"areaK":844,"geometryIssues":null,"singlePass":null,"ms":1}
+{"dataset":"tree-300","variant":"default","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":10}
+{"dataset":"tree-300","variant":"A","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"tree-300","variant":"A + regionChildPorts","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"tree-300","variant":"B","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":20}
+{"dataset":"tree-300","variant":"directionsFirst","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":13443,"geometryIssues":0,"singlePass":false,"ms":10}
+{"dataset":"tree-300","variant":"elk-rs","nodes":150,"edges":149,"lineNodeHits":0,"crossings":0,"bends":148,"areaK":8243,"geometryIssues":null,"singlePass":null,"ms":4}
+{"dataset":"tree-50","variant":"default","nodes":50,"edges":49,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":3269,"geometryIssues":0,"singlePass":false,"ms":4}
+{"dataset":"tree-50","variant":"A","nodes":50,"edges":49,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":3269,"geometryIssues":0,"singlePass":false,"ms":5}
+{"dataset":"tree-50","variant":"A + regionChildPorts","nodes":50,"edges":49,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":3269,"geometryIssues":0,"singlePass":false,"ms":5}
+{"dataset":"tree-50","variant":"B","nodes":50,"edges":49,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":3269,"geometryIssues":0,"singlePass":false,"ms":5}
+{"dataset":"tree-50","variant":"directionsFirst","nodes":50,"edges":49,"lineNodeHits":0,"crossings":0,"bends":0,"areaK":3269,"geometryIssues":0,"singlePass":false,"ms":4}
+{"dataset":"tree-50","variant":"elk-rs","nodes":50,"edges":49,"lineNodeHits":0,"crossings":0,"bends":48,"areaK":2039,"geometryIssues":null,"singlePass":null,"ms":2}
+{"dataset":"uml-class","variant":"default","nodes":43,"edges":24,"lineNodeHits":0,"crossings":3,"bends":49,"areaK":3675,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"uml-class","variant":"A","nodes":43,"edges":24,"lineNodeHits":0,"crossings":3,"bends":49,"areaK":3675,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"uml-class","variant":"A + regionChildPorts","nodes":43,"edges":24,"lineNodeHits":0,"crossings":3,"bends":49,"areaK":3675,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"uml-class","variant":"B","nodes":43,"edges":24,"lineNodeHits":0,"crossings":3,"bends":49,"areaK":3675,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"uml-class","variant":"directionsFirst","nodes":43,"edges":24,"lineNodeHits":0,"crossings":3,"bends":49,"areaK":3675,"geometryIssues":0,"singlePass":true,"ms":6}
+{"dataset":"uml-class","variant":"elk-rs","nodes":43,"edges":24,"lineNodeHits":0,"crossings":2,"bends":38,"areaK":1008,"geometryIssues":null,"singlePass":null,"ms":3}
+{"dataset":"workflow-dag","variant":"default","nodes":72,"edges":125,"lineNodeHits":0,"crossings":433,"bends":785,"areaK":11827,"geometryIssues":0,"singlePass":true,"ms":21}
+{"dataset":"workflow-dag","variant":"A","nodes":72,"edges":125,"lineNodeHits":0,"crossings":433,"bends":785,"areaK":11827,"geometryIssues":0,"singlePass":true,"ms":21}
+{"dataset":"workflow-dag","variant":"A + regionChildPorts","nodes":72,"edges":125,"lineNodeHits":0,"crossings":433,"bends":785,"areaK":11827,"geometryIssues":0,"singlePass":true,"ms":21}
+{"dataset":"workflow-dag","variant":"B","nodes":72,"edges":125,"lineNodeHits":0,"crossings":433,"bends":785,"areaK":11827,"geometryIssues":0,"singlePass":true,"ms":21}
+{"dataset":"workflow-dag","variant":"directionsFirst","nodes":72,"edges":125,"lineNodeHits":0,"crossings":433,"bends":785,"areaK":11827,"geometryIssues":0,"singlePass":true,"ms":21}
+{"dataset":"workflow-dag","variant":"elk-rs","nodes":72,"edges":125,"lineNodeHits":0,"crossings":249,"bends":434,"areaK":3650,"geometryIssues":null,"singlePass":null,"ms":10}

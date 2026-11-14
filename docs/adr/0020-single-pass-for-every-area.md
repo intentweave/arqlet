@@ -92,7 +92,12 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   axis, 81 without), crossings drop on the synthetic graphs and rise on mixed-large, and the bends rise about sevenfold,
   most of them inherent to leaving along the flow into an area without one; off by default.
 - **S1-4: the default decision** for `singlePassMixed` on the mixed corpus (can-bus, mixed-layouts, mixed-large, self-loops,
-  nested-tree-radial, petri-net-shapes) against the pipeline before single pass and elk-rs.
+  nested-tree-radial, petri-net-shapes) against the pipeline before single pass and elk-rs. Measured on all datasets
+  (2026-11-14, [results](../../benchmarks/results/s1-4-defaults-20261114.md)): the default is unchanged since 0.4.0
+  (fingerprints identical). `regionPorts` + `straightDetours` + `singlePassReversed` (without `singlePassMixed`) leaves 30
+  of 31 datasets geometrically identical and removes all 44 lines through nodes on mixed-large (crossings 811 against
+  721); with `singlePassMixed` 4 remain, with `regionChildPorts` 2 at many more crossings. Proposed: the three options as
+  the default after a timing sweep on an idle machine; `singlePassMixed` and `regionChildPorts` stay options.
 
 ## Consequences
 
