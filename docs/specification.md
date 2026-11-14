@@ -415,6 +415,9 @@ tracks need; every measured dataset keeps its crossings and bends, the layered v
 17 % less area. New reference fingerprints: `fingerprints-20261114-channels-by-demand-default.jsonl`
 (15 views at threads 1 and 4); with `channelsByDemand: false` the geometry equals 0.4.0.
 
+`ENGINE_VERSION` is `0.5.0` with release 0.5.0 (it stayed `0.2.0-prototype` from 0.2 to 0.4): the
+defaults changed, and edits refuse snapshots of another engine version.
+
 Single pass against the default gate (2026-11-08): over five seeds single pass is better
 than the refined default on all 16 datasets the automatic choice takes (11 mixed, 5 of one
 axis). Explicit ports on their flow side are constructed, and areas that choose their

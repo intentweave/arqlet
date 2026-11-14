@@ -22,9 +22,8 @@ answers in the Rust protocol.
   layered parents, straight edges through nodes and organic roots over containers are drawn differently. To keep 0.4's
   drawings, set the five options to `false` (with `channelsByDemand: false` the measured fingerprint views equal 0.4.0).
   They are written into a snapshot only when `false`.
-- **Snapshots of 0.4 load unchanged** (the engine version stays `0.2.0-prototype`), but a missing option reads as its
-  new default: the next edit of a 0.4 snapshot lays out with the new defaults unless the snapshot is configured with
-  them set to `false`.
+- **The engine version is `0.5.0`** (it was `0.2.0-prototype` since 0.2): edits of a snapshot from an earlier engine are
+  refused as before for any other version, so import the graph again rather than continuing a 0.4 snapshot.
 - **Rust: `arqlet::protocol::Response` has typed answers** for `scene`, `trace`, `neighbourhood`, `overview`, `intent`
   and `metrics` instead of `Response::Encoded`; the JSON is unchanged. Exhaustive struct literals of `LayoutOptions`
   need the new fields (or `..Default::default()`), and `arqlet_scene::metrics::DrawNode` has a field `shape`.
