@@ -3303,7 +3303,15 @@ fn reference_response(op: &str, v: &serde_json::Value) -> String {
 /// `snapshot: true` to get the Arqlet snapshot as well.
 fn elk_response(v: &serde_json::Value) -> String {
     let result = (|| -> Result<serde_json::Value, String> {
-        let elk = &v["graph"];
+        // Provisional: a graph that asks for its model order gets ids in input order, so that ties follow the input;
+        // the answer has the given ids again.
+        let (ordered, back) = if arqlet_elk::wants_model_order(&v["graph"]) {
+            let (graph, back) = arqlet_elk::in_model_order(&v["graph"]);
+            (Some(graph), back)
+        } else {
+            (None, Default::default())
+        };
+        let elk = ordered.as_ref().unwrap_or(&v["graph"]);
         let translation = arqlet_elk::translate(elk)?;
         let graph: Graph =
             serde_json::from_value(translation.graph.clone()).map_err(|e| e.to_string())?;
@@ -3350,6 +3358,11 @@ fn elk_response(v: &serde_json::Value) -> String {
             "graph": arqlet_elk::write_back(elk, &snapshot, &translation),
             "diagnostics": diagnostics,
         });
+        if !back.is_empty() {
+            // The given ids again (the evaluation `snapshot` below keeps the ordered ones).
+            arqlet_elk::restore_ids(&mut out["graph"], &back);
+            arqlet_elk::restore_ids(&mut out["diagnostics"], &back);
+        }
         // For evaluation: the Arqlet snapshot behind the result, for the `metrics` operation.
         if v["snapshot"].as_bool() == Some(true) {
             out["snapshot"] = serde_json::to_value(&snapshot).map_err(|e| e.to_string())?;
