@@ -5,6 +5,7 @@
 Explore hierarchies, flows, and graphs in one connected view.
 
 - [Cover](arqlet-cover.svg): dark title image showing connected hierarchy, flow and graph regions; used by the project README.
+- [X advertisement](arqlet-x-ad.svg): 1200 × 628 feed creative; upload the accompanying PNG to X.
 - [Icon](arqlet-icon.svg): mint A contour with a lavender crossbar and graph junctions on a transparent background.
 - [Wordmark](arqlet-wordmark.svg): transparent, light lettering intended for dark backgrounds.
 
