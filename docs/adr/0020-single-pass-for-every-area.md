@@ -96,8 +96,10 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   (2026-11-14, [results](../../benchmarks/results/s1-4-defaults-20261114.md)): the default is unchanged since 0.4.0
   (fingerprints identical). `regionPorts` + `straightDetours` + `singlePassReversed` (without `singlePassMixed`) leaves 30
   of 31 datasets geometrically identical and removes all 44 lines through nodes on mixed-large (crossings 811 against
-  721); with `singlePassMixed` 4 remain, with `regionChildPorts` 2 at many more crossings. Proposed: the three options as
-  the default after a timing sweep on an idle machine; `singlePassMixed` and `regionChildPorts` stay options.
+  721); with `singlePassMixed` 4 remain, with `regionChildPorts` 2 at many more crossings. Time
+  ([results](../../benchmarks/results/s1-4-timing-20261114.md)): the three options cost nothing where they change
+  nothing and 5 % on mixed-large; directionsFirst 2.5 times on synthetic-2k. Proposed: the three options as the default;
+  `singlePassMixed` and `regionChildPorts` stay options; directionsFirst stays an option until it combines with them.
 
 ## Consequences
 
