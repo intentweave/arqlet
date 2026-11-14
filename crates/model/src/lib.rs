@@ -1789,7 +1789,7 @@ pub struct LayoutOptions {
     pub single_pass_reversed: bool,
     /// ADR 0020, S1-1b: a straight edge that would pass through a node it does not end at is drawn around it instead: its
     /// orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment where nothing
-    /// is in the way and bends at the blockers' corners elsewhere. On by default since engine 0.5 (S1-4); written as
+    /// is in the way and bends at the blockers' corners elsewhere. On by default since 0.5.0 (S1-4); written as
     /// `false` when turned off.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub straight_detours: bool,
@@ -1815,7 +1815,7 @@ pub struct LayoutOptions {
     /// With `straightDetours`, the geometric repair of an organic area that cannot clear every straight line within a
     /// bounded budget clears the lines between children of organic areas first and those into its containers within a
     /// bounded budget of their own; their detours draw what remains around the nodes in its way. A repair that finishes
-    /// within the bounded budget is as without the option. On by default since engine 0.5; written as `false` when
+    /// within the bounded budget is as without the option. On by default since 0.5.0; written as `false` when
     /// turned off.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub nested_edges_by_detour: bool,

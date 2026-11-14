@@ -12,12 +12,28 @@ changes. The same engine runs natively and in the browser via WebAssembly.
 
 > **Status: prototype (engine `0.2.0-prototype`).** Arqlet works end to end and is
 > tested, but every API, the JSON protocol and the snapshot format are
-> provisional and may change in any release. Version 0.4.0 is on
+> provisional and may change in any release. Version 0.5.0 is on
 > [crates.io](https://crates.io/crates/arqlet) and [npm](https://www.npmjs.com/package/arqlet). Large graphs (100K+ nodes) are a goal, not a measured result.
 
 Arqlet was developed under the working name Layerweave. Measurement records in
 `benchmarks/results` from before 2026-11-09 and some dataset names (such as
 `layerweave-code`) keep that name.
+
+## Examples
+
+Drawn by Arqlet with the default options and painted by the SVG viewer of `@arqlet/viewer`
+(regenerate with `node tools/readme-examples.mjs`; the graphs come from `benchmarks/generate.py`).
+
+<table>
+<tr>
+<td width="50%"><a href="docs/assets/examples/mixed-layouts.svg"><img src="docs/assets/examples/mixed-layouts.svg" alt="An organic root over layered containers: a build pipeline left to right, an operations container top to bottom and a radial service mesh, connected by straight edges"></a><br><sub>An organic root over layered containers and a radial service mesh, each area with its own strategy and direction.</sub></td>
+<td width="50%"><a href="docs/assets/examples/cloud-architecture.svg"><img src="docs/assets/examples/cloud-architecture.svg" alt="A cloud architecture: nested containers (region, VPC, availability zones, subnets) with orthogonal routes that cross container borders through ports"></a><br><sub>Nested containers (region, VPC, zones, subnets) with orthogonal routes through their borders.</sub></td>
+</tr>
+<tr>
+<td width="50%"><a href="docs/assets/examples/petri-net-shapes.svg"><img src="docs/assets/examples/petri-net-shapes.svg" alt="A Petri net laid out organically: circle places and box transitions connected by straight arcs"></a><br><sub>An organic layout with circles and boxes; edges end on each node's outline.</sub></td>
+<td width="50%"><a href="docs/assets/examples/state-tcp.svg"><img src="docs/assets/examples/state-tcp.svg" alt="The TCP state machine laid out left to right, with cycles drawn as orthogonal back edges"></a><br><sub>A state machine with cycles, laid out left to right.</sub></td>
+</tr>
+</table>
 
 ## What works today
 
@@ -82,7 +98,7 @@ depend on the Git repository instead):
 
 ```toml
 [dependencies]
-arqlet = "0.4"
+arqlet = "0.5"
 ```
 
 ```rust
