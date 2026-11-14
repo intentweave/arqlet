@@ -18,6 +18,25 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `singlePassReversed` covers `bt` too (ADR 0020 S1-0b): every area is mirrored within its box and a container's header
+  stays at its top; a bottom-to-top graph draws as its top-to-bottom mirror
+  ([measurement](benchmarks/results/reversed-flows-20261114.md)).
+- `regionChildPorts` (experimental, off; ADR 0020 S1-3): layered containers inside an organic or radial area get border
+  nodes in their own flow, so their edges leave them along the flow and the area draws them on from there
+  ([measurement](benchmarks/results/region-child-ports-20261114.md)).
+- `regionPorts` (experimental, off; ADR 0020 S1-2): edges that leave an organic, tree or radial region in a layered parent
+  enter and leave it through ports on the sides of the parent's flow, with the inner leg drawn by the region
+  ([measurement](benchmarks/results/region-ports-20261114.md)).
+- `straightDetours` (experimental, off; ADR 0020 S1-1b): a straight edge that would pass through a node is drawn around it
+  (its orthogonal route pulled taut), so an organic root over layered containers has no line through a node; the
+  placement does not change ([measurement](benchmarks/results/straight-detours-20261114.md)).
+- `metrics` measures node shapes (provisional `shape` on a drawing node): a circle is its disc, so an edge that ends on a
+  circle's outline no longer counts as a line through the node. Rectangles measure as before
+  ([measurement](benchmarks/results/single-pass-mixed-20261114.md)).
+- `singlePassReversed` (experimental, off; ADR 0020 S1-0): a graph that flows right to left everywhere is laid out left to
+  right under single pass and mirrored, so `rl` draws as well as `lr` (today it switches single pass off and crosses and
+  bends more). Not yet `bt`, nor graphs with pins, label places, explicit ports or buses
+  ([measurement](benchmarks/results/reversed-flows-20261114.md)). ADR 0020 (proposed): single pass for every area.
 - ELK adapter: `elk.layered.considerModelOrder.strategy` (other than `NONE`) makes ties follow the input order instead
   of the node ids (provisional), as ELK follows its model order; renaming nodes no longer changes the drawing. The
   answer carries the given ids. Off by default; without it the output is unchanged.

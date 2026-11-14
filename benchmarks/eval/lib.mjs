@@ -44,7 +44,7 @@ export function normalizeArqlet(snapshot) {
   return {
     nodes: graph.nodes.map(n => {
       const r = absolute(n.id);
-      return {id: n.id, parentId: parents.get(n.id) ?? null, container: containers.has(n.id), x: r.x, y: r.y, w: r.width, h: r.height};
+      return {id: n.id, parentId: parents.get(n.id) ?? null, container: containers.has(n.id), x: r.x, y: r.y, w: r.width, h: r.height, ...(n.shape && n.shape !== 'rect' ? {shape: n.shape} : {})};
     }),
     // Bundle members share their leader's route and are not drawn separately.
     edges: graph.edges.filter(e => e.target !== null && !memberIds.has(e.id)).map(e => ({
@@ -61,7 +61,8 @@ export function normalizeArqlet(snapshot) {
 // are computed on every call; none is skipped for an engine.
 export function metrics(out) {
   const drawing = {
-    nodes: out.nodes.map(n => ({id: n.id, parentId: n.parentId ?? null, container: n.container, x: n.x, y: n.y, width: n.w, height: n.h})),
+    // A node's shape when it is not a rectangle: a circle is measured as its disc.
+    nodes: out.nodes.map(n => ({id: n.id, parentId: n.parentId ?? null, container: n.container, x: n.x, y: n.y, width: n.w, height: n.h, ...(n.shape ? {shape: n.shape} : {})})),
     edges: out.edges.map(e => ({id: e.id, source: e.source, target: e.target, points: e.points, sourcePort: e.sourcePort ?? null, targetPort: e.targetPort ?? null})),
     // Explicit buses (their members may share lines), when the drawing has them.
     ...(out.buses?.length ? {buses: out.buses} : {}),

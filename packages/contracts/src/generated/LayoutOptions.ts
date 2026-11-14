@@ -117,6 +117,34 @@ packComponents?: PackComponents,
  */
 isolatedGrid?: boolean,
 /**
+ * Experimental (ADR 0020, S1-0 and S1-0b): a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`)
+ * is laid out with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header
+ * at its top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses.
+ * Omitted when off, so the default output does not change.
+ */
+singlePassReversed?: boolean,
+/**
+ * Experimental (ADR 0020, S1-1b): a straight edge that would pass through a node it does not end at is drawn around it
+ * instead: its orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment
+ * where nothing is in the way and bends at the blockers' corners elsewhere. Omitted when off, so the default output
+ * does not change.
+ */
+straightDetours?: boolean,
+/**
+ * Experimental (ADR 0020, S1-2): an edge that leaves a region of another strategy (organic, tree, radial) in a layered
+ * parent is routed by the parent to a port on the region's border, on the side its flow uses, and drawn inside the
+ * region from that port to its node by the region's routing. Not for graphs with buses or explicit edge ports. Omitted
+ * when off, so the default output does not change.
+ */
+regionPorts?: boolean,
+/**
+ * Experimental (ADR 0020, S1-3): a container with a fixed flow inside an organic or radial area gets border nodes in
+ * its own flow, as in a parent of the same axis: its edges to the outside run inside it along its ranks to its border
+ * and leave it there, and the area draws them straight from that point. Omitted when off, so the default output does
+ * not change.
+ */
+regionChildPorts?: boolean,
+/**
  * Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
  * and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
  * delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the

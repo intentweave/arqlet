@@ -1,0 +1,24 @@
+{"dataset":"mixed-large","variant":"default","lineNodeHits":44,"crossings":721,"bends":0,"areaK":50888,"straightThroughNode":51,"ms":7745}
+{"dataset":"mixed-large","variant":"straightDetours","lineNodeHits":0,"crossings":811,"bends":68,"areaK":50888,"straightThroughNode":0,"ms":7723}
+{"dataset":"mixed-large","variant":"singlePassMixed","lineNodeHits":67,"crossings":750,"bends":0,"areaK":27185,"straightThroughNode":75,"ms":12473}
+{"dataset":"mixed-large","variant":"singlePassMixed + straightDetours","lineNodeHits":4,"crossings":954,"bends":120,"areaK":27185,"straightThroughNode":4,"ms":12454}
+{"dataset":"mixed-layouts","variant":"default","lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"straightThroughNode":0,"ms":20}
+{"dataset":"mixed-layouts","variant":"straightDetours","lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"straightThroughNode":0,"ms":20}
+{"dataset":"mixed-layouts","variant":"singlePassMixed","lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"straightThroughNode":0,"ms":20}
+{"dataset":"mixed-layouts","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":5,"bends":0,"areaK":1330,"straightThroughNode":0,"ms":21}
+{"dataset":"self-loops","variant":"default","lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"straightThroughNode":0,"ms":5}
+{"dataset":"self-loops","variant":"straightDetours","lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"straightThroughNode":0,"ms":5}
+{"dataset":"self-loops","variant":"singlePassMixed","lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"straightThroughNode":0,"ms":5}
+{"dataset":"self-loops","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":0,"bends":30,"areaK":255,"straightThroughNode":0,"ms":5}
+{"dataset":"can-bus","variant":"default","lineNodeHits":0,"crossings":0,"bends":32,"areaK":1315,"straightThroughNode":0,"ms":8}
+{"dataset":"can-bus","variant":"straightDetours","lineNodeHits":0,"crossings":0,"bends":32,"areaK":1315,"straightThroughNode":0,"ms":7}
+{"dataset":"can-bus","variant":"singlePassMixed","lineNodeHits":0,"crossings":0,"bends":27,"areaK":1305,"straightThroughNode":0,"ms":12}
+{"dataset":"can-bus","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":0,"bends":27,"areaK":1305,"straightThroughNode":0,"ms":12}
+{"dataset":"nested-tree-radial","variant":"default","lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"straightThroughNode":0,"ms":9}
+{"dataset":"nested-tree-radial","variant":"straightDetours","lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"straightThroughNode":0,"ms":9}
+{"dataset":"nested-tree-radial","variant":"singlePassMixed","lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"straightThroughNode":0,"ms":9}
+{"dataset":"nested-tree-radial","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":0,"bends":112,"areaK":42157,"straightThroughNode":0,"ms":9}
+{"dataset":"petri-net-shapes","variant":"default","lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"straightThroughNode":0,"ms":540}
+{"dataset":"petri-net-shapes","variant":"straightDetours","lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"straightThroughNode":0,"ms":538}
+{"dataset":"petri-net-shapes","variant":"singlePassMixed","lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"straightThroughNode":0,"ms":541}
+{"dataset":"petri-net-shapes","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":27,"bends":0,"areaK":1614,"straightThroughNode":0,"ms":545}

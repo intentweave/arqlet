@@ -1,0 +1,56 @@
+{"graph":"organic-root flat 1","variant":"straightDetours","lineNodeHits":0,"crossings":18,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":9,"offAxis":7,"ms":177}
+{"graph":"organic-root flat 1","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":5,"bends":10,"overlaps":0,"otherIssues":0,"borderEnds":9,"offAxis":1,"ms":49}
+{"graph":"organic-root flat 1","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":3,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":9,"offAxis":3,"ms":70}
+{"graph":"organic-root flat 1","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":0,"crossings":5,"bends":15,"overlaps":0,"otherIssues":0,"borderEnds":9,"offAxis":0,"ms":69}
+{"graph":"organic-root flat 2","variant":"straightDetours","lineNodeHits":0,"crossings":0,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":5,"ms":37}
+{"graph":"organic-root flat 2","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":3,"bends":12,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":0,"ms":293}
+{"graph":"organic-root flat 2","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":0,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":5,"ms":51}
+{"graph":"organic-root flat 2","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":0,"crossings":0,"bends":14,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":0,"ms":40}
+{"graph":"organic-root flat 3","variant":"straightDetours","lineNodeHits":0,"crossings":4,"bends":2,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":9,"ms":3266}
+{"graph":"organic-root flat 3","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":6,"bends":23,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":0,"ms":1639}
+{"graph":"organic-root flat 3","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":5,"bends":3,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":8,"ms":3105}
+{"graph":"organic-root flat 3","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":0,"crossings":5,"bends":29,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":0,"ms":2835}
+{"graph":"organic-root flat 4","variant":"straightDetours","lineNodeHits":0,"crossings":3,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":14,"offAxis":7,"ms":550}
+{"graph":"organic-root flat 4","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":5,"bends":27,"overlaps":0,"otherIssues":0,"borderEnds":14,"offAxis":1,"ms":323}
+{"graph":"organic-root flat 4","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":4,"bends":1,"overlaps":0,"otherIssues":1,"borderEnds":14,"offAxis":8,"ms":1173}
+{"graph":"organic-root flat 4","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":0,"crossings":6,"bends":26,"overlaps":0,"otherIssues":0,"borderEnds":14,"offAxis":0,"ms":1321}
+{"graph":"organic-root flat 5","variant":"straightDetours","lineNodeHits":0,"crossings":2,"bends":1,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":2,"ms":675}
+{"graph":"organic-root flat 5","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":1,"bends":15,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":0,"ms":21}
+{"graph":"organic-root flat 5","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":2,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":5,"ms":78}
+{"graph":"organic-root flat 5","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":0,"crossings":4,"bends":14,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":0,"ms":20}
+{"graph":"organic-root flat 6","variant":"straightDetours","lineNodeHits":0,"crossings":11,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":9,"ms":84}
+{"graph":"organic-root flat 6","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":3,"bends":16,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":1,"ms":128}
+{"graph":"organic-root flat 6","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":7,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":10,"ms":93}
+{"graph":"organic-root flat 6","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":0,"crossings":2,"bends":14,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":0,"ms":86}
+{"graph":"organic-root nested 1","variant":"straightDetours","lineNodeHits":0,"crossings":2,"bends":6,"overlaps":0,"otherIssues":0,"borderEnds":9,"offAxis":6,"ms":3411}
+{"graph":"organic-root nested 1","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":6,"bends":28,"overlaps":0,"otherIssues":0,"borderEnds":9,"offAxis":0,"ms":3497}
+{"graph":"organic-root nested 1","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":8,"bends":3,"overlaps":0,"otherIssues":1,"borderEnds":9,"offAxis":8,"ms":3502}
+{"graph":"organic-root nested 1","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":1,"crossings":8,"bends":35,"overlaps":0,"otherIssues":0,"borderEnds":9,"offAxis":0,"ms":2381}
+{"graph":"organic-root nested 2","variant":"straightDetours","lineNodeHits":0,"crossings":2,"bends":4,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":5,"ms":1553}
+{"graph":"organic-root nested 2","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":1,"bends":20,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":0,"ms":1705}
+{"graph":"organic-root nested 2","variant":"singlePassMixed + straightDetours","lineNodeHits":3,"crossings":6,"bends":1,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":5,"ms":2322}
+{"graph":"organic-root nested 2","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":4,"crossings":0,"bends":18,"overlaps":0,"otherIssues":0,"borderEnds":6,"offAxis":0,"ms":1503}
+{"graph":"organic-root nested 3","variant":"straightDetours","lineNodeHits":0,"crossings":6,"bends":6,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":11,"ms":3064}
+{"graph":"organic-root nested 3","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":12,"bends":47,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":1,"ms":3141}
+{"graph":"organic-root nested 3","variant":"singlePassMixed + straightDetours","lineNodeHits":2,"crossings":17,"bends":5,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":13,"ms":2955}
+{"graph":"organic-root nested 3","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":3,"crossings":8,"bends":47,"overlaps":0,"otherIssues":0,"borderEnds":15,"offAxis":0,"ms":2829}
+{"graph":"organic-root nested 4","variant":"straightDetours","lineNodeHits":0,"crossings":12,"bends":10,"overlaps":0,"otherIssues":0,"borderEnds":14,"offAxis":10,"ms":1474}
+{"graph":"organic-root nested 4","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":7,"bends":46,"overlaps":0,"otherIssues":0,"borderEnds":14,"offAxis":0,"ms":1667}
+{"graph":"organic-root nested 4","variant":"singlePassMixed + straightDetours","lineNodeHits":1,"crossings":3,"bends":4,"overlaps":0,"otherIssues":0,"borderEnds":14,"offAxis":10,"ms":1094}
+{"graph":"organic-root nested 4","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":2,"crossings":11,"bends":42,"overlaps":0,"otherIssues":0,"borderEnds":14,"offAxis":0,"ms":2747}
+{"graph":"organic-root nested 5","variant":"straightDetours","lineNodeHits":0,"crossings":2,"bends":6,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":4,"ms":1847}
+{"graph":"organic-root nested 5","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":1,"bends":33,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":0,"ms":2018}
+{"graph":"organic-root nested 5","variant":"singlePassMixed + straightDetours","lineNodeHits":2,"crossings":2,"bends":2,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":5,"ms":1431}
+{"graph":"organic-root nested 5","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":1,"crossings":6,"bends":23,"overlaps":0,"otherIssues":0,"borderEnds":7,"offAxis":0,"ms":2029}
+{"graph":"organic-root nested 6","variant":"straightDetours","lineNodeHits":0,"crossings":6,"bends":7,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":6,"ms":2281}
+{"graph":"organic-root nested 6","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":4,"bends":32,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":1,"ms":2510}
+{"graph":"organic-root nested 6","variant":"singlePassMixed + straightDetours","lineNodeHits":3,"crossings":4,"bends":1,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":6,"ms":2650}
+{"graph":"organic-root nested 6","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":2,"crossings":10,"bends":20,"overlaps":0,"otherIssues":0,"borderEnds":11,"offAxis":1,"ms":2216}
+{"graph":"mixed-layouts","variant":"straightDetours","lineNodeHits":0,"crossings":5,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":2,"offAxis":2,"ms":20}
+{"graph":"mixed-layouts","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":7,"bends":4,"overlaps":0,"otherIssues":0,"borderEnds":2,"offAxis":0,"ms":23}
+{"graph":"mixed-layouts","variant":"singlePassMixed + straightDetours","lineNodeHits":0,"crossings":5,"bends":0,"overlaps":0,"otherIssues":0,"borderEnds":2,"offAxis":2,"ms":20}
+{"graph":"mixed-layouts","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":0,"crossings":7,"bends":4,"overlaps":0,"otherIssues":0,"borderEnds":2,"offAxis":0,"ms":23}
+{"graph":"mixed-large","variant":"straightDetours","lineNodeHits":0,"crossings":811,"bends":68,"overlaps":0,"otherIssues":10,"borderEnds":82,"offAxis":37,"ms":7593}
+{"graph":"mixed-large","variant":"straightDetours + regionChildPorts","lineNodeHits":0,"crossings":901,"bends":254,"overlaps":0,"otherIssues":7,"borderEnds":82,"offAxis":9,"ms":8565}
+{"graph":"mixed-large","variant":"singlePassMixed + straightDetours","lineNodeHits":4,"crossings":954,"bends":120,"overlaps":4,"otherIssues":9,"borderEnds":82,"offAxis":31,"ms":12251}
+{"graph":"mixed-large","variant":"singlePassMixed + straightDetours + regionChildPorts","lineNodeHits":2,"crossings":1145,"bends":336,"overlaps":3,"otherIssues":4,"borderEnds":82,"offAxis":10,"ms":10206}
