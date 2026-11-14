@@ -1,4 +1,4 @@
-import type {Graph, Hidden, Overview, OverviewRequest, Scene, Snapshot} from '@arqlet/contracts';
+import type {Graph, GraphPatch, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
@@ -10,6 +10,9 @@ export interface SessionResult {
   /** `expand`/`collapse`: the container was in that state already; no engine call was made. */
   unchanged?: boolean;
 }
+
+/** The answer of a read-only request (`trace`, `neighbourhood`): its fields beside `ok: true`, or the error. */
+export type ReadAnswer<T> = ({ok: true} & T) | {ok: false; error: string};
 
 /** Provisional: one graph, its current snapshot, and changes applied in order with revision checks. */
 export interface Session {
@@ -41,7 +44,7 @@ export interface Session {
    * and routes of the current view that carry them; `distance` the hops of every visible node from the path.
    * `edgeKinds`: the paths follow only edges of these kinds (default: every edge).
    */
-  trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<EngineResponse>;
+  trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<ReadAnswer<TraceAnswer>>;
   /**
    * Provisional: the nodes within `hops` edges (default 1) of a node or of each of a list, read only, answered as
    * `trace` (`nodes`, `edges`, `visible`, `distance`) plus the `hops` of every node; `nodes` can go to `reveal`.
@@ -50,7 +53,13 @@ export interface Session {
   neighbourhood(
     nodeId: string | string[],
     init?: {hops?: number; direction?: 'out' | 'in' | 'both'; edgeKinds?: string[]},
-  ): Promise<EngineResponse>;
+  ): Promise<ReadAnswer<NeighbourhoodAnswer>>;
+  /**
+   * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
+   * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from
+   * where it was.
+   */
+  patch(patch: GraphPatch): Promise<SessionResult>;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<SessionResult>;
   /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest, or

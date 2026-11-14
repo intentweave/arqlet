@@ -44,7 +44,7 @@ def local_index(root):
                       "source": "local examples folder", "overview": bool(meta.get("overview")) and "nodes" in graph})
     return index
 # Every operation handled by the Rust dispatcher; the backend adds no graph semantics.
-OPERATIONS = {"import", "add", "toggle", "reveal", "filter", "trace", "neighbourhood", "direction", "refine", "structuredRefine", "configure", "optionDefaults", "measure", "shape", "scene", "move", "strategy", "routing", "metrics", "routeConflicts", "componentRefine", "containerRefine", "elkLayout", "overview", "refineProgressive", "intent", "restore", "port", "settle", "referenceCreate", "referenceRefresh", "referenceReroute", "referenceValidate", "referenceCanonical", "referenceSvg", "referenceFromSvg", "referenceReproduce", "referenceRepair"}
+OPERATIONS = {"import", "add", "toggle", "reveal", "filter", "patch", "trace", "neighbourhood", "direction", "refine", "structuredRefine", "configure", "optionDefaults", "measure", "shape", "scene", "move", "strategy", "routing", "metrics", "routeConflicts", "componentRefine", "containerRefine", "elkLayout", "overview", "refineProgressive", "intent", "restore", "port", "settle", "referenceCreate", "referenceRefresh", "referenceReroute", "referenceValidate", "referenceCanonical", "referenceSvg", "referenceFromSvg", "referenceReproduce", "referenceRepair"}
 MAX_BODY = 64_000_000
 # Operations a session runs on its own view (besides OPERATIONS): start it from a snapshot, hand its snapshot out.
 SESSION_OPERATIONS = {"load", "export"}

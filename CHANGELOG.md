@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **`arqlet::protocol::Response` has typed answers** (provisional) for `scene`, `trace`, `neighbourhood`, `overview`,
+  `intent` and `metrics` (`Response::Scene`, `Trace`, `Neighbourhood`, `Overview`, `Intent`, `Metrics`) instead of
+  `Response::Encoded`; the JSON is unchanged byte for byte. A Rust host that matched `Encoded` for these operations
+  matches the new variants. Contract types `TraceAnswer`, `NeighbourhoodAnswer`, `VisibleParts`; `session.trace` and
+  `session.neighbourhood` return them (`ReadAnswer<T>` in `@arqlet/engine-client`).
 - Playground: `build.sh` builds the native binaries with the `fast` profile (optimised like release, without LTO), and
   the backend runs `target/fast/layout-command` (`ARQLET_LAYOUT_COMMAND` overrides it; a debug build is the fallback).
   On a synthetic 20 000-node overview: 0.56 instead of 4.08 s (single run, Apple M3).
@@ -16,6 +21,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - ELK adapter: `elk.layered.considerModelOrder.strategy` (other than `NONE`) makes ties follow the input order instead
   of the node ids (provisional), as ELK follows its model order; renaming nodes no longer changes the drawing. The
   answer carries the given ids. Off by default; without it the output is unchanged.
+- `patch` (provisional): changes the graph of a view without a new import — `{nodes, edges, removeNodes, removeEdges}`,
+  removals first, a removed node with what it holds and its edges. The view keeps its collapsed containers, filter and
+  options; an abstracting view is laid out from scratch as a toggle lays it out (the same drawing as a fresh import of
+  the changed graph with that view), other views from their earlier positions. A host can start with aggregated edges
+  between collapsed containers and load a container's member edges when it is opened. `session.patch(patch)`; contract
+  type `GraphPatch`.
 - Overview sessions answer only what moves (provisional): a session's `overview` with `positionsOnly` returns
   `OverviewPositions` (positions, root radius, counts, representation) while the clusters stay those of its last
   overview, and the whole overview otherwise. `createOverviewSession` asks for it on the graph the engine keeps and

@@ -75,6 +75,12 @@ pub enum Request {
         on: Edit,
         hide: arqlet_model::Hidden,
     },
+    /// Change the source graph without a new import: add nodes and edges, remove nodes (with what they hold) and edges.
+    Patch {
+        #[serde(flatten)]
+        on: Edit,
+        patch: arqlet_model::GraphPatch,
+    },
     /// Show the given nodes by opening the containers that hold them (`partial`, default true: only as far as needed).
     Reveal {
         #[serde(flatten)]
@@ -268,6 +274,18 @@ pub enum Response {
     Snapshot(Box<Snapshot>),
     /// A refused or failed request.
     Error(String),
+    /// The scene of a snapshot (`scene`).
+    Scene(Box<arqlet_scene::Scene>),
+    /// The paths between two nodes (`trace`).
+    Trace(Box<arqlet_model::TraceAnswer>),
+    /// The nodes within some hops of nodes (`neighbourhood`).
+    Neighbourhood(Box<arqlet_model::NeighbourhoodAnswer>),
+    /// The cluster overview of a graph (`overview`).
+    Overview(Box<arqlet_model::Overview>),
+    /// The decisions a snapshot carries (`intent`).
+    Intent(Box<arqlet_model::Intent>),
+    /// The metrics of a drawing (`metrics`).
+    Metrics(Box<arqlet_scene::metrics::Metrics>),
     /// The JSON answer of an operation whose answer is not typed yet.
     Encoded(String),
 }
@@ -278,8 +296,30 @@ impl Response {
         match self {
             Response::Snapshot(s) => serde_json::json!({"ok": true, "snapshot": s}).to_string(),
             Response::Error(e) => serde_json::json!({"ok": false, "error": e}).to_string(),
+            Response::Scene(s) => serde_json::json!({"ok": true, "scene": s}).to_string(),
+            Response::Trace(a) => answered(a),
+            Response::Neighbourhood(a) => answered(a),
+            Response::Overview(o) => serde_json::json!({"ok": true, "overview": o}).to_string(),
+            Response::Intent(i) => serde_json::json!({"ok": true, "intent": i}).to_string(),
+            Response::Metrics(m) => serde_json::json!({"ok": true, "metrics": m}).to_string(),
             Response::Encoded(text) => text.clone(),
         }
+    }
+}
+
+/// A typed answer whose fields stand beside `ok` (`trace`, `neighbourhood`).
+fn answered<T: serde::Serialize>(answer: &T) -> String {
+    match crate::trace::answered(answer) {
+        Ok(v) => v.to_string(),
+        Err(e) => serde_json::json!({"ok": false, "error": e}).to_string(),
+    }
+}
+
+/// A typed result, or the error as the answer.
+fn typed_answer<T>(result: Result<T, String>, wrap: impl FnOnce(T) -> Response) -> Response {
+    match result {
+        Ok(value) => wrap(value),
+        Err(e) => Response::Error(e),
     }
 }
 
@@ -375,6 +415,7 @@ impl Request {
                     | "toggle"
                     | "reveal"
                     | "filter"
+                    | "patch"
                     | "configure"
                     | "port"
                     | "settle"
@@ -431,6 +472,12 @@ impl Request {
             "toggle" => Request::Toggle {
                 on,
                 node_id: v["nodeId"].as_str().ok_or("Missing nodeId")?.into(),
+            },
+            "patch" => Request::Patch {
+                on,
+                patch: serde_json::from_value(v["patch"].clone()).map_err(|e| {
+                    format!("patch must be {{nodes?, edges?, removeNodes?, removeEdges?}}: {e}")
+                })?,
             },
             "filter" => Request::Filter {
                 on,
@@ -604,6 +651,12 @@ pub fn handle(request: Request) -> Response {
             on.expected_layout_version,
             &node_id,
         )),
+        Request::Patch { on, patch } => snapshot(crate::patch::patch_snapshot(
+            &on.snapshot,
+            on.expected_revision,
+            on.expected_layout_version,
+            &patch,
+        )),
         Request::Filter { on, hide } => snapshot(crate::filter::filter_view(
             &on.snapshot,
             on.expected_revision,
@@ -684,23 +737,42 @@ pub fn handle(request: Request) -> Response {
                 budget.work_budget.as_ref(),
             ))
         }
-        Request::Intent { snapshot: s } => Response::Encoded(
-            serde_json::json!({"ok": true, "intent": history::intent_of(&s)}).to_string(),
-        ),
-        Request::Scene { body } => Response::Encoded(scene_response(&with_op("scene", body))),
-        Request::Trace { body } => {
-            Response::Encoded(trace::trace_response(&with_op("trace", body)).to_string())
+        Request::Intent { snapshot: s } => Response::Intent(Box::new(history::intent_of(&s))),
+        Request::Scene { body } => {
+            let v = with_op("scene", body);
+            typed_answer(
+                serde_json::from_value::<Snapshot>(v["snapshot"].clone())
+                    .map_err(|e| e.to_string())
+                    .and_then(|s| crate::filter::scene_of(&s)),
+                |s| Response::Scene(Box::new(s)),
+            )
         }
-        Request::Neighbourhood { body } => Response::Encoded(
-            trace::neighbourhood_response(&with_op("neighbourhood", body)).to_string(),
+        Request::Trace { body } => {
+            typed_answer(trace::trace_answer(&with_op("trace", body)), |a| {
+                Response::Trace(Box::new(a))
+            })
+        }
+        Request::Neighbourhood { body } => typed_answer(
+            trace::neighbourhood_answer(&with_op("neighbourhood", body)),
+            |a| Response::Neighbourhood(Box::new(a)),
         ),
         Request::Overview { body } => {
             let v = with_op("overview", body);
             let n = threads(v["threads"].as_u64());
-            Response::Encoded(overview::overview_response(&v, n).to_string())
+            typed_answer(overview::overview_of(&v, n), |o| {
+                Response::Overview(Box::new(o))
+            })
         }
         Request::ElkLayout { body } => Response::Encoded(elk_response(&with_op("elkLayout", body))),
-        Request::Metrics { body } => Response::Encoded(metrics_response(&with_op("metrics", body))),
+        Request::Metrics { body } => {
+            let v = with_op("metrics", body);
+            typed_answer(
+                serde_json::from_value::<arqlet_scene::metrics::Drawing>(v["drawing"].clone())
+                    .map_err(|e| e.to_string())
+                    .and_then(|drawing| arqlet_scene::metrics::measure(&drawing)),
+                |m| Response::Metrics(Box::new(m)),
+            )
+        }
         Request::RouteConflicts { body } => {
             Response::Encoded(route_conflicts_response(&with_op("routeConflicts", body)))
         }
