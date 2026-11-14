@@ -88,6 +88,8 @@ mod shape_change;
 mod shape_geometry;
 #[path = "single_pass.rs"]
 mod single_pass;
+#[path = "single_pass_reversed.rs"]
+mod single_pass_reversed;
 #[path = "sparse_stress.rs"]
 mod sparse_stress;
 #[path = "structured_communities.rs"]

@@ -1,0 +1,42 @@
+{"dataset":"activity-order","variant":"lr","crossings":14,"bends":82,"lineNodeHits":0,"width":1890,"height":825,"singlePass":true,"ms":902550}
+{"dataset":"activity-order","variant":"rl","crossings":49,"bends":106,"lineNodeHits":0,"width":1788,"height":594,"singlePass":false,"ms":6}
+{"dataset":"activity-order","variant":"rl + singlePassReversed","crossings":14,"bends":82,"lineNodeHits":0,"width":1890,"height":825,"singlePass":true,"ms":6}
+{"dataset":"arqlet-pipeline","variant":"lr","crossings":5,"bends":62,"lineNodeHits":0,"width":4074,"height":752,"singlePass":true,"ms":7}
+{"dataset":"arqlet-pipeline","variant":"rl","crossings":28,"bends":96,"lineNodeHits":0,"width":3884,"height":620,"singlePass":false,"ms":6}
+{"dataset":"arqlet-pipeline","variant":"rl + singlePassReversed","crossings":5,"bends":62,"lineNodeHits":0,"width":4074,"height":752,"singlePass":true,"ms":7}
+{"dataset":"bpmn-pools","variant":"lr","crossings":1,"bends":30,"lineNodeHits":0,"width":2924,"height":519,"singlePass":true,"ms":5}
+{"dataset":"bpmn-pools","variant":"rl","crossings":10,"bends":54,"lineNodeHits":0,"width":2812,"height":431,"singlePass":false,"ms":5}
+{"dataset":"bpmn-pools","variant":"rl + singlePassReversed","crossings":1,"bends":30,"lineNodeHits":0,"width":2924,"height":519,"singlePass":true,"ms":5}
+{"dataset":"cloud-architecture","variant":"lr","crossings":13,"bends":98,"lineNodeHits":0,"width":3886,"height":1170,"singlePass":true,"ms":9}
+{"dataset":"cloud-architecture","variant":"rl","crossings":31,"bends":126,"lineNodeHits":0,"width":3542,"height":903,"singlePass":false,"ms":6}
+{"dataset":"cloud-architecture","variant":"rl + singlePassReversed","crossings":13,"bends":98,"lineNodeHits":0,"width":3886,"height":1170,"singlePass":true,"ms":8}
+{"dataset":"deployment-cluster","variant":"lr","crossings":82,"bends":202,"lineNodeHits":0,"width":3860,"height":1326,"singlePass":true,"ms":12}
+{"dataset":"deployment-cluster","variant":"rl","crossings":112,"bends":244,"lineNodeHits":0,"width":3520,"height":978,"singlePass":false,"ms":10}
+{"dataset":"deployment-cluster","variant":"rl + singlePassReversed","crossings":82,"bends":202,"lineNodeHits":0,"width":3860,"height":1326,"singlePass":true,"ms":12}
+{"dataset":"er-diagram","variant":"lr","crossings":0,"bends":15,"lineNodeHits":0,"width":1218,"height":1502,"singlePass":true,"ms":4}
+{"dataset":"er-diagram","variant":"rl","crossings":0,"bends":29,"lineNodeHits":0,"width":1104,"height":1561,"singlePass":false,"ms":4}
+{"dataset":"er-diagram","variant":"rl + singlePassReversed","crossings":0,"bends":15,"lineNodeHits":0,"width":1218,"height":1502,"singlePass":true,"ms":4}
+{"dataset":"fixed-ports","variant":"lr","crossings":0,"bends":12,"lineNodeHits":0,"width":912,"height":162,"singlePass":true,"ms":3}
+{"dataset":"fixed-ports","variant":"rl","crossings":0,"bends":18,"lineNodeHits":0,"width":912,"height":162,"singlePass":false,"ms":3}
+{"dataset":"fixed-ports","variant":"rl + singlePassReversed","crossings":0,"bends":18,"lineNodeHits":0,"width":912,"height":162,"singlePass":false,"ms":2}
+{"dataset":"network-vlan","variant":"lr","crossings":23,"bends":110,"lineNodeHits":0,"width":2160,"height":1752,"singlePass":true,"ms":6}
+{"dataset":"network-vlan","variant":"rl","crossings":58,"bends":140,"lineNodeHits":0,"width":2082,"height":2064,"singlePass":false,"ms":6}
+{"dataset":"network-vlan","variant":"rl + singlePassReversed","crossings":23,"bends":110,"lineNodeHits":0,"width":2160,"height":1752,"singlePass":true,"ms":6}
+{"dataset":"org-chart","variant":"lr","crossings":21,"bends":170,"lineNodeHits":0,"width":5608,"height":2905,"singlePass":true,"ms":13}
+{"dataset":"org-chart","variant":"rl","crossings":43,"bends":296,"lineNodeHits":0,"width":4900,"height":3244,"singlePass":false,"ms":11}
+{"dataset":"org-chart","variant":"rl + singlePassReversed","crossings":21,"bends":170,"lineNodeHits":0,"width":5608,"height":2905,"singlePass":true,"ms":13}
+{"dataset":"petri-net","variant":"lr","crossings":32,"bends":84,"lineNodeHits":0,"width":1888,"height":801,"singlePass":true,"ms":6}
+{"dataset":"petri-net","variant":"rl","crossings":43,"bends":124,"lineNodeHits":0,"width":934,"height":991,"singlePass":false,"ms":5}
+{"dataset":"petri-net","variant":"rl + singlePassReversed","crossings":32,"bends":84,"lineNodeHits":0,"width":1888,"height":801,"singlePass":true,"ms":6}
+{"dataset":"state-order","variant":"lr","crossings":0,"bends":19,"lineNodeHits":0,"width":1974,"height":225,"singlePass":true,"ms":3}
+{"dataset":"state-order","variant":"rl","crossings":2,"bends":25,"lineNodeHits":0,"width":1936,"height":204,"singlePass":false,"ms":3}
+{"dataset":"state-order","variant":"rl + singlePassReversed","crossings":0,"bends":19,"lineNodeHits":0,"width":1974,"height":225,"singlePass":true,"ms":3}
+{"dataset":"state-tcp","variant":"lr","crossings":0,"bends":26,"lineNodeHits":0,"width":1888,"height":210,"singlePass":true,"ms":3}
+{"dataset":"state-tcp","variant":"rl","crossings":3,"bends":52,"lineNodeHits":0,"width":1888,"height":246,"singlePass":false,"ms":3}
+{"dataset":"state-tcp","variant":"rl + singlePassReversed","crossings":0,"bends":26,"lineNodeHits":0,"width":1888,"height":210,"singlePass":true,"ms":3}
+{"dataset":"uml-class","variant":"lr","crossings":0,"bends":39,"lineNodeHits":0,"width":2342,"height":1053,"singlePass":true,"ms":6}
+{"dataset":"uml-class","variant":"rl","crossings":10,"bends":61,"lineNodeHits":0,"width":1784,"height":1569,"singlePass":false,"ms":4}
+{"dataset":"uml-class","variant":"rl + singlePassReversed","crossings":0,"bends":39,"lineNodeHits":0,"width":2342,"height":1053,"singlePass":true,"ms":6}
+{"dataset":"workflow-dag","variant":"lr","crossings":198,"bends":300,"lineNodeHits":0,"width":2760,"height":1098,"singlePass":true,"ms":17}
+{"dataset":"workflow-dag","variant":"rl","crossings":358,"bends":394,"lineNodeHits":0,"width":2358,"height":848,"singlePass":false,"ms":10}
+{"dataset":"workflow-dag","variant":"rl + singlePassReversed","crossings":198,"bends":300,"lineNodeHits":0,"width":2760,"height":1098,"singlePass":true,"ms":16}

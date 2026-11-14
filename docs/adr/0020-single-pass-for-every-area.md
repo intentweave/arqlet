@@ -56,7 +56,11 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
 ## Steps
 
 - **S1-0: reversed flows by mirroring**, first for graphs whose areas are all reversed. Measure `rl`/`bt` against `lr`/`tb`
-  on the layered examples; expected: equal crossings and bends.
+  on the layered examples; expected: equal crossings and bends. Done for `rl` (2026-11-14, `singlePassReversed`,
+  [results](../../benchmarks/results/reversed-flows-20261114.md)): the mirrored drawing equals `lr`. Not for `bt`: a
+  container's header is at its top in both senses, so a mirror on the vertical axis moves children into the header and
+  shifts the axis by a header per level of nesting; `bt` needs single pass with a negative flow on the vertical axis, or a
+  header-aware transform (step S1-0b).
 - **S1-1: organic edges end on their nodes' borders** (straight routes clipped to the boxes). Fixes the own-node part of the
   lines through nodes in every pipeline.
 - **S1-2: border ports for regions in a layered parent** (decision 4), behind `singlePassMixed`.

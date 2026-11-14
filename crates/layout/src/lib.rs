@@ -19,6 +19,7 @@ mod styles;
 use arqlet_model::*;
 pub mod communities;
 mod directed;
+mod mirror;
 mod organic;
 pub mod overview;
 mod placement_geometry;
@@ -333,6 +334,31 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Experimental (`singlePassReversed`, ADR 0020 S1-0): a drawing that flows against its axis everywhere is laid out
+    // with the positive flow, where single pass runs, and mirrored; an earlier drawing is mirrored back to start from.
+    if options.single_pass_reversed {
+        if let Some(reversed) = mirror::uniform_reversal(graph, options) {
+            let vertical = reversed.vertical();
+            let positive = mirror::positive_graph(graph, reversed);
+            let earlier = previous.map(|p| {
+                let mut back = p.clone();
+                mirror::mirror(&mut back, vertical);
+                back.graph = mirror::positive_graph(&back.graph, reversed);
+                back
+            });
+            let (mut snapshot, stages) =
+                compute_counted_inner(&positive, earlier.as_ref(), dirty, options)?;
+            mirror::mirror(&mut snapshot, vertical);
+            snapshot.graph = graph.clone();
+            for o in snapshot.area_orientations.values_mut() {
+                if *o == mirror::positive(reversed) {
+                    *o = reversed;
+                }
+            }
+            apply_aggregate_weights(&mut snapshot);
+            return Ok((snapshot, stages));
+        }
+    }
     let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
     apply_aggregate_weights(&mut snapshot);
     Ok((snapshot, stages))

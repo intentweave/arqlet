@@ -18,6 +18,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `singlePassReversed` (experimental, off; ADR 0020 S1-0): a graph that flows right to left everywhere is laid out left to
+  right under single pass and mirrored, so `rl` draws as well as `lr` (today it switches single pass off and crosses and
+  bends more). Not yet `bt`, nor graphs with pins, label places, explicit ports or buses
+  ([measurement](benchmarks/results/reversed-flows-20261114.md)). ADR 0020 (proposed): single pass for every area.
 - `patch` (provisional): changes the graph of a view without a new import — `{nodes, edges, removeNodes, removeEdges}`,
   removals first, a removed node with what it holds and its edges. The view keeps its collapsed containers, filter and
   options; an abstracting view is laid out from scratch as a toggle lays it out (the same drawing as a fresh import of
