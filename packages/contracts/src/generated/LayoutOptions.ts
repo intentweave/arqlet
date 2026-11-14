@@ -145,6 +145,12 @@ regionPorts?: boolean,
  */
 regionChildPorts?: boolean,
 /**
+ * Experimental (single pass): every channel between two ranks is as wide as its tracks need (at least the margin on
+ * both sides and a track), narrower than the layer gap where it carries few tracks; the order and the places across
+ * the flow are chosen on the layer gap as before. Omitted when off, so the default output does not change.
+ */
+channelsByDemand?: boolean,
+/**
  * Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
  * and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
  * delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the

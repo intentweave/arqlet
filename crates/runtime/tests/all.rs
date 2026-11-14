@@ -4,6 +4,8 @@
 
 #[path = "abstract_pipeline.rs"]
 mod abstract_pipeline;
+#[path = "channels_by_demand.rs"]
+mod channels_by_demand;
 #[path = "circle_containers.rs"]
 mod circle_containers;
 #[path = "community_hubs.rs"]

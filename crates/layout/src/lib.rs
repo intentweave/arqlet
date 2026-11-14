@@ -1717,7 +1717,15 @@ fn realize_channel_widths(
         // What the construction found missing in this channel (`channel_key`), on top of the tracks counted here.
         let reported = gaps.get(&channel_key(area, k)).copied().unwrap_or(0.);
         let need = tracks[k] as f64 * track + 2. * margin + reported;
-        shift += snap((need - (near - far)).max(0.), grid);
+        // Experimental (`channelsByDemand`): a channel also narrows to what its tracks need, at least the margin on both
+        // sides and a track (as a border rank keeps), instead of keeping the layer gap. The order and the places across the
+        // flow were chosen before, on the layer gap, so the lanes stay as planned.
+        let change = if options.channels_by_demand {
+            need.max(2. * margin + track) - (near - far)
+        } else {
+            (need - (near - far)).max(0.)
+        };
+        shift += snap(change, grid);
         shifts[k + 1] = shift;
     }
     for (k, ids) in level_list.iter().enumerate() {
