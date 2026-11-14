@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **Default (ADR 0020, S1-4):** `regionPorts`, `straightDetours` and `singlePassReversed` are on by default (written as
+  `false` when turned off). Measured on every dataset: 30 of 31 draw exactly as before (the sweep fingerprints are
+  identical to 0.4.0), mixed-large draws no line through a node (44 before) at 90 more crossings, and a graph that flows
+  right to left or bottom to top everywhere draws as the mirror of its positive flow. Time: unchanged where nothing
+  changes, 5 % on mixed-large ([quality](benchmarks/results/s1-4-defaults-20261114.md),
+  [time](benchmarks/results/s1-4-timing-20261114.md)). A layout through region ports keeps the options its layout wrote,
+  so a drawing that fell back to the earlier pipeline is refined by that pipeline.
 - **`arqlet::protocol::Response` has typed answers** (provisional) for `scene`, `trace`, `neighbourhood`, `overview`,
   `intent` and `metrics` (`Response::Scene`, `Trace`, `Neighbourhood`, `Overview`, `Intent`, `Metrics`) instead of
   `Response::Encoded`; the JSON is unchanged byte for byte. A Rust host that matched `Encoded` for these operations
