@@ -216,6 +216,10 @@ struct Area {
     side_child: Vec<Option<u32>>,
     /// The area meets its parent at side nodes instead of border nodes.
     side_ports: bool,
+    /// Experimental (`regionPorts`, ADR 0020 S1-2): by (element, neighbour), the fixed sub-place (0..1 across the flow) of the
+    /// element's edges towards that neighbour: an element with explicit ports (a region's border ports) is seen at them
+    /// instead of its middle.
+    fixed: BTreeMap<(u32, u32), f64>,
 }
 
 impl Area {
@@ -345,7 +349,7 @@ impl Model {
         let len = a.ranks[a.rank_of[element as usize] as usize].len() as f64;
         let sub = match a.container[element as usize] {
             Some(c) => self.sub_place(c, neighbour, leaving),
-            None => 0.5,
+            None => a.fixed.get(&(element, neighbour)).copied().unwrap_or(0.5),
         };
         (a.pos[element as usize] as f64 + sub) / len
     }
@@ -810,6 +814,7 @@ fn model_of(
             side_child,
             side,
             side_ports: !plan.sides.is_empty(),
+            fixed: BTreeMap::new(),
         });
         elem_index.push(index);
     }
@@ -888,10 +893,63 @@ pub fn hierarchical_sweep(
     runs: usize,
     idle_limit: usize,
     seed: u32,
+    fixed: &BTreeMap<String, BTreeMap<String, f64>>,
 ) -> (usize, usize) {
     let ports = ports_of(plans, parent_of, edges);
     let weights = weights_of(plans, parent_of, edges);
     let mut model = model_of(plans, &ports, &weights, edges);
+    // Fixed sub-places (`regionPorts`): an element with explicit ports is seen, towards each neighbour on its chains, at
+    // the mean place of the ports of the edges that run to that neighbour.
+    for (element, by_edge) in fixed {
+        let Some(area_name) = parent_of.get(element) else {
+            continue;
+        };
+        let Some((a, plan)) = plans
+            .iter()
+            .enumerate()
+            .find(|(_, (n, _))| *n == area_name)
+            .map(|(i, (_, p))| (i, p))
+        else {
+            continue;
+        };
+        let index: BTreeMap<&str, u32> = model.areas[a]
+            .elems
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.as_str(), i as u32))
+            .collect();
+        let Some(&x) = index.get(element.as_str()) else {
+            continue;
+        };
+        let mut sums: BTreeMap<u32, (f64, usize)> = BTreeMap::new();
+        for (edge, &place) in by_edge {
+            let Some((source, target)) = edges.get(edge) else {
+                continue;
+            };
+            let other = if source == element { target } else { source };
+            let Some(far) = child_of(area_name, other, parent_of) else {
+                continue;
+            };
+            let neighbour = plan.chains.iter().find_map(|((p, q), dummies)| {
+                if p == element && *q == far {
+                    Some(dummies.first().unwrap_or(q).clone())
+                } else if *p == far && q == element {
+                    Some(dummies.last().unwrap_or(p).clone())
+                } else {
+                    None
+                }
+            });
+            let Some(&n) = neighbour.as_deref().and_then(|n| index.get(n)) else {
+                continue;
+            };
+            let entry = sums.entry(n).or_insert((0., 0));
+            entry.0 += place;
+            entry.1 += 1;
+        }
+        for (n, (sum, count)) in sums {
+            model.areas[a].fixed.insert((x, n), sum / count as f64);
+        }
+    }
     let names: Vec<String> = plans.keys().cloned().collect();
     let tops: Vec<usize> = names
         .iter()
@@ -1044,8 +1102,15 @@ mod tests {
             .into_iter()
             .map(|(e, s, t)| (e.to_string(), (s.to_string(), t.to_string())))
             .collect();
-        let (before, after) =
-            hierarchical_sweep(&mut plans, &parent_of, &edges, RUNS, IDLE_SWEEPS, 0);
+        let (before, after) = hierarchical_sweep(
+            &mut plans,
+            &parent_of,
+            &edges,
+            RUNS,
+            IDLE_SWEEPS,
+            0,
+            &BTreeMap::new(),
+        );
         assert_eq!(before, 1, "the border order crosses inside C");
         assert_eq!(after, 0, "{plans:?}");
     }

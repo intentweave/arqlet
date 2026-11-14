@@ -76,6 +76,8 @@ mod pins;
 mod reference;
 #[path = "reference_corpus.rs"]
 mod reference_corpus;
+#[path = "region_ports.rs"]
+mod region_ports;
 #[path = "reproduce.rs"]
 mod reproduce;
 #[path = "route_crossings.rs"]
@@ -88,7 +90,11 @@ mod shape_change;
 mod shape_geometry;
 #[path = "single_pass.rs"]
 mod single_pass;
+#[path = "single_pass_reversed.rs"]
+mod single_pass_reversed;
 #[path = "sparse_stress.rs"]
 mod sparse_stress;
+#[path = "straight_detours.rs"]
+mod straight_detours;
 #[path = "structured_communities.rs"]
 mod structured_communities;

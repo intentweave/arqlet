@@ -117,6 +117,27 @@ packComponents?: PackComponents,
  */
 isolatedGrid?: boolean,
 /**
+ * Experimental (ADR 0020, S1-0): a graph whose areas all flow right to left (`rl`) is laid out left to right, where
+ * single pass runs, and mirrored; logical edge direction is kept. Not `bt` yet (a container's header is at its top in
+ * both senses), nor graphs with pins, label places, explicit ports or buses. Omitted when off, so the default output
+ * does not change.
+ */
+singlePassReversed?: boolean,
+/**
+ * Experimental (ADR 0020, S1-1b): a straight edge that would pass through a node it does not end at is drawn around it
+ * instead: its orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment
+ * where nothing is in the way and bends at the blockers' corners elsewhere. Omitted when off, so the default output
+ * does not change.
+ */
+straightDetours?: boolean,
+/**
+ * Experimental (ADR 0020, S1-2): an edge that leaves a region of another strategy (organic, tree, radial) in a layered
+ * parent is routed by the parent to a port on the region's border, on the side its flow uses, and drawn inside the
+ * region from that port to its node by the region's routing. Not for graphs with buses or explicit edge ports. Omitted
+ * when off, so the default output does not change.
+ */
+regionPorts?: boolean,
+/**
  * How edges are drawn: orthogonal routes (the default, omitted) or straight segments between the port positions.
  * Straight routing never bends: an edge that would cross a foreign node is reported as a routing issue.
  */

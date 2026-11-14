@@ -18,6 +18,19 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `regionPorts` (experimental, off; ADR 0020 S1-2): edges that leave an organic, tree or radial region in a layered parent
+  enter and leave it through ports on the sides of the parent's flow, with the inner leg drawn by the region
+  ([measurement](benchmarks/results/region-ports-20261114.md)).
+- `straightDetours` (experimental, off; ADR 0020 S1-1b): a straight edge that would pass through a node is drawn around it
+  (its orthogonal route pulled taut), so an organic root over layered containers has no line through a node; the
+  placement does not change ([measurement](benchmarks/results/straight-detours-20261114.md)).
+- `metrics` measures node shapes (provisional `shape` on a drawing node): a circle is its disc, so an edge that ends on a
+  circle's outline no longer counts as a line through the node. Rectangles measure as before
+  ([measurement](benchmarks/results/single-pass-mixed-20261114.md)).
+- `singlePassReversed` (experimental, off; ADR 0020 S1-0): a graph that flows right to left everywhere is laid out left to
+  right under single pass and mirrored, so `rl` draws as well as `lr` (today it switches single pass off and crosses and
+  bends more). Not yet `bt`, nor graphs with pins, label places, explicit ports or buses
+  ([measurement](benchmarks/results/reversed-flows-20261114.md)). ADR 0020 (proposed): single pass for every area.
 - `patch` (provisional): changes the graph of a view without a new import — `{nodes, edges, removeNodes, removeEdges}`,
   removals first, a removed node with what it holds and its edges. The view keeps its collapsed containers, filter and
   options; an abstracting view is laid out from scratch as a toggle lays it out (the same drawing as a fresh import of

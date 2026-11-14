@@ -19,12 +19,14 @@ mod styles;
 use arqlet_model::*;
 pub mod communities;
 mod directed;
+mod mirror;
 mod organic;
 pub mod overview;
 mod placement_geometry;
 mod placement_order;
 mod placement_region;
 mod placement_structure;
+mod region_ports;
 mod repair;
 mod spatial;
 mod tree;
@@ -333,6 +335,64 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Experimental (`regionPorts`, ADR 0020 S1-2): edges that leave a region of another strategy in a layered parent end at
+    // the region's box for the layout; their inner legs are joined afterwards.
+    if options.region_ports {
+        if let Some((split, moved)) = region_ports::split(graph) {
+            let earlier = previous.map(|p| {
+                let mut back = p.clone();
+                if let Some((g, _)) = region_ports::split(&p.graph) {
+                    back.graph = g;
+                }
+                back
+            });
+            // The option stays on inside: the split graph has no edge that leaves a region (no recursion), and the order
+            // reads the regions' explicit ports of the second layout as their sub-places.
+            let inner = options.clone();
+            // A first layout gives the nodes inside the regions their places and the ports the order of the routes outside;
+            // the second puts each port at its node, in the order of the nodes. The better of the two by the published key
+            // is kept: ports in the order of the nodes keep the inner legs straight and apart, ports in the order outside
+            // cross less there.
+            let (mut first, first_stages) =
+                compute_counted(&split, earlier.as_ref(), dirty, &inner)?;
+            let placed = region_ports::with_ports(&split, &moved, &first);
+            let (mut second, stages) = compute_counted(&placed, earlier.as_ref(), dirty, &inner)?;
+            for snapshot in [&mut first, &mut second] {
+                snapshot.options = options.clone();
+                region_ports::join(snapshot, graph, &moved);
+            }
+            return Ok(if published_key(&first)? < published_key(&second)? {
+                (first, first_stages)
+            } else {
+                (second, stages)
+            });
+        }
+    }
+    // Experimental (`singlePassReversed`, ADR 0020 S1-0): a drawing that flows against its axis everywhere is laid out
+    // with the positive flow, where single pass runs, and mirrored; an earlier drawing is mirrored back to start from.
+    if options.single_pass_reversed {
+        if let Some(reversed) = mirror::uniform_reversal(graph, options) {
+            let vertical = reversed.vertical();
+            let positive = mirror::positive_graph(graph, reversed);
+            let earlier = previous.map(|p| {
+                let mut back = p.clone();
+                mirror::mirror(&mut back, vertical);
+                back.graph = mirror::positive_graph(&back.graph, reversed);
+                back
+            });
+            let (mut snapshot, stages) =
+                compute_counted_inner(&positive, earlier.as_ref(), dirty, options)?;
+            mirror::mirror(&mut snapshot, vertical);
+            snapshot.graph = graph.clone();
+            for o in snapshot.area_orientations.values_mut() {
+                if *o == mirror::positive(reversed) {
+                    *o = reversed;
+                }
+            }
+            apply_aggregate_weights(&mut snapshot);
+            return Ok((snapshot, stages));
+        }
+    }
     let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
     apply_aggregate_weights(&mut snapshot);
     Ok((snapshot, stages))
@@ -603,6 +663,21 @@ fn compute_mode_plain(
         .layout_diagnostics
         .push(format!("Single pass was not used: {reason}"));
     Ok(snapshot)
+}
+
+/// Experimental (`regionPorts`): the areas that hold an element with fixed sub-places (a region's explicit border ports) take
+/// the hierarchical order as it is: the placement's own ordering sees every element at its middle and would undo the order
+/// the sub-places gave. Nothing changes without such elements.
+fn fix_areas_with_ports(
+    plans: &mut layered_plan::LayeredPlans,
+    fixed: &BTreeMap<String, BTreeMap<String, f64>>,
+    parent_of: &BTreeMap<String, String>,
+) {
+    for element in fixed.keys() {
+        if let Some(plan) = parent_of.get(element).and_then(|area| plans.get_mut(area)) {
+            plan.fixed = true;
+        }
+    }
 }
 
 /// Why single pass cannot run on this graph, where the graph already says so. Without this check the attempt fails only after
@@ -3179,6 +3254,7 @@ fn drawing_of(
                 y: rect.y,
                 width: rect.width,
                 height: rect.height,
+                shape: n.shape,
             }
         })
         .collect();
@@ -3985,6 +4061,25 @@ fn compute_once(
             .iter()
             .filter_map(|e| Some((e.id.clone(), (e.source.clone(), e.target.clone()?))))
             .collect();
+        // Experimental (`regionPorts`): the explicit ports of a node, by edge, as its fixed sub-places in the order (their
+        // offsets across the flow); without the option every element is seen at its middle, as before.
+        let fixed_places: BTreeMap<String, BTreeMap<String, f64>> = if options.region_ports {
+            let by_id: BTreeMap<&str, &arqlet_model::Port> =
+                graph.ports.iter().map(|p| (p.id.as_str(), p)).collect();
+            let mut out: BTreeMap<String, BTreeMap<String, f64>> = BTreeMap::new();
+            for ep in &graph.edge_ports {
+                for port in [&ep.source_port, &ep.target_port].into_iter().flatten() {
+                    if let Some(p) = by_id.get(port.as_str()) {
+                        out.entry(p.node_id.clone())
+                            .or_default()
+                            .insert(ep.edge_id.clone(), p.offset);
+                    }
+                }
+            }
+            out
+        } else {
+            BTreeMap::new()
+        };
         // A backward edge between containers takes its border nodes on the other sides (`reversed_above`), which the
         // first placement could not know: its areas above were not placed yet. When there is such an edge, the drawing is
         // placed again with the plans of the first placement at hand (the ranks of every area are the same).
@@ -4042,6 +4137,7 @@ fn compute_once(
                 runs,
                 idle_limit,
                 options.order_seed,
+                &fixed_places,
             );
             let hierarchy_improved = after < before;
             if hierarchy_improved {
@@ -4053,6 +4149,7 @@ fn compute_once(
                         plan.fixed_borders = true;
                     }
                 }
+                fix_areas_with_ports(&mut ordered, &fixed_places, &parent_of);
                 run.plans = ordered;
             }
             if backward_between || hierarchy_improved || order_only {
@@ -4118,10 +4215,12 @@ fn compute_once(
                 hierarchy_order::RUNS,
                 hierarchy_order::IDLE_SWEEPS,
                 options.order_seed,
+                &fixed_places,
             );
             if after < before {
                 // The orders start the placement, which still improves each area's order from there (measured: following
                 // them as they are drew more crossings).
+                fix_areas_with_ports(&mut ordered, &fixed_places, &parent_of);
                 run.plans = ordered;
                 boxes = BTreeMap::new();
                 changed.clear();
@@ -9042,6 +9141,7 @@ mod round_tests {
                 y: 0.,
                 width: 20.,
                 height: 20.,
+                shape: Default::default(),
             }],
             edges: vec![],
             track_spacing: 6.,

@@ -28,6 +28,30 @@ pub struct DrawNode {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    /// The node's shape: a circle is the disc inscribed in its box, so a line through an empty corner of the box, or one
+    /// that ends on the circle, does not enter it. A rectangle when omitted (provisional).
+    #[serde(default)]
+    pub shape: arqlet_model::NodeShape,
+}
+
+/// Whether the segment `a`–`b` enters the node's outline: its box, or the disc of a circle (deeper than a rounding error, so
+/// a segment that starts or ends on the circle and leaves it does not count).
+fn enters_node(a: &Point, b: &Point, node: &DrawNode, r: &Rect) -> bool {
+    if node.shape != arqlet_model::NodeShape::Circle {
+        return enters(a, b, r);
+    }
+    let (cx, cy) = ((r.x0 + r.x1) / 2., (r.y0 + r.y1) / 2.);
+    let radius = (r.x1 - r.x0).min(r.y1 - r.y0) / 2.;
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let length = dx * dx + dy * dy;
+    let t = if length > 0. {
+        (((cx - a.x) * dx + (cy - a.y) * dy) / length).clamp(0., 1.)
+    } else {
+        0.
+    };
+    let (px, py) = (a.x + dx * t - cx, a.y + dy * t - cy);
+    let inner = (radius - 1e-3).max(0.);
+    px * px + py * py < inner * inner
 }
 
 /// An edge polyline. Two routes may share a line only where both name the same explicit port at that end
@@ -515,7 +539,7 @@ fn node_stats<'a>(
         if apart(r, clearance) {
             continue;
         }
-        if route.segs.iter().any(|(a, b)| enters(a, b, r)) {
+        if route.segs.iter().any(|(a, b)| enters_node(a, b, node, r)) {
             stats.hits.push(node.id.as_str());
             continue;
         }
@@ -1323,6 +1347,7 @@ mod tests {
             y,
             width: size,
             height: size,
+            shape: Default::default(),
         }
     }
     fn edge(id: &str, s: &str, t: &str, points: Vec<Point>) -> DrawEdge {
@@ -1760,5 +1785,53 @@ mod tests {
         // Each crossing pair is listed once from each side.
         assert_eq!(crossings, 2 * totals.crossing_pairs);
         assert!(route_conflicts(&drawing, "missing").is_err());
+    }
+    #[test]
+    fn a_circle_is_measured_as_its_disc() {
+        // A circle at (100, 0) of size 60; a line through the empty corner of its box, and one that ends on its outline and
+        // leaves it, do not enter it; one through its middle does.
+        let circle = |id: &str| DrawNode {
+            shape: arqlet_model::NodeShape::Circle,
+            ..node_sized(id, 100., 0., 60.)
+        };
+        let other = node_sized("a", 0., 200., 20.);
+        let far = node_sized("b", 300., 200., 20.);
+        let measure = |points: Vec<Point>, target: &str, nodes: Vec<DrawNode>| {
+            measure(&drawing(nodes, vec![edge("e", "a", target, points)]))
+                .unwrap()
+                .line_node_hits
+        };
+        let corner = vec![
+            p(0., 210.),
+            p(0., 3.),
+            p(103., 3.),
+            p(103., -40.),
+            p(310., -40.),
+            p(310., 200.),
+        ];
+        assert_eq!(
+            measure(
+                corner.clone(),
+                "b",
+                vec![other.clone(), far.clone(), circle("c")]
+            ),
+            0
+        );
+        assert_eq!(
+            measure(
+                corner,
+                "b",
+                vec![other.clone(), far.clone(), node_sized("c", 100., 0., 60.)]
+            ),
+            1
+        );
+        let through = vec![p(10., 200.), p(10., 30.), p(310., 30.), p(310., 200.)];
+        assert_eq!(
+            measure(through, "b", vec![other.clone(), far, circle("c")]),
+            1
+        );
+        // An edge that ends on the circle (at its left point) does not count as entering it.
+        let ending = vec![p(10., 200.), p(10., 30.), p(100., 30.)];
+        assert_eq!(measure(ending, "c", vec![other, circle("c")]), 0);
     }
 }
