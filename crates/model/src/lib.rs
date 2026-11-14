@@ -1805,6 +1805,12 @@ pub struct LayoutOptions {
     /// not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub region_child_ports: bool,
+    /// Experimental: with `straightDetours`, the geometric repair of organic areas does not move nodes to clear a straight
+    /// edge whose end lies inside a container of the area; the edge's detour draws it around the nodes in its way. The
+    /// repair still clears the lines between children of organic areas. Omitted when off, so the default output does not
+    /// change.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub nested_edges_by_detour: bool,
     /// Internal (`regionChildPorts`): by container and edge (`"{container}\u{1}{edge}"`), whether the edge's border node
     /// stands at the end of the container's flow (its last rank) rather than at its start: the side that faces the edge's
     /// other end in the area's abstract placement. Derived for each layout, never written or read.
@@ -2079,6 +2085,7 @@ impl Default for LayoutOptions {
             straight_detours: true,
             region_ports: true,
             region_child_ports: false,
+            nested_edges_by_detour: false,
             region_child_sides: BTreeMap::new(),
             directions_first: false,
             force_directed: false,

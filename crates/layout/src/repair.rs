@@ -2151,6 +2151,17 @@ fn repair_once(
         if s == t {
             continue;
         }
+        // Experimental (`nestedEdgesByDetour`): a straight edge with an end inside a container of the organic area is left to
+        // its detour (`straightDetours`), which draws it around the nodes in its way; the repair clears only the lines
+        // between children of organic areas, which it moves directly. Moving whole containers to clear lines through their
+        // inside cost the most time and area (benchmarks/results/nested-edges-by-detour-20261114.md).
+        if options.nested_edges_by_detour
+            && options.straight_detours
+            && !(organic(graph.nodes[s].parent_id.as_deref())
+                && organic(graph.nodes[t].parent_id.as_deref()))
+        {
+            continue;
+        }
         // The ancestors of both endpoints: a straight edge may cross the containers its endpoints sit in.
         let mut around = BTreeSet::new();
         for start in [parents[s], parents[t]] {
