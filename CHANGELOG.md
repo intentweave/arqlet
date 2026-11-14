@@ -18,6 +18,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `metrics` measures node shapes (provisional `shape` on a drawing node): a circle is its disc, so an edge that ends on a
+  circle's outline no longer counts as a line through the node. Rectangles measure as before
+  ([measurement](benchmarks/results/single-pass-mixed-20261114.md)).
 - `singlePassReversed` (experimental, off; ADR 0020 S1-0): a graph that flows right to left everywhere is laid out left to
   right under single pass and mirrored, so `rl` draws as well as `lr` (today it switches single pass off and crosses and
   bends more). Not yet `bt`, nor graphs with pins, label places, explicit ports or buses

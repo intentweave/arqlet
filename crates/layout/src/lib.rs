@@ -3205,6 +3205,7 @@ fn drawing_of(
                 y: rect.y,
                 width: rect.width,
                 height: rect.height,
+                shape: n.shape,
             }
         })
         .collect();
@@ -9068,6 +9069,7 @@ mod round_tests {
                 y: 0.,
                 width: 20.,
                 height: 20.,
+                shape: Default::default(),
             }],
             edges: vec![],
             track_spacing: 6.,

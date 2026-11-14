@@ -514,6 +514,7 @@ fn drawing(graph: &Graph, curated: &CuratedScene) -> Result<Drawing, String> {
             y: bounds.y,
             width: bounds.width,
             height: bounds.height,
+            shape: node.shape,
         });
     }
     let mut edges = Vec::with_capacity(curated.routes.len());

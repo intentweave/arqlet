@@ -5630,6 +5630,7 @@ mod tests {
                     y: rect.y,
                     width: rect.width,
                     height: rect.height,
+                    shape: n.shape,
                 }
             })
             .collect();

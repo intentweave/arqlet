@@ -24,9 +24,10 @@ Free directions are handled by `directionsFirst` (S2b: candidates fixed under si
 
 Two findings shape the steps:
 
-- Part of the lines through nodes on the mixed examples are straight edges of organic areas that start or end at the
-  centre of their own node instead of its border (4 of 10 on mixed-layouts, 4 of 9 on self-loops). That is a geometry
-  defect of the organic edges, independent of single pass.
+- The lines through nodes on the small mixed examples are a measurement artefact: the `metrics` drawing carries no node
+  shapes, so an edge that ends correctly on a circle's outline runs inside the circle's box and counts as a hit. With
+  every node a box, mixed-layouts and self-loops have none (10 and 9 with circles); mixed-large keeps 62 of its 90 in the
+  pipeline before single pass, which are real.
 - Edges between a layered area and a region of another strategy are not constructed by single pass but completed by the
   older router, without the border contract ADR 0017 gives areas of another axis.
 
@@ -42,7 +43,7 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
 2. **Regions.** Organic, tree and radial areas, and areas with straight routing, are regions: their children keep the
    placement of their strategy (as with `singlePassMixed`).
 3. **Edges inside a region** are drawn by the region's routing (straight for organic and radial, the tree's own for tree),
-   and end on the border of their nodes, never inside them.
+   and end on the outline of their nodes.
 4. **Border ports.** Every edge that crosses a region's border gets a port on the region's box, placed by the region after
    its placement: on the side the surrounding flow uses (ADR 0017, rule 1), at the point closest to the inner end, ports of
    one side a track apart. The inner leg is the region's routing from the node to its port; the outer leg is an ordinary
@@ -61,8 +62,12 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   container's header is at its top in both senses, so a mirror on the vertical axis moves children into the header and
   shifts the axis by a header per level of nesting; `bt` needs single pass with a negative flow on the vertical axis, or a
   header-aware transform (step S1-0b).
-- **S1-1: organic edges end on their nodes' borders** (straight routes clipped to the boxes). Fixes the own-node part of the
-  lines through nodes in every pipeline.
+- **S1-1: the metrics measure node shapes** (a circle as its disc, as the straight router already does), so that the gate
+  counts real lines through nodes; then the real hits of mixed-large are analysed. Done (2026-11-14, [results](../../benchmarks/results/single-pass-mixed-20261114.md)):
+  mixed-layouts and self-loops have none; every hit left on mixed-large is a straight one-segment edge of the organic root
+  through another node (`straight-through-node`), 44 in the pipeline before single pass and 67 with `singlePassMixed`.
+- **S1-1b: straight edges inside a region avoid nodes**: a straight edge that would pass through a node is drawn around it
+  (bent at the node's corner) or the region's placement moves the node off the line; measured on mixed-large.
 - **S1-2: border ports for regions in a layered parent** (decision 4), behind `singlePassMixed`.
 - **S1-3: layered areas inside regions** (decision 5) and an organic root.
 - **S1-4: the default decision** for `singlePassMixed` on the mixed corpus (can-bus, mixed-layouts, mixed-large, self-loops,
