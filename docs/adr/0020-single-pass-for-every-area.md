@@ -58,10 +58,11 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
 
 - **S1-0: reversed flows by mirroring**, first for graphs whose areas are all reversed. Measure `rl`/`bt` against `lr`/`tb`
   on the layered examples; expected: equal crossings and bends. Done for `rl` (2026-11-14, `singlePassReversed`,
-  [results](../../benchmarks/results/reversed-flows-20261114.md)): the mirrored drawing equals `lr`. Not for `bt`: a
-  container's header is at its top in both senses, so a mirror on the vertical axis moves children into the header and
-  shifts the axis by a header per level of nesting; `bt` needs single pass with a negative flow on the vertical axis, or a
-  header-aware transform (step S1-0b).
+  [results](../../benchmarks/results/reversed-flows-20261114.md)): the mirrored drawing equals `lr`. `bt` (S1-0b, done
+  the same day): a container keeps its header at its top in both senses, so every area is mirrored within its own box
+  and its content moved back by the difference of its two margins (the shifts of nested areas add up); routes follow the
+  area that holds each point, a horizontal segment that passes a container's side changing its height there. The
+  mirrored drawing equals `tb` on the same examples.
 - **S1-1: the metrics measure node shapes** (a circle as its disc, as the straight router already does), so that the gate
   counts real lines through nodes; then the real hits of mixed-large are analysed. Done (2026-11-14, [results](../../benchmarks/results/single-pass-mixed-20261114.md)):
   mixed-layouts and self-loops have none; every hit left on mixed-large is a straight one-segment edge of the organic root

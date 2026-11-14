@@ -1781,10 +1781,10 @@ pub struct LayoutOptions {
     /// Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub isolated_grid: bool,
-    /// Experimental (ADR 0020, S1-0): a graph whose areas all flow right to left (`rl`) is laid out left to right, where
-    /// single pass runs, and mirrored; logical edge direction is kept. Not `bt` yet (a container's header is at its top in
-    /// both senses), nor graphs with pins, label places, explicit ports or buses. Omitted when off, so the default output
-    /// does not change.
+    /// Experimental (ADR 0020, S1-0 and S1-0b): a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`)
+    /// is laid out with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header
+    /// at its top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses.
+    /// Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub single_pass_reversed: bool,
     /// Experimental (ADR 0020, S1-1b): a straight edge that would pass through a node it does not end at is drawn around it

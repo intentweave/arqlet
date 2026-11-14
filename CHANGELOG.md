@@ -18,6 +18,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `singlePassReversed` covers `bt` too (ADR 0020 S1-0b): every area is mirrored within its box and a container's header
+  stays at its top; a bottom-to-top graph draws as its top-to-bottom mirror
+  ([measurement](benchmarks/results/reversed-flows-20261114.md)).
 - `regionChildPorts` (experimental, off; ADR 0020 S1-3): layered containers inside an organic or radial area get border
   nodes in their own flow, so their edges leave them along the flow and the area draws them on from there
   ([measurement](benchmarks/results/region-child-ports-20261114.md)).

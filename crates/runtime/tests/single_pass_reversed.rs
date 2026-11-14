@@ -36,13 +36,7 @@ fn import(graph: &Value, options: Value) -> Snapshot {
 
 #[test]
 fn a_reversed_drawing_is_the_mirror_of_the_positive_one_and_flows_backwards() {
-    // Right to left only: `bt` is not mirrored yet (a container's header stays at its top), and keeps the earlier pipeline.
-    let bt = import(&chains("bt"), json!({"singlePassReversed": true}));
-    assert!(bt
-        .layout_diagnostics
-        .iter()
-        .any(|d| d.starts_with("Single pass was not used")));
-    for (positive, reversed, vertical) in [("lr", "rl", false)] {
+    for (positive, reversed, vertical) in [("lr", "rl", false), ("tb", "bt", true)] {
         let on = json!({"singlePassReversed": true});
         let mirrored = import(&chains(reversed), on.clone());
         let plain = import(&chains(positive), json!({}));
@@ -108,5 +102,65 @@ fn a_reversed_drawing_is_the_mirror_of_the_positive_one_and_flows_backwards() {
             .layout_diagnostics
             .iter()
             .any(|d| d.starts_with("Single pass was not used")));
+    }
+}
+
+/// Bottom to top with nested containers: every container keeps its header at its top (the shifts of nested areas add up),
+/// the geometry is valid, and the drawing measures as top to bottom does.
+#[test]
+fn nested_containers_flow_bottom_to_top_with_headers_at_their_tops() {
+    let graph = |direction: &str| {
+        json!({"nodes": [
+            {"id": "outer", "kind": "group", "label": "outer"},
+            {"id": "inner", "kind": "group", "label": "inner", "parentId": "outer"},
+            {"id": "a", "kind": "fn", "label": "a", "parentId": "inner"},
+            {"id": "b", "kind": "fn", "label": "b", "parentId": "inner"},
+            {"id": "c", "kind": "fn", "label": "c", "parentId": "outer"},
+            {"id": "d", "kind": "fn", "label": "d"}],
+          "edges": [
+            {"id": "ab", "kind": "calls", "source": "a", "target": "b"},
+            {"id": "bc", "kind": "calls", "source": "b", "target": "c"},
+            {"id": "cd", "kind": "calls", "source": "c", "target": "d"},
+            {"id": "da", "kind": "calls", "source": "d", "target": "a"}],
+          "defaultDirection": direction,
+          "containerDirections": {"outer": direction, "inner": direction}})
+    };
+    let mirrored = import(&graph("bt"), json!({"singlePassReversed": true}));
+    let plain = import(&graph("tb"), json!({}));
+    let issues =
+        arqlet_scene::validate_geometry(&mirrored.graph, &mirrored.boxes, Default::default());
+    assert!(issues.is_empty(), "{issues:?}");
+    let (a, b) = (
+        arqlet_layout::published_metrics(&mirrored).unwrap(),
+        arqlet_layout::published_metrics(&plain).unwrap(),
+    );
+    assert_eq!(
+        (a.crossings, a.line_node_hits),
+        (b.crossings, b.line_node_hits)
+    );
+    assert_eq!((a.width, a.height), (b.width, b.height));
+    // The same margins as top to bottom: the children of each container start below its header.
+    for c in ["outer", "inner"] {
+        let top = |s: &Snapshot| {
+            s.graph
+                .nodes
+                .iter()
+                .filter(|n| n.parent_id.as_deref() == Some(c))
+                .map(|n| s.boxes[&n.id].y)
+                .fold(f64::INFINITY, f64::min)
+        };
+        assert!((top(&mirrored) - top(&plain)).abs() < 1e-6, "{c}");
+    }
+    // b lies above a (the flow runs upwards), and every route stays axis-parallel.
+    let abs = arqlet_layout::absolute_all(&mirrored.graph, &mirrored.boxes);
+    assert!(abs["b"].y < abs["a"].y);
+    for r in &mirrored.routes {
+        for w in r.points.windows(2) {
+            assert!(
+                (w[0].x - w[1].x).abs() < 1e-6 || (w[0].y - w[1].y).abs() < 1e-6,
+                "{} stays orthogonal",
+                r.id
+            );
+        }
     }
 }
