@@ -2121,6 +2121,7 @@ fn align_lanes(
     (gap, track): (f64, f64),
     blocks: bool,
     room: &BTreeMap<String, (f64, f64)>,
+    shared: bool,
 ) -> (f64, BTreeMap<usize, Vec<String>>) {
     let across = |r: &Rect| {
         if vertical {
@@ -2241,7 +2242,19 @@ fn align_lanes(
         .collect();
     // A rank of border nodes takes the order of the lanes its edges arrive on, so that every border node can lie on its
     // edge's lane (each has one neighbour inside the container).
-    let border_rank = |ids: &Vec<usize>| !ids.is_empty() && ids.iter().all(|&id| border[id]);
+    // Experimental (`sharedBorderRanks`): a rank of border nodes and side nodes only counts as a border rank too; its side
+    // nodes keep their places and only its border nodes take the order of their lanes.
+    let side: Vec<bool> = names
+        .iter()
+        .map(|id| id.starts_with(SIDE_IN_PREFIX) || id.starts_with(SIDE_OUT_PREFIX))
+        .collect();
+    let border_rank = |ids: &Vec<usize>| {
+        !ids.is_empty()
+            && (ids.iter().all(|&id| border[id])
+                || shared
+                    && ids.iter().any(|&id| border[id])
+                    && ids.iter().all(|&id| border[id] || side[id]))
+    };
     // Border nodes follow: an element other than a border node looks at its other neighbours, when it has any.
     let target_of = |start: &[Option<f64>], id: usize| -> Option<f64> {
         let list = &near[id];
@@ -2274,13 +2287,21 @@ fn align_lanes(
                 continue;
             }
             if border_rank(&ranks[r]) {
-                let mut keyed: Vec<(f64, usize, usize)> = ranks[r]
+                // The border nodes are ordered on the places border nodes hold (all of a pure border rank).
+                let places: Vec<usize> = (0..ranks[r].len())
+                    .filter(|&i| border[ranks[r][i]])
+                    .collect();
+                let mut keyed: Vec<(f64, usize, usize)> = places
                     .iter()
-                    .enumerate()
-                    .map(|(i, &id)| (target_of(&start, id).unwrap_or(f64::MAX), i, id))
+                    .map(|&i| {
+                        let id = ranks[r][i];
+                        (target_of(&start, id).unwrap_or(f64::MAX), i, id)
+                    })
                     .collect();
                 keyed.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-                ranks[r] = keyed.into_iter().map(|k| k.2).collect();
+                for (&place, (_, _, id)) in places.iter().zip(keyed) {
+                    ranks[r][place] = id;
+                }
             }
             // The rank at once: the places nearest to the targets (least squares, weighted by the edges) that keep the
             // rank's order and gaps, by pooling neighbours that would overlap (isotonic regression).
@@ -2404,6 +2425,258 @@ fn align_lanes(
 /// dummy farthest along the cross axis; the elements after a moved dummy in its rank move on as far as needed to keep the
 /// distances they had. Repeated until nothing moves (at most four rounds; a later chain may push an earlier one off its
 /// line). Returns the far end across the flow of everything placed in the ranks.
+/// Experimental (`straightenOffsets`): after the placement across the flow, every container of a rank may move across the flow to put one of its edges' ports on the line of the port it meets in
+/// the neighbouring rank (`lanes`: the drawn ports by element and edge; a dummy's lane is its middle). A move is taken when
+/// it keeps the element between its neighbours in the rank with their gap (a track between two dummies), stays within the
+/// extent everything already takes (the drawing does not grow), leaves fewer of the element's segments bent and adds no
+/// crossing in their channels; the nearest such move wins. Three rounds. Returns whether anything moved.
+fn straighten_offsets(
+    placed: &mut BTreeMap<String, Rect>,
+    levels: &BTreeMap<usize, Vec<String>>,
+    (chains, link_edges, lanes): (
+        &BTreeMap<(String, String), Vec<String>>,
+        &BTreeMap<(String, String), Vec<String>>,
+        &BTreeMap<(String, String), f64>,
+    ),
+    vertical: bool,
+    (gap, track, low): (f64, f64, f64),
+    containers: &BTreeSet<&str>,
+) -> bool {
+    let across = |r: &Rect| {
+        if vertical {
+            (r.x, r.width)
+        } else {
+            (r.y, r.height)
+        }
+    };
+    let virtual_node = |id: &str| {
+        id.starts_with(DUMMY_PREFIX)
+            || id.starts_with(BORDER_PREFIX)
+            || id.starts_with(SIDE_IN_PREFIX)
+            || id.starts_with(SIDE_OUT_PREFIX)
+    };
+    // Every segment of every edge between adjacent elements of a chain: (element, element, edge).
+    let mut hops: Vec<(String, String, String)> = Vec::new();
+    for ((a, b), dummies) in chains {
+        let Some(edges) = link_edges.get(&(a.clone(), b.clone())) else {
+            continue;
+        };
+        let elements: Vec<&String> = std::iter::once(a)
+            .chain(dummies.iter())
+            .chain(std::iter::once(b))
+            .collect();
+        for w in elements.windows(2) {
+            for e in edges {
+                hops.push((w[0].clone(), w[1].clone(), e.clone()));
+            }
+        }
+    }
+    let mut touching: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    for (k, (a, b, _)) in hops.iter().enumerate() {
+        touching.entry(a.as_str()).or_default().push(k);
+        touching.entry(b.as_str()).or_default().push(k);
+    }
+    let mut of_edge: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    for (k, (_, _, e)) in hops.iter().enumerate() {
+        of_edge.entry(e.as_str()).or_default().push(k);
+    }
+    // The channel of every segment (the lower rank of its ends), oriented from the lower rank to the higher, and the
+    // segments of each channel: a move may not add crossings there (two segments cross when their ports lie in opposite
+    // orders on the two ranks).
+    let rank_of: BTreeMap<&str, usize> = levels
+        .iter()
+        .flat_map(|(r, ids)| ids.iter().map(move |id| (id.as_str(), *r)))
+        .collect();
+    let mut channel: Vec<Option<usize>> = vec![None; hops.len()];
+    let mut in_channel: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (k, (a, b, _)) in hops.iter().enumerate() {
+        if let (Some(&ra), Some(&rb)) = (rank_of.get(a.as_str()), rank_of.get(b.as_str())) {
+            let c = ra.min(rb);
+            channel[k] = Some(c);
+            in_channel.entry(c).or_default().push(k);
+        }
+    }
+    let port = |placed: &BTreeMap<String, Rect>, id: &str, edge: &str| -> Option<f64> {
+        let (start, size) = across(placed.get(id)?);
+        Some(
+            start
+                + lanes
+                    .get(&(id.to_string(), edge.to_string()))
+                    .copied()
+                    .unwrap_or(size / 2.),
+        )
+    };
+    let bent = |placed: &BTreeMap<String, Rect>, list: &[usize]| {
+        list.iter()
+            .filter(|&&k| {
+                let (a, b, e) = &hops[k];
+                matches!((port(placed, a, e), port(placed, b, e)), (Some(p), Some(q)) if (p - q).abs() > 0.5)
+            })
+            .count()
+    };
+    // The crossings of the segments `list` with the other segments of their channels.
+    let crossings = |placed: &BTreeMap<String, Rect>, list: &[usize]| {
+        let ends = |k: usize| -> Option<(f64, f64)> {
+            let (a, b, e) = &hops[k];
+            let (p, q) = (port(placed, a, e)?, port(placed, b, e)?);
+            Some(if rank_of.get(a.as_str()) <= rank_of.get(b.as_str()) {
+                (p, q)
+            } else {
+                (q, p)
+            })
+        };
+        let mut count = 0;
+        let mut seen: BTreeSet<(usize, usize)> = BTreeSet::new();
+        for &k in list {
+            let (Some(c), Some((p1, q1))) = (channel[k], ends(k)) else {
+                continue;
+            };
+            for &j in in_channel.get(&c).map(Vec::as_slice).unwrap_or(&[]) {
+                if j == k || !seen.insert((k.min(j), k.max(j))) {
+                    continue;
+                }
+                if let Some((p2, q2)) = ends(j) {
+                    if (p1 - p2) * (q1 - q2) < -1e-9 {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        count
+    };
+    let extent = placed
+        .values()
+        .map(|r| {
+            let (s, w) = across(r);
+            s + w
+        })
+        .fold(low, f64::max);
+    let mut moved = false;
+    for _ in 0..3 {
+        let mut changed = false;
+        for ids in levels.values() {
+            for (i, id) in ids.iter().enumerate() {
+                // Only containers: their ports are their border and side nodes, placed by their own plan; a leaf's ports are
+                // ordered by its neighbours' places after the placement, so a moved leaf changes the order its edges cross
+                // in (org-chart: 37 crossings to 59).
+                if virtual_node(id) || !containers.contains(id.as_str()) {
+                    continue;
+                }
+                let (Some(list), Some(rect)) = (touching.get(id.as_str()), placed.get(id)) else {
+                    continue;
+                };
+                let (start, size) = across(rect);
+                let space = |a: &str, b: &str| {
+                    if a.starts_with(DUMMY_PREFIX) && b.starts_with(DUMMY_PREFIX) {
+                        track
+                    } else {
+                        gap
+                    }
+                };
+                let before_list = list.clone();
+                let before = bent(placed, &before_list);
+                if before == 0 {
+                    continue;
+                }
+                let mut shifts: Vec<f64> = list
+                    .iter()
+                    .filter_map(|&k| {
+                        let (a, b, e) = &hops[k];
+                        let (other, mine) = if a == id { (b, a) } else { (a, b) };
+                        Some(port(placed, other, e)? - port(placed, mine, e)?)
+                    })
+                    .filter(|d| d.abs() > 0.5)
+                    .collect();
+                shifts.sort_by(|a, b| a.abs().total_cmp(&b.abs()).then(a.total_cmp(b)));
+                let set = |placed: &mut BTreeMap<String, Rect>, id: &str, to: f64| {
+                    let rect = placed.get_mut(id).expect("placed element");
+                    if vertical {
+                        rect.x = to;
+                    } else {
+                        rect.y = to;
+                    }
+                };
+                for d in shifts {
+                    let to = start + d;
+                    // The element and the virtual nodes it pushes on the side it moves to: each keeps its place unless the
+                    // one before it comes within the gap.
+                    let mut moves: Vec<(String, f64, f64)> = vec![(id.clone(), start, to)];
+                    let mut fits = true;
+                    if d < 0. {
+                        let mut limit = to;
+                        let mut next = id.as_str();
+                        let mut j = i;
+                        while let Some(prev) = j.checked_sub(1).and_then(|p| ids.get(p)) {
+                            let (s, w) = placed.get(prev).map_or((low, 0.), |r| across(r));
+                            let room = limit - space(prev, next);
+                            if s + w <= room + 1e-9 {
+                                break;
+                            }
+                            if !virtual_node(prev) {
+                                fits = false;
+                                break;
+                            }
+                            moves.push((prev.clone(), s, room - w));
+                            limit = room - w;
+                            next = prev;
+                            j -= 1;
+                        }
+                        fits &= limit >= low - 1e-9;
+                    } else {
+                        let mut limit = to + size;
+                        let mut previous = id.as_str();
+                        let mut j = i;
+                        while let Some(next) = ids.get(j + 1) {
+                            let (s, w) = placed.get(next).map_or((extent, 0.), |r| across(r));
+                            let room = limit + space(previous, next);
+                            if s >= room - 1e-9 {
+                                break;
+                            }
+                            if !virtual_node(next) {
+                                fits = false;
+                                break;
+                            }
+                            moves.push((next.clone(), s, room));
+                            limit = room + w;
+                            previous = next;
+                            j += 1;
+                        }
+                        fits &= limit <= extent + 1e-9;
+                    }
+                    if !fits {
+                        continue;
+                    }
+                    // The segments of everything that moves, and every other segment of their edges: straightening one
+                    // segment of a chain moves its change of lane into another channel, where it may cross.
+                    let mut all: Vec<usize> = moves
+                        .iter()
+                        .flat_map(|(m, _, _)| touching.get(m.as_str()).cloned().unwrap_or_default())
+                        .flat_map(|k| of_edge.get(hops[k].2.as_str()).cloned().unwrap_or_default())
+                        .collect();
+                    all.sort_unstable();
+                    all.dedup();
+                    let (was, crossed) = (bent(placed, &all), crossings(placed, &all));
+                    for (m, _, to) in &moves {
+                        set(placed, m, *to);
+                    }
+                    if bent(placed, &all) < was && crossings(placed, &all) <= crossed {
+                        changed = true;
+                        moved = true;
+                        break;
+                    }
+                    for (m, from, _) in &moves {
+                        set(placed, m, *from);
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    moved
+}
+
 fn straighten_chains(
     placed: &mut BTreeMap<String, Rect>,
     levels: &BTreeMap<usize, Vec<String>>,
@@ -6219,14 +6492,28 @@ fn place(
                 }
                 if !border_entering.is_empty() || !border_leaving.is_empty() {
                     let (entering, leaving) = (border_entering, border_leaving);
-                    if !entering.is_empty() {
+                    // Experimental (`sharedBorderRanks`): a first or last rank of side nodes only takes the border nodes too.
+                    let only = |rank: Option<&Vec<String>>, prefix: &str| {
+                        options.shared_border_ranks
+                            && rank.is_some_and(|ids| {
+                                !ids.is_empty() && ids.iter().all(|id| id.starts_with(prefix))
+                            })
+                    };
+                    let share_first = only(levels.get(&0), SIDE_IN_PREFIX);
+                    let top = levels.keys().copied().max().unwrap_or(0);
+                    let share_last = only(levels.get(&top), SIDE_OUT_PREFIX);
+                    if !entering.is_empty() && !share_first {
                         // The entering border takes rank 0; every other rank moves one on.
                         for r in ranks.values_mut() {
                             *r += 1;
                         }
                         levels = levels.into_iter().map(|(r, ids)| (r + 1, ids)).collect();
                     }
-                    let last = levels.keys().copied().max().unwrap_or(0) + 1;
+                    let last = if share_last {
+                        levels.keys().copied().max().unwrap_or(0)
+                    } else {
+                        levels.keys().copied().max().unwrap_or(0) + 1
+                    };
                     for (edge, child) in &entering {
                         let node = format!("{BORDER_PREFIX}{edge}");
                         levels.entry(0).or_default().push(node.clone());
@@ -6887,8 +7174,17 @@ fn place(
             };
             // A border rank (step 6) needs only the margin and a track before or after it; the channel widening adds what its
             // lane changes need.
-            let border_level =
-                |ids: &Vec<String>| ids.iter().all(|id| id.starts_with(BORDER_PREFIX));
+            // Experimental (`sharedBorderRanks`): a rank of border nodes and side nodes only counts as a border rank too.
+            let border_level = |ids: &Vec<String>| {
+                ids.iter().all(|id| id.starts_with(BORDER_PREFIX))
+                    || options.shared_border_ranks
+                        && ids.iter().any(|id| id.starts_with(BORDER_PREFIX))
+                        && ids.iter().all(|id| {
+                            id.starts_with(BORDER_PREFIX)
+                                || id.starts_with(SIDE_IN_PREFIX)
+                                || id.starts_with(SIDE_OUT_PREFIX)
+                        })
+            };
             let gap = if options.layered_construction
                 && (border_level(ids)
                     || level_list
@@ -7144,6 +7440,7 @@ fn place(
                             (cross_gap, options.track_spacing),
                             options.single_pass,
                             &lead_room,
+                            options.shared_border_ranks,
                         );
                         placement_geometry::CrossPlan {
                             tracks: channel_tracks_by_edges(
@@ -7194,6 +7491,7 @@ fn place(
                             (cross_gap, options.track_spacing),
                             options.single_pass,
                             &lead_room,
+                            options.shared_border_ranks,
                         );
                         *border_orders.borrow_mut() = reordered;
                         cross_extent = cross_extent.max(reach + cross_gap);
@@ -7214,6 +7512,49 @@ fn place(
                     }
                 }
             }
+            // Experimental (`straightenOffsets`): elements move across the flow where that straightens an edge at its drawn
+            // ports, within their gaps and the drawing's extent; the tracks are then counted on the new places.
+            let planned_tracks = match (&lanes, options.straighten_offsets && options.single_pass) {
+                (Some(lanes), true) => {
+                    let mut exact = counted(lanes);
+                    for child in &children {
+                        let Some(plan) = plans.get(&child.id) else {
+                            continue;
+                        };
+                        for (edge, side) in &plan.sides {
+                            if let Some(p) = layered_plan::side_port(
+                                plan,
+                                (0., 0.),
+                                side,
+                                Some(options.track_spacing),
+                            ) {
+                                exact.insert(
+                                    (child.id.clone(), edge.clone()),
+                                    if vertical { p.x } else { p.y },
+                                );
+                            }
+                        }
+                    }
+                    let low = if vertical { 24. } else { 48. };
+                    if straighten_offsets(
+                        &mut placed,
+                        &levels,
+                        (&chains, &link_edges, &exact),
+                        vertical,
+                        (cross_gap, options.track_spacing, low),
+                        &children
+                            .iter()
+                            .filter(|c| !index.children_of(Some(c.id.as_str())).is_empty())
+                            .map(|c| c.id.as_str())
+                            .collect(),
+                    ) {
+                        None
+                    } else {
+                        planned_tracks
+                    }
+                }
+                _ => planned_tracks,
+            };
             // Space for the tracks (plan section 4a, step 4): every channel between two ranks is as wide as its lane changes
             // need, a track each (changes whose spans do not overlap share one, `constructive::track_slots`) and the
             // margin from both ranks; the ranks after it move along the flow. Without it, the tracks of a crowded channel

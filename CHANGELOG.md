@@ -32,6 +32,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `sharedBorderRanks` (experimental, off): in a container across its parent's flow, border nodes share the first or last
+  rank with the side nodes instead of opening a rank of their own (which held only a long-edge dummy). cloud-architecture
+  4.5 % and org-chart 9.8 % smaller, synthetic-2k 13 crossings and 19 bends fewer at 1.3 % more area
+  (benchmarks/results/cross-axis-space-20261115.md).
+- `straightenOffsets` (experimental, off): after the placement across the flow, a container moves where that straightens
+  an edge at its drawn ports, within its gaps, when fewer segments stay bent and no crossing is added in the moved edges'
+  channels (cloud-architecture: the subnets of a zone stand flush, 8 bends fewer). Not yet a default: org-chart and
+  synthetic-2k get more crossings from a cause outside the guarded channels.
 - `repairCompaction` (experimental, off): in a flat organic drawing, the nodes the geometric repair pushed out are pulled
   back toward their stress places as far as no conflict comes back and no crossing is added (petri-net-shapes 23 %
   smaller, organic-25 9 %; every other dataset unchanged).

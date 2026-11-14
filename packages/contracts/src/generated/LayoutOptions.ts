@@ -110,6 +110,19 @@ componentPacking?: boolean,
  */
 packComponents?: PackComponents,
 /**
+ * Experimental: in a container across its parent's flow, the border nodes of edges that cross it share the first or
+ * last rank with the side nodes of edges that enter or leave on its sides, when that rank holds only side nodes,
+ * instead of opening a rank of their own (which left a rank of one long-edge dummy before the first child). Off by
+ * default.
+ */
+sharedBorderRanks?: boolean,
+/**
+ * Experimental: after the placement across the flow, an element (a leaf or a container) moves across the flow where
+ * that straightens one of its edges to the neighbouring rank at the ports as they are drawn, when it fits in the gap
+ * between its neighbours in the rank, the drawing does not grow, and fewer segments stay bent. Off by default.
+ */
+straightenOffsets?: boolean,
+/**
  * Experimental: the children of a layered area that have no edge to another child (a file of unrelated functions)
  * are spread over the ranks as a grid instead of all standing in the first rank, one long column. They fill the
  * ranks the connected children use, and more when there are many of them, so the grid comes out about square.
