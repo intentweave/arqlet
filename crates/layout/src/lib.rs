@@ -7103,12 +7103,39 @@ fn place(
                         )
                     });
                     physical_track_counts.clone_from(&tracks);
+                    // `channelsByDemand` narrows the channels only where every area above has a fixed flow too: inside an
+                    // organic, tree or radial area a container that shrinks after that area's placement left overlaps
+                    // (benchmarks/results/channels-by-demand-20261114.md, mixed-large).
+                    let narrow = options.channels_by_demand && {
+                        // The areas above this one, up to the root (`None`).
+                        let mut above = parent
+                            .and_then(|p| index.node(p))
+                            .map(|n| n.parent_id.as_deref());
+                        let mut layered = true;
+                        while let Some(area) = above {
+                            if !matches!(
+                                direction_for(graph, area),
+                                Mode::Orientation(_) | Mode::Chooser(_)
+                            ) {
+                                layered = false;
+                                break;
+                            }
+                            above = area
+                                .and_then(|a| index.node(a))
+                                .map(|n| n.parent_id.as_deref());
+                        }
+                        layered
+                    };
+                    let local = LayoutOptions {
+                        channels_by_demand: narrow,
+                        ..options.clone()
+                    };
                     realize_channel_widths(
                         &mut placed,
                         &level_list,
                         &tracks,
                         vertical,
-                        options,
+                        &local,
                         (parent.unwrap_or("<root>"), gaps),
                     )
                 }

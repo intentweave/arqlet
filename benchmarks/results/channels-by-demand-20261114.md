@@ -70,3 +70,11 @@ Reading:
   channel to what its tracks need (at least the margin on both sides and a track, as a border rank keeps).
 - Container margins (header 36, padding 12 each side, a border rank 36 per side) and the gaps within ranks are untouched:
   the next levers.
+
+Default check on every dataset (the default's own views, per-container directions kept; 32 datasets): the first version
+narrowed channels inside the layered containers of organic roots too, and mixed-large got overlaps between them (16
+`node_overlap`, 4 `overlap`) and lines through nodes, as the containers shrank after the organic placement. The option
+now narrows only where every area above has a fixed or chosen flow. Then: 15 identical (every organic, tree and mixed
+one), 2 better (org-chart, synthetic-2k: 2730 against 2792 crossings, 1655 against 1613 bends), 12 with the same quality
+and 5 to 25 % less area, 3 worse (state-order +1 crossing, workflow-dag +4 bends, layerweave-code +3 crossings and +2
+bends); in sum 58 crossings fewer, 46 bends more, 4.4 % less area.
