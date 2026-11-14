@@ -1719,7 +1719,20 @@ fn realize_channel_widths(
         // What the construction found missing in this channel (`channel_key`), on top of the tracks counted here.
         let reported = gaps.get(&channel_key(area, k)).copied().unwrap_or(0.);
         let need = tracks[k] as f64 * track + 2. * margin + reported;
-        shift += snap((need - (near - far)).max(0.), grid);
+        // Experimental (`channelsByDemand`): a channel also narrows to what its tracks need, at least the margin on both
+        // sides and a track (as a border rank keeps), instead of keeping the layer gap. The order and the places across the
+        // flow were chosen before, on the layer gap, so the lanes stay as planned.
+        // A narrowed channel with tracks keeps one track in reserve: the construction may need a lane more than the
+        // planning counted where several edges change lanes towards one node (layerweave-code: a route then doubled back).
+        // It never grows wider than without the option.
+        let widened = (need - (near - far)).max(0.);
+        let change = if options.channels_by_demand {
+            let reserve = if tracks[k] > 0 { track } else { 0. };
+            ((need + reserve).max(2. * margin + track) - (near - far)).min(widened)
+        } else {
+            widened
+        };
+        shift += snap(change, grid);
         shifts[k + 1] = shift;
     }
     for (k, ids) in level_list.iter().enumerate() {
@@ -7097,12 +7110,86 @@ fn place(
                         )
                     });
                     physical_track_counts.clone_from(&tracks);
+                    // `channelsByDemand` narrows the channels only where every area above has a fixed flow too: inside an
+                    // organic, tree or radial area a container that shrinks after that area's placement left overlaps
+                    // (benchmarks/results/channels-by-demand-20261114.md, mixed-large).
+                    let narrow = options.channels_by_demand && {
+                        // The areas above this one, up to the root (`None`).
+                        let mut above = parent
+                            .and_then(|p| index.node(p))
+                            .map(|n| n.parent_id.as_deref());
+                        let mut layered = true;
+                        while let Some(area) = above {
+                            // A fixed flow above: an area that chooses its direction compares both by its children's
+                            // extents, which narrower channels change (synthetic-2k: the choice turned).
+                            if !matches!(direction_for(graph, area), Mode::Orientation(_)) {
+                                layered = false;
+                                break;
+                            }
+                            above = area
+                                .and_then(|a| index.node(a))
+                                .map(|n| n.parent_id.as_deref());
+                        }
+                        // And the parent's flow runs along the same axis (or this is the root): a container of the other
+                        // axis that narrows changes its extent across its parent's flow, so the parent is placed anew
+                        // around it (state-order: a crossing more).
+                        let same_axis = match parent {
+                            None => true,
+                            Some(p) => {
+                                let outer = index.node(p).and_then(|n| n.parent_id.as_deref());
+                                let axis = |area: Option<&str>| match direction_for(graph, area) {
+                                    Mode::Orientation(o) => Some(o.vertical()),
+                                    _ => None,
+                                };
+                                // The parent's axis must be known: a parent that chooses its direction compares both by
+                                // the extents of its children (synthetic-2k).
+                                axis(outer).is_some() && axis(parent) == axis(outer)
+                            }
+                        };
+                        // And this area's own flow is fixed: an area that chooses its direction compares both by their
+                        // extent, and narrower channels could turn that choice (synthetic-2k).
+                        let fixed = matches!(direction_for(graph, parent), Mode::Orientation(_));
+                        layered && same_axis && fixed
+                    };
+                    let local = LayoutOptions {
+                        channels_by_demand: narrow,
+                        ..options.clone()
+                    };
+                    // A narrowed channel keeps a track for every self-loop of a node beside it: the loops are built
+                    // after the tracks are counted and run around their node through the channels on both sides.
+                    let tracks: Vec<usize> = if narrow {
+                        let loops: Vec<usize> = level_list
+                            .iter()
+                            .map(|ids| {
+                                ids.iter()
+                                    .map(|id| {
+                                        graph
+                                            .edges
+                                            .iter()
+                                            .filter(|e| {
+                                                e.source == *id
+                                                    && e.target.as_deref() == Some(id.as_str())
+                                            })
+                                            .count()
+                                    })
+                                    .max()
+                                    .unwrap_or(0)
+                            })
+                            .collect();
+                        tracks
+                            .iter()
+                            .enumerate()
+                            .map(|(k, &t)| t + loops[k].max(loops.get(k + 1).copied().unwrap_or(0)))
+                            .collect()
+                    } else {
+                        tracks.clone()
+                    };
                     realize_channel_widths(
                         &mut placed,
                         &level_list,
                         &tracks,
                         vertical,
-                        options,
+                        &local,
                         (parent.unwrap_or("<root>"), gaps),
                     )
                 }

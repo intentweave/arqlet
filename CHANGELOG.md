@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **Default:** `channelsByDemand` is on: channels between ranks are as wide as their tracks need instead of at least the
+  layer gap (in areas with a fixed flow along their parent's axis below fixed flows). Every measured dataset keeps its
+  lines through nodes, crossings and bends; the layered views take 3 to 17 % less area
+  ([measurement](benchmarks/results/channels-by-demand-20261114.md), [area breakdown](benchmarks/results/area-breakdown-20261114.md)).
+  New reference fingerprints: `benchmarks/results/fingerprints-20261114-channels-by-demand-default.jsonl`. The spacing
+  options and what they cost are measured in `docs/configuration.md` (*Spacing and area*).
 - **Default:** `nestedEdgesByDetour` is on: a repair of an organic area that cannot clear every straight line within a
   bounded budget clears the lines between its children first and those into its containers within a bounded budget of
   their own, and the detours draw what remains around the nodes in its way. 31 of 32 datasets draw as before; on an
