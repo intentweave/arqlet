@@ -145,6 +145,13 @@ regionPorts?: boolean,
  */
 regionChildPorts?: boolean,
 /**
+ * Experimental: with `straightDetours`, the geometric repair of organic areas does not move nodes to clear a straight
+ * edge whose end lies inside a container of the area; the edge's detour draws it around the nodes in its way. The
+ * repair still clears the lines between children of organic areas. Omitted when off, so the default output does not
+ * change.
+ */
+nestedEdgesByDetour?: boolean,
+/**
  * Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
  * and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
  * delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the
