@@ -1781,23 +1781,23 @@ pub struct LayoutOptions {
     /// Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub isolated_grid: bool,
-    /// Experimental (ADR 0020, S1-0 and S1-0b): a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`)
-    /// is laid out with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header
-    /// at its top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses.
-    /// Omitted when off, so the default output does not change.
-    #[serde(default, skip_serializing_if = "is_false")]
+    /// ADR 0020, S1-0 and S1-0b: a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`) is laid out
+    /// with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header at its
+    /// top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses. On by default
+    /// since engine 0.5 (S1-4, accepted by measurement); written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub single_pass_reversed: bool,
-    /// Experimental (ADR 0020, S1-1b): a straight edge that would pass through a node it does not end at is drawn around it
-    /// instead: its orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment
-    /// where nothing is in the way and bends at the blockers' corners elsewhere. Omitted when off, so the default output
-    /// does not change.
-    #[serde(default, skip_serializing_if = "is_false")]
+    /// ADR 0020, S1-1b: a straight edge that would pass through a node it does not end at is drawn around it instead: its
+    /// orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment where nothing
+    /// is in the way and bends at the blockers' corners elsewhere. On by default since engine 0.5 (S1-4); written as
+    /// `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub straight_detours: bool,
-    /// Experimental (ADR 0020, S1-2): an edge that leaves a region of another strategy (organic, tree, radial) in a layered
-    /// parent is routed by the parent to a port on the region's border, on the side its flow uses, and drawn inside the
-    /// region from that port to its node by the region's routing. Not for graphs with buses or explicit edge ports. Omitted
-    /// when off, so the default output does not change.
-    #[serde(default, skip_serializing_if = "is_false")]
+    /// ADR 0020, S1-2: an edge that leaves a region of another strategy (organic, tree, radial) in a layered parent is
+    /// routed by the parent to a port on the region's border, on the side its flow uses, and drawn inside the region from
+    /// that port to its node by the region's routing. Not for graphs with buses or explicit edge ports. On by default since
+    /// engine 0.5 (S1-4); written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub region_ports: bool,
     /// Experimental (ADR 0020, S1-3): a container with a fixed flow inside an organic or radial area gets border nodes in
     /// its own flow, as in a parent of the same axis: its edges to the outside run inside it along its ranks to its border
@@ -1812,6 +1812,12 @@ pub struct LayoutOptions {
     /// when turned off.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub channels_by_demand: bool,
+    /// Experimental: with `straightDetours`, the geometric repair of organic areas does not move nodes to clear a straight
+    /// edge whose end lies inside a container of the area; the edge's detour draws it around the nodes in its way. The
+    /// repair still clears the lines between children of organic areas. Omitted when off, so the default output does not
+    /// change.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub nested_edges_by_detour: bool,
     /// Internal (`regionChildPorts`): by container and edge (`"{container}\u{1}{edge}"`), whether the edge's border node
     /// stands at the end of the container's flow (its last rank) rather than at its start: the side that faces the edge's
     /// other end in the area's abstract placement. Derived for each layout, never written or read.
@@ -2082,11 +2088,12 @@ impl Default for LayoutOptions {
             component_packing: false,
             pack_components: None,
             isolated_grid: false,
-            single_pass_reversed: false,
-            straight_detours: false,
-            region_ports: false,
+            single_pass_reversed: true,
+            straight_detours: true,
+            region_ports: true,
             region_child_ports: false,
             channels_by_demand: true,
+            nested_edges_by_detour: false,
             region_child_sides: BTreeMap::new(),
             directions_first: false,
             force_directed: false,

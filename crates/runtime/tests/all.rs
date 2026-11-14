@@ -56,6 +56,8 @@ mod move_gesture;
 mod move_only;
 #[path = "neighbourhood.rs"]
 mod neighbourhood;
+#[path = "nested_edges_by_detour.rs"]
+mod nested_edges_by_detour;
 #[path = "objectives.rs"]
 mod objectives;
 #[path = "option_defaults.rs"]

@@ -13,6 +13,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   ([measurement](benchmarks/results/channels-by-demand-20261114.md), [area breakdown](benchmarks/results/area-breakdown-20261114.md)).
   New reference fingerprints: `benchmarks/results/fingerprints-20261114-channels-by-demand-default.jsonl`. The spacing
   options and what they cost are measured in `docs/configuration.md` (*Spacing and area*).
+- **Default (ADR 0020, S1-4):** `regionPorts`, `straightDetours` and `singlePassReversed` are on by default (written as
+  `false` when turned off). Measured on every dataset: 30 of 31 draw exactly as before (the sweep fingerprints are
+  identical to 0.4.0), mixed-large draws no line through a node (44 before) at 90 more crossings, and a graph that flows
+  right to left or bottom to top everywhere draws as the mirror of its positive flow. Time: unchanged where nothing
+  changes, 5 % on mixed-large ([quality](benchmarks/results/s1-4-defaults-20261114.md),
+  [time](benchmarks/results/s1-4-timing-20261114.md)). A layout through region ports keeps the options its layout wrote,
+  so a drawing that fell back to the earlier pipeline is refined by that pipeline.
 - **`arqlet::protocol::Response` has typed answers** (provisional) for `scene`, `trace`, `neighbourhood`, `overview`,
   `intent` and `metrics` (`Response::Scene`, `Trace`, `Neighbourhood`, `Overview`, `Intent`, `Metrics`) instead of
   `Response::Encoded`; the JSON is unchanged byte for byte. A Rust host that matched `Encoded` for these operations
@@ -24,6 +31,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `nestedEdgesByDetour` (experimental, off): the repair of an organic area leaves straight edges into its containers to their
+  detours; on an organic root over layered containers (mixed-large) the import takes 0.29 s instead of 7.6 s and the
+  refinement 2.9 s instead of 31 s, with valid geometry and a quarter of the area, at more crossings and bends
+  ([measurement](benchmarks/results/nested-edges-by-detour-20261114.md)).
 - `singlePassReversed` covers `bt` too (ADR 0020 S1-0b): every area is mirrored within its box and a container's header
   stays at its top; a bottom-to-top graph draws as its top-to-bottom mirror
   ([measurement](benchmarks/results/reversed-flows-20261114.md)).

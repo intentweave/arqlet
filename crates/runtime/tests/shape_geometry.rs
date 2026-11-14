@@ -71,7 +71,16 @@ fn a_fixed_blocker_between_fixed_ends_is_diagnosed_not_hidden() {
     )
     .unwrap();
     let pins = [("a", 0., 0.), ("b", 600., 0.), ("d", 300., 0.)];
-    let snapshot = pinned(&base, &pins);
+    // The straight segment itself: with `straightDetours` (the default) the edge is drawn around d instead, checked below.
+    let mut options = pins_json(&pins);
+    options["straightDetours"] = json!(false);
+    let snapshot = configure_snapshot(&base, base.revision, base.layout_version, &options).unwrap();
+    let detoured = pinned(&base, &pins);
+    assert!(
+        straight_through(&detoured).is_empty(),
+        "{:?}",
+        detoured.geometry_issues
+    );
     let issues = straight_through(&snapshot);
     assert_eq!(issues.len(), 1, "{:?}", snapshot.geometry_issues);
     assert!(issues[0].contains("node d"), "{issues:?}");
