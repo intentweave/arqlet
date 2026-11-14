@@ -6,17 +6,20 @@ use arqlet_runtime::import_graph_with;
 use serde_json::json;
 
 /// The pipeline before single pass became the default (ADR 0016), which these tests exercise.
+// The fingerprints in this file were recorded with channels at least the layer gap wide (`channelsByDemand` off).
 fn legacy() -> LayoutOptions {
     LayoutOptions {
         single_pass_auto: false,
         single_pass: false,
         abstract_routing: false,
+        channels_by_demand: false,
         ..LayoutOptions::default()
     }
 }
 
 fn options(on: bool) -> LayoutOptions {
     LayoutOptions {
+        channels_by_demand: false,
         layered_construction: on,
         hierarchical_ordering: false,
         ..legacy()

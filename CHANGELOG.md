@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **Default:** `channelsByDemand` is on: channels between ranks are as wide as their tracks need instead of at least the
+  layer gap (in areas with a fixed flow along their parent's axis below fixed flows). Every measured dataset keeps its
+  lines through nodes, crossings and bends; the layered views take 3 to 17 % less area
+  ([measurement](benchmarks/results/channels-by-demand-20261114.md), [area breakdown](benchmarks/results/area-breakdown-20261114.md)).
+  New reference fingerprints: `benchmarks/results/fingerprints-20261114-channels-by-demand-default.jsonl`. The spacing
+  options and what they cost are measured in `docs/configuration.md` (*Spacing and area*).
 - **`arqlet::protocol::Response` has typed answers** (provisional) for `scene`, `trace`, `neighbourhood`, `overview`,
   `intent` and `metrics` (`Response::Scene`, `Trace`, `Neighbourhood`, `Overview`, `Intent`, `Metrics`) instead of
   `Response::Encoded`; the JSON is unchanged byte for byte. A Rust host that matched `Encoded` for these operations
@@ -18,9 +24,6 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
-- `channelsByDemand` (experimental, off): channels between ranks as wide as their tracks need instead of at least the layer
-  gap; 3 to 17 % less area per layered view at unchanged crossings and bends on every dataset
-  ([measurement](benchmarks/results/channels-by-demand-20261114.md), [area breakdown](benchmarks/results/area-breakdown-20261114.md)).
 - `singlePassReversed` covers `bt` too (ADR 0020 S1-0b): every area is mirrored within its box and a container's header
   stays at its top; a bottom-to-top graph draws as its top-to-bottom mirror
   ([measurement](benchmarks/results/reversed-flows-20261114.md)).

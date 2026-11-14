@@ -145,9 +145,11 @@ regionPorts?: boolean,
  */
 regionChildPorts?: boolean,
 /**
- * Experimental (single pass): every channel between two ranks is as wide as its tracks need (at least the margin on
- * both sides and a track), narrower than the layer gap where it carries few tracks; the order and the places across
- * the flow are chosen on the layer gap as before. Omitted when off, so the default output does not change.
+ * Single pass: every channel between two ranks is as wide as its tracks need (at least the margin on both sides and a
+ * track), narrower than the layer gap where it carries few tracks; the order and the places across the flow are chosen
+ * on the layer gap as before. Only in areas with a fixed flow along their parent's axis below fixed flows. On by
+ * default since engine 0.5 (no change in crossings or bends on any measured dataset, less area); written as `false`
+ * when turned off.
  */
 channelsByDemand?: boolean,
 /**

@@ -27,8 +27,8 @@ fn channels_with_few_tracks_narrow_and_the_drawing_stays_valid() {
             *value = direction.clone();
         }
     }
-    let plain = import(&graph, json!({}));
-    let narrow = import(&graph, json!({"channelsByDemand": true}));
+    let plain = import(&graph, json!({"channelsByDemand": false}));
+    let narrow = import(&graph, json!({}));
     let (a, b) = (
         arqlet_layout::published_metrics(&plain).unwrap(),
         arqlet_layout::published_metrics(&narrow).unwrap(),
@@ -50,7 +50,9 @@ fn channels_with_few_tracks_narrow_and_the_drawing_stays_valid() {
     assert!(narrow.route_conflicts.is_empty());
     // The order across the flow is the same: every node keeps its place across the flow relative to its rank neighbours.
     assert_eq!(plain.routes.len(), narrow.routes.len());
-    assert!(!serde_json::to_string(&plain.options)
+    // On by default, written only when turned off.
+    assert!(narrow.options.channels_by_demand);
+    assert!(!serde_json::to_string(&narrow.options)
         .unwrap()
         .contains("channelsByDemand"));
 }

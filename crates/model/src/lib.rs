@@ -1805,10 +1805,12 @@ pub struct LayoutOptions {
     /// not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub region_child_ports: bool,
-    /// Experimental (single pass): every channel between two ranks is as wide as its tracks need (at least the margin on
-    /// both sides and a track), narrower than the layer gap where it carries few tracks; the order and the places across
-    /// the flow are chosen on the layer gap as before. Omitted when off, so the default output does not change.
-    #[serde(default, skip_serializing_if = "is_false")]
+    /// Single pass: every channel between two ranks is as wide as its tracks need (at least the margin on both sides and a
+    /// track), narrower than the layer gap where it carries few tracks; the order and the places across the flow are chosen
+    /// on the layer gap as before. Only in areas with a fixed flow along their parent's axis below fixed flows. On by
+    /// default since engine 0.5 (no change in crossings or bends on any measured dataset, less area); written as `false`
+    /// when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub channels_by_demand: bool,
     /// Internal (`regionChildPorts`): by container and edge (`"{container}\u{1}{edge}"`), whether the edge's border node
     /// stands at the end of the container's flow (its last rank) rather than at its start: the side that faces the edge's
@@ -2084,7 +2086,7 @@ impl Default for LayoutOptions {
             straight_detours: false,
             region_ports: false,
             region_child_ports: false,
-            channels_by_demand: false,
+            channels_by_demand: true,
             region_child_sides: BTreeMap::new(),
             directions_first: false,
             force_directed: false,
