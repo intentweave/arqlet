@@ -35,6 +35,10 @@ pub fn resolve_with(
     PortContext::new(graph).resolve_with(boxes, placement, min_spacing, node_rows, row_order)
 }
 
+/// Experimental (`organicForces`): how far beyond a node's corner its loops reach, for the first loop and for each loop.
+const LOOP_REACH: f64 = 24.;
+const LOOP_STEP: f64 = 8.;
+
 /// Immutable lookup tables shared by every port resolution for one graph.
 #[derive(Clone)]
 pub(crate) struct PortContext<'g> {
@@ -59,6 +63,8 @@ pub(crate) struct PortContext<'g> {
     /// Experimental (plan section 4a, `layeredConstruction`): an automatic port of an edge that runs forward through areas
     /// of one fixed flow sits on the side the flow leaves (source) or enters (target). Off by default.
     flow_sides: bool,
+    /// Experimental (`organicForces`): the loops of a node take a corner where no other box lies in their way.
+    loop_space: bool,
     /// Experimental (plan section 4a, step 3): order keys of automatic ports by (edge, source end), from the layered plan
     /// (`layered_plan::port_keys`). A node side whose ports all have a key is ordered by them instead of by the geometry.
     order_keys: BTreeMap<(String, bool), f64>,
@@ -169,6 +175,7 @@ impl<'g> PortContext<'g> {
             loop_indices,
             loop_counts,
             flow_sides: false,
+            loop_space: false,
             order_keys: BTreeMap::new(),
             end_sides: BTreeMap::new(),
             lanes: BTreeMap::new(),
@@ -190,6 +197,12 @@ impl<'g> PortContext<'g> {
     /// The context with the order keys of the layered plan (see `order_keys`).
     pub(crate) fn with_order_keys(mut self, keys: BTreeMap<(String, bool), f64>) -> Self {
         self.order_keys = keys;
+        self
+    }
+
+    /// The context with the loops' corner chosen by free space first (see `loop_space`).
+    pub(crate) fn with_loop_space(mut self, on: bool) -> Self {
+        self.loop_space = on;
         self
     }
 
@@ -361,11 +374,54 @@ impl<'g> PortContext<'g> {
                     load.get(&(node, a as u8)).copied().unwrap_or(0)
                         + load.get(&(node, b as u8)).copied().unwrap_or(0)
                 };
+                // Experimental (`organicForces`): the boxes in the way of the loops at a corner, other than the node's own
+                // ancestors and descendants. The loops are drawn at the end and do not take part in the placement; a corner
+                // that a neighbour blocks makes the router take them around it, with bends.
+                let blocked = |(a, b): (PortSide, PortSide)| -> usize {
+                    if !self.loop_space {
+                        return 0;
+                    }
+                    let reach = LOOP_REACH + LOOP_STEP * self.loop_counts[node] as f64;
+                    let (cx, cy) = (r.x + r.width / 2., r.y + r.height / 2.);
+                    let right = matches!(a, PortSide::Right) || matches!(b, PortSide::Right);
+                    let bottom = matches!(a, PortSide::Bottom) || matches!(b, PortSide::Bottom);
+                    let (x0, x1) = if right {
+                        (cx, r.x + r.width + reach)
+                    } else {
+                        (r.x - reach, cx)
+                    };
+                    let (y0, y1) = if bottom {
+                        (cy, r.y + r.height + reach)
+                    } else {
+                        (r.y - reach, cy)
+                    };
+                    let related = |other: &str| {
+                        let up = |from: &str, to: &str| {
+                            let mut at = parents.get(from).copied().flatten();
+                            while let Some(p) = at {
+                                if p == to {
+                                    return true;
+                                }
+                                at = parents.get(p).copied().flatten();
+                            }
+                            false
+                        };
+                        other == node || up(node, other) || up(other, node)
+                    };
+                    self.node_ids
+                        .iter()
+                        .filter(|other| !related(other))
+                        .filter(|other| {
+                            let o = rect_for(other);
+                            o.x < x1 && o.x + o.width > x0 && o.y < y1 && o.y + o.height > y0
+                        })
+                        .count()
+                };
                 let best = CORNERS
                     .iter()
                     .copied()
                     .enumerate()
-                    .min_by_key(|&(i, corner)| (count(corner), corner != usual, i))
+                    .min_by_key(|&(i, corner)| (blocked(corner), count(corner), corner != usual, i))
                     .map(|(_, corner)| corner)
                     .unwrap_or(usual);
                 loop_corner.insert(node, best);

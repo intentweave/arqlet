@@ -296,16 +296,22 @@ const PULL_STEPS: [f64; 4] = [64., 32., 16., 8.];
 /// placement). The repair takes the move that resolves the most conflicts, however far it goes, and keeps a node there once
 /// the drawing is free of conflicts; the drawing then is larger than it needs to be. Each node, farthest moved first, takes
 /// the nearest fraction of the way back that leaves the drawing free of conflicts; the rounds repeat while a node moves.
-/// A drawing with conflicts left, or with containers, is returned unchanged.
+/// A drawing with conflicts left, or whose movable nodes lie in containers, is returned unchanged.
 fn pull_back(
     search: &Search,
     geometry: &dyn Geometry,
     start: &[(f64, f64)],
     settled: Settled,
 ) -> Settled {
-    // Only a flat drawing: in a nested one the moves change routed edges and the containers' sizes, which this check does
-    // not see (on mixed-large it added crossings and geometry issues).
-    if !settled.conflicts.is_empty() || search.groups.iter().any(Option::is_some) {
+    // Only where the movable nodes lie in the root: the children of a nested organic area change their container's routed
+    // edges and size, which this check does not see (on mixed-large it added crossings and geometry issues). A container
+    // in the root moves as a whole.
+    let nested = search
+        .groups
+        .iter()
+        .zip(search.movable)
+        .any(|(group, &movable)| movable && group.is_some());
+    if !settled.conflicts.is_empty() || nested {
         return settled;
     }
     let mut centres = settled.centres;

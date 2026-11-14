@@ -59,6 +59,13 @@ fn forces_draw_the_organic_examples_smaller() {
 }
 
 #[test]
+fn forces_take_the_ends_inside_containers_and_room_for_loops() {
+    // self-loops: an edge into a container pulls toward the node it ends at inside (not the container's centre), and the
+    // loops take a corner where no neighbour lies; 255k to 245k with the same bends (measured 2026-11-14).
+    check("self-loops", json!({"organicForces": true}), 1.0);
+}
+
+#[test]
 fn the_compaction_pulls_back_what_the_repair_pushed_out() {
     // petri-net-shapes: 1614k to 1247k (measured 2026-11-14).
     check("petri-net-shapes", json!({"repairCompaction": true}), 0.85);

@@ -2685,6 +2685,7 @@ pub fn layered_construction(
     let plans = layered_plans(graph, options);
     let resolved = ports::PortContext::new(graph)
         .with_flow_sides(options.layered_construction)
+        .with_loop_space(options.organic_forces)
         .with_order_keys(layered_plan::port_keys(&plans, graph))
         .with_end_sides(layered_plan::end_sides(&plans, graph, options.single_pass))
         .resolve_with(
@@ -4034,7 +4035,9 @@ fn compute_once(
     }
     validate(graph)?;
     let index = GraphIndex::new(graph);
-    let port_context = ports::PortContext::new(graph).with_flow_sides(options.layered_construction);
+    let port_context = ports::PortContext::new(graph)
+        .with_flow_sides(options.layered_construction)
+        .with_loop_space(options.organic_forces);
     for label in options
         .edge_labels
         .values()
@@ -5385,6 +5388,80 @@ fn owner_among(
 /// The links between an area's children and their ranks (the cycle break, and network simplex when chosen). The ranks depend
 /// only on the area's own children, so the links a cycle break reverses are known before any area is placed.
 #[allow(clippy::type_complexity)]
+/// Experimental (`organicForces`): for every link between two of `ids` (siblings), the mean offset of its edges' ends from
+/// each sibling's centre. An end that is the sibling itself lies at its centre; one inside it at the descendant's centre,
+/// from the boxes of the descendants (relative to their parents, laid out before the siblings are arranged) and the
+/// siblings' sizes.
+fn organic_anchors<'g>(
+    graph: &'g Graph,
+    ids: &'g [String],
+    sizes: &BTreeMap<String, (f64, f64)>,
+    boxes: &BTreeMap<String, Rect>,
+) -> organic::Anchors {
+    let parent: BTreeMap<&str, Option<&str>> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let siblings: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
+    // The sibling that holds `id` and the offset of `id`'s centre from that sibling's centre.
+    let end = |id: &'g str| -> Option<(&'g str, (f64, f64))> {
+        if siblings.contains(id) {
+            return Some((id, (0., 0.)));
+        }
+        let own = boxes.get(id)?;
+        let (mut x, mut y) = (own.width / 2., own.height / 2.);
+        let mut at = id;
+        while !siblings.contains(at) {
+            let r = boxes.get(at)?;
+            x += r.x;
+            y += r.y;
+            at = (*parent.get(at)?)?;
+        }
+        // The siblings themselves are not placed yet: their sizes are known.
+        let (w, h) = sizes.get(at)?;
+        Some((at, (x - w / 2., y - h / 2.)))
+    };
+    let mut sums: BTreeMap<(String, String), ((f64, f64), (f64, f64), f64)> = BTreeMap::new();
+    for edge in &graph.edges {
+        let Some(target) = edge.target.as_deref() else {
+            continue;
+        };
+        let (Some((a, oa)), Some((b, ob))) = (end(&edge.source), end(target)) else {
+            continue;
+        };
+        if a == b {
+            continue;
+        }
+        let entry = sums
+            .entry((a.to_string(), b.to_string()))
+            .or_insert(((0., 0.), (0., 0.), 0.));
+        entry.0 = (entry.0 .0 + oa.0, entry.0 .1 + oa.1);
+        entry.1 = (entry.1 .0 + ob.0, entry.1 .1 + ob.1);
+        entry.2 += 1.;
+    }
+    let ends = sums
+        .into_iter()
+        .map(|(link, (sa, sb, n))| (link, ((sa.0 / n, sa.1 / n), (sb.0 / n, sb.1 / n))))
+        .collect();
+    // Every descendant's box, by the sibling that holds it, as an offset of its centre and its half extent.
+    let mut inside: BTreeMap<String, Vec<((f64, f64), (f64, f64))>> = BTreeMap::new();
+    for node in &graph.nodes {
+        if siblings.contains(node.id.as_str()) {
+            continue;
+        }
+        if let Some((sibling, offset)) = end(&node.id) {
+            if let Some(r) = boxes.get(&node.id) {
+                inside
+                    .entry(sibling.to_string())
+                    .or_default()
+                    .push((offset, (r.width / 2., r.height / 2.)));
+            }
+        }
+    }
+    organic::Anchors { ends, inside }
+}
+
 fn area_ranks(
     children: &[&Node],
     index: &GraphIndex<'_>,
@@ -7426,6 +7503,11 @@ fn place(
                     }
                 }
             }
+            // Experimental (`organicForces`): where the edges of each link end, relative to the children's centres. The
+            // children are placed already, so the boxes of their descendants are known.
+            let anchors = options
+                .organic_forces
+                .then(|| organic_anchors(graph, &ids, &sizes, boxes));
             organic::organic_arrange_counted(
                 &ids,
                 &link_set,
@@ -7442,7 +7524,7 @@ fn place(
                 options.sparse_stress,
                 options.size_aware_stress,
                 options.scalable_stress,
-                options.organic_forces,
+                anchors.as_ref(),
                 counters,
             )
         }
@@ -7828,6 +7910,7 @@ pub fn seed_drawing(
 ) -> (Vec<Route>, Vec<arqlet_model::ResolvedPort>) {
     let ports = ports::PortContext::new(graph)
         .with_flow_sides(options.layered_construction)
+        .with_loop_space(options.organic_forces)
         .resolve_with(
             boxes,
             options.port_placement,
@@ -8486,7 +8569,8 @@ fn reroute_with(
 ) -> Result<Snapshot, arqlet_routing::channel::Stopped> {
     let mut result = snapshot.clone();
     let port_context = ports::PortContext::new(&snapshot.graph)
-        .with_flow_sides(snapshot.options.layered_construction);
+        .with_flow_sides(snapshot.options.layered_construction)
+        .with_loop_space(snapshot.options.organic_forces);
     let straight: BTreeSet<String> = snapshot.straight_edges.iter().cloned().collect();
     if !straight.is_empty()
         && snapshot
@@ -8684,6 +8768,7 @@ fn finish_routes(snapshot: &mut Snapshot, bundle: bool) {
     // on the flow sides, so the published ports are the ones the routes start and end at.
     let mut resolved = ports::PortContext::new(&snapshot.graph)
         .with_flow_sides(snapshot.options.layered_construction)
+        .with_loop_space(snapshot.options.organic_forces)
         .resolve_with(
             &snapshot.boxes,
             snapshot.options.port_placement,
@@ -8785,8 +8870,9 @@ pub fn search_placement_counted(
     }
 
     let graph = &snapshot.graph;
-    let port_context =
-        ports::PortContext::new(graph).with_flow_sides(snapshot.options.layered_construction);
+    let port_context = ports::PortContext::new(graph)
+        .with_flow_sides(snapshot.options.layered_construction)
+        .with_loop_space(snapshot.options.organic_forces);
     let parents: BTreeMap<&str, Option<&str>> = graph
         .nodes
         .iter()
