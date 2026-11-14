@@ -101,7 +101,7 @@ Status: all three modes are implemented in the demo and tested (`ui-regression.m
 
 ## Layout options
 
-- Options live in `LayoutOptions` (crates/model) and travel with the snapshot. Defaults must be omitted from serialized output, so the default results stay byte-identical; check the stored refinement fingerprints (`benchmarks/results/fingerprints-20261114-channels-by-demand-default.jsonl` for the default: 15 views at threads 1 and 4, layerweave-code at 968/1825; `fingerprints-20261108-single-pass-default.jsonl` for `channelsByDemand: false`; `fingerprints-20261021T103351Z.jsonl` for `singlePassAuto: false`) after any change.
+- Options live in `LayoutOptions` (crates/model) and travel with the snapshot. Defaults must be omitted from serialized output, so the default results stay byte-identical; check the stored refinement fingerprints (`benchmarks/results/fingerprints-20261114-channels-by-demand-default.jsonl` for the default: 15 views at threads 1 and 4, engine 0.5.0, layerweave-code at 968/1826; `fingerprints-20261108-single-pass-default.jsonl` for `channelsByDemand: false`; `fingerprints-20261021T103351Z.jsonl` for `singlePassAuto: false`) after any change.
 - Choosing the default strategy is an open decision. Use `benchmarks/eval/grid.mjs` and `docs/configuration.md` for the measurements; do not change the default on intuition.
 
 ## Conventions
