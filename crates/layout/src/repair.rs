@@ -2867,7 +2867,10 @@ mod root_tests {
             &[("a", "rect"), ("b", "rect"), ("d", "rect")],
             &[("a", "b"), ("d", "a")],
         );
-        let snapshot = compute(&graph, None, &BTreeSet::new(), &options(&pins)).unwrap();
+        // The straight segment itself (no detour around d, which `straightDetours` would draw).
+        let mut opts = options(&pins);
+        opts.straight_detours = false;
+        let snapshot = compute(&graph, None, &BTreeSet::new(), &opts).unwrap();
         // The diagnostics of the routes and the findings about the segment agree: both name the blocked edge.
         assert!(
             snapshot

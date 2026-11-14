@@ -96,8 +96,8 @@ fn a_reversed_drawing_is_the_mirror_of_the_positive_one_and_flows_backwards() {
         let toggled = call(json!({"op": "toggle", "snapshot": s, "nodeId": "c0",
             "expectedRevision": s["revision"], "expectedLayoutVersion": s["layoutVersion"]}));
         assert_eq!(toggled["ok"], true, "{toggled}");
-        // Without the option: as before, without single pass.
-        let off = import(&chains(reversed), json!({}));
+        // Turned off: as before, without single pass.
+        let off = import(&chains(reversed), json!({"singlePassReversed": false}));
         assert!(off
             .layout_diagnostics
             .iter()

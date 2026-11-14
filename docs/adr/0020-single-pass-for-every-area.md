@@ -1,7 +1,9 @@
 # ADR 0020: Single pass for every area: reversed flows, and regions of other strategies with border ports
 
 Date: 2026-11-13.
-Status: proposed. Steps S1-0 to S1-4 below, each behind an option and measured before the next.
+Status: accepted (2026-11-14, S1-4): `regionPorts`, `straightDetours` and `singlePassReversed` are on by default;
+`singlePassMixed` and `regionChildPorts` stay options. Steps S1-0 to S1-4 below, each behind an option and measured before
+the next.
 
 ## Context
 
@@ -98,8 +100,10 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   of 31 datasets geometrically identical and removes all 44 lines through nodes on mixed-large (crossings 811 against
   721); with `singlePassMixed` 4 remain, with `regionChildPorts` 2 at many more crossings. Time
   ([results](../../benchmarks/results/s1-4-timing-20261114.md)): the three options cost nothing where they change
-  nothing and 5 % on mixed-large; directionsFirst 2.5 times on synthetic-2k. Proposed: the three options as the default;
-  `singlePassMixed` and `regionChildPorts` stay options; directionsFirst stays an option until it combines with them.
+  nothing and 5 % on mixed-large; directionsFirst 2.5 times on synthetic-2k. Decided (2026-11-14): the three options are
+  the default (the fingerprints of the sweep views stay identical to 0.4.0); `singlePassMixed` and `regionChildPorts`
+  stay options; directionsFirst stays an option until it combines with them. The automatic choice of a routing style
+  (`auto`) compares the straight segment without its detour, as before.
 
 ## Consequences
 

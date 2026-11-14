@@ -357,8 +357,9 @@ pub fn compute_counted(
                 compute_counted(&split, earlier.as_ref(), dirty, &inner)?;
             let placed = region_ports::with_ports(&split, &moved, &first);
             let (mut second, stages) = compute_counted(&placed, earlier.as_ref(), dirty, &inner)?;
+            // Each keeps the options its layout wrote (a layout that fell back to the other pipeline says so), so a later
+            // edit or refinement goes on with the pipeline that drew it.
             for snapshot in [&mut first, &mut second] {
-                snapshot.options = options.clone();
                 region_ports::join(snapshot, graph, &moved);
             }
             return Ok(if published_key(&first)? < published_key(&second)? {
@@ -402,7 +403,8 @@ pub fn compute_counted(
             };
             let (mut snapshot, stages) =
                 compute_counted_inner(graph, previous, dirty, &with_sides)?;
-            snapshot.options = options.clone();
+            // The options the layout wrote, without the sides it was given (internal, derived for each layout).
+            snapshot.options.region_child_sides.clear();
             region_ports::child_legs(&mut snapshot);
             apply_aggregate_weights(&mut snapshot);
             return Ok((snapshot, stages));

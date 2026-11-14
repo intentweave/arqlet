@@ -117,24 +117,24 @@ packComponents?: PackComponents,
  */
 isolatedGrid?: boolean,
 /**
- * Experimental (ADR 0020, S1-0 and S1-0b): a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`)
- * is laid out with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header
- * at its top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses.
- * Omitted when off, so the default output does not change.
+ * ADR 0020, S1-0 and S1-0b: a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`) is laid out
+ * with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header at its
+ * top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses. On by default
+ * since engine 0.5 (S1-4, accepted by measurement); written as `false` when turned off.
  */
 singlePassReversed?: boolean,
 /**
- * Experimental (ADR 0020, S1-1b): a straight edge that would pass through a node it does not end at is drawn around it
- * instead: its orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment
- * where nothing is in the way and bends at the blockers' corners elsewhere. Omitted when off, so the default output
- * does not change.
+ * ADR 0020, S1-1b: a straight edge that would pass through a node it does not end at is drawn around it instead: its
+ * orthogonal route pulled taut around every node it does not end at or lie in, so it stays one segment where nothing
+ * is in the way and bends at the blockers' corners elsewhere. On by default since engine 0.5 (S1-4); written as
+ * `false` when turned off.
  */
 straightDetours?: boolean,
 /**
- * Experimental (ADR 0020, S1-2): an edge that leaves a region of another strategy (organic, tree, radial) in a layered
- * parent is routed by the parent to a port on the region's border, on the side its flow uses, and drawn inside the
- * region from that port to its node by the region's routing. Not for graphs with buses or explicit edge ports. Omitted
- * when off, so the default output does not change.
+ * ADR 0020, S1-2: an edge that leaves a region of another strategy (organic, tree, radial) in a layered parent is
+ * routed by the parent to a port on the region's border, on the side its flow uses, and drawn inside the region from
+ * that port to its node by the region's routing. Not for graphs with buses or explicit edge ports. On by default since
+ * engine 0.5 (S1-4); written as `false` when turned off.
  */
 regionPorts?: boolean,
 /**

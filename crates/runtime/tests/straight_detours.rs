@@ -28,8 +28,8 @@ fn straight_through(s: &Snapshot) -> usize {
 
 #[test]
 fn straight_edges_of_an_organic_root_go_around_the_nodes_in_their_way() {
-    let plain = import(json!({}));
-    let detours = import(json!({"straightDetours": true}));
+    let plain = import(json!({"straightDetours": false}));
+    let detours = import(json!({}));
     // Without the option: straight edges through nodes, reported.
     let before = arqlet_layout::published_metrics(&plain).unwrap();
     assert!(before.line_node_hits > 0 && straight_through(&plain) > 0);
@@ -77,8 +77,9 @@ fn straight_edges_of_an_organic_root_go_around_the_nodes_in_their_way() {
         straight_segments > 0,
         "edges with a free line stay straight"
     );
+    // On by default, written only when turned off.
     assert!(detours.options.straight_detours);
-    assert!(!serde_json::to_string(&plain.options)
+    assert!(!serde_json::to_string(&detours.options)
         .unwrap()
         .contains("straightDetours"));
 }

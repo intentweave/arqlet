@@ -68,6 +68,9 @@ fn candidates(
 /// A drawing that cannot be keyed ranks after every keyed one.
 fn score(snapshot: &Snapshot, straight: &BTreeSet<String>) -> (bool, Vec<i64>) {
     let mut trial = snapshot.clone();
+    // The choice compares the straight segment itself with the orthogonal route: a detour (`straightDetours`) is drawn for
+    // edges that are straight, it does not make a blocked segment win the choice.
+    trial.options.straight_detours = false;
     let routed = apply_straight_edges(&mut trial, straight).and_then(|()| {
         route_orthogonal_around(
             &mut trial,
