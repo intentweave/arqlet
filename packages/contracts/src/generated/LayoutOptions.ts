@@ -145,10 +145,11 @@ regionPorts?: boolean,
  */
 regionChildPorts?: boolean,
 /**
- * Experimental: with `straightDetours`, the geometric repair of organic areas does not move nodes to clear a straight
- * edge whose end lies inside a container of the area; the edge's detour draws it around the nodes in its way. The
- * repair still clears the lines between children of organic areas. Omitted when off, so the default output does not
- * change.
+ * With `straightDetours`, the geometric repair of an organic area that cannot clear every straight line within a
+ * bounded budget clears the lines between children of organic areas first and those into its containers within a
+ * bounded budget of their own; their detours draw what remains around the nodes in its way. A repair that finishes
+ * within the bounded budget is as without the option. On by default since engine 0.5; written as `false` when
+ * turned off.
  */
 nestedEdgesByDetour?: boolean,
 /**

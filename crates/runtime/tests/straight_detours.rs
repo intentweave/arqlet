@@ -28,8 +28,9 @@ fn straight_through(s: &Snapshot) -> usize {
 
 #[test]
 fn straight_edges_of_an_organic_root_go_around_the_nodes_in_their_way() {
-    let plain = import(json!({"straightDetours": false}));
-    let detours = import(json!({}));
+    let plain = import(json!({"straightDetours": false, "nestedEdgesByDetour": false}));
+    // The detours alone (the repair as without `nestedEdgesByDetour`): the placement does not change.
+    let detours = import(json!({"nestedEdgesByDetour": false}));
     // Without the option: straight edges through nodes, reported.
     let before = arqlet_layout::published_metrics(&plain).unwrap();
     assert!(before.line_node_hits > 0 && straight_through(&plain) > 0);

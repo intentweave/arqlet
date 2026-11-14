@@ -33,7 +33,10 @@ fn nested_lines_are_left_to_their_detours_and_flat_areas_keep_their_repair() {
         flat,
         json!({"nestedEdgesByDetour": true, "straightDetours": true}),
     );
-    let off = import(flat, json!({"straightDetours": true}));
+    let off = import(
+        flat,
+        json!({"straightDetours": true, "nestedEdgesByDetour": false}),
+    );
     assert_eq!(
         serde_json::to_value(&on.boxes).unwrap(),
         serde_json::to_value(&off.boxes).unwrap()
@@ -42,8 +45,11 @@ fn nested_lines_are_left_to_their_detours_and_flat_areas_keep_their_repair() {
         serde_json::to_value(&on.routes).unwrap(),
         serde_json::to_value(&off.routes).unwrap()
     );
-    // Off by default and not written.
-    assert!(!serde_json::to_string(&off.options)
+    // On by default and not written; written when turned off.
+    assert!(!serde_json::to_string(&on.options)
+        .unwrap()
+        .contains("nestedEdgesByDetour"));
+    assert!(serde_json::to_string(&off.options)
         .unwrap()
         .contains("nestedEdgesByDetour"));
 }
