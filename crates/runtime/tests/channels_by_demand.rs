@@ -16,10 +16,17 @@ fn import(graph: &Value, options: Value) -> Snapshot {
 
 #[test]
 fn channels_with_few_tracks_narrow_and_the_drawing_stays_valid() {
-    let graph: Value = serde_json::from_str(include_str!(
+    // Every area in the root's direction: the option narrows areas with a fixed flow along their parent's axis.
+    let mut graph: Value = serde_json::from_str(include_str!(
         "../../../benchmarks/datasets/arqlet-pipeline.json"
     ))
     .unwrap();
+    let direction = graph["defaultDirection"].clone();
+    if let Some(map) = graph["containerDirections"].as_object_mut() {
+        for value in map.values_mut() {
+            *value = direction.clone();
+        }
+    }
     let plain = import(&graph, json!({}));
     let narrow = import(&graph, json!({"channelsByDemand": true}));
     let (a, b) = (
@@ -33,8 +40,9 @@ fn channels_with_few_tracks_narrow_and_the_drawing_stays_valid() {
         a.area
     );
     assert_eq!(b.line_node_hits, 0);
-    assert!(
-        b.crossings <= a.crossings && b.bends <= a.bends,
+    assert_eq!(
+        (b.crossings, b.bends),
+        (a.crossings, a.bends),
         "{b:?} against {a:?}"
     );
     let issues = arqlet_scene::validate_geometry(&narrow.graph, &narrow.boxes, Default::default());
