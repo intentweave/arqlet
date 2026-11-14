@@ -38,7 +38,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - Playground: **Live** (organic areas keep settling, animated): turns on force-directed behaviour and follows every change
   with bounded `settle` calls, one animated frame each, until the engine reports convergence (at most 60 calls). Each
   call goes through `execute()`, so it runs in the split, browser-only and backend-only modes, and a stale answer is
-  discarded as for any edit. Each frame is a preview; the converged one is repaired.
+  discarded as for any edit. Each frame is a preview; the converged one is repaired. An import in live mode animates
+  from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
+  equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
 - `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
 
 ## 0.5.0 — 2026-11-14

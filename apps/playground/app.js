@@ -458,6 +458,13 @@ async function live(){
  living=true;
  try{await settle(LIVE_CALLS);}finally{living=false;}
 }
+// An import in live mode came without the forces (see loadInitial): turning them on starts the animation from the stress.
+// The configure edit is followed by the settling like any change in live mode.
+function liveFromScratch(){
+ if(!$('live').checked||snapshot?.options?.organicForces!==false)return false;
+ setTimeout(()=>setOption({organicForces:true},'organicForces'),0);
+ return true;
+}
 async function settle(calls=3){
  if($('live').checked)calls=Math.max(calls,LIVE_CALLS);
  for(let call=0;call<calls;call++){
@@ -713,6 +720,9 @@ async function loadInitial(){
  const projected=erProjection(plain);
  const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),...(packed?{packComponents:{}}:{}),...(communities>0&&Number($('hub-links').value)>0?{communityHubs:{minLinks:Math.round(Number($('hub-links').value))}}:{}),
   ...(domainGroups&&groups?{groups}:{}),...(collapseFirst!==''?{levelOfDetail:{depth:Number(collapseFirst)}}:{})};
+ // Live mode animates from scratch: the import keeps the stress placement (no forces) and turns force-directed behaviour
+ // on; reset() then switches the forces on, and the settling animates the drawing from the stress into their equilibrium.
+ if($('live').checked)Object.assign(extra,{organicForces:false,forceDirected:true});
  const importOptions=Object.keys(extra).length?{...(projected.options??{}),...extra}:projected.options;
  const limit=example==='default'&&!(budget>0)&&!abstracted?VIEW_LIMIT:EXAMPLE_LIMIT;
  const data=await execute('import',{op:'import',graph:projected.graph,limit,...(importOptions?{options:importOptions}:{})});
@@ -768,7 +778,7 @@ async function reset(){
  history.clear();
  tracker?.end('modelchange');
  const token=++loadToken;epoch++;cancelRefinement();curation=null;pending=null;selected=null;treeSignature=null;userSizes.clear();geometry.clear();selection.clear();$('add').disabled=true;
- try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);scheduleRefinement();}
+ try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);if(liveFromScratch())return;scheduleRefinement();}
  catch(e){if(token===loadToken)status(e.message);}
 }
 $('reset').onclick=reset;
