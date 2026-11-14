@@ -18,6 +18,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- ELK adapter: `elk.layered.considerModelOrder.strategy` (other than `NONE`) makes ties follow the input order instead
+  of the node ids (provisional), as ELK follows its model order; renaming nodes no longer changes the drawing. The
+  answer carries the given ids. Off by default; without it the output is unchanged.
+- `patch` (provisional): changes the graph of a view without a new import — `{nodes, edges, removeNodes, removeEdges}`,
+  removals first, a removed node with what it holds and its edges. The view keeps its collapsed containers, filter and
+  options; an abstracting view is laid out from scratch as a toggle lays it out (the same drawing as a fresh import of
+  the changed graph with that view), other views from their earlier positions. A host can start with aggregated edges
+  between collapsed containers and load a container's member edges when it is opened. `session.patch(patch)`; contract
+  type `GraphPatch`.
 - Trace in the cluster overview (provisional): `overviewTrace` and `overviewNeighbourhood` find paths and neighbourhoods
   on the overview's graph (the one an overview session keeps, or the request's), answered as `GraphTrace` /
   `GraphNeighbourhood`; `createOverviewSession` gets `trace` and `neighbourhood`. `@arqlet/viewer`: `pathOf` maps an

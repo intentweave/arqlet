@@ -2650,6 +2650,35 @@ pub struct Overview {
     pub stats: OverviewStats,
 }
 
+/// Provisional: a change of the source graph of a view (`patch`): nodes and edges to add, and nodes (each with what it
+/// holds and its edges) and edges to remove. Removals apply first.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct GraphPatch {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<Node>>"))]
+    pub nodes: Vec<Node>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<Edge>>"))]
+    pub edges: Vec<Edge>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub remove_nodes: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub remove_edges: Vec<String>,
+}
+
+impl GraphPatch {
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+            && self.edges.is_empty()
+            && self.remove_nodes.is_empty()
+            && self.remove_edges.is_empty()
+    }
+}
+
 /// Provisional: what of some source-graph nodes and edges the current view shows (`trace`, `neighbourhood`): the visible
 /// boxes that hold the nodes, and the routes that carry the edges.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

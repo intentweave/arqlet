@@ -21,6 +21,7 @@ export * from './GeometryIssue';
 export * from './Gesture';
 export * from './Graph';
 export * from './GraphNeighbourhood';
+export * from './GraphPatch';
 export * from './GraphTrace';
 export * from './Hidden';
 export * from './HybridCriterion';

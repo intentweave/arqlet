@@ -330,3 +330,23 @@ test('an overview session traces on its graph, resident or sending it', {skip: !
   }
   assert.deepEqual(answers[0], answers[1]);
 });
+
+test('a session patches the graph without a new import and keeps its view', {skip: !engine}, async () => {
+  const g = {nodes: [{id: 'p', kind: 'package', label: 'p'}, {id: 'q', kind: 'package', label: 'q'},
+    ...['a', 'b'].map(id => ({id, kind: 'file', label: id, parentId: 'p'})), {id: 'c', kind: 'file', label: 'c', parentId: 'q'}],
+  edges: [{id: 'pq', kind: 'calls', source: 'p', target: 'q', weight: 2}]};
+  const states = [];
+  for (const resident of [true, false]) {
+    const session = createSession(engine, {resident});
+    await session.import(g, {options: {levelOfDetail: {depth: 0}}});
+    await session.expand('p');
+    const r = await session.patch({edges: [{id: 'ac', kind: 'calls', source: 'a', target: 'c'}], removeEdges: ['pq']});
+    assert.equal(r.ok, true, r.error);
+    assert.equal(session.isCollapsed('q'), true, 'q stays collapsed');
+    assert.ok((await session.scene()).routes.some(x => x.id === 'ac'));
+    assert.equal((await session.patch({removeEdges: ['nowhere']})).ok, false);
+    states.push(session.snapshot.collapsedIds);
+    await session.close();
+  }
+  assert.deepEqual(states[0], states[1]);
+});

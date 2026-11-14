@@ -22,7 +22,10 @@
 //!   on any node with children;
 //! - on the root, the spacings `spacing.nodeNode` (`nodeSpacing`), `spacing.nodeNodeBetweenLayers` (`layerSpacing`),
 //!   `spacing.edgeEdge` and `spacing.edgeEdgeBetweenLayers` (the smaller as `trackSpacing`) and `spacing.portPort`
-//!   (`minPortSpacing`). Arqlet keeps its own label room and channel widths on top of them.
+//!   (`minPortSpacing`). Arqlet keeps its own label room and channel widths on top of them;
+//! - on the root, `layered.considerModelOrder.strategy` other than `NONE` (provisional): ties follow the input order
+//!   instead of the ids (`in_model_order` renames nodes, ports and edges in input order before the layout and
+//!   `restore_ids` gives the answer its ids back), so the drawing no longer changes when nodes are renamed.
 //!
 //! Written back: `x`, `y`, `width`, `height` of every node relative to its parent, of every port relative to its node, of every
 //! label relative to its owner; the root's size; and every edge's `sections` (`startPoint`, `endPoint`, `bendPoints`,
@@ -271,6 +274,8 @@ fn area_options(
                     ));
                 }
             },
+            // Read before the translation (`wants_model_order`).
+            "layered.considerModelOrder.strategy" | "considerModelOrder.strategy" => {}
             // Read where they apply (ports), or the defaults of Arqlet already are their meaning.
             "port.side"
             | "port.index"
@@ -1149,5 +1154,99 @@ mod tests {
             .diagnostics
             .iter()
             .any(|d| d.contains("separateConnectedComponents")));
+    }
+}
+
+/// Provisional: whether the graph asks for the input order to decide ties (`layered.considerModelOrder.strategy` other
+/// than `NONE` on the root), as ELK follows its model order. Arqlet breaks ties by id; `in_model_order` makes its ids
+/// follow the input order for such a graph.
+pub fn wants_model_order(elk: &Value) -> bool {
+    options_of(elk).iter().any(|(k, v)| {
+        matches!(
+            k.as_str(),
+            "layered.considerModelOrder.strategy" | "considerModelOrder.strategy"
+        ) && v.trim_matches('"') != "NONE"
+    })
+}
+
+/// The prefix of the ids `in_model_order` gives; `restore_ids` turns them back.
+const ORDER_PREFIX: &str = "arqlet-order-";
+
+/// A copy of the graph whose nodes, ports and edges have ids in input order (`arqlet-order-00000000`, …), so that ties
+/// broken by id follow the input; with the map from the new ids back to the given ones. Edge ends follow the renaming.
+pub fn in_model_order(elk: &Value) -> (Value, BTreeMap<String, String>) {
+    fn assign(node: &Value, next: &mut usize, map: &mut BTreeMap<String, String>) {
+        for child in node["children"].as_array().into_iter().flatten() {
+            for item in
+                std::iter::once(child).chain(child["ports"].as_array().into_iter().flatten())
+            {
+                if let Some(id) = item["id"].as_str() {
+                    map.insert(id.to_string(), format!("{ORDER_PREFIX}{next:08}"));
+                    *next += 1;
+                }
+            }
+            assign(child, next, map);
+        }
+        for edge in node["edges"].as_array().into_iter().flatten() {
+            if let Some(id) = edge["id"].as_str() {
+                map.insert(id.to_string(), format!("{ORDER_PREFIX}{next:08}"));
+                *next += 1;
+            }
+        }
+    }
+    fn rename(node: &mut Value, map: &BTreeMap<String, String>) {
+        let swap = |v: &mut Value| {
+            if let Some(new) = v.as_str().and_then(|id| map.get(id)) {
+                *v = Value::String(new.clone());
+            }
+        };
+        if let Some(children) = node["children"].as_array_mut() {
+            for child in children {
+                swap(&mut child["id"]);
+                if let Some(ports) = child["ports"].as_array_mut() {
+                    for port in ports {
+                        swap(&mut port["id"]);
+                    }
+                }
+                rename(child, map);
+            }
+        }
+        if let Some(edges) = node["edges"].as_array_mut() {
+            for edge in edges {
+                swap(&mut edge["id"]);
+                for end in ["sources", "targets"] {
+                    if let Some(ends) = edge[end].as_array_mut() {
+                        ends.iter_mut().for_each(swap);
+                    }
+                }
+            }
+        }
+    }
+    let mut map = BTreeMap::new();
+    assign(elk, &mut 0, &mut map);
+    let mut out = elk.clone();
+    rename(&mut out, &map);
+    let back = map.into_iter().map(|(old, new)| (new, old)).collect();
+    (out, back)
+}
+
+/// Turns the ids `in_model_order` gave back into the given ones, in a laid-out graph (nodes, ports, edges, their ends and
+/// the shapes their sections name) and in text (diagnostics).
+pub fn restore_ids(out: &mut Value, back: &BTreeMap<String, String>) {
+    match out {
+        Value::String(s) => {
+            if let Some(old) = back.get(s.as_str()) {
+                *s = old.clone();
+            } else if s.contains(ORDER_PREFIX) {
+                for (new, old) in back.iter().rev() {
+                    if s.contains(new.as_str()) {
+                        *s = s.replace(new.as_str(), old);
+                    }
+                }
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(|v| restore_ids(v, back)),
+        Value::Object(map) => map.values_mut().for_each(|v| restore_ids(v, back)),
+        _ => {}
     }
 }

@@ -75,6 +75,12 @@ pub enum Request {
         on: Edit,
         hide: arqlet_model::Hidden,
     },
+    /// Change the source graph without a new import: add nodes and edges, remove nodes (with what they hold) and edges.
+    Patch {
+        #[serde(flatten)]
+        on: Edit,
+        patch: arqlet_model::GraphPatch,
+    },
     /// Show the given nodes by opening the containers that hold them (`partial`, default true: only as far as needed).
     Reveal {
         #[serde(flatten)]
@@ -423,6 +429,7 @@ impl Request {
                     | "toggle"
                     | "reveal"
                     | "filter"
+                    | "patch"
                     | "configure"
                     | "port"
                     | "settle"
@@ -479,6 +486,12 @@ impl Request {
             "toggle" => Request::Toggle {
                 on,
                 node_id: v["nodeId"].as_str().ok_or("Missing nodeId")?.into(),
+            },
+            "patch" => Request::Patch {
+                on,
+                patch: serde_json::from_value(v["patch"].clone()).map_err(|e| {
+                    format!("patch must be {{nodes?, edges?, removeNodes?, removeEdges?}}: {e}")
+                })?,
             },
             "filter" => Request::Filter {
                 on,
@@ -651,6 +664,12 @@ pub fn handle(request: Request) -> Response {
             on.expected_revision,
             on.expected_layout_version,
             &node_id,
+        )),
+        Request::Patch { on, patch } => snapshot(crate::patch::patch_snapshot(
+            &on.snapshot,
+            on.expected_revision,
+            on.expected_layout_version,
+            &patch,
         )),
         Request::Filter { on, hide } => snapshot(crate::filter::filter_view(
             &on.snapshot,
