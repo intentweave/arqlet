@@ -75,8 +75,10 @@ fn a_force_directed_drag_keeps_children_outside_its_region_in_place() {
         }
         checked += 1;
         let (a, b) = (&after.boxes[&node.id], &snapshot.boxes[&node.id]);
+        // Up to rounding: a held child's box goes through its centre (corner plus half the size) and back.
+        let near = |p: f64, q: f64| (p - q).abs() < 1e-6;
         assert!(
-            (a.x, a.y, a.width, a.height) == (b.x, b.y, b.width, b.height),
+            near(a.x, b.x) && near(a.y, b.y) && near(a.width, b.width) && near(a.height, b.height),
             "{} is outside the drag region and moved",
             node.id
         );

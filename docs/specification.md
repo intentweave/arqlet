@@ -418,6 +418,18 @@ tracks need; every measured dataset keeps its crossings and bends, the layered v
 `ENGINE_VERSION` is `0.5.0` with release 0.5.0 (it stayed `0.2.0-prototype` from 0.2 to 0.4): the
 defaults changed, and edits refuse snapshots of another engine version.
 
+`organicForces` is on by default (after 0.5.0): a fresh organic placement continues after the stress with forces in the
+manner of d3-force, chosen per area against the stress by crossings and lines through boxes, with a fallback to the
+stress for a fresh layout that keeps a geometry issue; force-directed drags and `settle` relax with the same forces.
+Measured in `benchmarks/results/organic-forces-20261114.md`; the fingerprint views are unchanged. `settle` with the
+forces takes preview steps and repairs the converged one, so it converges (5 to 24 calls on the organic examples); the
+playground's **Live** option follows every change with such calls, one animated frame each, in all three deployment modes.
+
+`sharedBorderRanks` and `alignStacked` are on by default (after 0.5.0): containers across their parent's flow share the
+border rank with side nodes, and stacks of containers (one edge between them, the only one on each side) are aligned as
+priority blocks of the placement across the flow, so the stack stands flush with straight edges
+(`benchmarks/results/cross-axis-space-20261115.md`).
+
 Single pass against the default gate (2026-11-08): over five seeds single pass is better
 than the refined default on all 16 datasets the automatic choice takes (11 mixed, 5 of one
 axis). Explicit ports on their flow side are constructed, and areas that choose their

@@ -168,6 +168,28 @@ get('example').value='default';get('example').onchange();await flush();
 assert.equal(latest.graph.nodes.length,initial.graph.nodes.length,'default example returns to the native snapshot');
 console.log(`Example selection passed: ${exampleIndex.length} demo graphs offered; import via the mode's lane.`);
 
+// Live mode: an import animates from scratch. It keeps the stress placement (no forces, force-directed behaviour on), then
+// switches the forces on, and settles call by call until the engine reports convergence; the converged drawing is valid,
+// and the live mode schedules no refinement that would lay the drawing out anew.
+if(exampleIndex.some(e=>e.name==='petri-net-shapes')){
+  get('mode').value='split';get('mode').onchange();await flush();
+  const refinesBefore=backendCalls;
+  get('live').checked=true;
+  get('example').value='petri-net-shapes';get('example').onchange();
+  let rounds=0;
+  for(;rounds<400&&!(latest?.editReport?.settle?.converged);rounds++)await flush();
+  assert.equal(latest?.editReport?.settle?.converged,true,'the live settling converges');
+  assert.equal(latest.options.forceDirected,true,'live mode turns force-directed behaviour on');
+  assert.equal(latest.options.organicForces,undefined,'the forces are on again (the default, omitted)');
+  assert.deepEqual(latest.geometryIssues,[],'the converged drawing is valid');
+  assert.ok((latest.editReport.settle.round??0)>0,'it took several settle calls');
+  assert.equal(backendCalls,refinesBefore,'no refinement in live mode');
+  const settledIn=latest.editReport.settle.round+1;
+  get('live').checked=false;
+  get('example').value='default';get('example').onchange();await flush();
+  console.log(`Live mode passed: the import animated from the stress and converged in ${settledIn} settle calls, no refinement.`);
+}else console.log('Live mode skipped: the petri-net-shapes example is not built.');
+
 // Options: preset and bundling go through `configure`; the page reflects bundling from the snapshot.
 get('mode').value='split';get('mode').onchange();await flush();
 // Presets: applying one names the snapshot with its configId; a custom change clears the name.

@@ -1775,6 +1775,19 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub pack_components: Option<PackComponents>,
+    /// In a container across its parent's flow, the border nodes of edges that cross it share the first or last rank with
+    /// the side nodes of edges that enter or leave on its sides, when that rank holds only side nodes, instead of opening a
+    /// rank of their own (which left a rank of one long-edge dummy before the first child). On by default since 0.6.0;
+    /// written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub shared_border_ranks: bool,
+    /// An edge between two containers of adjacent ranks that is the upper one's only edge toward the next rank and the lower
+    /// one's only edge from the previous rank (a stack of containers, such as the subnets of a zone) forms a block of the
+    /// placement across the flow with priority, at its ports as the containers' own plans place them: the two containers
+    /// stand so that the edge runs straight, before the median alignment and with crossing segments giving way, as for
+    /// segments between dummies. On by default since 0.6.0; written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub align_stacked: bool,
     /// Experimental: the children of a layered area that have no edge to another child (a file of unrelated functions)
     /// are spread over the ranks as a grid instead of all standing in the first rank, one long column. They fill the
     /// ranks the connected children use, and more when there are many of them, so the grid comes out about square.
@@ -1825,6 +1838,16 @@ pub struct LayoutOptions {
     #[serde(skip)]
     #[cfg_attr(feature = "ts", ts(skip))]
     pub region_child_sides: BTreeMap<String, bool>,
+    /// Internal (`settle` with `organicForces`): the share of a damped step a force-directed continuation takes, below 1 in
+    /// later calls of one settling so that it converges. Set for each call, never written or read.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub settle_cooling: Option<f64>,
+    /// Internal (`settle` with `organicForces`): the step is a preview, which the settling repairs once it converges; its
+    /// straight edges stay straight instead of taking detours that change from frame to frame. Never written or read.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub settle_preview: bool,
     /// Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
     /// and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
     /// delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the
@@ -1850,6 +1873,19 @@ pub struct LayoutOptions {
     /// Experimental conflict-directed organic repair, with the exhaustive search as a fallback. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub directed_repair: bool,
+    /// A fresh organic placement continues after the stress with forces in the manner of d3-force (springs one node spacing
+    /// long between where the edges end, many-body repulsion, box collision, a push off the straight edges, and a pull
+    /// toward the centroid), which closes the gaps the stress leaves and leaves the repair little to resolve. Taken per area
+    /// only where the straight edges cross no more often and pass through no more boxes; a drawing that keeps a geometry
+    /// issue is laid out again without the forces. A node's loops take a corner where no neighbour lies. On by default
+    /// since 0.6.0; written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub organic_forces: bool,
+    /// The loops of a node take the corner of the node where no other box lies in their way (then the corner whose sides
+    /// carry the fewest other edges, as before); the loops take no part in the placement, and a blocked corner made the
+    /// router take them around the neighbour, with bends. On by default since 0.6.0; written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub loop_space: bool,
     /// Experimental bounded repulsion from projected edge chords at the end of organic stress. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub node_edge_repulsion: bool,
@@ -2088,6 +2124,8 @@ impl Default for LayoutOptions {
             strict_clearance: false,
             component_packing: false,
             pack_components: None,
+            shared_border_ranks: true,
+            align_stacked: true,
             isolated_grid: false,
             single_pass_reversed: true,
             straight_detours: true,
@@ -2096,12 +2134,16 @@ impl Default for LayoutOptions {
             channels_by_demand: true,
             nested_edges_by_detour: true,
             region_child_sides: BTreeMap::new(),
+            settle_cooling: None,
+            settle_preview: false,
             directions_first: false,
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,
             vpsc_overlap_removal: false,
             directed_repair: false,
+            organic_forces: true,
+            loop_space: true,
             node_edge_repulsion: false,
             sparse_stress: false,
             scalable_stress: false,
@@ -2508,6 +2550,14 @@ pub struct Settle {
     pub steps: usize,
     pub residual: f64,
     pub converged: bool,
+    /// The calls of one settling so far (0 for the first): each takes a smaller step than the one before, so that the
+    /// settling converges. Counted on from the report of the snapshot a call continues. Omitted when 0.
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub round: u32,
+}
+
+fn is_zero_u32(v: &u32) -> bool {
+    *v == 0
 }
 
 /// What a streamed publication of a refinement job is: a preview (a step of an edit that is not final), the best layout found so

@@ -110,6 +110,21 @@ componentPacking?: boolean,
  */
 packComponents?: PackComponents,
 /**
+ * In a container across its parent's flow, the border nodes of edges that cross it share the first or last rank with
+ * the side nodes of edges that enter or leave on its sides, when that rank holds only side nodes, instead of opening a
+ * rank of their own (which left a rank of one long-edge dummy before the first child). On by default since 0.6.0;
+ * written as `false` when turned off.
+ */
+sharedBorderRanks?: boolean,
+/**
+ * An edge between two containers of adjacent ranks that is the upper one's only edge toward the next rank and the lower
+ * one's only edge from the previous rank (a stack of containers, such as the subnets of a zone) forms a block of the
+ * placement across the flow with priority, at its ports as the containers' own plans place them: the two containers
+ * stand so that the edge runs straight, before the median alignment and with crossing segments giving way, as for
+ * segments between dummies. On by default since 0.6.0; written as `false` when turned off.
+ */
+alignStacked?: boolean,
+/**
  * Experimental: the children of a layered area that have no edge to another child (a file of unrelated functions)
  * are spread over the ranks as a grid instead of all standing in the first rank, one long column. They fill the
  * ranks the connected children use, and more when there are many of them, so the grid comes out about square.
@@ -191,6 +206,21 @@ vpscOverlapRemoval?: boolean,
  * Experimental conflict-directed organic repair, with the exhaustive search as a fallback. Off by default.
  */
 directedRepair?: boolean,
+/**
+ * A fresh organic placement continues after the stress with forces in the manner of d3-force (springs one node spacing
+ * long between where the edges end, many-body repulsion, box collision, a push off the straight edges, and a pull
+ * toward the centroid), which closes the gaps the stress leaves and leaves the repair little to resolve. Taken per area
+ * only where the straight edges cross no more often and pass through no more boxes; a drawing that keeps a geometry
+ * issue is laid out again without the forces. A node's loops take a corner where no neighbour lies. On by default
+ * since 0.6.0; written as `false` when turned off.
+ */
+organicForces?: boolean,
+/**
+ * The loops of a node take the corner of the node where no other box lies in their way (then the corner whose sides
+ * carry the fewest other edges, as before); the loops take no part in the placement, and a blocked corner made the
+ * router take them around the neighbour, with bends. On by default since 0.6.0; written as `false` when turned off.
+ */
+loopSpace?: boolean,
 /**
  * Experimental bounded repulsion from projected edge chords at the end of organic stress. Off by default.
  */

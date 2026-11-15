@@ -281,27 +281,41 @@ function drawnPosition(id){
 // engine's result is final; this only shows the way to it. Off when the user asks for reduced motion.
 const ANIMATED=['data-node-id','data-container-id','data-header-id','data-toggle-id','data-pin-id','data-pinned-id','data-resize-id'];
 function idOf(el){for(const a of ANIMATED){const v=el.getAttribute(a);if(v!==null)return v;}return null;}
+// The elements that move as a whole: those with an id of their own that no other such element contains (a node's pin control
+// lies inside the node and moves with it; an offset of its own would move it twice).
+function movingElements(){
+ const all=[...$('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))];
+ const set=new Set(all);
+ return all.filter(el=>{for(let p=el.parentElement;p;p=p.parentElement)if(set.has(p))return false;return true;});
+}
 function placesOnScreen(){
  // Only a real DOM has places on screen; an animation never stands in the way of the change itself.
  if(typeof $('graph').querySelectorAll!=='function')return null;
  const out=new Map();
- for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){const id=idOf(el);if(id!==null&&!out.has(id)){const r=el.getBoundingClientRect();out.set(id,[r.left,r.top]);}}
+ for(const el of movingElements()){const id=idOf(el);if(id!==null&&!out.has(id)){const r=el.getBoundingClientRect();out.set(id,[r.left,r.top]);}}
  return out;
 }
-function animateFrom(before){
- try{animate(before);}catch{/* the change is drawn; only its animation is lost */}
+function animateFrom(before,options={}){
+ try{animate(before,options);}catch{/* the change is drawn; only its animation is lost */}
 }
-function animate(before){
+// `before` holds the places as they were on screen, including an animation still running. The places after the change are
+// measured without any animation's offset, else a new animation that starts while one runs adds its offset again and the
+// offsets build up (the live mode's frames come faster than an animation lasts). `fade: false` keeps the routes and labels
+// visible (the frames of settling), instead of fading them in.
+function animate(before,{fade=true}={}){
  if(!before||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){el.style.transition='none';el.style.transform='';}
+ const moving=typeof $('graph').querySelectorAll==='function'?movingElements():[];
+ $('graph').getBoundingClientRect();
  const after=placesOnScreen(),moved=[];
- for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){
+ for(const el of moving){
   const id=idOf(el),from=before.get(id),to=after.get(id);
   el.style.transition='none';
   // CSS lengths in the drawing are its user units: a screen pixel is 1/scale of one.
   if(from&&to)el.style.transform=`translate(${(from[0]-to[0])/scale}px,${(from[1]-to[1])/scale}px)`;else el.style.opacity='0';
   moved.push(el);
  }
- for(const el of $('graph').querySelectorAll('[data-route-id],[data-label-id]')){el.style.transition='none';el.style.opacity='0';moved.push(el);}
+ if(fade)for(const el of $('graph').querySelectorAll('[data-route-id],[data-label-id]')){el.style.transition='none';el.style.opacity='0';moved.push(el);}
  $('graph').getBoundingClientRect();
  requestAnimationFrame(()=>{for(const el of moved){el.style.transition='transform 380ms ease, opacity 380ms ease';el.style.transform='';el.style.opacity='';}});
  setTimeout(()=>{for(const el of moved)el.style.transition='';},450);
@@ -329,8 +343,11 @@ async function edit(request,{busy,fit=false,chained=false,remember=null,anchor=n
  const after=before?drawnPosition(anchor):null;
  if(after){autoFit=false;draw(false);const c=$('canvas');c.scrollLeft+=after.x-before.x;c.scrollTop+=after.y-before.y;}
  else draw(fit);
- animateFrom(places);
- if(!chained)scheduleRefinement();
+ animateFrom(places,{fade:request.op!=='settle'});
+ // Live mode: no refinement after a change; it would lay the drawing out anew while it settles (and after).
+ if(!chained&&!$('live').checked)scheduleRefinement();
+ // Live mode: a change other than a settle step is followed by settling (after this edit has returned).
+ if(!chained&&request.op!=='settle'&&$('live').checked)setTimeout(live,0);
  // A new node changes the graph itself: what was remembered no longer describes it. A decision is remembered as one entry.
  if(request.op==='add')history.clear();
  else if(remember)recordHistory(typeof remember==='string'?remember:remember.label,baseSnapshot,snapshot,{merge:!!remember.merge});
@@ -446,7 +463,27 @@ function finishLabel(){
 }
 // After a drag with force-directed behaviour the other nodes settle: a few bounded calls, each of at most three damped steps, until
 // the largest move is below the threshold. The status says whether the placement converged or was only refined.
+// Live mode (organic areas keep settling): every change is followed by up to LIVE_CALLS bounded settle calls, each drawn as
+// one animated frame, until the largest move is below the engine's threshold. The host only decides when to ask; each call
+// goes through execute() like any edit, so it runs in every deployment mode and a stale answer is discarded.
+const LIVE_CALLS=60;
+let living=false;
+async function live(){
+ if(living||!$('live').checked||!snapshot?.options?.forceDirected)return;
+ living=true;
+ try{await settle(LIVE_CALLS);}finally{living=false;}
+}
+// An import in live mode came without the forces (see loadInitial): turning them on starts the animation from the stress.
+// The configure edit is followed by the settling like any change in live mode.
+function liveFromScratch(){
+ if(!$('live').checked||snapshot?.options?.organicForces!==false)return false;
+ setTimeout(()=>setOption({organicForces:true},'organicForces'),0);
+ return true;
+}
 async function settle(calls=3){
+ // The steps of a settling are previews until it converges (the converged one is repaired), so it goes on until then, in
+ // and out of the live mode; the cooling of the engine makes it converge within LIVE_CALLS calls on the organic examples.
+ if($('live').checked||snapshot?.options?.forceDirected)calls=Math.max(calls,LIVE_CALLS);
  for(let call=0;call<calls;call++){
   if(!snapshot||pending||drag||resize||containerResize||portDrag||labelDrag||curation)return;
   const result=await edit({op:'settle',snapshot},{busy:'Settling …',chained:true});
@@ -454,9 +491,9 @@ async function settle(calls=3){
   const report=snapshot.editReport?.settle;
   if(!report)return;
   status(`Settled: ${report.converged?'converged':'refined, not converged'} · largest move ${report.residual.toFixed(2)} after ${report.steps} step${report.steps===1?'':'s'}`);
-  if(report.converged){scheduleRefinement();return;}
+  if(report.converged){if(!$('live').checked)scheduleRefinement();return;}
  }
- scheduleRefinement();
+ if(!$('live').checked)scheduleRefinement();
 }
 // A fixed size is a border the node cannot cross: the drag stops at the edge of every fixed container above the node
 // (ADR 0010). The farthest one is applied first, so the nearest, which lies inside it, has the last word.
@@ -700,6 +737,9 @@ async function loadInitial(){
  const projected=erProjection(plain);
  const extra={...(budget>0?{visibleNodeBudget:budget}:{}),...(communities>0?{communities}:{}),...(packed?{packComponents:{}}:{}),...(communities>0&&Number($('hub-links').value)>0?{communityHubs:{minLinks:Math.round(Number($('hub-links').value))}}:{}),
   ...(domainGroups&&groups?{groups}:{}),...(collapseFirst!==''?{levelOfDetail:{depth:Number(collapseFirst)}}:{})};
+ // Live mode animates from scratch: the import keeps the stress placement (no forces) and turns force-directed behaviour
+ // on; reset() then switches the forces on, and the settling animates the drawing from the stress into their equilibrium.
+ if($('live').checked)Object.assign(extra,{organicForces:false,forceDirected:true});
  const importOptions=Object.keys(extra).length?{...(projected.options??{}),...extra}:projected.options;
  const limit=example==='default'&&!(budget>0)&&!abstracted?VIEW_LIMIT:EXAMPLE_LIMIT;
  const data=await execute('import',{op:'import',graph:projected.graph,limit,...(importOptions?{options:importOptions}:{})});
@@ -755,7 +795,7 @@ async function reset(){
  history.clear();
  tracker?.end('modelchange');
  const token=++loadToken;epoch++;cancelRefinement();curation=null;pending=null;selected=null;treeSignature=null;userSizes.clear();geometry.clear();selection.clear();$('add').disabled=true;
- try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);scheduleRefinement();}
+ try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);if(liveFromScratch())return;scheduleRefinement();}
  catch(e){if(token===loadToken)status(e.message);}
 }
 $('reset').onclick=reset;
@@ -1076,6 +1116,13 @@ numberOption('archive-refinement','archiveRefinement','archive refinement',{min:
 // On/off options and optional numbers; an empty number field clears its option, so the engine default applies.
 const FLAGS=[['component-packing','componentPacking'],['vpsc-overlap-removal','vpscOverlapRemoval'],['directed-repair','directedRepair'],['node-edge-repulsion','nodeEdgeRepulsion'],['sparse-stress','sparseStress'],['scalable-stress','scalableStress'],['force-directed','forceDirected'],['strict-clearance','strictClearance'],['extended-conflict-selection','extendedConflictSelection'],['routed-candidates','routedCandidates'],['flat-region','flatRegion'],['global-layering','globalLayering'],['simplex-ranks','simplexRanks']];
 for(const [id,key] of FLAGS)$(id).onchange=()=>setOption({[key]:$(id).checked},key);
+// Live needs force-directed behaviour: turning it on turns that on (the configure edit then starts the settling).
+$('live').onchange=()=>{
+ if(!$('live').checked)return;
+ if(snapshot?.options?.forceDirected){live();return;}
+ $('force-directed').checked=true;
+ setOption({forceDirected:true},'forceDirected');
+};
 $('layered-construction').onchange=()=>{
  const enabled=$('layered-construction').checked;
  setOption({layeredConstruction:enabled,hierarchicalOrdering:enabled},enabled?'Hierarchical layered pipeline':'Previous layout pipeline');

@@ -19,6 +19,21 @@ use std::rc::Rc;
 /// The largest number of children an organic area may have in the first version (the distance matrix is n² values).
 pub const MAX_NODES: usize = 300;
 
+/// Experimental (`organicForces`): for a link between two children, where its edges end relative to each child's centre (the
+/// mean over the link's edges): an edge into a container ends at a node inside it, not at the container's centre.
+/// `inside` lists, per child, the boxes of its descendants as (centre offset from the child's centre, half extent): an edge
+/// may pass through them though it misses the child's own box at none.
+#[derive(Default, Debug)]
+pub(crate) struct Anchors {
+    pub ends: BTreeMap<(String, String), ((f64, f64), (f64, f64))>,
+    pub inside: BTreeMap<String, Vec<((f64, f64), (f64, f64))>>,
+    /// The share of a damped step a continuation takes (`settle_cooling`; 1 outside a settling).
+    pub cooling: f64,
+    /// Whether the area lies in a layered parent, which routes its edges by ports: at a tie of crossings and boxes in the
+    /// way, the arrangement whose separated boxes take less room wins (can-bus: the forces took 0.25 % more).
+    pub tie_by_area: bool,
+}
+
 /// The largest number of children of an area under `sparseStress`. The stress is O(pivots·n + m) per iteration, but the repair
 /// stage still keeps a triangular table of pairs (n²/2 entries) and the import of 500 children took 82 s in one release run
 /// (300 took 13.6 s). Larger areas are not measured, so they are not allowed yet.
@@ -605,6 +620,125 @@ fn scalable_rounds(
 /// The ticks of the force refinement of the scalable placement, and its starting temperature (d3-force starts at 1; the stress
 /// layout is already close, so the refinement starts cooler).
 const FORCE_TICKS: usize = 300;
+/// Experimental (`organicForces`): the strength of the pull toward the centroid (d3's forceX and forceY default to 0.1), and
+/// the spring length in node spacings (the scalable placement's springs are √2 spacings long, with no pull).
+const FORCES_GRAVITY: f64 = 0.05;
+const FORCES_SPRING: f64 = 1.;
+/// Experimental (`organicForces`): a centroid shift of a continuation below this is rounding (layout units).
+const CENTROID_TOLERANCE: f64 = 1e-6;
+/// Experimental (`organicForces`): up to this many children the pull has its full strength; beyond, it falls with the square
+/// root of their number.
+const FORCES_GRAVITY_NODES: f64 = 25.;
+
+/// Whether the links connect every child (an area of one child counts as connected).
+fn connected(ids: &[String], links: &BTreeSet<(String, String)>) -> bool {
+    let index: BTreeMap<&str, usize> = ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (id.as_str(), i))
+        .collect();
+    let mut root: Vec<usize> = (0..ids.len()).collect();
+    fn find(root: &mut [usize], mut i: usize) -> usize {
+        while root[i] != i {
+            root[i] = root[root[i]];
+            i = root[i];
+        }
+        i
+    }
+    let mut parts = ids.len();
+    for (a, b) in links {
+        let (Some(&a), Some(&b)) = (index.get(a.as_str()), index.get(b.as_str())) else {
+            continue;
+        };
+        let (ra, rb) = (find(&mut root, a), find(&mut root, b));
+        if ra != rb {
+            root[ra] = rb;
+            parts -= 1;
+        }
+    }
+    parts <= 1
+}
+
+/// The straight chords (between centres) of `edges` at `x` that pass through a box other than their ends', with the gap.
+fn chord_hits(
+    x: &[(f64, f64)],
+    edges: &[(usize, usize)],
+    ends: &[((f64, f64), (f64, f64))],
+    extent: &[(f64, f64)],
+    inside: &[Vec<((f64, f64), (f64, f64))>],
+) -> usize {
+    let holds = |c: (f64, f64), h: (f64, f64), p: (f64, f64)| {
+        (p.0 - c.0).abs() <= h.0 && (p.1 - c.1).abs() <= h.1
+    };
+    edges
+        .iter()
+        .enumerate()
+        .map(|(e, &(a, b))| {
+            let (p, q) = chord(x, edges, ends, e);
+            let siblings = (0..x.len())
+                .filter(|&k| k != a && k != b)
+                .filter(|&k| {
+                    segment_hits_box(
+                        p,
+                        q,
+                        x[k],
+                        extent[k].0 / 2. + GAP / 2.,
+                        extent[k].1 / 2. + GAP / 2.,
+                    )
+                })
+                .count();
+            // The descendants of any child, the ends' own included; a box that holds an end of the edge (its node or an
+            // ancestor of it) is not in the way.
+            let nested = (0..x.len())
+                .flat_map(|k| {
+                    inside
+                        .get(k)
+                        .into_iter()
+                        .flatten()
+                        .map(move |&(o, h)| ((x[k].0 + o.0, x[k].1 + o.1), h))
+                })
+                .filter(|&(c, h)| !holds(c, h, p) && !holds(c, h, q))
+                .filter(|&(c, h)| segment_hits_box(p, q, c, h.0 + GAP / 2., h.1 + GAP / 2.))
+                .count();
+            siblings + nested
+        })
+        .sum()
+}
+
+/// The straight edge `e` at `x`, from where it ends at its source to where it ends at its target.
+fn chord(
+    x: &[(f64, f64)],
+    edges: &[(usize, usize)],
+    ends: &[((f64, f64), (f64, f64))],
+    e: usize,
+) -> ((f64, f64), (f64, f64)) {
+    let (a, b) = edges[e];
+    let (oa, ob) = ends.get(e).copied().unwrap_or(((0., 0.), (0., 0.)));
+    (
+        (x[a].0 + oa.0, x[a].1 + oa.1),
+        (x[b].0 + ob.0, x[b].1 + ob.1),
+    )
+}
+
+/// The proper crossings between the straight chords of `edges` (between centres) at `x`.
+fn chord_crossings(
+    x: &[(f64, f64)],
+    edges: &[(usize, usize)],
+    ends: &[((f64, f64), (f64, f64))],
+) -> usize {
+    let mut count = 0;
+    for (k, &(a, b)) in edges.iter().enumerate() {
+        let (s, t) = chord(x, edges, ends, k);
+        for (l, &(p, q)) in edges.iter().enumerate().skip(k + 1) {
+            let (u, w) = chord(x, edges, ends, l);
+            if p != a && p != b && q != a && q != b && crate::proper_crossing(s, t, u, w) {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 const FORCE_ALPHA: f64 = 0.5;
 
 /// A force refinement in the manner of d3-force (springs, many-body repulsion, collision; the model is reimplemented here and
@@ -620,11 +754,37 @@ fn force_refine(
     fixed: &[bool],
     length: f64,
 ) -> usize {
+    force_refine_with(
+        x,
+        edges,
+        extent,
+        fixed,
+        length,
+        std::f64::consts::SQRT_2,
+        0.,
+        &[],
+    )
+}
+
+/// `force_refine` with springs of `spring` node spacings and a pull of strength `gravity` toward the centroid. With `ends`
+/// (one per edge, else empty) the springs and the push off the edges take the edges where they end, at those offsets from
+/// the centres.
+#[allow(clippy::too_many_arguments)]
+fn force_refine_with(
+    x: &mut [(f64, f64)],
+    edges: &[(usize, usize)],
+    extent: &[(f64, f64)],
+    fixed: &[bool],
+    length: f64,
+    spring: f64,
+    gravity: f64,
+    ends: &[((f64, f64), (f64, f64))],
+) -> usize {
     let n = x.len();
     if n < 2 {
         return 0;
     }
-    let distance = length * std::f64::consts::SQRT_2;
+    let distance = length * spring;
     let charge = -distance * distance / 44.;
     let mut degree = vec![0usize; n];
     for &(a, b) in edges {
@@ -638,9 +798,10 @@ fn force_refine(
     for tick in 0..FORCE_TICKS {
         alpha -= alpha * decay;
         // Springs (as d3's link force: strength 1 / smaller degree, biased towards the endpoint of smaller degree).
-        for &(a, b) in edges {
-            let dx = x[b].0 + v[b].0 - x[a].0 - v[a].0;
-            let dy = x[b].1 + v[b].1 - x[a].1 - v[a].1;
+        for (k, &(a, b)) in edges.iter().enumerate() {
+            let (oa, ob) = ends.get(k).copied().unwrap_or(((0., 0.), (0., 0.)));
+            let dx = x[b].0 + ob.0 + v[b].0 - x[a].0 - oa.0 - v[a].0;
+            let dy = x[b].1 + ob.1 + v[b].1 - x[a].1 - oa.1 - v[a].1;
             let l = (dx * dx + dy * dy).sqrt();
             if l == 0. {
                 continue;
@@ -702,8 +863,18 @@ fn force_refine(
                 }
             }
         }
+        // Experimental (`organicForces`): a pull of every node toward the centroid, as d3's forceX and forceY, so that the
+        // repulsion does not drive the drawing apart.
+        if gravity > 0. {
+            let (cx, cy) = x.iter().fold((0., 0.), |(a, b), p| (a + p.0, b + p.1));
+            let (cx, cy) = (cx / n as f64, cy / n as f64);
+            for (vi, xi) in v.iter_mut().zip(x.iter()) {
+                vi.0 += (cx - xi.0) * gravity * alpha;
+                vi.1 += (cy - xi.1) * gravity * alpha;
+            }
+        }
         if tick >= FORCE_TICKS - EDGE_TICKS {
-            edge_push(x, &mut v, edges, extent, fixed, max_extent);
+            edge_push(x, &mut v, edges, ends, extent, fixed, max_extent);
         }
         for i in 0..n {
             if fixed[i] {
@@ -727,10 +898,12 @@ const EDGE_PUSH: f64 = 0.5;
 
 /// One pass of the edge push of `force_refine`, on the predicted positions (`x + v`), in edge order, the candidates found by
 /// a spatial hash over the box centres.
+#[allow(clippy::too_many_arguments)]
 fn edge_push(
     x: &[(f64, f64)],
     v: &mut [(f64, f64)],
     edges: &[(usize, usize)],
+    ends: &[((f64, f64), (f64, f64))],
     extent: &[(f64, f64)],
     fixed: &[bool],
     max_extent: f64,
@@ -741,8 +914,12 @@ fn edge_push(
     let spatial = SpatialHash::new(&predicted, cell);
     let reach = max_extent / 2. + GAP;
     let mut candidates = Vec::new();
-    for &(a, b) in edges {
-        let (p, q) = (predicted[a], predicted[b]);
+    for (e, &(a, b)) in edges.iter().enumerate() {
+        let (oa, ob) = ends.get(e).copied().unwrap_or(((0., 0.), (0., 0.)));
+        let (p, q) = (
+            (predicted[a].0 + oa.0, predicted[a].1 + oa.1),
+            (predicted[b].0 + ob.0, predicted[b].1 + ob.1),
+        );
         let min = (p.0.min(q.0) - reach, p.1.min(q.1) - reach);
         let max = (p.0.max(q.0) + reach, p.1.max(q.1) + reach);
         spatial.query_bounds(min, max, &mut candidates);
@@ -1237,6 +1414,7 @@ fn organic_stages_with_vpsc(
         sparse,
         size_aware,
         false,
+        None,
     )
 }
 
@@ -1254,6 +1432,7 @@ fn organic_stages_full(
     sparse: bool,
     size_aware: bool,
     scalable: bool,
+    anchors: Option<&Anchors>,
 ) -> Stages {
     // The scalable placement takes the sparse targets (pivots and neighbours) and weights them itself.
     let sparse = sparse || scalable;
@@ -1300,6 +1479,10 @@ fn organic_stages_full(
     // With `relax` steps a warm start is not held: the stress is relaxed from the positions for that many steps, which is the
     // force-directed behaviour (pinned children stay, the others move toward their targets).
     let iterations = if warm.is_some() { relax } else { iterations };
+    // With `organicForces` a force-directed continuation relaxes with the same forces as the fresh placement, not with the
+    // stress: the stress equilibrium is wider than the forces' and would push a dropped node away from its neighbours.
+    let forces_relax = warm.is_some() && relax > 0 && anchors.is_some();
+    let iterations = if forces_relax { 0 } else { iterations };
     let mut x: Vec<(f64, f64)> = match warm {
         Some(start) => ids.iter().map(|id| start[id]).collect(),
         None => {
@@ -1392,21 +1575,149 @@ fn organic_stages_full(
         let extents: Vec<_> = ids.iter().map(|id| sizes[id]).collect();
         repel_node_edges(&mut x, &edges, &extents, &fixed_flags, length * 0.1);
     }
+    // Experimental (`organicForces`): a fresh placement continues with the force refinement of the scalable placement, its
+    // springs one node spacing long and a pull toward the centroid (d3-force's link, many-body, collide and x/y forces). The
+    // stress layout keeps the global shape; the forces close the gaps the stress leaves between nodes of different sizes,
+    // and push nodes off the straight edges, so the repair has little left to resolve.
+    // Only an area whose links connect all children: without links between them the repulsion has nothing to hold against
+    // and only spreads them (the nested organic areas of mixed-large: lines through nodes and geometry issues).
+    if let Some(anchors) = anchors.filter(|_| {
+        warm.is_none() && scalable_targets.is_none() && iterations > 0 && connected(ids, links)
+    }) {
+        let index: BTreeMap<&str, usize> = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.as_str(), i))
+            .collect();
+        let edges: Vec<(usize, usize)> = links
+            .iter()
+            .map(|(a, b)| (index[a.as_str()], index[b.as_str()]))
+            .collect();
+        let inside: Vec<Vec<((f64, f64), (f64, f64))>> = ids
+            .iter()
+            .map(|id| anchors.inside.get(id).cloned().unwrap_or_default())
+            .collect();
+        let ends: Vec<((f64, f64), (f64, f64))> = links
+            .iter()
+            .map(|link| {
+                anchors
+                    .ends
+                    .get(link)
+                    .copied()
+                    .unwrap_or(((0., 0.), (0., 0.)))
+            })
+            .collect();
+        let extents: Vec<_> = ids.iter().map(|id| sizes[id]).collect();
+        // The pull weakens with the number of children: a larger area holds more nodes per unit of pull, and the full pull
+        // crowded areas of 100 and more children until the repair could not resolve them.
+        let gravity = FORCES_GRAVITY * (FORCES_GRAVITY_NODES / n.max(1) as f64).sqrt().min(1.);
+        let mut forced = x.clone();
+        used += force_refine_with(
+            &mut forced,
+            &edges,
+            &extents,
+            &fixed_flags,
+            length,
+            FORCES_SPRING,
+            gravity,
+            &ends,
+        );
+        // The forces neither look at crossings nor keep straight edges out of nodes (they push them off softly): their
+        // arrangement is taken only when its straight edges cross no more often and pass through no more boxes than those
+        // of the stress layout. A box in the way is what the repair resolves with far moves (organic-25: 2 against 7).
+        let crossings = (
+            chord_crossings(&forced, &edges, &ends),
+            chord_crossings(&x, &edges, &ends),
+        );
+        let hits = (
+            chord_hits(&forced, &edges, &ends, &extents, &inside),
+            chord_hits(&x, &edges, &ends, &extents, &inside),
+        );
+        let room = |p: &[(f64, f64)]| {
+            let mut p = p.to_vec();
+            separate_overlaps_with_option(&mut p, &extents, &fixed_flags, use_vpsc);
+            let (mut lo, mut hi) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
+            for (c, e) in p.iter().zip(&extents) {
+                lo = (lo.0.min(c.0 - e.0 / 2.), lo.1.min(c.1 - e.1 / 2.));
+                hi = (hi.0.max(c.0 + e.0 / 2.), hi.1.max(c.1 + e.1 / 2.));
+            }
+            (hi.0 - lo.0) * (hi.1 - lo.1)
+        };
+        let tie = crossings.0 == crossings.1 && hits.0 == hits.1;
+        if crossings.0 <= crossings.1
+            && hits.0 <= hits.1
+            && !(tie && anchors.tie_by_area && room(&forced) > room(&x))
+        {
+            x = forced;
+        }
+    }
     // A force-directed continuation moves toward the relaxed positions by a fraction, and by a bounded distance: each step of a
     // drag nudges the neighbours the way a spring would, instead of jumping to the equilibrium (which is far off after a big
     // drag and made the drawing jump and swim).
+    if let (true, Some(anchors)) = (forces_relax, anchors) {
+        let index: BTreeMap<&str, usize> = ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| (id.as_str(), i))
+            .collect();
+        let edges: Vec<(usize, usize)> = links
+            .iter()
+            .map(|(a, b)| (index[a.as_str()], index[b.as_str()]))
+            .collect();
+        let ends: Vec<((f64, f64), (f64, f64))> = links
+            .iter()
+            .map(|link| {
+                anchors
+                    .ends
+                    .get(link)
+                    .copied()
+                    .unwrap_or(((0., 0.), (0., 0.)))
+            })
+            .collect();
+        let extents: Vec<_> = ids.iter().map(|id| sizes[id]).collect();
+        let gravity = FORCES_GRAVITY * (FORCES_GRAVITY_NODES / n.max(1) as f64).sqrt().min(1.);
+        let before = x.clone();
+        used += force_refine_with(
+            &mut x,
+            &edges,
+            &extents,
+            &fixed_flags,
+            length,
+            FORCES_SPRING,
+            gravity,
+            &ends,
+        );
+        // Without a held node nothing anchors the drawing: it keeps its centroid, so that repeated steps (`settle`) do not
+        // shift it (a continuation translates the drawing only when a node passes the margin, and never back: the drawing
+        // crept by 30 to 70 units a step). A shift below `CENTROID_TOLERANCE` is rounding and is left alone, so a step that
+        // moves nothing keeps every coordinate exactly.
+        if !fixed_flags.iter().any(|&f| f) && n > 0 {
+            let centroid = |p: &[(f64, f64)]| {
+                let (sx, sy) = p.iter().fold((0., 0.), |(a, b), q| (a + q.0, b + q.1));
+                (sx / n as f64, sy / n as f64)
+            };
+            let (a, b) = (centroid(&before), centroid(&x));
+            if (a.0 - b.0).p_hypot(a.1 - b.1) > CENTROID_TOLERANCE {
+                for p in x.iter_mut() {
+                    *p = (p.0 + a.0 - b.0, p.1 + a.1 - b.1);
+                }
+            }
+        }
+    }
     if let (Some(start), true) = (warm, relax > 0) {
         for (i, id) in ids.iter().enumerate() {
             if fixed_flags[i] {
                 continue;
             }
             let (dx, dy) = (x[i].0 - start[id].0, x[i].1 - start[id].1);
-            let moved = dx.p_hypot(dy) * FORCE_DAMPING;
-            let limit = length * FORCE_MAX_STEP;
+            // A later call of a settling takes a smaller share of the step (`settle_cooling`), as a force simulation cools.
+            let cooling = anchors.map_or(1., |a| a.cooling.clamp(0., 1.));
+            let moved = dx.p_hypot(dy) * FORCE_DAMPING * cooling;
+            let limit = length * FORCE_MAX_STEP * cooling;
             let scale = if moved > limit && moved > 0. {
                 limit / (dx.p_hypot(dy))
             } else {
-                FORCE_DAMPING
+                FORCE_DAMPING * cooling
             };
             x[i] = (start[id].0 + dx * scale, start[id].1 + dy * scale);
         }
@@ -1448,7 +1759,7 @@ pub fn organic_arrange(
 ) -> (BTreeMap<String, Rect>, (f64, f64)) {
     organic_arrange_inner(
         ids, links, sizes, start, iterations, grid, fixed, relax, false, false, false, false,
-        false, None,
+        false, None, None,
     )
 }
 
@@ -1466,6 +1777,7 @@ pub(crate) fn organic_arrange_counted(
     sparse: bool,
     size_aware: bool,
     scalable: bool,
+    anchors: Option<&Anchors>,
     counters: &mut crate::SearchCounters,
 ) -> (BTreeMap<String, Rect>, (f64, f64)) {
     organic_arrange_inner(
@@ -1482,6 +1794,7 @@ pub(crate) fn organic_arrange_counted(
         sparse,
         size_aware,
         scalable,
+        anchors,
         Some(counters),
     )
 }
@@ -1500,6 +1813,7 @@ fn organic_arrange_inner(
     sparse: bool,
     size_aware: bool,
     scalable: bool,
+    anchors: Option<&Anchors>,
     mut counters: Option<&mut crate::SearchCounters>,
 ) -> (BTreeMap<String, Rect>, (f64, f64)) {
     let snap = |v: f64| {
@@ -1525,6 +1839,7 @@ fn organic_arrange_inner(
         sparse,
         size_aware,
         scalable,
+        anchors,
     );
     if let Some(counters) = counters.as_deref_mut() {
         counters.organic_stress_nanos = counters
@@ -1873,6 +2188,7 @@ mod tests {
             false,
             false,
             false,
+            None,
             &mut counters,
         );
         assert_eq!(overlaps(&placed), 0);
@@ -1898,6 +2214,7 @@ mod tests {
             false,
             false,
             false,
+            None,
             &mut counters,
         );
         assert!(counters.organic_stress_nanos > 0);
@@ -2425,7 +2742,7 @@ mod scalable_tests {
         let sizes: BTreeMap<String, (f64, f64)> =
             ids.iter().map(|id| (id.clone(), (180., 54.))).collect();
         organic_stages_full(
-            ids, links, &sizes, None, 300, fixed, 0, false, false, !scalable, false, scalable,
+            ids, links, &sizes, None, 300, fixed, 0, false, false, !scalable, false, scalable, None,
         )
     }
 

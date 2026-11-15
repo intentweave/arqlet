@@ -5,6 +5,113 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- **Default:** `sharedBorderRanks` and `alignStacked` are on: free space beside stacked containers. In a container across
+  its parent's flow the border nodes share the first or last rank with the side nodes instead of opening one of their
+  own, which held only a long-edge dummy; and an edge that is the only one between two containers of adjacent ranks (a
+  stack, such as the subnets of a zone) forms a block of the placement across the flow with priority, at the ports the
+  containers' plans give, so the stack stands flush and its edges run straight. Decided in the plan, not by moving
+  boxes afterwards (a pass that did, `straightenOffsets`, added crossings it could not see and was dropped).
+  cloud-architecture 114 → 108 bends and 7.1 % smaller, org-chart 2 bends fewer and 9.8 % smaller, synthetic-2k 12
+  crossings and 35 bends fewer at 1.3 % more area, arqlet-pipeline 2 bends fewer at 0.3 % more area; every other dataset
+  unchanged ([measurement](benchmarks/results/cross-axis-space-20261115.md)). New reference fingerprints:
+  `benchmarks/results/fingerprints-20261115-stacked-default.jsonl` (4 of 15 views changed; with both options `false`
+  the geometry equals the 20261114 reference).
+- **Default:** `loopSpace` is on: the loops of a node take a corner where no other box lies in their way, in every area
+  (before only in organic ones with `organicForces`); they take no part in the placement. synthetic-2k 8 bends fewer, every
+  other dataset with the same crossings, bends and area (state-order draws its loops at other corners). New reference
+  fingerprints: `benchmarks/results/fingerprints-20261115-loop-space-default.jsonl` (state-order changed; with
+  `loopSpace: false` the views equal the stacked-default reference).
+- **Default:** `organicForces` is on: a fresh organic placement continues after the stress with forces in the manner of
+  d3-force (springs between where the edges end, many-body repulsion, box collision, a push off straight edges, and a pull
+  toward the centroid that weakens with the number of children). Taken per area only where the children are connected
+  and the straight edges cross no more often and pass through no more boxes, nested ones included; a fresh layout that
+  keeps a geometry issue is laid out again without the forces. A node's loops in an organic area take a corner where no
+  neighbour lies. A force-directed drag and `settle` relax with the same forces. petri-net-shapes 41 % smaller and 5×
+  faster, mixed-layouts 5 crossings to 0 and 22 % smaller, organic-50 40 % smaller, organic-200 5 crossings to 2,
+  self-loops 4 % smaller; every other dataset and every fingerprint view unchanged (can-bus was 0.25 % larger until an
+  area in a layered parent kept the stress at a tie of crossings and boxes in the way when the forces took more room)
+  ([measurement](benchmarks/results/organic-forces-20261114.md)). `organicForces: false` restores the earlier placement.
+
+- With `organicForces`, `settle` takes its steps as previews of the forces (no repair in between, as the steps of a
+  force-directed drag) and repairs the step that converges; the settling then counts as converged. Without a held node a
+  step keeps the drawing's centroid. Before, the repair and the relaxation worked against each other and a continuation
+  shifted the drawing at every step (it is translated when a node passes the margin, never back), so settling did not
+  converge (petri-net-shapes swung by 80 units, mixed-layouts crept by 70 a step; with the stress model up to 1300). Now
+  petri-net-shapes converges in 5 calls, mixed-layouts in 8, organic-50 in 24, each call 8 to 40 ms.
+
+- Settling cools: each call of one settling takes 0.9 of the step of the call before (the report counts the calls as
+  `round`), as a force simulation cools, so that it converges instead of swinging. On the organic examples within 4 to
+  43 calls (organic-100 did not converge in 60 before).
+
+- `organicForces` leaves out an area whose child containers hold containers themselves: the edges deep inside them are
+  what the choice before the repair cannot foresee, and such a drawing kept an issue and was laid out a second time
+  without the forces (mixed-large: import 2.0 s, now 1.1 s as before the forces; every other result unchanged).
+
+- The geometric repair resolves ports faster: the per-edge parts that depend on the graph only (the flow sides' common
+  area and axis, the source's area mode, the end sides) are computed once, ends are read by index, and loop corners only
+  for the nodes a trial asks for; it keeps the boxes between the trials of a repair and reads only the changed ones again,
+  computes the sort keys of a side once and the ids of automatic ports once per edge end. mixed-large's layout
+  1147 → 808 ms with byte-identical output ([measurement](benchmarks/results/port-resolution-20261115.md)).
+
+- A step of a drag repairs within its local budget also for the lines into containers (`nestedEdgesByDetour`), whose own
+  budget it used to take: drag steps on mixed-large 0.7–0.85 s → 75–154 ms; the finish does the rest
+  ([measurement](benchmarks/results/drag-steps-20261115.md)).
+
+- The end of a drag on a nested organic drawing: an organic root moves as a whole off its wall before the repair, the
+  moderate repair of the lines between children counts its scans on its own, and the full repair after a drop runs only for
+  conflicts the detours do not draw around. mixed-large's gesture 4.9 s → 1.3 s (3.8 s → 2.4 s with force-directed
+  behaviour), with fewer crossings and less area, no issue left; without force-directed behaviour more bends until the
+  background refinement ([measurement](benchmarks/results/drop-repair-20261115.md)).
+
+- The preview steps of a settling keep their straight edges straight instead of drawing detours that change from frame
+  to frame; the converged step is repaired and drawn as before.
+- Playground: after a force-directed drop the settling goes on until it converges (it stopped after three calls and left
+  an unrepaired preview since the steps became previews).
+- Playground test of the live mode (`ui-regression.mjs`): an import animates from the stress, converges, stays valid and
+  starts no refinement.
+
+- `directionsFirst` combines with the other options: each candidate with fixed directions goes through the whole
+  pipeline (region ports, reversed flows, region child ports), where before the first matching branch ran alone. The
+  measured datasets draw as before (er-diagram and synthetic-2k, the only ones with free directions, take none of the other
+  branches); `directionsFirst` stays off (synthetic-2k: 306 crossings fewer, but 62 bends more and 67 % more area in 2.9×
+  the time).
+
+- The routing styles of the edges (`edge_choices`) look the areas up in a parent table built once, instead of searching the
+  node list for every parent of every edge; the repair asks for them again and again, which was quadratic in the size of
+  the view (a view of 1000 nodes of synthetic-20k spent most of its first 15 minutes there). Byte-identical output.
+
+- Large views no longer route everything again: the engine choice (both routers on the whole drawing) runs only up to 500
+  routes, and routing the routes in conflict again only up to 500 conflicts; above that the conflicts are reported, as
+  under single pass. A 1000-node view of synthetic-20k took more than 15 minutes, now 26 s; synthetic-20k with one level
+  open (349 visible nodes, 8072 edges) more than 10 minutes, now 7 s.
+
+### Removed
+
+- `repairCompaction` (experimental, never released): with `organicForces` it added nothing.
+
+### Fixed
+
+- Playground: the end of the live animation flickered and the drawing rolled in at other places. A node's pin control
+  lies inside the node and took the node's animation offset a second time; in the live mode's frames, which come faster
+  than an animation lasts, the offsets doubled from frame to frame. Only the outermost element of an id is moved now,
+  and the places after a change are measured without a running animation's offset. The routes are no longer faded in at
+  every frame of settling, and the live mode starts no refinement (it laid the drawing out anew after the animation).
+- The end of a drag that changes no pin repaired nothing: the engine saw unchanged options and answered without a layout,
+  so conflicts the local repair of the last drag step left stood. The end of a gesture now lays out the dragged node
+  again when geometry issues remain (not for a force-directed drag, which settles by its own steps).
+
+### Added
+
+- Playground: **Live** (organic areas keep settling, animated): turns on force-directed behaviour and follows every change
+  with bounded `settle` calls, one animated frame each, until the engine reports convergence (at most 60 calls). Each
+  call goes through `execute()`, so it runs in the split, browser-only and backend-only modes, and a stale answer is
+  discarded as for any edit. Each frame is a preview; the converged one is repaired. An import in live mode animates
+  from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
+  equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
+- `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
+
 ## 0.5.0 — 2026-11-14
 
 Every area in single pass, smaller drawings and valid geometry on every dataset. Reversed flows (`rl`, `bt`) draw as the

@@ -4,12 +4,16 @@
 //! This is a continuation of the placement from its positions, not of a solver state: no solver state is kept. Provisional.
 use super::{check_current, recompute_layout, uses_organic};
 use arqlet_model::math::PortableMath;
-use arqlet_model::{EditReport, Settle, Snapshot};
+use arqlet_model::{EditReport, Gesture, LayoutOptions, Settle, Snapshot};
 
 /// The damped steps a call runs at most (each is one complete recomputation of the view from the positions before it).
 pub const CONTINUATION_STEPS: usize = 3;
 /// A node that moves less than this in a step (layout units) counts as settled.
 pub const CONVERGED_BELOW: f64 = 0.5;
+/// The id of the preview gesture the steps of a settle run under (`organicForces`); never in a published snapshot.
+const SETTLE_GESTURE: &str = "settle";
+/// The share of the step the next call of a settling keeps (with `organicForces`): 0.9 per call, a tenth after 22 calls.
+pub const SETTLE_COOLING: f64 = 0.9;
 
 /// The largest distance any node's box moved between two snapshots of the same view.
 fn residual(before: &Snapshot, after: &Snapshot) -> f64 {
@@ -39,6 +43,7 @@ pub fn settle_snapshot(
                 steps: 0,
                 residual: 0.,
                 converged: true,
+                round: 0,
             }),
             ..Default::default()
         });
@@ -46,9 +51,42 @@ pub fn settle_snapshot(
     }
     let mut current = snapshot.clone();
     current.gesture = None;
+    // With `organicForces` the steps are previews, as the steps of a force-directed drag: the forces move the nodes and the
+    // repair does not run, so the two do not work against each other from step to step (with a repair in every step the
+    // drawing swung by 80 units and more without converging). The step that converges is repaired, as the end of a drag.
+    let forces = snapshot.options.organic_forces;
+    let preview = |ending: bool| Gesture {
+        id: SETTLE_GESTURE.into(),
+        seq: 0,
+        node: String::new(),
+        active: true,
+        previous: None,
+        previous_others: Default::default(),
+        ending,
+        origin: None,
+    };
+    // The calls of one settling: each continues the round of the report it finds, and with the forces takes a smaller step
+    // than the one before (`SETTLE_COOLING` per call), so that the settling converges instead of swinging.
+    let round = snapshot
+        .edit_report
+        .as_ref()
+        .and_then(|r| r.settle.as_ref())
+        .filter(|s| !s.converged)
+        .map_or(0, |s| s.round.saturating_add(1));
+    let mut options = snapshot.options.clone();
+    if forces {
+        options.settle_cooling = Some(SETTLE_COOLING.p_powf(f64::from(round)));
+    }
     let (mut steps, mut moved) = (0, f64::INFINITY);
+    let preview_options = LayoutOptions {
+        settle_preview: forces,
+        ..options.clone()
+    };
     while steps < CONTINUATION_STEPS {
-        let next = recompute_layout(&current, &snapshot.options, None)?;
+        if forces {
+            current.gesture = Some(preview(false));
+        }
+        let next = recompute_layout(&current, &preview_options, None)?;
         moved = residual(&current, &next);
         current = next;
         steps += 1;
@@ -56,11 +94,22 @@ pub fn settle_snapshot(
             break;
         }
     }
+    // The forces have converged: the repair ends the settling, as the drop ends a drag. Its moves are not the forces' and
+    // would start them again (the repaired drawing is not their equilibrium), so the settling counts as converged and the
+    // host stops asking; the residual reports the forces' last step.
+    if forces && moved < CONVERGED_BELOW {
+        current.gesture = Some(preview(true));
+        current = recompute_layout(&current, &options, None)?;
+    }
+    current.gesture = None;
+    current.options.settle_cooling = None;
+    current.options.settle_preview = false;
     current.edit_report = Some(EditReport {
         settle: Some(Settle {
             steps,
             residual: moved,
             converged: moved < CONVERGED_BELOW,
+            round,
         }),
         ..Default::default()
     });

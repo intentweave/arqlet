@@ -335,6 +335,80 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    let forced = compute_counted_body(graph, previous, dirty, options)?;
+    // Experimental (`organicForces`): the forces are chosen per area before the repair, which cannot be foreseen there. A
+    // drawing that keeps a geometry issue is laid out again without them, and the one with fewer issues is kept (mixed-large:
+    // one straight edge through a node in a deeply nested container). Only then does the layout run twice.
+    // Only a fresh layout: the forces act on fresh placements only, and a continuation (a drag step reports its conflicts
+    // on purpose) gains nothing from a second layout.
+    if !options.organic_forces || previous.is_some() || forced.0.geometry_issues.is_empty() {
+        return Ok(forced);
+    }
+    let without = LayoutOptions {
+        organic_forces: false,
+        ..options.clone()
+    };
+    let (mut plain, stages) = compute_counted_body(graph, previous, dirty, &without)?;
+    if plain.geometry_issues.len() < forced.0.geometry_issues.len() {
+        // The option stays in the snapshot: a later layout of it goes on as configured.
+        plain.options.organic_forces = true;
+        return Ok((plain, stages));
+    }
+    Ok(forced)
+}
+
+fn compute_counted_body(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    // Experimental (`directionsFirst`): the free directions are chosen by a first layout, and the drawing is laid out
+    // again with those orientations fixed (single pass builds edges between fixed axes; it delegates them under a free
+    // direction, which decides its orientation only after its children are placed).
+    // The candidates are every free area left to right, and every free area top to bottom; each is laid out with its
+    // orientations fixed under single pass, and the drawing with the best published key wins (overlaps, lines through
+    // nodes, shared lines, crossings, …, bends before length), left to right on a tie. The compact choice per area (the
+    // plain free layout) was a third candidate: it never won on the layered examples and cost as much as the old free
+    // layout (benchmarks/results/free-directions-20261113.md), so it is not tried.
+    if options.directions_first && has_free_direction(graph) {
+        let free = free_areas(graph);
+        let mut candidates: Vec<BTreeMap<String, Orientation>> = Vec::new();
+        for orientation in [Orientation::Lr, Orientation::Tb] {
+            let all: BTreeMap<String, Orientation> = free
+                .iter()
+                .map(|area| (area.clone(), orientation))
+                .collect();
+            if !candidates.contains(&all) {
+                candidates.push(all);
+            }
+        }
+        let mut best: Option<(
+            Vec<i64>,
+            Snapshot,
+            SearchCounters,
+            BTreeMap<String, Orientation>,
+        )> = None;
+        for chosen in candidates {
+            let fixed = with_chosen_directions(graph, &chosen);
+            // The whole pipeline for each candidate, with every other option (region ports, reversed flows, …): before,
+            // the first matching branch of this function ran alone, so `directionsFirst` did not combine with them.
+            let inner = LayoutOptions {
+                directions_first: false,
+                ..options.clone()
+            };
+            let (mut snapshot, stages) = compute_counted_body(&fixed, previous, dirty, &inner)?;
+            snapshot.options.directions_first = true;
+            let key = published_key(&snapshot)?;
+            if best.as_ref().is_none_or(|(b, ..)| key < *b) {
+                best = Some((key, snapshot, stages, chosen));
+            }
+        }
+        let (_, mut snapshot, stages, chosen) = best.expect("one candidate at least");
+        snapshot.graph = graph.clone();
+        snapshot.area_orientations = chosen;
+        return Ok((snapshot, stages));
+    }
     // Experimental (`regionPorts`, ADR 0020 S1-2): edges that leave a region of another strategy in a layered parent end at
     // the region's box for the layout; their inner legs are joined afterwards.
     if options.region_ports {
@@ -409,46 +483,6 @@ pub fn compute_counted(
             apply_aggregate_weights(&mut snapshot);
             return Ok((snapshot, stages));
         }
-    }
-    // Experimental (`directionsFirst`): the free directions are chosen by a first layout, and the drawing is laid out
-    // again with those orientations fixed (single pass builds edges between fixed axes; it delegates them under a free
-    // direction, which decides its orientation only after its children are placed).
-    // The candidates are every free area left to right, and every free area top to bottom; each is laid out with its
-    // orientations fixed under single pass, and the drawing with the best published key wins (overlaps, lines through
-    // nodes, shared lines, crossings, …, bends before length), left to right on a tie. The compact choice per area (the
-    // plain free layout) was a third candidate: it never won on the layered examples and cost as much as the old free
-    // layout (benchmarks/results/free-directions-20261113.md), so it is not tried.
-    if options.directions_first && has_free_direction(graph) {
-        let free = free_areas(graph);
-        let mut candidates: Vec<BTreeMap<String, Orientation>> = Vec::new();
-        for orientation in [Orientation::Lr, Orientation::Tb] {
-            let all: BTreeMap<String, Orientation> = free
-                .iter()
-                .map(|area| (area.clone(), orientation))
-                .collect();
-            if !candidates.contains(&all) {
-                candidates.push(all);
-            }
-        }
-        let mut best: Option<(
-            Vec<i64>,
-            Snapshot,
-            SearchCounters,
-            BTreeMap<String, Orientation>,
-        )> = None;
-        for chosen in candidates {
-            let fixed = with_chosen_directions(graph, &chosen);
-            let (snapshot, stages) = compute_counted_inner(&fixed, previous, dirty, options)?;
-            let key = published_key(&snapshot)?;
-            if best.as_ref().is_none_or(|(b, ..)| key < *b) {
-                best = Some((key, snapshot, stages, chosen));
-            }
-        }
-        let (_, mut snapshot, stages, chosen) = best.expect("one candidate at least");
-        snapshot.graph = graph.clone();
-        snapshot.area_orientations = chosen;
-        apply_aggregate_weights(&mut snapshot);
-        return Ok((snapshot, stages));
     }
     let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
     if options.region_child_ports {
@@ -602,7 +636,10 @@ fn compute_counted_inner(
     // of a dense drawing) or the whole drawing with both engines is not bounded by their size (2000 children did not finish
     // in 30 minutes); the conflicts that remain are reported.
     let whole_reroute = !snapshot.options.scalable_stress;
+    // The engine choice routes the whole drawing again with both engines: not above `MAX_REROUTED_ROUTES` routes.
+    let engine_choice_fits = snapshot.routes.len() <= engine_choice::MAX_REROUTED_ROUTES;
     if whole_reroute
+        && engine_choice_fits
         && !dragging
         && !snapshot.route_conflicts.is_empty()
         && !snapshot.options.hierarchical_ordering
@@ -615,9 +652,12 @@ fn compute_counted_inner(
     // result is kept when it has fewer conflicts. A conflict that remains (an edge between areas of different flow axes,
     // which has no sections yet, searched into a node) goes to the choice of the routing engine as without the pipeline:
     // a route through a node is a hard violation.
+    // Not for more conflicts than `MAX_REROUTED_ROUTES`: in a dense view nearly every route is in conflict, and routing them
+    // again around all others did not end (a view of 349 nodes and 8778 edges); they are reported.
     if whole_reroute
         && !dragging
         && !snapshot.route_conflicts.is_empty()
+        && snapshot.route_conflicts.len() <= engine_choice::MAX_REROUTED_ROUTES
         && snapshot.options.hierarchical_ordering
     {
         let mut routed = reroute(&snapshot);
@@ -631,7 +671,11 @@ fn compute_counted_inner(
         // with both engines found nothing better on the measured views (their output is the same without it) and took
         // 42 s on a toggle with 481 routes that crossed container borders, for the same 6 conflicts
         // (benchmarks/results/single-pass-without-engine-choice-20261112.md); the conflicts are reported.
-        if whole_reroute && !snapshot.route_conflicts.is_empty() && !snapshot.options.single_pass {
+        if whole_reroute
+            && engine_choice_fits
+            && !snapshot.route_conflicts.is_empty()
+            && !snapshot.options.single_pass
+        {
             if let Some(better) = engine_choice::improve(graph, previous, &snapshot, &finish)? {
                 return Ok((better, stages));
             }
@@ -2093,6 +2137,8 @@ fn align_lanes(
     (gap, track): (f64, f64),
     blocks: bool,
     room: &BTreeMap<String, (f64, f64)>,
+    shared: bool,
+    stacked: &BTreeMap<(String, String), f64>,
 ) -> (f64, BTreeMap<usize, Vec<String>>) {
     let across = |r: &Rect| {
         if vertical {
@@ -2109,7 +2155,7 @@ fn align_lanes(
     // By element: (neighbour on a chain, own lane offset, neighbour's lane offset) for every edge of the chain.
     let mut meets: BTreeMap<&str, Vec<(&str, f64, f64)>> = BTreeMap::new();
     // Every segment of every chain's edges, for block placement.
-    let mut segments: Vec<(&str, f64, &str, f64)> = Vec::new();
+    let mut segments: Vec<(&str, f64, &str, f64, bool)> = Vec::new();
     for ((a, b), dummies) in chains {
         let Some(edges) = link_edges.get(&(a.clone(), b.clone())) else {
             continue;
@@ -2144,7 +2190,19 @@ fn align_lanes(
                     continue;
                 };
                 if blocks {
-                    segments.push((w[0], p, w[1], q));
+                    // Experimental (`alignStacked`): a stack edge between two containers at its exact ports, with priority.
+                    let exact = (dummies.is_empty())
+                        .then(|| {
+                            Some((
+                                *stacked.get(&(w[0].clone(), (*e).clone()))?,
+                                *stacked.get(&(w[1].clone(), (*e).clone()))?,
+                            ))
+                        })
+                        .flatten();
+                    match exact {
+                        Some((p, q)) => segments.push((w[0], p, w[1], q, true)),
+                        None => segments.push((w[0], p, w[1], q, false)),
+                    }
                 }
                 if x_end || !upstream {
                     meets.entry(w[0]).or_default().push((w[1], p, q));
@@ -2213,7 +2271,19 @@ fn align_lanes(
         .collect();
     // A rank of border nodes takes the order of the lanes its edges arrive on, so that every border node can lie on its
     // edge's lane (each has one neighbour inside the container).
-    let border_rank = |ids: &Vec<usize>| !ids.is_empty() && ids.iter().all(|&id| border[id]);
+    // Experimental (`sharedBorderRanks`): a rank of border nodes and side nodes only counts as a border rank too; its side
+    // nodes keep their places and only its border nodes take the order of their lanes.
+    let side: Vec<bool> = names
+        .iter()
+        .map(|id| id.starts_with(SIDE_IN_PREFIX) || id.starts_with(SIDE_OUT_PREFIX))
+        .collect();
+    let border_rank = |ids: &Vec<usize>| {
+        !ids.is_empty()
+            && (ids.iter().all(|&id| border[id])
+                || shared
+                    && ids.iter().any(|&id| border[id])
+                    && ids.iter().all(|&id| border[id] || side[id]))
+    };
     // Border nodes follow: an element other than a border node looks at its other neighbours, when it has any.
     let target_of = |start: &[Option<f64>], id: usize| -> Option<f64> {
         let list = &near[id];
@@ -2246,13 +2316,21 @@ fn align_lanes(
                 continue;
             }
             if border_rank(&ranks[r]) {
-                let mut keyed: Vec<(f64, usize, usize)> = ranks[r]
+                // The border nodes are ordered on the places border nodes hold (all of a pure border rank).
+                let places: Vec<usize> = (0..ranks[r].len())
+                    .filter(|&i| border[ranks[r][i]])
+                    .collect();
+                let mut keyed: Vec<(f64, usize, usize)> = places
                     .iter()
-                    .enumerate()
-                    .map(|(i, &id)| (target_of(&start, id).unwrap_or(f64::MAX), i, id))
+                    .map(|&i| {
+                        let id = ranks[r][i];
+                        (target_of(&start, id).unwrap_or(f64::MAX), i, id)
+                    })
                     .collect();
                 keyed.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
-                ranks[r] = keyed.into_iter().map(|k| k.2).collect();
+                for (&place, (_, _, id)) in places.iter().zip(keyed) {
+                    ranks[r][place] = id;
+                }
             }
             // The rank at once: the places nearest to the targets (least squares, weighted by the edges) that keep the
             // rank's order and gaps, by pooling neighbours that would overlap (isotonic regression).
@@ -2303,11 +2381,12 @@ fn align_lanes(
         // Provisional (single pass): straight blocks on the ranks the sweeps ordered (border ranks follow their lanes).
         let segments: Vec<block_placement::Segment> = segments
             .iter()
-            .map(|(a, p, b, q)| block_placement::Segment {
+            .map(|(a, p, b, q, priority)| block_placement::Segment {
                 upper: slot[a],
                 upper_offset: *p,
                 lower: slot[b],
                 lower_offset: *q,
+                priority: *priority,
             })
             .collect();
         let starts = block_placement::place(&block_placement::Input {
@@ -2685,6 +2764,7 @@ pub fn layered_construction(
     let plans = layered_plans(graph, options);
     let resolved = ports::PortContext::new(graph)
         .with_flow_sides(options.layered_construction)
+        .with_loop_space(options.loop_space)
         .with_order_keys(layered_plan::port_keys(&plans, graph))
         .with_end_sides(layered_plan::end_sides(&plans, graph, options.single_pass))
         .resolve_with(
@@ -4034,7 +4114,9 @@ fn compute_once(
     }
     validate(graph)?;
     let index = GraphIndex::new(graph);
-    let port_context = ports::PortContext::new(graph).with_flow_sides(options.layered_construction);
+    let port_context = ports::PortContext::new(graph)
+        .with_flow_sides(options.layered_construction)
+        .with_loop_space(options.loop_space);
     for label in options
         .edge_labels
         .values()
@@ -4454,6 +4536,30 @@ fn compute_once(
         &mut ordering,
         &mut run.capacity_seeds,
     );
+    // With `organicForces` the drawings are denser, and the moderate repair at the end of a drag can be left with a node
+    // that has no room within two spacings. The end of the gesture then repairs fully, as a fresh layout does; the steps of
+    // the drag stay local.
+    // Only for a conflict the detours do not draw around: a straight edge through a node is drawn around it by
+    // `straightDetours` (and the lines into containers stay to them by design), an overlap or a node outside its area is not.
+    let undrawable = repair_issues
+        .iter()
+        .any(|i| i.kind != "straight-through-node" || !options.straight_detours);
+    if options.organic_forces && effort == repair::Effort::Moderate && undrawable {
+        let mut full = repair::Memo::new(repair::Effort::Full);
+        repair_issues = repair_and_replace(
+            graph,
+            &index,
+            &port_context,
+            options,
+            &mut boxes,
+            &mut full,
+            (optimize, minimum, &gaps, &mut orientations),
+            &mut run.search,
+            &mut run.plans,
+            &mut ordering,
+            &mut run.capacity_seeds,
+        );
+    }
     if options.abstract_routing {
         if (run.stop)() {
             return Err(Abort::Stopped);
@@ -5385,6 +5491,85 @@ fn owner_among(
 /// The links between an area's children and their ranks (the cycle break, and network simplex when chosen). The ranks depend
 /// only on the area's own children, so the links a cycle break reverses are known before any area is placed.
 #[allow(clippy::type_complexity)]
+/// Experimental (`organicForces`): for every link between two of `ids` (siblings), the mean offset of its edges' ends from
+/// each sibling's centre. An end that is the sibling itself lies at its centre; one inside it at the descendant's centre,
+/// from the boxes of the descendants (relative to their parents, laid out before the siblings are arranged) and the
+/// siblings' sizes.
+fn organic_anchors<'g>(
+    graph: &'g Graph,
+    ids: &'g [String],
+    sizes: &BTreeMap<String, (f64, f64)>,
+    boxes: &BTreeMap<String, Rect>,
+) -> organic::Anchors {
+    let parent: BTreeMap<&str, Option<&str>> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let siblings: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
+    // The sibling that holds `id` and the offset of `id`'s centre from that sibling's centre.
+    let end = |id: &'g str| -> Option<(&'g str, (f64, f64))> {
+        if siblings.contains(id) {
+            return Some((id, (0., 0.)));
+        }
+        let own = boxes.get(id)?;
+        let (mut x, mut y) = (own.width / 2., own.height / 2.);
+        let mut at = id;
+        while !siblings.contains(at) {
+            let r = boxes.get(at)?;
+            x += r.x;
+            y += r.y;
+            at = (*parent.get(at)?)?;
+        }
+        // The siblings themselves are not placed yet: their sizes are known.
+        let (w, h) = sizes.get(at)?;
+        Some((at, (x - w / 2., y - h / 2.)))
+    };
+    let mut sums: BTreeMap<(String, String), ((f64, f64), (f64, f64), f64)> = BTreeMap::new();
+    for edge in &graph.edges {
+        let Some(target) = edge.target.as_deref() else {
+            continue;
+        };
+        let (Some((a, oa)), Some((b, ob))) = (end(&edge.source), end(target)) else {
+            continue;
+        };
+        if a == b {
+            continue;
+        }
+        let entry = sums
+            .entry((a.to_string(), b.to_string()))
+            .or_insert(((0., 0.), (0., 0.), 0.));
+        entry.0 = (entry.0 .0 + oa.0, entry.0 .1 + oa.1);
+        entry.1 = (entry.1 .0 + ob.0, entry.1 .1 + ob.1);
+        entry.2 += 1.;
+    }
+    let ends = sums
+        .into_iter()
+        .map(|(link, (sa, sb, n))| (link, ((sa.0 / n, sa.1 / n), (sb.0 / n, sb.1 / n))))
+        .collect();
+    // Every descendant's box, by the sibling that holds it, as an offset of its centre and its half extent.
+    let mut inside: BTreeMap<String, Vec<((f64, f64), (f64, f64))>> = BTreeMap::new();
+    for node in &graph.nodes {
+        if siblings.contains(node.id.as_str()) {
+            continue;
+        }
+        if let Some((sibling, offset)) = end(&node.id) {
+            if let Some(r) = boxes.get(&node.id) {
+                inside
+                    .entry(sibling.to_string())
+                    .or_default()
+                    .push((offset, (r.width / 2., r.height / 2.)));
+            }
+        }
+    }
+    organic::Anchors {
+        ends,
+        inside,
+        cooling: 1.,
+        tie_by_area: false,
+    }
+}
+
 fn area_ranks(
     children: &[&Node],
     index: &GraphIndex<'_>,
@@ -6095,14 +6280,28 @@ fn place(
                 }
                 if !border_entering.is_empty() || !border_leaving.is_empty() {
                     let (entering, leaving) = (border_entering, border_leaving);
-                    if !entering.is_empty() {
+                    // Experimental (`sharedBorderRanks`): a first or last rank of side nodes only takes the border nodes too.
+                    let only = |rank: Option<&Vec<String>>, prefix: &str| {
+                        options.shared_border_ranks
+                            && rank.is_some_and(|ids| {
+                                !ids.is_empty() && ids.iter().all(|id| id.starts_with(prefix))
+                            })
+                    };
+                    let share_first = only(levels.get(&0), SIDE_IN_PREFIX);
+                    let top = levels.keys().copied().max().unwrap_or(0);
+                    let share_last = only(levels.get(&top), SIDE_OUT_PREFIX);
+                    if !entering.is_empty() && !share_first {
                         // The entering border takes rank 0; every other rank moves one on.
                         for r in ranks.values_mut() {
                             *r += 1;
                         }
                         levels = levels.into_iter().map(|(r, ids)| (r + 1, ids)).collect();
                     }
-                    let last = levels.keys().copied().max().unwrap_or(0) + 1;
+                    let last = if share_last {
+                        levels.keys().copied().max().unwrap_or(0)
+                    } else {
+                        levels.keys().copied().max().unwrap_or(0) + 1
+                    };
                     for (edge, child) in &entering {
                         let node = format!("{BORDER_PREFIX}{edge}");
                         levels.entry(0).or_default().push(node.clone());
@@ -6763,8 +6962,17 @@ fn place(
             };
             // A border rank (step 6) needs only the margin and a track before or after it; the channel widening adds what its
             // lane changes need.
-            let border_level =
-                |ids: &Vec<String>| ids.iter().all(|id| id.starts_with(BORDER_PREFIX));
+            // Experimental (`sharedBorderRanks`): a rank of border nodes and side nodes only counts as a border rank too.
+            let border_level = |ids: &Vec<String>| {
+                ids.iter().all(|id| id.starts_with(BORDER_PREFIX))
+                    || options.shared_border_ranks
+                        && ids.iter().any(|id| id.starts_with(BORDER_PREFIX))
+                        && ids.iter().all(|id| {
+                            id.starts_with(BORDER_PREFIX)
+                                || id.starts_with(SIDE_IN_PREFIX)
+                                || id.starts_with(SIDE_OUT_PREFIX)
+                        })
+            };
             let gap = if options.layered_construction
                 && (border_level(ids)
                     || level_list
@@ -6973,6 +7181,69 @@ fn place(
                 all.extend(exact_lanes.iter().map(|(k, v)| (k.clone(), *v)));
                 all
             };
+            // Experimental (`alignStacked`): the stack edges, the only edge between two containers of adjacent ranks, at
+            // their exact ports in the containers' own plans (a side node's port as drawn, a border node's lane).
+            let stacked: BTreeMap<(String, String), f64> = if options.align_stacked
+                && options.single_pass
+            {
+                let containers: BTreeSet<&str> = children
+                    .iter()
+                    .filter(|c| !index.children_of(Some(c.id.as_str())).is_empty())
+                    .map(|c| c.id.as_str())
+                    .collect();
+                let port = |child: &str, edge: &str| -> Option<f64> {
+                    let plan = plans.get(child)?;
+                    if let Some(side) = plan.sides.get(edge) {
+                        let p = layered_plan::side_port(
+                            plan,
+                            (0., 0.),
+                            side,
+                            Some(options.track_spacing),
+                        )?;
+                        return Some(if vertical { p.x } else { p.y });
+                    }
+                    let d = plan.dummies.get(plan.borders.get(edge)?)?;
+                    Some(if vertical {
+                        d.x + d.width / 2.
+                    } else {
+                        d.y + d.height / 2.
+                    })
+                };
+                // The links of every element toward the next rank and from the previous one (the first hop of every chain).
+                let mut down: BTreeMap<&str, usize> = BTreeMap::new();
+                let mut up: BTreeMap<&str, usize> = BTreeMap::new();
+                for (a, b) in chains.keys() {
+                    *down.entry(a.as_str()).or_default() +=
+                        link_edges.get(&(a.clone(), b.clone())).map_or(1, Vec::len);
+                    *up.entry(b.as_str()).or_default() +=
+                        link_edges.get(&(a.clone(), b.clone())).map_or(1, Vec::len);
+                }
+                let mut found = BTreeMap::new();
+                for ((a, b), dummies) in &chains {
+                    // A stack: the edge is the upper container's only one toward the next rank and the lower one's only one
+                    // from the previous rank; otherwise its other edges would pay for it (uml-class, layerweave-code).
+                    if down.get(a.as_str()) != Some(&1) || up.get(b.as_str()) != Some(&1) {
+                        continue;
+                    }
+                    if !dummies.is_empty()
+                        || !containers.contains(a.as_str())
+                        || !containers.contains(b.as_str())
+                    {
+                        continue;
+                    }
+                    let Some([edge]) = link_edges.get(&(a.clone(), b.clone())).map(Vec::as_slice)
+                    else {
+                        continue;
+                    };
+                    if let (Some(p), Some(q)) = (port(a, edge), port(b, edge)) {
+                        found.insert((a.clone(), edge.clone()), p);
+                        found.insert((b.clone(), edge.clone()), q);
+                    }
+                }
+                found
+            } else {
+                BTreeMap::new()
+            };
             let planned_tracks = if reuse_cross {
                 let lanes = lanes.as_ref().expect("hierarchical lane planning");
                 let input = placement_geometry::Input {
@@ -7020,6 +7291,8 @@ fn place(
                             (cross_gap, options.track_spacing),
                             options.single_pass,
                             &lead_room,
+                            options.shared_border_ranks,
+                            &stacked,
                         );
                         placement_geometry::CrossPlan {
                             tracks: channel_tracks_by_edges(
@@ -7070,6 +7343,8 @@ fn place(
                             (cross_gap, options.track_spacing),
                             options.single_pass,
                             &lead_room,
+                            options.shared_border_ranks,
+                            &stacked,
                         );
                         *border_orders.borrow_mut() = reordered;
                         cross_extent = cross_extent.max(reach + cross_gap);
@@ -7426,6 +7701,29 @@ fn place(
                     }
                 }
             }
+            // Experimental (`organicForces`): where the edges of each link end, relative to the children's centres. The
+            // children are placed already, so the boxes of their descendants are known.
+            // Not where a child container holds containers itself: the edges deep inside them are what the repair cannot
+            // foresee, and a drawing that kept an issue was laid out a second time without the forces (mixed-large: the
+            // import took 2.0 s instead of 1.1 s).
+            let deep = children.iter().any(|c| {
+                index
+                    .children_of(Some(c.id.as_str()))
+                    .iter()
+                    .any(|&g| !index.children[g].is_empty())
+            });
+            let in_layered = parent.is_some_and(|p| {
+                let outer = index.node(p).and_then(|n| n.parent_id.as_deref());
+                matches!(
+                    direction_for(graph, outer),
+                    Mode::Orientation(_) | Mode::Chooser(_)
+                )
+            });
+            let anchors = (options.organic_forces && !deep).then(|| organic::Anchors {
+                cooling: options.settle_cooling.unwrap_or(1.),
+                tie_by_area: in_layered,
+                ..organic_anchors(graph, &ids, &sizes, boxes)
+            });
             organic::organic_arrange_counted(
                 &ids,
                 &link_set,
@@ -7442,6 +7740,7 @@ fn place(
                 options.sparse_stress,
                 options.size_aware_stress,
                 options.scalable_stress,
+                anchors.as_ref(),
                 counters,
             )
         }
@@ -7827,6 +8126,7 @@ pub fn seed_drawing(
 ) -> (Vec<Route>, Vec<arqlet_model::ResolvedPort>) {
     let ports = ports::PortContext::new(graph)
         .with_flow_sides(options.layered_construction)
+        .with_loop_space(options.loop_space)
         .resolve_with(
             boxes,
             options.port_placement,
@@ -8290,7 +8590,7 @@ fn bend_count(points: &[Point]) -> usize {
         .count()
 }
 
-fn proper_crossing(a: (f64, f64), b: (f64, f64), c: (f64, f64), d: (f64, f64)) -> bool {
+pub(crate) fn proper_crossing(a: (f64, f64), b: (f64, f64), c: (f64, f64), d: (f64, f64)) -> bool {
     let orient = |p: (f64, f64), q: (f64, f64), r: (f64, f64)| {
         (q.0 - p.0) * (r.1 - p.1) - (q.1 - p.1) * (r.0 - p.0)
     };
@@ -8485,7 +8785,8 @@ fn reroute_with(
 ) -> Result<Snapshot, arqlet_routing::channel::Stopped> {
     let mut result = snapshot.clone();
     let port_context = ports::PortContext::new(&snapshot.graph)
-        .with_flow_sides(snapshot.options.layered_construction);
+        .with_flow_sides(snapshot.options.layered_construction)
+        .with_loop_space(snapshot.options.loop_space);
     let straight: BTreeSet<String> = snapshot.straight_edges.iter().cloned().collect();
     if !straight.is_empty()
         && snapshot
@@ -8683,6 +8984,7 @@ fn finish_routes(snapshot: &mut Snapshot, bundle: bool) {
     // on the flow sides, so the published ports are the ones the routes start and end at.
     let mut resolved = ports::PortContext::new(&snapshot.graph)
         .with_flow_sides(snapshot.options.layered_construction)
+        .with_loop_space(snapshot.options.loop_space)
         .resolve_with(
             &snapshot.boxes,
             snapshot.options.port_placement,
@@ -8784,8 +9086,9 @@ pub fn search_placement_counted(
     }
 
     let graph = &snapshot.graph;
-    let port_context =
-        ports::PortContext::new(graph).with_flow_sides(snapshot.options.layered_construction);
+    let port_context = ports::PortContext::new(graph)
+        .with_flow_sides(snapshot.options.layered_construction)
+        .with_loop_space(snapshot.options.loop_space);
     let parents: BTreeMap<&str, Option<&str>> = graph
         .nodes
         .iter()

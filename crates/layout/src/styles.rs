@@ -175,11 +175,46 @@ fn edge_choices(graph: &Graph, options: &LayoutOptions) -> Result<Choices, Strin
     let legacy = options.edge_routing.map(legacy_style);
     let mut choices: BTreeMap<String, Vec<RoutingStyle>> = BTreeMap::new();
     let mut areas: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    // The parent of every node, once (the first node of an id, as `Graph::edge_area` and `Graph::routing_constraint` find
+    // it): they searched the node list for every parent of every edge, quadratic in the size of the view, and the repair
+    // asks for the choices again and again (a view of 1000 nodes of synthetic-20k did not finish in 15 minutes).
+    let mut parent_of: BTreeMap<&str, Option<&str>> = BTreeMap::new();
+    for n in &graph.nodes {
+        parent_of
+            .entry(n.id.as_str())
+            .or_insert(n.parent_id.as_deref());
+    }
+    let ancestors = |id: &str| -> Vec<&str> {
+        let mut chain = Vec::new();
+        let mut current = parent_of.get(id).copied().flatten();
+        while let Some(parent) = current {
+            chain.push(parent);
+            current = parent_of.get(parent).copied().flatten();
+        }
+        chain
+    };
+    let edge_area = |source: &str, target: &str| -> Option<String> {
+        let target_chain = ancestors(target);
+        ancestors(source)
+            .into_iter()
+            .find(|area| target_chain.contains(area))
+            .map(str::to_string)
+    };
+    let routing_constraint = |parent: Option<&str>| -> Option<RoutingConstraint> {
+        let mut current = parent;
+        while let Some(id) = current {
+            if let Some(value) = graph.container_routing.get(id) {
+                return Some(value.clone());
+            }
+            current = parent_of.get(id).copied().flatten();
+        }
+        graph.default_routing.clone()
+    };
     for edge in graph.edges.iter().filter(|e| e.target.is_some()) {
         let target = edge.target.as_deref().unwrap_or_default();
-        let area = graph.edge_area(&edge.source, target);
+        let area = edge_area(&edge.source, target);
         let who = area.as_deref().unwrap_or("the root");
-        let authored = graph.routing_constraint(area.as_deref());
+        let authored = routing_constraint(area.as_deref());
         let requirement = match (&authored, legacy) {
             (Some(c), Some(style)) if !c.admits(style) => {
                 return Err(format!(
@@ -430,18 +465,21 @@ pub fn apply_straight_edges(
                 .collect();
             // Experimental (`straightDetours`, ADR 0020 S1-1b): around the blockers, on the edge's earlier route pulled taut
             // around every node the edge does not end at or lie in; kept only when that route is clear of them.
-            let detour = (snapshot.options.straight_detours && !blocked.is_empty())
-                .then(|| {
-                    detour(
-                        snapshot,
-                        &e.id,
-                        (e.source.as_str(), target),
-                        &holding,
-                        &absolute,
-                        &outlines,
-                    )
-                })
-                .flatten();
+            // A preview step of a settling keeps its straight edges straight (`settle_preview`): the converged step is repaired.
+            let detour = (snapshot.options.straight_detours
+                && !snapshot.options.settle_preview
+                && !blocked.is_empty())
+            .then(|| {
+                detour(
+                    snapshot,
+                    &e.id,
+                    (e.source.as_str(), target),
+                    &holding,
+                    &absolute,
+                    &outlines,
+                )
+            })
+            .flatten();
             if detour.is_none() {
                 for node in blocked {
                     issues.push(format!("straight edge {} passes through node {node}", e.id));
