@@ -87,6 +87,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   under single pass. A 1000-node view of synthetic-20k took more than 15 minutes, now 26 s; synthetic-20k with one level
   open (349 visible nodes, 8072 edges) more than 10 minutes, now 7 s.
 
+- `loopSpace` finds the nodes within reach of a node's loop corners once and tests their ancestors only for them; every
+  node was tested for every corner of every node with a loop (a 5 000-node view of synthetic-20k: 198 s → 78 s,
+  [measurement](benchmarks/results/structured-view-scale-20261115.md)). Byte-identical output.
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.
