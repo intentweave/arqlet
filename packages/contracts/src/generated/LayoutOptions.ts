@@ -216,6 +216,12 @@ directedRepair?: boolean,
  */
 organicForces?: boolean,
 /**
+ * The loops of a node take the corner of the node where no other box lies in their way (then the corner whose sides
+ * carry the fewest other edges, as before); the loops take no part in the placement, and a blocked corner made the
+ * router take them around the neighbour, with bends. On by default since 0.6.0; written as `false` when turned off.
+ */
+loopSpace?: boolean,
+/**
  * Experimental bounded repulsion from projected edge chords at the end of organic stress. Off by default.
  */
 nodeEdgeRepulsion?: boolean,

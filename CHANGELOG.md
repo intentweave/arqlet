@@ -18,6 +18,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   unchanged ([measurement](benchmarks/results/cross-axis-space-20261115.md)). New reference fingerprints:
   `benchmarks/results/fingerprints-20261115-stacked-default.jsonl` (4 of 15 views changed; with both options `false`
   the geometry equals the 20261114 reference).
+- **Default:** `loopSpace` is on: the loops of a node take a corner where no other box lies in their way, in every area
+  (before only in organic ones with `organicForces`); they take no part in the placement. synthetic-2k 8 bends fewer, every
+  other dataset with the same crossings, bends and area (state-order draws its loops at other corners). New reference
+  fingerprints: `benchmarks/results/fingerprints-20261115-loop-space-default.jsonl` (state-order changed; with
+  `loopSpace: false` the views equal the stacked-default reference).
 - **Default:** `organicForces` is on: a fresh organic placement continues after the stress with forces in the manner of
   d3-force (springs between where the edges end, many-body repulsion, box collision, a push off straight edges, and a pull
   toward the centroid that weakens with the number of children). Taken per area only where the children are connected

@@ -2748,7 +2748,7 @@ pub fn layered_construction(
     let plans = layered_plans(graph, options);
     let resolved = ports::PortContext::new(graph)
         .with_flow_sides(options.layered_construction)
-        .with_loop_space(options.organic_forces)
+        .with_loop_space(options.loop_space)
         .with_order_keys(layered_plan::port_keys(&plans, graph))
         .with_end_sides(layered_plan::end_sides(&plans, graph, options.single_pass))
         .resolve_with(
@@ -4100,7 +4100,7 @@ fn compute_once(
     let index = GraphIndex::new(graph);
     let port_context = ports::PortContext::new(graph)
         .with_flow_sides(options.layered_construction)
-        .with_loop_space(options.organic_forces);
+        .with_loop_space(options.loop_space);
     for label in options
         .edge_labels
         .values()
@@ -8101,7 +8101,7 @@ pub fn seed_drawing(
 ) -> (Vec<Route>, Vec<arqlet_model::ResolvedPort>) {
     let ports = ports::PortContext::new(graph)
         .with_flow_sides(options.layered_construction)
-        .with_loop_space(options.organic_forces)
+        .with_loop_space(options.loop_space)
         .resolve_with(
             boxes,
             options.port_placement,
@@ -8761,7 +8761,7 @@ fn reroute_with(
     let mut result = snapshot.clone();
     let port_context = ports::PortContext::new(&snapshot.graph)
         .with_flow_sides(snapshot.options.layered_construction)
-        .with_loop_space(snapshot.options.organic_forces);
+        .with_loop_space(snapshot.options.loop_space);
     let straight: BTreeSet<String> = snapshot.straight_edges.iter().cloned().collect();
     if !straight.is_empty()
         && snapshot
@@ -8959,7 +8959,7 @@ fn finish_routes(snapshot: &mut Snapshot, bundle: bool) {
     // on the flow sides, so the published ports are the ones the routes start and end at.
     let mut resolved = ports::PortContext::new(&snapshot.graph)
         .with_flow_sides(snapshot.options.layered_construction)
-        .with_loop_space(snapshot.options.organic_forces)
+        .with_loop_space(snapshot.options.loop_space)
         .resolve_with(
             &snapshot.boxes,
             snapshot.options.port_placement,
@@ -9063,7 +9063,7 @@ pub fn search_placement_counted(
     let graph = &snapshot.graph;
     let port_context = ports::PortContext::new(graph)
         .with_flow_sides(snapshot.options.layered_construction)
-        .with_loop_space(snapshot.options.organic_forces);
+        .with_loop_space(snapshot.options.loop_space);
     let parents: BTreeMap<&str, Option<&str>> = graph
         .nodes
         .iter()

@@ -1876,6 +1876,11 @@ pub struct LayoutOptions {
     /// since 0.6.0; written as `false` when turned off.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub organic_forces: bool,
+    /// The loops of a node take the corner of the node where no other box lies in their way (then the corner whose sides
+    /// carry the fewest other edges, as before); the loops take no part in the placement, and a blocked corner made the
+    /// router take them around the neighbour, with bends. On by default since 0.6.0; written as `false` when turned off.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub loop_space: bool,
     /// Experimental bounded repulsion from projected edge chords at the end of organic stress. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub node_edge_repulsion: bool,
@@ -2132,6 +2137,7 @@ impl Default for LayoutOptions {
             vpsc_overlap_removal: false,
             directed_repair: false,
             organic_forces: true,
+            loop_space: true,
             node_edge_repulsion: false,
             sparse_stress: false,
             scalable_stress: false,

@@ -35,7 +35,7 @@ pub fn resolve_with(
     PortContext::new(graph).resolve_with(boxes, placement, min_spacing, node_rows, row_order)
 }
 
-/// Experimental (`organicForces`): how far beyond a node's corner its loops reach, for the first loop and for each loop.
+/// `loopSpace`: how far beyond a node's corner its loops reach, for the first loop and for each loop.
 const LOOP_REACH: f64 = 24.;
 const LOOP_STEP: f64 = 8.;
 
@@ -63,7 +63,7 @@ pub(crate) struct PortContext<'g> {
     /// Experimental (plan section 4a, `layeredConstruction`): an automatic port of an edge that runs forward through areas
     /// of one fixed flow sits on the side the flow leaves (source) or enters (target). Off by default.
     flow_sides: bool,
-    /// With `organicForces`: the loops of a node in an organic area take a corner where no other box lies in their way.
+    /// `loopSpace`: the loops of a node take a corner where no other box lies in their way.
     loop_space: bool,
     /// Experimental (plan section 4a, step 3): order keys of automatic ports by (edge, source end), from the layered plan
     /// (`layered_plan::port_keys`). A node side whose ports all have a key is ordered by them instead of by the geometry.
@@ -549,12 +549,11 @@ impl<'g> PortContext<'g> {
                     load.get(&(node, a as u8)).copied().unwrap_or(0)
                         + load.get(&(node, b as u8)).copied().unwrap_or(0)
                 };
-                // Experimental (`organicForces`): the boxes in the way of the loops at a corner, other than the node's own
+                // `loopSpace`: the boxes in the way of the loops at a corner, other than the node's own
                 // ancestors and descendants. The loops are drawn at the end and do not take part in the placement; a corner
                 // that a neighbour blocks makes the router take them around it, with bends.
                 let blocked = |(a, b): (PortSide, PortSide)| -> usize {
-                    // Only in organic areas: a layered area keeps its loop sides (another proposal there).
-                    if !self.loop_space || graph.area_mode(parents[node]) != Ok(Mode::Organic) {
+                    if !self.loop_space {
                         return 0;
                     }
                     let reach = LOOP_REACH + LOOP_STEP * self.loop_counts[node] as f64;
