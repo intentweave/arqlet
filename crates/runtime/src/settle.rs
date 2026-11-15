@@ -12,6 +12,8 @@ pub const CONTINUATION_STEPS: usize = 3;
 pub const CONVERGED_BELOW: f64 = 0.5;
 /// The id of the preview gesture the steps of a settle run under (`organicForces`); never in a published snapshot.
 const SETTLE_GESTURE: &str = "settle";
+/// The share of the step the next call of a settling keeps (with `organicForces`): 0.9 per call, a tenth after 22 calls.
+pub const SETTLE_COOLING: f64 = 0.9;
 
 /// The largest distance any node's box moved between two snapshots of the same view.
 fn residual(before: &Snapshot, after: &Snapshot) -> f64 {
@@ -41,6 +43,7 @@ pub fn settle_snapshot(
                 steps: 0,
                 residual: 0.,
                 converged: true,
+                round: 0,
             }),
             ..Default::default()
         });
@@ -62,12 +65,24 @@ pub fn settle_snapshot(
         ending,
         origin: None,
     };
+    // The calls of one settling: each continues the round of the report it finds, and with the forces takes a smaller step
+    // than the one before (`SETTLE_COOLING` per call), so that the settling converges instead of swinging.
+    let round = snapshot
+        .edit_report
+        .as_ref()
+        .and_then(|r| r.settle.as_ref())
+        .filter(|s| !s.converged)
+        .map_or(0, |s| s.round.saturating_add(1));
+    let mut options = snapshot.options.clone();
+    if forces {
+        options.settle_cooling = Some(SETTLE_COOLING.p_powf(f64::from(round)));
+    }
     let (mut steps, mut moved) = (0, f64::INFINITY);
     while steps < CONTINUATION_STEPS {
         if forces {
             current.gesture = Some(preview(false));
         }
-        let next = recompute_layout(&current, &snapshot.options, None)?;
+        let next = recompute_layout(&current, &options, None)?;
         moved = residual(&current, &next);
         current = next;
         steps += 1;
@@ -80,14 +95,16 @@ pub fn settle_snapshot(
     // host stops asking; the residual reports the forces' last step.
     if forces && moved < CONVERGED_BELOW {
         current.gesture = Some(preview(true));
-        current = recompute_layout(&current, &snapshot.options, None)?;
+        current = recompute_layout(&current, &options, None)?;
     }
     current.gesture = None;
+    current.options.settle_cooling = None;
     current.edit_report = Some(EditReport {
         settle: Some(Settle {
             steps,
             residual: moved,
             converged: moved < CONVERGED_BELOW,
+            round,
         }),
         ..Default::default()
     });

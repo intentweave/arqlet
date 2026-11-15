@@ -3,4 +3,9 @@
 /**
  * The outcome of the settling steps after a drag (see `EditReport::settle`).
  */
-export type Settle = { steps: number, residual: number, converged: boolean, };
+export type Settle = { steps: number, residual: number, converged: boolean,
+/**
+ * The calls of one settling so far (0 for the first): each takes a smaller step than the one before, so that the
+ * settling converges. Counted on from the report of the snapshot a call continues. Omitted when 0.
+ */
+round?: number, };

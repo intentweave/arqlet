@@ -35,17 +35,27 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   converge (petri-net-shapes swung by 80 units, mixed-layouts crept by 70 a step; with the stress model up to 1300). Now
   petri-net-shapes converges in 5 calls, mixed-layouts in 8, organic-50 in 24, each call 8 to 40 ms.
 
+- Settling cools: each call of one settling takes 0.9 of the step of the call before (the report counts the calls as
+  `round`), as a force simulation cools, so that it converges instead of swinging. On the organic examples within 4 to
+  43 calls (organic-100 did not converge in 60 before).
+
+### Removed
+
+- `repairCompaction` (experimental, never released): with `organicForces` it added nothing.
+
 ### Fixed
 
+- Playground: the end of the live animation flickered and the drawing rolled in at other places. A node's pin control
+  lies inside the node and took the node's animation offset a second time; in the live mode's frames, which come faster
+  than an animation lasts, the offsets doubled from frame to frame. Only the outermost element of an id is moved now,
+  and the places after a change are measured without a running animation's offset. The routes are no longer faded in at
+  every frame of settling, and the live mode starts no refinement (it laid the drawing out anew after the animation).
 - The end of a drag that changes no pin repaired nothing: the engine saw unchanged options and answered without a layout,
   so conflicts the local repair of the last drag step left stood. The end of a gesture now lays out the dragged node
   again when geometry issues remain (not for a force-directed drag, which settles by its own steps).
 
 ### Added
 
-- `repairCompaction` (experimental, off): in a flat organic drawing, the nodes the geometric repair pushed out are pulled
-  back toward their stress places as far as no conflict comes back and no crossing is added (petri-net-shapes 23 %
-  smaller, organic-25 9 %; every other dataset unchanged).
 - Playground: **Live** (organic areas keep settling, animated): turns on force-directed behaviour and follows every change
   with bounded `settle` calls, one animated frame each, until the engine reports convergence (at most 60 calls). Each
   call goes through `execute()`, so it runs in the split, browser-only and backend-only modes, and a stale answer is

@@ -1838,6 +1838,11 @@ pub struct LayoutOptions {
     #[serde(skip)]
     #[cfg_attr(feature = "ts", ts(skip))]
     pub region_child_sides: BTreeMap<String, bool>,
+    /// Internal (`settle` with `organicForces`): the share of a damped step a force-directed continuation takes, below 1 in
+    /// later calls of one settling so that it converges. Set for each call, never written or read.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub settle_cooling: Option<f64>,
     /// Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
     /// and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
     /// delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the
@@ -1863,11 +1868,6 @@ pub struct LayoutOptions {
     /// Experimental conflict-directed organic repair, with the exhaustive search as a fallback. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub directed_repair: bool,
-    /// Experimental: after the geometric repair of an organic area has resolved every conflict, each node it moved is pulled
-    /// back toward its place from the stress placement, as far as no conflict comes back. Edges stay straight; the drawing
-    /// only shrinks where the repair had pushed nodes out. Off by default.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub repair_compaction: bool,
     /// A fresh organic placement continues after the stress with forces in the manner of d3-force (springs one node spacing
     /// long between where the edges end, many-body repulsion, box collision, a push off the straight edges, and a pull
     /// toward the centroid), which closes the gaps the stress leaves and leaves the repair little to resolve. Taken per area
@@ -2124,13 +2124,13 @@ impl Default for LayoutOptions {
             channels_by_demand: true,
             nested_edges_by_detour: true,
             region_child_sides: BTreeMap::new(),
+            settle_cooling: None,
             directions_first: false,
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,
             vpsc_overlap_removal: false,
             directed_repair: false,
-            repair_compaction: false,
             organic_forces: true,
             node_edge_repulsion: false,
             sparse_stress: false,
@@ -2538,6 +2538,14 @@ pub struct Settle {
     pub steps: usize,
     pub residual: f64,
     pub converged: bool,
+    /// The calls of one settling so far (0 for the first): each takes a smaller step than the one before, so that the
+    /// settling converges. Counted on from the report of the snapshot a call continues. Omitted when 0.
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub round: u32,
+}
+
+fn is_zero_u32(v: &u32) -> bool {
+    *v == 0
 }
 
 /// What a streamed publication of a refinement job is: a preview (a step of an edit that is not final), the best layout found so

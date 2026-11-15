@@ -27,6 +27,8 @@ pub const MAX_NODES: usize = 300;
 pub(crate) struct Anchors {
     pub ends: BTreeMap<(String, String), ((f64, f64), (f64, f64))>,
     pub inside: BTreeMap<String, Vec<((f64, f64), (f64, f64))>>,
+    /// The share of a damped step a continuation takes (`settle_cooling`; 1 outside a settling).
+    pub cooling: f64,
 }
 
 /// The largest number of children of an area under `sparseStress`. The stress is O(pivots·n + m) per iteration, but the repair
@@ -1686,12 +1688,14 @@ fn organic_stages_full(
                 continue;
             }
             let (dx, dy) = (x[i].0 - start[id].0, x[i].1 - start[id].1);
-            let moved = dx.p_hypot(dy) * FORCE_DAMPING;
-            let limit = length * FORCE_MAX_STEP;
+            // A later call of a settling takes a smaller share of the step (`settle_cooling`), as a force simulation cools.
+            let cooling = anchors.map_or(1., |a| a.cooling.clamp(0., 1.));
+            let moved = dx.p_hypot(dy) * FORCE_DAMPING * cooling;
+            let limit = length * FORCE_MAX_STEP * cooling;
             let scale = if moved > limit && moved > 0. {
                 limit / (dx.p_hypot(dy))
             } else {
-                FORCE_DAMPING
+                FORCE_DAMPING * cooling
             };
             x[i] = (start[id].0 + dx * scale, start[id].1 + dy * scale);
         }

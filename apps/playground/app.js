@@ -281,27 +281,41 @@ function drawnPosition(id){
 // engine's result is final; this only shows the way to it. Off when the user asks for reduced motion.
 const ANIMATED=['data-node-id','data-container-id','data-header-id','data-toggle-id','data-pin-id','data-pinned-id','data-resize-id'];
 function idOf(el){for(const a of ANIMATED){const v=el.getAttribute(a);if(v!==null)return v;}return null;}
+// The elements that move as a whole: those with an id of their own that no other such element contains (a node's pin control
+// lies inside the node and moves with it; an offset of its own would move it twice).
+function movingElements(){
+ const all=[...$('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))];
+ const set=new Set(all);
+ return all.filter(el=>{for(let p=el.parentElement;p;p=p.parentElement)if(set.has(p))return false;return true;});
+}
 function placesOnScreen(){
  // Only a real DOM has places on screen; an animation never stands in the way of the change itself.
  if(typeof $('graph').querySelectorAll!=='function')return null;
  const out=new Map();
- for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){const id=idOf(el);if(id!==null&&!out.has(id)){const r=el.getBoundingClientRect();out.set(id,[r.left,r.top]);}}
+ for(const el of movingElements()){const id=idOf(el);if(id!==null&&!out.has(id)){const r=el.getBoundingClientRect();out.set(id,[r.left,r.top]);}}
  return out;
 }
-function animateFrom(before){
- try{animate(before);}catch{/* the change is drawn; only its animation is lost */}
+function animateFrom(before,options={}){
+ try{animate(before,options);}catch{/* the change is drawn; only its animation is lost */}
 }
-function animate(before){
+// `before` holds the places as they were on screen, including an animation still running. The places after the change are
+// measured without any animation's offset, else a new animation that starts while one runs adds its offset again and the
+// offsets build up (the live mode's frames come faster than an animation lasts). `fade: false` keeps the routes and labels
+// visible (the frames of settling), instead of fading them in.
+function animate(before,{fade=true}={}){
  if(!before||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){el.style.transition='none';el.style.transform='';}
+ const moving=typeof $('graph').querySelectorAll==='function'?movingElements():[];
+ $('graph').getBoundingClientRect();
  const after=placesOnScreen(),moved=[];
- for(const el of $('graph').querySelectorAll(ANIMATED.map(a=>`[${a}]`).join(','))){
+ for(const el of moving){
   const id=idOf(el),from=before.get(id),to=after.get(id);
   el.style.transition='none';
   // CSS lengths in the drawing are its user units: a screen pixel is 1/scale of one.
   if(from&&to)el.style.transform=`translate(${(from[0]-to[0])/scale}px,${(from[1]-to[1])/scale}px)`;else el.style.opacity='0';
   moved.push(el);
  }
- for(const el of $('graph').querySelectorAll('[data-route-id],[data-label-id]')){el.style.transition='none';el.style.opacity='0';moved.push(el);}
+ if(fade)for(const el of $('graph').querySelectorAll('[data-route-id],[data-label-id]')){el.style.transition='none';el.style.opacity='0';moved.push(el);}
  $('graph').getBoundingClientRect();
  requestAnimationFrame(()=>{for(const el of moved){el.style.transition='transform 380ms ease, opacity 380ms ease';el.style.transform='';el.style.opacity='';}});
  setTimeout(()=>{for(const el of moved)el.style.transition='';},450);
@@ -329,8 +343,9 @@ async function edit(request,{busy,fit=false,chained=false,remember=null,anchor=n
  const after=before?drawnPosition(anchor):null;
  if(after){autoFit=false;draw(false);const c=$('canvas');c.scrollLeft+=after.x-before.x;c.scrollTop+=after.y-before.y;}
  else draw(fit);
- animateFrom(places);
- if(!chained)scheduleRefinement();
+ animateFrom(places,{fade:request.op!=='settle'});
+ // Live mode: no refinement after a change; it would lay the drawing out anew while it settles (and after).
+ if(!chained&&!$('live').checked)scheduleRefinement();
  // Live mode: a change other than a settle step is followed by settling (after this edit has returned).
  if(!chained&&request.op!=='settle'&&$('live').checked)setTimeout(live,0);
  // A new node changes the graph itself: what was remembered no longer describes it. A decision is remembered as one entry.
@@ -474,9 +489,9 @@ async function settle(calls=3){
   const report=snapshot.editReport?.settle;
   if(!report)return;
   status(`Settled: ${report.converged?'converged':'refined, not converged'} · largest move ${report.residual.toFixed(2)} after ${report.steps} step${report.steps===1?'':'s'}`);
-  if(report.converged){scheduleRefinement();return;}
+  if(report.converged){if(!$('live').checked)scheduleRefinement();return;}
  }
- scheduleRefinement();
+ if(!$('live').checked)scheduleRefinement();
 }
 // A fixed size is a border the node cannot cross: the drag stops at the edge of every fixed container above the node
 // (ADR 0010). The farthest one is applied first, so the nearest, which lies inside it, has the last word.

@@ -1,6 +1,5 @@
-//! `organicForces` (forces in the manner of d3-force after the stress, on by default) and the experimental `repairCompaction`
-//! (the nodes the repair pushed out are pulled back): smaller organic drawings with valid geometry and no more crossings or
-//! bends than without.
+//! `organicForces` (forces in the manner of d3-force after the stress, on by default): smaller organic drawings with valid
+//! geometry and no more crossings or bends than without.
 use arqlet_model::Snapshot;
 use arqlet_runtime::dispatch;
 use serde_json::{json, Value};
@@ -62,18 +61,6 @@ fn forces_take_the_ends_inside_containers_and_room_for_loops() {
         json!({"organicForces": false}),
         json!({}),
         1.0,
-    );
-}
-
-#[test]
-fn the_compaction_pulls_back_what_the_repair_pushed_out() {
-    // petri-net-shapes: 1614k to 1247k (measured 2026-11-14).
-    let off = json!({"organicForces": false});
-    check(
-        "petri-net-shapes",
-        off,
-        json!({"organicForces": false, "repairCompaction": true}),
-        0.85,
     );
 }
 

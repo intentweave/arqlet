@@ -5541,7 +5541,11 @@ fn organic_anchors<'g>(
             }
         }
     }
-    organic::Anchors { ends, inside }
+    organic::Anchors {
+        ends,
+        inside,
+        cooling: 1.,
+    }
 }
 
 fn area_ranks(
@@ -7677,9 +7681,10 @@ fn place(
             }
             // Experimental (`organicForces`): where the edges of each link end, relative to the children's centres. The
             // children are placed already, so the boxes of their descendants are known.
-            let anchors = options
-                .organic_forces
-                .then(|| organic_anchors(graph, &ids, &sizes, boxes));
+            let anchors = options.organic_forces.then(|| organic::Anchors {
+                cooling: options.settle_cooling.unwrap_or(1.),
+                ..organic_anchors(graph, &ids, &sizes, boxes)
+            });
             organic::organic_arrange_counted(
                 &ids,
                 &link_set,
