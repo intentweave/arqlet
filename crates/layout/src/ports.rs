@@ -76,6 +76,10 @@ pub(crate) struct PortContext<'g> {
     end_side_of: Vec<[Option<PortSide>; 2]>,
     /// The edges (indices into `edges`) that end at every node, by node index.
     incident: Vec<Vec<usize>>,
+    /// The children of every node, by node index.
+    child_index: Vec<Vec<usize>>,
+    /// The id of an automatic port, by edge and end (source, target): `auto:{edge}:{end}`.
+    auto_ids: Vec<[String; 2]>,
     /// By edge: the flow axis of its ends' smallest common area (`flow_axis`), and the mode of its source's area.
     edge_axis: Vec<Option<bool>>,
     edge_mode: Vec<Mode>,
@@ -87,12 +91,22 @@ pub(crate) struct PortContext<'g> {
 
 #[derive(Default)]
 pub(crate) struct PortResolveScratch {
+    /// Whether `relative` and `rects` hold the boxes of the last call, so that a caller that names the nodes whose boxes
+    /// changed since (`resolve_nodes_into`'s `changed`) has only those read again.
+    valid: bool,
     rects: Vec<Rect>,
     /// The boxes of `node_ids` as given (relative to their parents), read in one pass over the boxes.
     relative: Vec<Option<Rect>>,
     /// Whether a node (by index) is one of the nodes asked for (`only`).
     selected: Vec<bool>,
     row_ports: Vec<(usize, String, String, PortSide, f64, String)>,
+}
+
+impl PortResolveScratch {
+    /// Forgets the boxes of the last call: the next call reads every box.
+    pub(crate) fn invalidate(&mut self) {
+        self.valid = false;
+    }
 }
 
 impl<'g> PortContext<'g> {
@@ -174,6 +188,21 @@ impl<'g> PortContext<'g> {
             }
         }
         let end_side_of = vec![[None, None]; edges.len()];
+        let auto_ids: Vec<[String; 2]> = edges
+            .iter()
+            .map(|e| {
+                [
+                    format!("auto:{}:source", e.id),
+                    format!("auto:{}:target", e.id),
+                ]
+            })
+            .collect();
+        let mut child_index: Vec<Vec<usize>> = vec![Vec::new(); node_ids.len()];
+        for (i, parent) in parent_index.iter().enumerate() {
+            if let Some(p) = *parent {
+                child_index[p].push(i);
+            }
+        }
         let edge_axis: Vec<Option<bool>> = edges
             .iter()
             .map(|e| match e.target.as_deref() {
@@ -209,6 +238,8 @@ impl<'g> PortContext<'g> {
             end_sides: BTreeMap::new(),
             end_side_of,
             incident,
+            child_index,
+            auto_ids,
             edge_axis,
             edge_mode,
             lanes: BTreeMap::new(),
@@ -284,12 +315,14 @@ impl<'g> PortContext<'g> {
             node_rows,
             row_order,
             only,
+            None,
             &mut scratch,
             &mut result,
         );
         result
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn resolve_nodes_into(
         &self,
         boxes: &BTreeMap<String, Rect>,
@@ -298,13 +331,28 @@ impl<'g> PortContext<'g> {
         node_rows: &BTreeMap<String, Vec<arqlet_model::Row>>,
         row_order: arqlet_model::RowPortOrder,
         only: Option<&[&str]>,
+        changed: Option<&[usize]>,
         scratch: &mut PortResolveScratch,
         result: &mut Vec<ResolvedPort>,
     ) {
         result.clear();
-        let graph = self.graph;
-        let explicit = &self.explicit;
-        let bindings = &self.bindings;
+        // The boxes of the last call stand where the caller names the nodes whose boxes changed since (by node index): only
+        // those are read again, and the absolute boxes of them and of everything inside them computed again, in the same
+        // order of additions as below, so every value is the same as a full computation gives.
+        if let (Some(changed), true) = (changed, scratch.valid) {
+            if self.refresh(boxes, changed, scratch) {
+                return self.resolve_rest(
+                    placement,
+                    min_spacing,
+                    node_rows,
+                    row_order,
+                    only,
+                    scratch,
+                    result,
+                );
+            }
+        }
+        scratch.valid = false;
         let parents = &self.parents;
         // The absolute box of every node, as `absolute_with` gives it (its own box, then each parent's offset, in that order),
         // with the boxes read in one pass in id order instead of a map lookup per node and per parent.
@@ -347,6 +395,73 @@ impl<'g> PortContext<'g> {
             }
             scratch.rects.push(r);
         }
+        scratch.valid = true;
+        self.resolve_rest(
+            placement,
+            min_spacing,
+            node_rows,
+            row_order,
+            only,
+            scratch,
+            result,
+        )
+    }
+
+    /// Reads the boxes of the `changed` nodes again and computes the absolute boxes of them and of their descendants as the
+    /// full computation does. False when a node has no box (the full computation then gives the failure it gives).
+    fn refresh(
+        &self,
+        boxes: &BTreeMap<String, Rect>,
+        changed: &[usize],
+        scratch: &mut PortResolveScratch,
+    ) -> bool {
+        if scratch.relative.len() != self.node_ids.len()
+            || scratch.rects.len() != self.node_ids.len()
+        {
+            return false;
+        }
+        for &i in changed {
+            let Some(rect) = boxes.get(self.node_ids[i]) else {
+                return false;
+            };
+            scratch.relative[i] = Some(rect.clone());
+        }
+        let mut stack: Vec<usize> = changed.to_vec();
+        while let Some(i) = stack.pop() {
+            let Some(own) = scratch.relative[i].clone() else {
+                return false;
+            };
+            let mut r = own;
+            let mut parent = self.parent_index[i];
+            while let Some(p) = parent {
+                let Some(pr) = scratch.relative[p].as_ref() else {
+                    return false;
+                };
+                r.x += pr.x;
+                r.y += pr.y;
+                parent = self.parent_index[p];
+            }
+            scratch.rects[i] = r;
+            stack.extend(self.child_index[i].iter().copied());
+        }
+        true
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn resolve_rest(
+        &self,
+        placement: PortPlacement,
+        min_spacing: f64,
+        node_rows: &BTreeMap<String, Vec<arqlet_model::Row>>,
+        row_order: arqlet_model::RowPortOrder,
+        only: Option<&[&str]>,
+        scratch: &mut PortResolveScratch,
+        result: &mut Vec<ResolvedPort>,
+    ) {
+        let graph = self.graph;
+        let explicit = &self.explicit;
+        let bindings = &self.bindings;
+        let parents = &self.parents;
         let rects = &scratch.rects;
         let rect_for = |id: &str| &rects[self.node_index[id]];
         let shapes = &self.shapes;
@@ -667,7 +782,7 @@ impl<'g> PortContext<'g> {
                     result.push(ResolvedPort {
                         id: configured
                             .map(|p| p.id.clone())
-                            .unwrap_or(format!("auto:{}:{}", edge.id, endpoint)),
+                            .unwrap_or_else(|| self.auto_ids[k][side_index].clone()),
                         node_id: node.into(),
                         edge_id: edge.id.clone(),
                         endpoint: endpoint.into(),
@@ -742,7 +857,7 @@ impl<'g> PortContext<'g> {
                 result.push(ResolvedPort {
                     id: configured
                         .map(|p| p.id.clone())
-                        .unwrap_or(format!("auto:{}:{}", edge.id, endpoint)),
+                        .unwrap_or_else(|| self.auto_ids[k][side_index].clone()),
                     node_id: node.into(),
                     edge_id: edge.id.clone(),
                     endpoint: endpoint.into(),
@@ -784,16 +899,19 @@ impl<'g> PortContext<'g> {
                     bounds.y + bounds.height * (i as f64 + 1.) / (count + 1.);
             }
         }
-        let mut groups: BTreeMap<(String, u8), Vec<usize>> = BTreeMap::new();
+        // By node index and side: every side is placed on its own, so the order of the sides does not matter.
+        let mut groups: BTreeMap<(usize, u8), Vec<usize>> = BTreeMap::new();
         // Circle ports keep their place on the outline; the rectangle sides below do not move them.
         for (i, port) in result.iter().enumerate().filter(|(_, p)| {
             !p.explicit
                 && shapes.get(p.node_id.as_str()).copied().unwrap_or_default() != NodeShape::Circle
         }) {
-            groups
-                .entry((port.node_id.clone(), port.side as u8))
-                .or_default()
-                .push(i);
+            let node = self
+                .node_index
+                .get(port.node_id.as_str())
+                .copied()
+                .unwrap_or(usize::MAX);
+            groups.entry((node, port.side as u8)).or_default().push(i);
         }
         // Ports on one side keep the order of their peers along that side, so that edges do not cross
         // at the node. Ties (same peer position) fall back to the edge id.
@@ -841,24 +959,30 @@ impl<'g> PortContext<'g> {
                 .get(&(port.edge_id.clone(), port.endpoint == "source"))
                 .copied()
         };
+        // The keys once per port: the sorting only reorders indices, and the keys look their peers up by id.
+        let keys: Vec<f64> = (0..result.len()).map(peer_key).collect();
+        let order: Vec<Option<f64>> = if self.order_keys.is_empty() {
+            Vec::new()
+        } else {
+            (0..result.len()).map(order_key).collect()
+        };
         for indices in groups.values_mut() {
             // The order of the layered plan, when it gives every port of the side a key.
-            if !self.order_keys.is_empty() && indices.iter().all(|&i| order_key(i).is_some()) {
+            if !order.is_empty() && indices.iter().all(|&i| order[i].is_some()) {
                 indices.sort_by(|a, b| {
-                    order_key(*a)
+                    order[*a]
                         .unwrap()
-                        .total_cmp(&order_key(*b).unwrap())
+                        .total_cmp(&order[*b].unwrap())
                         .then_with(|| result[*a].edge_id.cmp(&result[*b].edge_id))
                 });
                 continue;
             }
             indices.sort_by(|a, b| {
-                peer_key(*a)
-                    .total_cmp(&peer_key(*b))
+                keys[*a]
+                    .total_cmp(&keys[*b])
                     .then_with(|| result[*a].edge_id.cmp(&result[*b].edge_id))
             });
         }
-        let keys: Vec<f64> = (0..result.len()).map(peer_key).collect();
         for indices in groups.values() {
             let Some(&first) = indices.first() else {
                 continue;

@@ -852,6 +852,10 @@ struct TrialScratch<'a> {
     selected_nodes: Vec<&'a str>,
     resolved_ports: Vec<arqlet_model::ResolvedPort>,
     port_scratch: ports::PortResolveScratch,
+    /// The node whose box the last port resolution saw moved (it is put back or committed after it): the next resolution
+    /// reads it again, with the node that moves then.
+    ports_moved: Option<usize>,
+    ports_changed: Vec<usize>,
     moved_outline: Option<Outline>,
     edge_ends: Vec<[Option<(f64, f64)>; 2]>,
     edge_changed: Vec<bool>,
@@ -877,6 +881,8 @@ impl<'a> TrialScratch<'a> {
             selected_nodes: Vec::with_capacity(edges.saturating_mul(2).saturating_add(1)),
             resolved_ports: Vec::with_capacity(edges.saturating_mul(2)),
             port_scratch: ports::PortResolveScratch::default(),
+            ports_moved: None,
+            ports_changed: Vec::with_capacity(2),
             moved_outline: None,
             edge_ends: vec![[None, None]; edges],
             edge_changed: vec![false; edges],
@@ -1334,8 +1340,17 @@ impl RootDrawing<'_> {
                 selected_nodes,
                 resolved_ports,
                 port_scratch,
+                ports_moved,
+                ports_changed,
                 ..
             } = &mut *scratch;
+            // The boxes that changed since the last resolution: the node moved then (put back or committed) and now.
+            ports_changed.clear();
+            ports_changed.extend(ports_moved.iter().copied());
+            if !ports_changed.contains(&moved) {
+                ports_changed.push(moved);
+            }
+            *ports_moved = Some(moved);
             self.ports.resolve_nodes_into(
                 boxes,
                 self.options.port_placement,
@@ -1343,6 +1358,7 @@ impl RootDrawing<'_> {
                 &self.options.node_rows,
                 self.options.row_port_order,
                 Some(selected_nodes.as_slice()),
+                Some(ports_changed.as_slice()),
                 port_scratch,
                 resolved_ports,
             );
@@ -1480,8 +1496,17 @@ impl RootDrawing<'_> {
                 selected_nodes,
                 resolved_ports,
                 port_scratch,
+                ports_moved,
+                ports_changed,
                 ..
             } = &mut *scratch;
+            // The boxes that changed since the last resolution: the node moved then (put back or committed) and now.
+            ports_changed.clear();
+            ports_changed.extend(ports_moved.iter().copied());
+            if !ports_changed.contains(&moved) {
+                ports_changed.push(moved);
+            }
+            *ports_moved = Some(moved);
             self.ports.resolve_nodes_into(
                 boxes,
                 self.options.port_placement,
@@ -1489,6 +1514,7 @@ impl RootDrawing<'_> {
                 &self.options.node_rows,
                 self.options.row_port_order,
                 Some(selected_nodes.as_slice()),
+                Some(ports_changed.as_slice()),
                 port_scratch,
                 resolved_ports,
             );
@@ -1628,7 +1654,13 @@ impl Geometry for RootDrawing<'_> {
         }
         let base = self.compute(centres);
         let result = self.assemble(&base);
-        self.scratch.borrow_mut().boxes.clone_from(&base.boxes);
+        {
+            let mut scratch = self.scratch.borrow_mut();
+            scratch.boxes.clone_from(&base.boxes);
+            // Every box may have changed: the next port resolution reads them all.
+            scratch.port_scratch.invalidate();
+            scratch.ports_moved = None;
+        }
         *self.cache.borrow_mut() = Some(base);
         result
     }

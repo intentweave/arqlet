@@ -45,8 +45,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 - The geometric repair resolves ports faster: the per-edge parts that depend on the graph only (the flow sides' common
   area and axis, the source's area mode, the end sides) are computed once, ends are read by index, and loop corners only
-  for the nodes a trial asks for. mixed-large's layout 1147 → 914 ms with byte-identical output
-  ([measurement](benchmarks/results/port-resolution-20261115.md)).
+  for the nodes a trial asks for; it keeps the boxes between the trials of a repair and reads only the changed ones again,
+  computes the sort keys of a side once and the ids of automatic ports once per edge end. mixed-large's layout
+  1147 → 808 ms with byte-identical output ([measurement](benchmarks/results/port-resolution-20261115.md)).
 
 - A step of a drag repairs within its local budget also for the lines into containers (`nestedEdgesByDetour`), whose own
   budget it used to take: drag steps on mixed-large 0.7–0.85 s → 75–154 ms; the finish does the rest
