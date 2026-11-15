@@ -39,6 +39,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `round`), as a force simulation cools, so that it converges instead of swinging. On the organic examples within 4 to
   43 calls (organic-100 did not converge in 60 before).
 
+- `organicForces` leaves out an area whose child containers hold containers themselves: the edges deep inside them are
+  what the choice before the repair cannot foresee, and such a drawing kept an issue and was laid out a second time
+  without the forces (mixed-large: import 2.0 s, now 1.1 s as before the forces; every other result unchanged).
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.

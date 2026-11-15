@@ -7681,7 +7681,16 @@ fn place(
             }
             // Experimental (`organicForces`): where the edges of each link end, relative to the children's centres. The
             // children are placed already, so the boxes of their descendants are known.
-            let anchors = options.organic_forces.then(|| organic::Anchors {
+            // Not where a child container holds containers itself: the edges deep inside them are what the repair cannot
+            // foresee, and a drawing that kept an issue was laid out a second time without the forces (mixed-large: the
+            // import took 2.0 s instead of 1.1 s).
+            let deep = children.iter().any(|c| {
+                index
+                    .children_of(Some(c.id.as_str()))
+                    .iter()
+                    .any(|&g| !index.children[g].is_empty())
+            });
+            let anchors = (options.organic_forces && !deep).then(|| organic::Anchors {
                 cooling: options.settle_cooling.unwrap_or(1.),
                 ..organic_anchors(graph, &ids, &sizes, boxes)
             });
