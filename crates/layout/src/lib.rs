@@ -4523,7 +4523,12 @@ fn compute_once(
     // With `organicForces` the drawings are denser, and the moderate repair at the end of a drag can be left with a node
     // that has no room within two spacings. The end of the gesture then repairs fully, as a fresh layout does; the steps of
     // the drag stay local.
-    if options.organic_forces && effort == repair::Effort::Moderate && !repair_issues.is_empty() {
+    // Only for a conflict the detours do not draw around: a straight edge through a node is drawn around it by
+    // `straightDetours` (and the lines into containers stay to them by design), an overlap or a node outside its area is not.
+    let undrawable = repair_issues
+        .iter()
+        .any(|i| i.kind != "straight-through-node" || !options.straight_detours);
+    if options.organic_forces && effort == repair::Effort::Moderate && undrawable {
         let mut full = repair::Memo::new(repair::Effort::Full);
         repair_issues = repair_and_replace(
             graph,

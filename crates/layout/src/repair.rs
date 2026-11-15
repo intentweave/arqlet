@@ -1907,6 +1907,15 @@ pub(crate) fn repair_areas(
     // The probe's moves are those of the first repair without the option when it ends within its budget (the search is
     // deterministic and its end does not depend on the budget then), so its boxes and findings stand for that repair.
     let mut probed: Option<Vec<GeometryIssue>> = None;
+    // An exhausted probe: the boxes it started from, the boxes it left and its findings and scans. The second phase starts
+    // from the same boxes when the first phase moved nothing, and the repair is deterministic, so it takes them instead of
+    // doing the same work again.
+    let mut exhausted_probe: Option<(
+        BTreeMap<String, Rect>,
+        BTreeMap<String, Rect>,
+        Vec<GeometryIssue>,
+        usize,
+    )> = None;
     // Without a straight edge into a container of an organic area the two phases are the repair without the option.
     let nested_lines = || {
         let organic = |parent: Option<&str>| graph.area_mode(parent) == Ok(Mode::Organic);
@@ -1948,6 +1957,8 @@ pub(crate) fn repair_areas(
         if !exhausted {
             *boxes = probe;
             probed = Some(found);
+        } else {
+            exhausted_probe = Some((boxes.clone(), probe, found, own.get()));
         }
         exhausted
     };
@@ -1966,11 +1977,19 @@ pub(crate) fn repair_areas(
             lines,
         )
     };
+    // Below the full effort the first phase has the budget of its effort to itself: the exhausted probe's scans used it up,
+    // and a drop's moderate repair of the lines between children then did nothing (2 scans) and left them to a full repair.
+    let first_scans = Cell::new(0);
+    let first_counter = if phased && effort != Effort::Full {
+        &first_scans
+    } else {
+        scans
+    };
     let mut issues = None;
     for _ in 0..FIT_ROUNDS {
         let found = match probed.take() {
             Some(found) => found,
-            None => once(boxes, scans, first),
+            None => once(boxes, first_counter, first),
         };
         if !grow || !fit_containers(graph, options, boxes, reference) {
             issues = Some(found);
@@ -1978,17 +1997,46 @@ pub(crate) fn repair_areas(
         }
     }
     // The last fit grew a container after the issues were read: read them again on the final boxes.
-    let issues = issues.unwrap_or_else(|| once(boxes, scans, first));
+    let issues = issues.unwrap_or_else(|| once(boxes, first_counter, first));
+    if !std::ptr::eq(first_counter, scans) {
+        scans.set(scans.get() + first_scans.get());
+    }
     if !phased {
         return issues;
     }
-    let own = Cell::new(0);
-    let issues = once(boxes, &own, Lines::Bounded);
-    scans.set(scans.get() + own.get());
+    let issues = match exhausted_probe {
+        Some((from, to, found, used)) if identical_boxes(&from, boxes) => {
+            *boxes = to;
+            scans.set(scans.get() + used);
+            found
+        }
+        _ => {
+            let own = Cell::new(0);
+            let issues = once(boxes, &own, Lines::Bounded);
+            scans.set(scans.get() + own.get());
+            issues
+        }
+    };
     if grow && fit_containers(graph, options, boxes, reference) {
         return once(boxes, scans, Lines::Siblings);
     }
     issues
+}
+
+/// Whether two box maps hold the same nodes with bit for bit the same boxes.
+fn identical_boxes(a: &BTreeMap<String, Rect>, b: &BTreeMap<String, Rect>) -> bool {
+    let bits = |r: &Rect| {
+        [
+            r.x.to_bits(),
+            r.y.to_bits(),
+            r.width.to_bits(),
+            r.height.to_bits(),
+        ]
+    };
+    a.len() == b.len()
+        && a.iter()
+            .zip(b)
+            .all(|((ka, ra), (kb, rb))| ka == kb && bits(ra) == bits(rb))
 }
 
 /// Grows every container whose size follows its content to hold its children with the geometry padding, deepest first.
@@ -2249,6 +2297,32 @@ fn repair_once(
             })
         })
         .collect();
+    // An organic root whose nodes reach before the wall (a drag pushed them there) moves as a whole by that much, when none
+    // of its nodes is pinned: the arrangement stays as it is, and the repair does not push the nodes back one by one (which
+    // took 88 000 scans at a drop on mixed-large).
+    if organic(None)
+        && !ids
+            .iter()
+            .enumerate()
+            .any(|(i, id)| parents[i].is_none() && options.pins.contains_key(id))
+    {
+        let roots: Vec<usize> = (0..ids.len()).filter(|&i| parents[i].is_none()).collect();
+        let low = roots
+            .iter()
+            .fold((f64::INFINITY, f64::INFINITY), |(x, y), &i| {
+                let r = &boxes[&ids[i]];
+                (x.min(r.x), y.min(r.y))
+            });
+        let shift = ((WALL.0 - low.0).max(0.), (WALL.1 - low.1).max(0.));
+        if (shift.0 > 0. || shift.1 > 0.) && shift.0.is_finite() && shift.1.is_finite() {
+            for &i in &roots {
+                if let Some(r) = boxes.get_mut(&ids[i]) {
+                    r.x += shift.0;
+                    r.y += shift.1;
+                }
+            }
+        }
+    }
     let straight = styles::straight_candidates(graph, options);
     let mut edges = Vec::new();
     let mut containers = Vec::new();

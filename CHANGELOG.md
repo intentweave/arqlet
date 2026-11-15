@@ -53,6 +53,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   budget it used to take: drag steps on mixed-large 0.7–0.85 s → 75–154 ms; the finish does the rest
   ([measurement](benchmarks/results/drag-steps-20261115.md)).
 
+- The end of a drag on a nested organic drawing: an organic root moves as a whole off its wall before the repair, the
+  moderate repair of the lines between children counts its scans on its own, and the full repair after a drop runs only for
+  conflicts the detours do not draw around. mixed-large's gesture 4.9 s → 1.3 s (3.8 s → 2.4 s with force-directed
+  behaviour), with fewer crossings and less area, no issue left; without force-directed behaviour more bends until the
+  background refinement ([measurement](benchmarks/results/drop-repair-20261115.md)).
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.
