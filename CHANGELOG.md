@@ -78,6 +78,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   branches); `directionsFirst` stays off (synthetic-2k: 306 crossings fewer, but 62 bends more and 67 % more area in 2.9×
   the time).
 
+- The routing styles of the edges (`edge_choices`) look the areas up in a parent table built once, instead of searching the
+  node list for every parent of every edge; the repair asks for them again and again, which was quadratic in the size of
+  the view (a view of 1000 nodes of synthetic-20k spent most of its first 15 minutes there). Byte-identical output.
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.
