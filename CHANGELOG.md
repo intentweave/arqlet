@@ -70,6 +70,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - Playground test of the live mode (`ui-regression.mjs`): an import animates from the stress, converges, stays valid and
   starts no refinement.
 
+- `directionsFirst` combines with the other options: each candidate with fixed directions goes through the whole
+  pipeline (region ports, reversed flows, region child ports), where before the first matching branch ran alone. The
+  measured datasets draw as before (er-diagram and synthetic-2k, the only ones with free directions, take none of the other
+  branches); `directionsFirst` stays off (synthetic-2k: 306 crossings fewer, but 62 bends more and 67 % more area in 2.9×
+  the time).
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.

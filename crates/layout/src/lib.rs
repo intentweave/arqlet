@@ -363,6 +363,52 @@ fn compute_counted_body(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Experimental (`directionsFirst`): the free directions are chosen by a first layout, and the drawing is laid out
+    // again with those orientations fixed (single pass builds edges between fixed axes; it delegates them under a free
+    // direction, which decides its orientation only after its children are placed).
+    // The candidates are every free area left to right, and every free area top to bottom; each is laid out with its
+    // orientations fixed under single pass, and the drawing with the best published key wins (overlaps, lines through
+    // nodes, shared lines, crossings, …, bends before length), left to right on a tie. The compact choice per area (the
+    // plain free layout) was a third candidate: it never won on the layered examples and cost as much as the old free
+    // layout (benchmarks/results/free-directions-20261113.md), so it is not tried.
+    if options.directions_first && has_free_direction(graph) {
+        let free = free_areas(graph);
+        let mut candidates: Vec<BTreeMap<String, Orientation>> = Vec::new();
+        for orientation in [Orientation::Lr, Orientation::Tb] {
+            let all: BTreeMap<String, Orientation> = free
+                .iter()
+                .map(|area| (area.clone(), orientation))
+                .collect();
+            if !candidates.contains(&all) {
+                candidates.push(all);
+            }
+        }
+        let mut best: Option<(
+            Vec<i64>,
+            Snapshot,
+            SearchCounters,
+            BTreeMap<String, Orientation>,
+        )> = None;
+        for chosen in candidates {
+            let fixed = with_chosen_directions(graph, &chosen);
+            // The whole pipeline for each candidate, with every other option (region ports, reversed flows, …): before,
+            // the first matching branch of this function ran alone, so `directionsFirst` did not combine with them.
+            let inner = LayoutOptions {
+                directions_first: false,
+                ..options.clone()
+            };
+            let (mut snapshot, stages) = compute_counted_body(&fixed, previous, dirty, &inner)?;
+            snapshot.options.directions_first = true;
+            let key = published_key(&snapshot)?;
+            if best.as_ref().is_none_or(|(b, ..)| key < *b) {
+                best = Some((key, snapshot, stages, chosen));
+            }
+        }
+        let (_, mut snapshot, stages, chosen) = best.expect("one candidate at least");
+        snapshot.graph = graph.clone();
+        snapshot.area_orientations = chosen;
+        return Ok((snapshot, stages));
+    }
     // Experimental (`regionPorts`, ADR 0020 S1-2): edges that leave a region of another strategy in a layered parent end at
     // the region's box for the layout; their inner legs are joined afterwards.
     if options.region_ports {
@@ -437,46 +483,6 @@ fn compute_counted_body(
             apply_aggregate_weights(&mut snapshot);
             return Ok((snapshot, stages));
         }
-    }
-    // Experimental (`directionsFirst`): the free directions are chosen by a first layout, and the drawing is laid out
-    // again with those orientations fixed (single pass builds edges between fixed axes; it delegates them under a free
-    // direction, which decides its orientation only after its children are placed).
-    // The candidates are every free area left to right, and every free area top to bottom; each is laid out with its
-    // orientations fixed under single pass, and the drawing with the best published key wins (overlaps, lines through
-    // nodes, shared lines, crossings, …, bends before length), left to right on a tie. The compact choice per area (the
-    // plain free layout) was a third candidate: it never won on the layered examples and cost as much as the old free
-    // layout (benchmarks/results/free-directions-20261113.md), so it is not tried.
-    if options.directions_first && has_free_direction(graph) {
-        let free = free_areas(graph);
-        let mut candidates: Vec<BTreeMap<String, Orientation>> = Vec::new();
-        for orientation in [Orientation::Lr, Orientation::Tb] {
-            let all: BTreeMap<String, Orientation> = free
-                .iter()
-                .map(|area| (area.clone(), orientation))
-                .collect();
-            if !candidates.contains(&all) {
-                candidates.push(all);
-            }
-        }
-        let mut best: Option<(
-            Vec<i64>,
-            Snapshot,
-            SearchCounters,
-            BTreeMap<String, Orientation>,
-        )> = None;
-        for chosen in candidates {
-            let fixed = with_chosen_directions(graph, &chosen);
-            let (snapshot, stages) = compute_counted_inner(&fixed, previous, dirty, options)?;
-            let key = published_key(&snapshot)?;
-            if best.as_ref().is_none_or(|(b, ..)| key < *b) {
-                best = Some((key, snapshot, stages, chosen));
-            }
-        }
-        let (_, mut snapshot, stages, chosen) = best.expect("one candidate at least");
-        snapshot.graph = graph.clone();
-        snapshot.area_orientations = chosen;
-        apply_aggregate_weights(&mut snapshot);
-        return Ok((snapshot, stages));
     }
     let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
     if options.region_child_ports {
