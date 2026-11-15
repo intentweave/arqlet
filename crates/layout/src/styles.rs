@@ -430,18 +430,21 @@ pub fn apply_straight_edges(
                 .collect();
             // Experimental (`straightDetours`, ADR 0020 S1-1b): around the blockers, on the edge's earlier route pulled taut
             // around every node the edge does not end at or lie in; kept only when that route is clear of them.
-            let detour = (snapshot.options.straight_detours && !blocked.is_empty())
-                .then(|| {
-                    detour(
-                        snapshot,
-                        &e.id,
-                        (e.source.as_str(), target),
-                        &holding,
-                        &absolute,
-                        &outlines,
-                    )
-                })
-                .flatten();
+            // A preview step of a settling keeps its straight edges straight (`settle_preview`): the converged step is repaired.
+            let detour = (snapshot.options.straight_detours
+                && !snapshot.options.settle_preview
+                && !blocked.is_empty())
+            .then(|| {
+                detour(
+                    snapshot,
+                    &e.id,
+                    (e.source.as_str(), target),
+                    &holding,
+                    &absolute,
+                    &outlines,
+                )
+            })
+            .flatten();
             if detour.is_none() {
                 for node in blocked {
                     issues.push(format!("straight edge {} passes through node {node}", e.id));

@@ -4,7 +4,7 @@
 //! This is a continuation of the placement from its positions, not of a solver state: no solver state is kept. Provisional.
 use super::{check_current, recompute_layout, uses_organic};
 use arqlet_model::math::PortableMath;
-use arqlet_model::{EditReport, Gesture, Settle, Snapshot};
+use arqlet_model::{EditReport, Gesture, LayoutOptions, Settle, Snapshot};
 
 /// The damped steps a call runs at most (each is one complete recomputation of the view from the positions before it).
 pub const CONTINUATION_STEPS: usize = 3;
@@ -78,11 +78,15 @@ pub fn settle_snapshot(
         options.settle_cooling = Some(SETTLE_COOLING.p_powf(f64::from(round)));
     }
     let (mut steps, mut moved) = (0, f64::INFINITY);
+    let preview_options = LayoutOptions {
+        settle_preview: forces,
+        ..options.clone()
+    };
     while steps < CONTINUATION_STEPS {
         if forces {
             current.gesture = Some(preview(false));
         }
-        let next = recompute_layout(&current, &options, None)?;
+        let next = recompute_layout(&current, &preview_options, None)?;
         moved = residual(&current, &next);
         current = next;
         steps += 1;
@@ -99,6 +103,7 @@ pub fn settle_snapshot(
     }
     current.gesture = None;
     current.options.settle_cooling = None;
+    current.options.settle_preview = false;
     current.edit_report = Some(EditReport {
         settle: Some(Settle {
             steps,

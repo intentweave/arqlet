@@ -1843,6 +1843,11 @@ pub struct LayoutOptions {
     #[serde(skip)]
     #[cfg_attr(feature = "ts", ts(skip))]
     pub settle_cooling: Option<f64>,
+    /// Internal (`settle` with `organicForces`): the step is a preview, which the settling repairs once it converges; its
+    /// straight edges stay straight instead of taking detours that change from frame to frame. Never written or read.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub settle_preview: bool,
     /// Experimental: free directions (`auto`) are laid out with their orientations fixed — every free area left to right,
     /// and every free area top to bottom — so that single pass constructs the edges between areas (ADR 0017) instead of
     /// delegating them, and the drawing with the best published key wins. The snapshot keeps the free directions and the
@@ -2130,6 +2135,7 @@ impl Default for LayoutOptions {
             nested_edges_by_detour: true,
             region_child_sides: BTreeMap::new(),
             settle_cooling: None,
+            settle_preview: false,
             directions_first: false,
             force_directed: false,
             edge_routing: None,

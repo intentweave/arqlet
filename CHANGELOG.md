@@ -65,6 +65,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   behaviour), with fewer crossings and less area, no issue left; without force-directed behaviour more bends until the
   background refinement ([measurement](benchmarks/results/drop-repair-20261115.md)).
 
+- The preview steps of a settling keep their straight edges straight instead of drawing detours that change from frame
+  to frame; the converged step is repaired and drawn as before.
+- Playground test of the live mode (`ui-regression.mjs`): an import animates from the stress, converges, stays valid and
+  starts no refinement.
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.
