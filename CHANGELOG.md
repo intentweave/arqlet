@@ -43,6 +43,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   what the choice before the repair cannot foresee, and such a drawing kept an issue and was laid out a second time
   without the forces (mixed-large: import 2.0 s, now 1.1 s as before the forces; every other result unchanged).
 
+- The geometric repair resolves ports faster: the per-edge parts that depend on the graph only (the flow sides' common
+  area and axis, the source's area mode, the end sides) are computed once, ends are read by index, and loop corners only
+  for the nodes a trial asks for. mixed-large's layout 1147 → 914 ms with byte-identical output
+  ([measurement](benchmarks/results/port-resolution-20261115.md)).
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.

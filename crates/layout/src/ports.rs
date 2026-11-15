@@ -72,6 +72,13 @@ pub(crate) struct PortContext<'g> {
     /// that the edge leaves or enters through a side node: the side the area's own flow leaves or enters by
     /// (`layered_plan::end_sides`). It wins over the flow-side rule, which follows the smallest area holding both ends.
     end_sides: BTreeMap<(String, bool), PortSide>,
+    /// `end_sides` by edge (in the order of `edges`) and end (source, target), so that a port does not look it up by id.
+    end_side_of: Vec<[Option<PortSide>; 2]>,
+    /// The edges (indices into `edges`) that end at every node, by node index.
+    incident: Vec<Vec<usize>>,
+    /// By edge: the flow axis of its ends' smallest common area (`flow_axis`), and the mode of its source's area.
+    edge_axis: Vec<Option<bool>>,
+    edge_mode: Vec<Mode>,
     /// Experimental (consistent layered pipeline): absolute places along the side of automatic ports by (edge, source end),
     /// with whether the flow they were planned for is vertical (`layered_plan::port_lanes`). A side across that flow (left
     /// and right for a horizontal flow) whose ports all have one takes them.
@@ -157,6 +164,28 @@ impl<'g> PortContext<'g> {
                     e.target.as_deref().and_then(|t| node_index.get(t).copied()),
                 ]
             })
+            .collect::<Vec<[Option<usize>; 2]>>();
+        let mut incident: Vec<Vec<usize>> = vec![Vec::new(); node_ids.len()];
+        for (k, ends) in edge_ends.iter().enumerate() {
+            for &end in ends.iter().flatten() {
+                if incident[end].last() != Some(&k) {
+                    incident[end].push(k);
+                }
+            }
+        }
+        let end_side_of = vec![[None, None]; edges.len()];
+        let edge_axis: Vec<Option<bool>> = edges
+            .iter()
+            .map(|e| match e.target.as_deref() {
+                Some(target) if target != e.source => {
+                    flow_axis(graph, &parents, e.source.as_str(), target)
+                }
+                _ => None,
+            })
+            .collect();
+        let edge_mode: Vec<Mode> = edges
+            .iter()
+            .map(|e| direction_for(graph, parents.get(e.source.as_str()).copied().flatten()))
             .collect();
         Self {
             graph,
@@ -178,6 +207,10 @@ impl<'g> PortContext<'g> {
             loop_space: false,
             order_keys: BTreeMap::new(),
             end_sides: BTreeMap::new(),
+            end_side_of,
+            incident,
+            edge_axis,
+            edge_mode,
             lanes: BTreeMap::new(),
         }
     }
@@ -190,6 +223,16 @@ impl<'g> PortContext<'g> {
 
     /// The context with the sides of ends inside areas of another axis (see `end_sides`).
     pub(crate) fn with_end_sides(mut self, sides: BTreeMap<(String, bool), PortSide>) -> Self {
+        self.end_side_of = self
+            .edges
+            .iter()
+            .map(|edge| {
+                [
+                    sides.get(&(edge.id.clone(), true)).copied(),
+                    sides.get(&(edge.id.clone(), false)).copied(),
+                ]
+            })
+            .collect();
         self.end_sides = sides;
         self
     }
@@ -312,54 +355,68 @@ impl<'g> PortContext<'g> {
         let peers = &self.peers;
         let loop_indices = &self.loop_indices;
         // The sides of an edge's automatic ports, by the flow-side rule (when on) or the facing sides.
-        let automatic_sides = |edge: &Edge| -> (PortSide, PortSide) {
-            let src = rect_for(edge.source.as_str());
-            let dst = rect_for(edge.target.as_deref().unwrap());
-            let parent = parents[edge.source.as_str()];
+        let automatic_sides = |k: usize| -> (PortSide, PortSide) {
+            let edge = edges[k];
+            // The ends by index where the edge has them (every edge of the context does), else by id as before.
+            let [a, b] = self.edge_ends[k];
+            let src = a.map_or_else(|| rect_for(edge.source.as_str()), |i| &rects[i]);
+            let dst = b.map_or_else(|| rect_for(edge.target.as_deref().unwrap()), |i| &rects[i]);
             let self_loop = edge.source == edge.target.as_deref().unwrap();
             let sides = self
                 .flow_sides
                 .then(|| {
                     (!self_loop)
                         .then(|| {
-                            flow_side_pair(
-                                graph,
-                                parents,
-                                edge.source.as_str(),
-                                edge.target.as_deref().unwrap(),
-                                src,
-                                dst,
-                            )
+                            self.edge_axis[k]
+                                .and_then(|vertical| flow_side_pair(vertical, src, dst))
                         })
                         .flatten()
                 })
                 .flatten()
-                .unwrap_or_else(|| facing_sides(src, dst, direction_for(graph, parent), self_loop));
+                .unwrap_or_else(|| facing_sides(src, dst, self.edge_mode[k], self_loop));
             let (source, target) = sides;
-            (
-                *self
-                    .end_sides
-                    .get(&(edge.id.clone(), true))
-                    .unwrap_or(&source),
-                *self
-                    .end_sides
-                    .get(&(edge.id.clone(), false))
-                    .unwrap_or(&target),
-            )
+            let [s, t] = self.end_side_of.get(k).copied().unwrap_or([None, None]);
+            (s.unwrap_or(source), t.unwrap_or(target))
         };
+        // The nodes asked for, as a mask by index: an end outside the graph is never asked for (it is not among the ids).
+        scratch.selected.clear();
+        if let Some(nodes) = only {
+            scratch.selected.resize(self.node_ids.len(), false);
+            for node in nodes {
+                if let Some(&i) = self.node_index.get(node) {
+                    scratch.selected[i] = true;
+                }
+            }
+        }
+        let selected = &scratch.selected;
         // Experimental (flow sides): the loops of a node take the corner whose two sides carry the fewest other edges (ties:
         // the usual loop sides), so that the loops do not lie across the node's other edges.
         let mut loop_corner: BTreeMap<&str, (PortSide, PortSide)> = BTreeMap::new();
         if self.flow_sides && !self.loop_counts.is_empty() {
+            // The load of the sides of the loop nodes asked for (all of them without `only`), from their own edges only: the
+            // corner of a node depends on nothing else, and a repair asks for a few nodes per trial.
             let mut load: BTreeMap<(&str, u8), usize> = BTreeMap::new();
-            for edge in edges {
-                let target = edge.target.as_deref().unwrap();
-                if edge.source == target {
+            for &node in self.loop_counts.keys() {
+                let Some(&i) = self.node_index.get(node) else {
+                    continue;
+                };
+                if only.is_some() && !selected[i] {
                     continue;
                 }
-                let (a, b) = automatic_sides(edge);
-                *load.entry((edge.source.as_str(), a as u8)).or_default() += 1;
-                *load.entry((target, b as u8)).or_default() += 1;
+                for &k in &self.incident[i] {
+                    let edge = edges[k];
+                    let target = edge.target.as_deref().unwrap();
+                    if edge.source == target {
+                        continue;
+                    }
+                    let (a, b) = automatic_sides(k);
+                    if edge.source == node {
+                        *load.entry((node, a as u8)).or_default() += 1;
+                    }
+                    if target == node {
+                        *load.entry((node, b as u8)).or_default() += 1;
+                    }
+                }
             }
             const CORNERS: [(PortSide, PortSide); 4] = [
                 (PortSide::Right, PortSide::Top),
@@ -368,6 +425,9 @@ impl<'g> PortContext<'g> {
                 (PortSide::Bottom, PortSide::Right),
             ];
             for &node in self.loop_counts.keys() {
+                if only.is_some() && !self.node_index.get(node).is_some_and(|&i| selected[i]) {
+                    continue;
+                }
                 let r = rect_for(node);
                 let usual = facing_sides(r, r, direction_for(graph, parents[node]), true);
                 let count = |(a, b): (PortSide, PortSide)| {
@@ -431,17 +491,6 @@ impl<'g> PortContext<'g> {
         // Row ports, with their node, row, side, the peer's height and the edge (see the ordering below).
         scratch.row_ports.clear();
         let row_ports = &mut scratch.row_ports;
-        // The nodes asked for, as a mask by index: an end outside the graph is never asked for (it is not among the ids).
-        scratch.selected.clear();
-        if let Some(nodes) = only {
-            scratch.selected.resize(self.node_ids.len(), false);
-            for node in nodes {
-                if let Some(&i) = self.node_index.get(node) {
-                    scratch.selected[i] = true;
-                }
-            }
-        }
-        let selected = &scratch.selected;
         for (k, edge) in edges.iter().enumerate() {
             for (side_index, (endpoint, node)) in [
                 ("source", edge.source.as_str()),
@@ -466,7 +515,7 @@ impl<'g> PortContext<'g> {
                 let self_loop = edge.source == edge.target.as_deref().unwrap();
                 let (source_side, target_side) = match loop_corner.get(edge.source.as_str()) {
                     Some(&corner) if self_loop => corner,
-                    _ => automatic_sides(edge),
+                    _ => automatic_sides(k),
                 };
                 let side = configured
                     .map(|p| p.side)
@@ -965,14 +1014,15 @@ const LOOP_TURN: f64 = 0.35;
 /// The flow sides of an edge (experimental, see `PortContext::flow_sides`): when every area from each end up to the smallest
 /// container holding both has a fixed left-to-right or top-to-bottom flow, and the target lies after the source in it, the
 /// source leaves on the right (bottom) and the target is entered on the left (top). `None` otherwise.
-fn flow_side_pair(
+/// The structural part of `flow_side_pair`: the flow axis (vertical or not) of the smallest area that holds both ends, when
+/// neither end lies in the other and every area the edge passes has a fixed flow; `None` otherwise. It depends on the graph
+/// only, so a context computes it once per edge.
+fn flow_axis(
     graph: &Graph,
     parents: &BTreeMap<&str, Option<&str>>,
     source: &str,
     target: &str,
-    src: &Rect,
-    dst: &Rect,
-) -> Option<(PortSide, PortSide)> {
+) -> Option<bool> {
     let chain = |id: &str| -> Vec<Option<&str>> {
         let mut out = Vec::new();
         let mut at = parents.get(id).copied().flatten();
@@ -1011,6 +1061,12 @@ fn flow_side_pair(
     if passed.copied().any(|area| axis(area).is_none()) {
         return None;
     }
+    Some(vertical)
+}
+
+/// The sides of an edge's automatic ports by the flow of the smallest area that holds both ends (`flow_axis`, computed once
+/// per edge): forward along that flow, or reversed for an edge whose target lies wholly before its source.
+fn flow_side_pair(vertical: bool, src: &Rect, dst: &Rect) -> Option<(PortSide, PortSide)> {
     let forward = if vertical {
         dst.y >= src.y + src.height
     } else {
