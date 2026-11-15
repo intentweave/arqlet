@@ -29,6 +29,9 @@ pub(crate) struct Anchors {
     pub inside: BTreeMap<String, Vec<((f64, f64), (f64, f64))>>,
     /// The share of a damped step a continuation takes (`settle_cooling`; 1 outside a settling).
     pub cooling: f64,
+    /// Whether the area lies in a layered parent, which routes its edges by ports: at a tie of crossings and boxes in the
+    /// way, the arrangement whose separated boxes take less room wins (can-bus: the forces took 0.25 % more).
+    pub tie_by_area: bool,
 }
 
 /// The largest number of children of an area under `sparseStress`. The stress is O(pivots·n + m) per iteration, but the repair
@@ -1622,9 +1625,28 @@ fn organic_stages_full(
         // The forces neither look at crossings nor keep straight edges out of nodes (they push them off softly): their
         // arrangement is taken only when its straight edges cross no more often and pass through no more boxes than those
         // of the stress layout. A box in the way is what the repair resolves with far moves (organic-25: 2 against 7).
-        if chord_crossings(&forced, &edges, &ends) <= chord_crossings(&x, &edges, &ends)
-            && chord_hits(&forced, &edges, &ends, &extents, &inside)
-                <= chord_hits(&x, &edges, &ends, &extents, &inside)
+        let crossings = (
+            chord_crossings(&forced, &edges, &ends),
+            chord_crossings(&x, &edges, &ends),
+        );
+        let hits = (
+            chord_hits(&forced, &edges, &ends, &extents, &inside),
+            chord_hits(&x, &edges, &ends, &extents, &inside),
+        );
+        let room = |p: &[(f64, f64)]| {
+            let mut p = p.to_vec();
+            separate_overlaps_with_option(&mut p, &extents, &fixed_flags, use_vpsc);
+            let (mut lo, mut hi) = ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN));
+            for (c, e) in p.iter().zip(&extents) {
+                lo = (lo.0.min(c.0 - e.0 / 2.), lo.1.min(c.1 - e.1 / 2.));
+                hi = (hi.0.max(c.0 + e.0 / 2.), hi.1.max(c.1 + e.1 / 2.));
+            }
+            (hi.0 - lo.0) * (hi.1 - lo.1)
+        };
+        let tie = crossings.0 == crossings.1 && hits.0 == hits.1;
+        if crossings.0 <= crossings.1
+            && hits.0 <= hits.1
+            && !(tie && anchors.tie_by_area && room(&forced) > room(&x))
         {
             x = forced;
         }

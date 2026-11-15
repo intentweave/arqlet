@@ -5550,6 +5550,7 @@ fn organic_anchors<'g>(
         ends,
         inside,
         cooling: 1.,
+        tie_by_area: false,
     }
 }
 
@@ -7695,8 +7696,16 @@ fn place(
                     .iter()
                     .any(|&g| !index.children[g].is_empty())
             });
+            let in_layered = parent.is_some_and(|p| {
+                let outer = index.node(p).and_then(|n| n.parent_id.as_deref());
+                matches!(
+                    direction_for(graph, outer),
+                    Mode::Orientation(_) | Mode::Chooser(_)
+                )
+            });
             let anchors = (options.organic_forces && !deep).then(|| organic::Anchors {
                 cooling: options.settle_cooling.unwrap_or(1.),
+                tie_by_area: in_layered,
                 ..organic_anchors(graph, &ids, &sizes, boxes)
             });
             organic::organic_arrange_counted(

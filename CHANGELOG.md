@@ -30,7 +30,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   keeps a geometry issue is laid out again without the forces. A node's loops in an organic area take a corner where no
   neighbour lies. A force-directed drag and `settle` relax with the same forces. petri-net-shapes 41 % smaller and 5×
   faster, mixed-layouts 5 crossings to 0 and 22 % smaller, organic-50 40 % smaller, organic-200 5 crossings to 2,
-  self-loops 4 % smaller; can-bus 0.25 % larger; every other dataset and every fingerprint view unchanged
+  self-loops 4 % smaller; every other dataset and every fingerprint view unchanged (can-bus was 0.25 % larger until an
+  area in a layered parent kept the stress at a tie of crossings and boxes in the way when the forces took more room)
   ([measurement](benchmarks/results/organic-forces-20261114.md)). `organicForces: false` restores the earlier placement.
 
 - With `organicForces`, `settle` takes its steps as previews of the forces (no repair in between, as the steps of a
