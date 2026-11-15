@@ -481,7 +481,9 @@ function liveFromScratch(){
  return true;
 }
 async function settle(calls=3){
- if($('live').checked)calls=Math.max(calls,LIVE_CALLS);
+ // The steps of a settling are previews until it converges (the converged one is repaired), so it goes on until then, in
+ // and out of the live mode; the cooling of the engine makes it converge within LIVE_CALLS calls on the organic examples.
+ if($('live').checked||snapshot?.options?.forceDirected)calls=Math.max(calls,LIVE_CALLS);
  for(let call=0;call<calls;call++){
   if(!snapshot||pending||drag||resize||containerResize||portDrag||labelDrag||curation)return;
   const result=await edit({op:'settle',snapshot},{busy:'Settling …',chained:true});
