@@ -48,6 +48,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   for the nodes a trial asks for. mixed-large's layout 1147 → 914 ms with byte-identical output
   ([measurement](benchmarks/results/port-resolution-20261115.md)).
 
+- A step of a drag repairs within its local budget also for the lines into containers (`nestedEdgesByDetour`), whose own
+  budget it used to take: drag steps on mixed-large 0.7–0.85 s → 75–154 ms; the finish does the rest
+  ([measurement](benchmarks/results/drag-steps-20261115.md)).
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.

@@ -2321,7 +2321,9 @@ fn repair_once(
         scratch: RefCell::new(TrialScratch::new(boxes, ids.len(), edges.len())),
         scans,
         port_resolution_nanos,
-        budget: if lines == Lines::Bounded {
+        // The nested lines have a budget of their own, but no more than the effort allows: a step of a drag repairs locally
+        // (the nested budget made every drag step on mixed-large take 0.8 s).
+        budget: if lines == Lines::Bounded && effort != Effort::Local {
             NESTED_SCAN_BUDGET
         } else if effort == Effort::Local {
             LOCAL_SCAN_BUDGET
