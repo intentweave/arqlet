@@ -29,7 +29,7 @@ looks ports up by string; the spatial hash sorts its candidates. A drag step on 
 ## Second round: boxes kept between trials, sort keys once, port ids once
 
 Same machine and command, measured one after the other (before: the first round and the drag-step change committed;
-after: this change in \`crates/layout/src/ports.rs\` and \`crates/layout/src/repair.rs\`):
+after: this change in `crates/layout/src/ports.rs` and `crates/layout/src/repair.rs`):
 
 | | median layout | min |
 |---|---|---|
@@ -47,6 +47,6 @@ after: this change in \`crates/layout/src/ports.rs\` and \`crates/layout/src/rep
 Output byte-identical on the seven organic datasets after import and a three-step move; default fingerprints identical on
 all 15 views; 852 tests. From the start of this work: mixed-large 1147 → 808 ms (about 30 %).
 
-Left: the checks of straight segments against outlines (\`through_item_with\`, \`Outline::segment_enters\`: about 40 % now)
+Left: the checks of straight segments against outlines (`through_item_with`, `Outline::segment_enters`: about 40 % now)
 are cheap each but many; making them cheaper without changing a result is not obvious (a squared distance instead of
-\`hypot\` for discs could differ in the last bit at the boundary).
+`hypot` for discs could differ in the last bit at the boundary).
