@@ -61,6 +61,29 @@ that belongs to a zone, a team and a security domain at once cannot be shown. Pl
 - Open questions for the ADR: the concrete dimensions of the exports, how many groups and dimensions, and whether the
   extra memberships shape the layout or are only drawn at first.
 
+## 7. Scaling from 20K to 1M nodes (planned)
+
+The box pipeline (placement, routing, repair, scene) will not lay out a million nodes at once, and it need not: the whole
+graph is shown by the cluster overview, and structured views lay out the opened part with a few thousand visible nodes.
+State on 2026-11-15: the overview takes 100K nodes in 2.5 s natively (4 threads) and 7.5 s in WASM with its own WebGL
+renderer; the structured view is bounded to 10K visible nodes, took 21 s for 3142 visible nodes of synthetic-20k, and did
+not finish in 15 minutes at other limits (a quadratic lookup in the edge styles, fixed; the earlier routing path's
+engine choice rerouting everything with the channel router, open). The SVG viewer draws everything.
+
+1. Remove the pathological paths of the structured view and make it measurable up to 10K visible nodes (time budgets
+   or no whole reroute at that size, no quadratic helpers).
+2. A measurement plan for 20K, 50K, 100K, 300K and 1M: overview, first structured view within a budget, opening a
+   container, memory, transfer size, frame time in the browser; hardware, build and seed recorded.
+3. Rendering: viewport culling (draw what lies in the visible window and a margin, from a spatial index of the scene),
+   detail by zoom (labels, ports and arrows left out below a scale, containers as filled areas), then WebGL for the
+   structured scene as for the overview.
+4. Levels of detail in the structured view: `levelOfDetail` and communities keep it within a budget; opening a container
+   lays out that container only and keeps the rest; aggregated edges with weights between closed groups.
+5. Engine: independent containers in parallel (`parallel_map`, the result identical for any thread count), time budgets
+   with the last complete result, responses with what moved only (`positionsOnly`, sessions), the columnar data path of
+   ADR 0019 for large answers.
+6. The overview toward 1M: levels computed when opened, independent clusters in parallel.
+
 ## Open decisions (not blocking the scaffold)
 
 - Final project name and package availability.
