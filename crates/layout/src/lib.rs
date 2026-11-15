@@ -636,7 +636,10 @@ fn compute_counted_inner(
     // of a dense drawing) or the whole drawing with both engines is not bounded by their size (2000 children did not finish
     // in 30 minutes); the conflicts that remain are reported.
     let whole_reroute = !snapshot.options.scalable_stress;
+    // The engine choice routes the whole drawing again with both engines: not above `MAX_REROUTED_ROUTES` routes.
+    let engine_choice_fits = snapshot.routes.len() <= engine_choice::MAX_REROUTED_ROUTES;
     if whole_reroute
+        && engine_choice_fits
         && !dragging
         && !snapshot.route_conflicts.is_empty()
         && !snapshot.options.hierarchical_ordering
@@ -649,9 +652,12 @@ fn compute_counted_inner(
     // result is kept when it has fewer conflicts. A conflict that remains (an edge between areas of different flow axes,
     // which has no sections yet, searched into a node) goes to the choice of the routing engine as without the pipeline:
     // a route through a node is a hard violation.
+    // Not for more conflicts than `MAX_REROUTED_ROUTES`: in a dense view nearly every route is in conflict, and routing them
+    // again around all others did not end (a view of 349 nodes and 8778 edges); they are reported.
     if whole_reroute
         && !dragging
         && !snapshot.route_conflicts.is_empty()
+        && snapshot.route_conflicts.len() <= engine_choice::MAX_REROUTED_ROUTES
         && snapshot.options.hierarchical_ordering
     {
         let mut routed = reroute(&snapshot);
@@ -665,7 +671,11 @@ fn compute_counted_inner(
         // with both engines found nothing better on the measured views (their output is the same without it) and took
         // 42 s on a toggle with 481 routes that crossed container borders, for the same 6 conflicts
         // (benchmarks/results/single-pass-without-engine-choice-20261112.md); the conflicts are reported.
-        if whole_reroute && !snapshot.route_conflicts.is_empty() && !snapshot.options.single_pass {
+        if whole_reroute
+            && engine_choice_fits
+            && !snapshot.route_conflicts.is_empty()
+            && !snapshot.options.single_pass
+        {
             if let Some(better) = engine_choice::improve(graph, previous, &snapshot, &finish)? {
                 return Ok((better, stages));
             }

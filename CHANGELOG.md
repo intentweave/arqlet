@@ -82,6 +82,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   node list for every parent of every edge; the repair asks for them again and again, which was quadratic in the size of
   the view (a view of 1000 nodes of synthetic-20k spent most of its first 15 minutes there). Byte-identical output.
 
+- Large views no longer route everything again: the engine choice (both routers on the whole drawing) runs only up to 500
+  routes, and routing the routes in conflict again only up to 500 conflicts; above that the conflicts are reported, as
+  under single pass. A 1000-node view of synthetic-20k took more than 15 minutes, now 26 s; synthetic-20k with one level
+  open (349 visible nodes, 8072 edges) more than 10 minutes, now 7 s.
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.

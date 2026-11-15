@@ -19,6 +19,11 @@ const SEARCH_PASSES: usize = 2;
 const MAX_EVALUATIONS: usize = 24;
 const MAX_SEARCH_NODES: usize = 60;
 
+/// The most routes a drawing may have for the engine choice to route it again with both engines. Above it the conflicts
+/// are reported, as under single pass: a view of 1000 nodes of synthetic-20k (about 1500 visible) did not finish in 15
+/// minutes, routing everything again with the channel router.
+pub(crate) const MAX_REROUTED_ROUTES: usize = 500;
+
 /// The Optimize-time budget: the crossing step may try more candidates than the layout, because it runs on the delivered
 /// drawing only and the published key decides whether a candidate is kept.
 const OPTIMIZE_EVALUATIONS: usize = 80;
