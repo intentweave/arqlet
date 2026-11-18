@@ -45,7 +45,12 @@ areaStrategies?: { [key in string]: LayoutStrategy },
 /**
  * Structured counterpart of the routing diagnostics that name a passed-through node.
  */
-routeConflicts?: Array<RouteConflict>, schemaVersion: number, engineVersion: string, revision: number, layoutVersion: number, baseRevision: number | null, options?: LayoutOptions, graph: Graph, sourceGraph: Graph | null, collapsedIds: Array<string>, boxes: { [key in string]: Rect }, routes: Array<Route>, recomputedContainers: Array<string>, optimization?: OptimizationReport | null, omittedUnresolvedEdges: number, geometryIssues: Array<GeometryIssue>, resolvedPorts: Array<ResolvedPort>, boundaryCrossings: Array<BoundaryCrossing>,
+routeConflicts?: Array<RouteConflict>, schemaVersion: number, engineVersion: string, revision: number, layoutVersion: number, baseRevision: number | null, options?: LayoutOptions, graph: Graph,
+/**
+ * The whole graph a view was taken from (shared, not copied: snapshots of one view, and a session's requests, hold the
+ * same graph; it is replaced, never changed in place).
+ */
+sourceGraph: Graph | null, collapsedIds: Array<string>, boxes: { [key in string]: Rect }, routes: Array<Route>, recomputedContainers: Array<string>, optimization?: OptimizationReport | null, omittedUnresolvedEdges: number, geometryIssues: Array<GeometryIssue>, resolvedPorts: Array<ResolvedPort>, boundaryCrossings: Array<BoundaryCrossing>,
 /**
  * The edges drawn as straight segments (the others are orthogonal). Empty when every edge is orthogonal.
  */

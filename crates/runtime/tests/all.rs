@@ -110,5 +110,7 @@ mod sparse_stress;
 mod stacked_containers;
 #[path = "straight_detours.rs"]
 mod straight_detours;
+#[path = "structure_cache.rs"]
+mod structure_cache;
 #[path = "structured_communities.rs"]
 mod structured_communities;

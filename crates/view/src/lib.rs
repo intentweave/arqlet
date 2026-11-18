@@ -3,6 +3,11 @@ use arqlet_model::*;
 use std::collections::{BTreeMap, BTreeSet};
 pub fn project(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, String> {
     validate(source)?;
+    project_validated(source, collapsed)
+}
+
+/// `project` on a source validated before (by an earlier `project` of the same graph): the projection is still validated.
+pub fn project_validated(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, String> {
     let nodes: BTreeMap<_, _> = source.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
     // The containers, once: a search of all nodes for every collapsed id was quadratic.
     let parents: BTreeSet<&str> = source
@@ -64,8 +69,26 @@ pub fn project(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, St
         .filter(|n| owner(&n.id) == n.id)
         .map(|n| n.id.clone())
         .collect();
-    let mut graph = source.clone();
-    graph.nodes.retain(|n| visible.contains(&n.id));
+    // The visible nodes only, in their order (a copy of the whole graph that then dropped the hidden ones cost a copy of
+    // every node of a large source per view).
+    let mut graph = Graph {
+        default_direction: source.default_direction.clone(),
+        container_directions: source.container_directions.clone(),
+        default_strategy: source.default_strategy.clone(),
+        container_strategies: source.container_strategies.clone(),
+        default_routing: source.default_routing.clone(),
+        container_routing: source.container_routing.clone(),
+        ports: Vec::new(),
+        edge_ports: Vec::new(),
+        nodes: source
+            .nodes
+            .iter()
+            .filter(|n| visible.contains(&n.id))
+            .cloned()
+            .collect(),
+        edges: Vec::new(),
+        buses: source.buses.clone(),
+    };
     graph.edges = source
         .edges
         .iter()
@@ -82,7 +105,12 @@ pub fn project(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, St
             Some(edge)
         })
         .collect();
-    graph.ports.retain(|port| visible.contains(&port.node_id));
+    graph.ports = source
+        .ports
+        .iter()
+        .filter(|port| visible.contains(&port.node_id))
+        .cloned()
+        .collect();
     let (old_edges, new_edges) = (first_by_id(&source.edges), first_by_id(&graph.edges));
     graph.edge_ports = source
         .edge_ports

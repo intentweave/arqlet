@@ -593,8 +593,10 @@ pub struct Snapshot {
     #[serde(default, skip_serializing_if = "LayoutOptions::is_default")]
     pub options: LayoutOptions,
     pub graph: Graph,
+    /// The whole graph a view was taken from (shared, not copied: snapshots of one view, and a session's requests, hold the
+    /// same graph; it is replaced, never changed in place).
     #[serde(default)]
-    pub source_graph: Option<Graph>,
+    pub source_graph: Option<std::sync::Arc<Graph>>,
     #[serde(default)]
     pub collapsed_ids: Vec<String>,
     pub boxes: BTreeMap<String, Rect>,
@@ -603,6 +605,12 @@ pub struct Snapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub optimization: Option<OptimizationReport>,
     pub omitted_unresolved_edges: usize,
+    /// Provisional (ADR 0019): the source graph as the view structures it (groups, communities, rests), kept with the
+    /// snapshot so that the next view of the same source and the same structure options does not compute it again. Never
+    /// serialized: a loaded snapshot computes it on first use.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub structure: Option<std::sync::Arc<ViewStructure>>,
     #[serde(default)]
     pub geometry_issues: Vec<GeometryIssue>,
     #[serde(default)]
@@ -1609,6 +1617,17 @@ fn renamed_to_level_of_detail<'de, D: serde::Deserializer<'de>>(_: D) -> Result<
     Err(serde::de::Error::custom(
         "initialCollapse was renamed to levelOfDetail in engine 0.4",
     ))
+}
+
+/// Provisional (ADR 0019): a structured view of a source graph (`Snapshot::structure`): valid for `source` (the same
+/// shared graph, compared by identity) and the structure options in `key`.
+#[derive(Debug)]
+pub struct ViewStructure {
+    pub source: std::sync::Arc<Graph>,
+    pub key: String,
+    pub view: std::sync::Arc<Graph>,
+    /// Whether `view` passed validation (a projection of it succeeded); later projections need not validate it again.
+    pub validated: bool,
 }
 
 /// The level of detail (provisional): which containers a view shows collapsed at first, by depth and by kind; opening

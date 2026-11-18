@@ -27,8 +27,9 @@ pub fn set_port(
     }
     let mut source = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     let edge = source
         .edges
         .iter()
@@ -94,7 +95,7 @@ pub fn set_port(
         }
     }
     let mut changed = snapshot.clone();
-    changed.source_graph = Some(source);
+    changed.source_graph = Some(source.into());
     recompute_layout(&changed, &snapshot.options, None)
 }
 

@@ -20,7 +20,7 @@ fn an_explicit_none_strategy_survives_the_round_trip() {
     let snapshot = import_graph(graph, 100).expect("imports");
     let text = serde_json::to_string(&snapshot).unwrap();
     let back: Snapshot = serde_json::from_str(&text).unwrap();
-    let source = back.source_graph.as_ref().unwrap_or(&back.graph);
+    let source = back.source_graph.as_deref().unwrap_or(&back.graph);
     assert_ne!(
         source.area_mode(Some("pipeline")),
         source.area_mode(None),

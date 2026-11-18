@@ -26,8 +26,9 @@ pub fn patch_snapshot(
     }
     let mut graph = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     // Removals: the named nodes with everything below them, the edges at them, and the named edges.
     let known_nodes: BTreeSet<&str> = graph.nodes.iter().map(|n| n.id.as_str()).collect();
     if let Some(id) = patch
@@ -154,7 +155,7 @@ pub fn patch_snapshot(
         .layout_version
         .checked_add(1)
         .ok_or("Layout version overflow")?;
-    result.source_graph = Some(graph);
+    result.source_graph = Some(graph.into());
     result.collapsed_ids = collapsed.into_iter().collect();
     result.omitted_unresolved_edges = omitted;
     Ok(result)

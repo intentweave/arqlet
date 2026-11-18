@@ -54,7 +54,7 @@ fn the_first_view_stays_within_its_node_and_edge_budget() {
     assert_eq!(edges.collapsed_ids, ["g1", "g2", "g3"]);
     assert!(edges.graph.edges.len() <= 12);
     // Every edge keeps its logical direction: the view's edges are the source's, ends moved to collapsed containers.
-    let source = edges.source_graph.as_ref().unwrap();
+    let source = edges.source_graph.as_deref().unwrap();
     for e in &edges.graph.edges {
         let original = source.edges.iter().find(|s| s.id == e.id).unwrap();
         let shown = |id: &str| {
@@ -98,7 +98,7 @@ fn a_node_budget_divides_a_flat_graph_into_communities() {
     // Given communities are kept.
     let own: LayoutOptions =
         serde_json::from_value(json!({"levelOfDetail": {"nodes": 12}, "communities": 30})).unwrap();
-    let graph = snapshot.source_graph.clone().unwrap();
+    let graph = (*snapshot.source_graph.clone().unwrap()).clone();
     assert_eq!(
         import_graph_with(graph, 100, &own)
             .unwrap()

@@ -35,7 +35,7 @@ pub fn settle_snapshot(
     layout: u64,
 ) -> Result<Snapshot, String> {
     check_current(snapshot, expected, layout)?;
-    let source = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     if !snapshot.options.force_directed || !uses_organic(source) {
         let mut same = snapshot.clone();
         same.edit_report = Some(EditReport {

@@ -246,8 +246,9 @@ fn initially_collapsed(view: &Graph, options: &LayoutOptions) -> BTreeSet<String
 
 /// The view of a source graph (`project_view`).
 pub struct View {
-    /// The structured graph (`structured`): the source graph with the communities as containers.
-    pub graph: Graph,
+    /// The structured graph (`structured`): the source graph with the communities as containers (shared, as the
+    /// snapshot's `structure` keeps it).
+    pub graph: std::sync::Arc<Graph>,
     /// The collapsed containers that still exist in it (a community can be gone after the graph changed).
     pub collapsed: BTreeSet<String>,
     /// The projection that is laid out.
@@ -288,7 +289,18 @@ pub fn project_view(
     options: &LayoutOptions,
     merge: bool,
 ) -> Result<View, String> {
-    let view = structured(source, options)?.into_owned();
+    let view = std::sync::Arc::new(structured(source, options)?.into_owned());
+    project_view_on(view, false, collapsed, options, merge)
+}
+
+/// `project_view` on a graph structured already (`structure_of`); `validated` when an earlier view projected it.
+fn project_view_on(
+    view: std::sync::Arc<Graph>,
+    validated: bool,
+    collapsed: &[String],
+    options: &LayoutOptions,
+    merge: bool,
+) -> Result<View, String> {
     let containers: BTreeSet<&str> = view
         .nodes
         .iter()
@@ -302,7 +314,11 @@ pub fn project_view(
         })
         .cloned()
         .collect();
-    let mut projected = arqlet_view::project(&view, &collapsed)?;
+    let mut projected = if validated {
+        arqlet_view::project_validated(&view, &collapsed)?
+    } else {
+        arqlet_view::project(&view, &collapsed)?
+    };
     let mut weights = BTreeMap::new();
     if merge && aggregates(options) {
         (projected, weights) = merge_view(&view, projected, options);
@@ -313,6 +329,58 @@ pub fn project_view(
         projected,
         weights,
     })
+}
+
+/// The key of the options `structured` depends on: a structured view is valid for the same source and the same key.
+fn structure_key(options: &LayoutOptions) -> String {
+    serde_json::to_string(&(
+        &options.groups,
+        options.communities,
+        &options.community_hubs,
+        &options.partial,
+        &options.hidden,
+    ))
+    .expect("options serialize")
+}
+
+/// Provisional (ADR 0019): the snapshot's source graph as the view structures it with `options`, and the structure to keep
+/// with the next snapshot. Taken from `snapshot.structure` when that was made for the same shared source graph and the
+/// same structure options (`structure_key`); otherwise computed (`structured`) and returned to be kept. A snapshot without
+/// a shared source (`source_graph` unset) structures its graph each time.
+pub(crate) fn structure_of(
+    snapshot: &Snapshot,
+    options: &LayoutOptions,
+) -> Result<
+    (
+        std::sync::Arc<Graph>,
+        Option<std::sync::Arc<ViewStructure>>,
+        bool,
+    ),
+    String,
+> {
+    let Some(source) = snapshot.source_graph.as_ref() else {
+        let view = structured(&snapshot.graph, options)?.into_owned();
+        return Ok((std::sync::Arc::new(view), None, false));
+    };
+    let key = structure_key(options);
+    if let Some(kept) = snapshot
+        .structure
+        .as_ref()
+        .filter(|kept| std::sync::Arc::ptr_eq(&kept.source, source) && kept.key == key)
+    {
+        return Ok((kept.view.clone(), Some(kept.clone()), kept.validated));
+    }
+    let view = match structured(source, options)? {
+        std::borrow::Cow::Borrowed(_) => source.clone(),
+        std::borrow::Cow::Owned(view) => std::sync::Arc::new(view),
+    };
+    let kept = std::sync::Arc::new(ViewStructure {
+        source: source.clone(),
+        key,
+        view: view.clone(),
+        validated: false,
+    });
+    Ok((view, Some(kept), false))
 }
 
 /// Provisional: with a node budget (`LevelOfDetail::nodes`) and no `communities` of its own, a container with more
@@ -554,7 +622,13 @@ pub fn import_graph_counted(
     // Experimental (global layering, iteration 1): within a node budget the first view collapses containers, the
     // outermost first, and a collapsed container takes the size estimated from its content.
     if aggregates(options) {
-        let view = structured(&graph, options)?;
+        // The source graph shared, and its structure kept with the snapshot for the next views (`structure_of`).
+        let source = std::sync::Arc::new(graph);
+        let shared = match structured(&source, options)? {
+            std::borrow::Cow::Borrowed(_) => source.clone(),
+            std::borrow::Cow::Owned(view) => std::sync::Arc::new(view),
+        };
+        let view = shared.as_ref();
         // The first view: within a node budget, the outermost containers collapsed; and those `initially_collapsed` names.
         let mut collapsed = if options.visible_node_budget > 0 {
             budget::initial_collapse(&view, options.visible_node_budget)
@@ -568,18 +642,25 @@ pub fn import_graph_counted(
             collapsed.extend(pulled.into_iter().filter(|id| ids.contains(id.as_str())));
         }
         let (projected, weights) =
-            merge_view(&view, arqlet_view::project(&view, &collapsed)?, options);
-        let options = view_options(&view, &collapsed, options, &weights);
+            merge_view(view, arqlet_view::project(view, &collapsed)?, options);
+        let key = structure_key(options);
+        let options = view_options(view, &collapsed, options, &weights);
         let (mut snapshot, stages) =
             arqlet_layout::compute_counted(&projected, None, &BTreeSet::new(), &options)?;
-        snapshot.source_graph = Some(graph);
+        snapshot.source_graph = Some(source.clone());
+        snapshot.structure = Some(std::sync::Arc::new(ViewStructure {
+            source,
+            key,
+            view: shared,
+            validated: true,
+        }));
         snapshot.collapsed_ids = collapsed.into_iter().collect();
         snapshot.omitted_unresolved_edges = omitted;
         return Ok((snapshot, stages));
     }
     let (mut snapshot, stages) =
         arqlet_layout::compute_counted(&graph, None, &BTreeSet::new(), options)?;
-    snapshot.source_graph = Some(graph);
+    snapshot.source_graph = Some(graph.into());
     snapshot.omitted_unresolved_edges = omitted;
     Ok((snapshot, stages))
 }
@@ -612,8 +693,9 @@ pub fn add_node(
         .ok_or("Unknown source node")?;
     let mut graph = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     let id = format!("local:{}", snapshot.revision + 1);
     if graph.nodes.iter().any(|n| n.id == id) {
         return Err("Local node ID collision".into());
@@ -670,7 +752,7 @@ pub fn add_node(
         snapshot.options.clone()
     };
     let mut result = arqlet_layout::compute(&projected, Some(snapshot), &dirty, &options)?;
-    result.source_graph = Some(graph);
+    result.source_graph = Some(graph.into());
     result.collapsed_ids = collapsed.into_iter().collect();
     Ok(result)
 }
@@ -707,9 +789,25 @@ pub fn toggle_container(
     if snapshot.revision != expected || snapshot.layout_version != layout {
         return Err("Stale view request".into());
     }
-    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
-    // The view's containers: with communities, those too.
-    let source = structured(canonical, &snapshot.options)?;
+    // The view's containers: with communities, those too. The structure found here is handed on, so the view below does
+    // not compute it again.
+    let (source, kept, _) = structure_of(snapshot, &snapshot.options)?;
+    let primed;
+    let snapshot = match &kept {
+        Some(kept)
+            if !snapshot
+                .structure
+                .as_ref()
+                .is_some_and(|s| std::sync::Arc::ptr_eq(s, kept)) =>
+        {
+            primed = Snapshot {
+                structure: Some(kept.clone()),
+                ..snapshot.clone()
+            };
+            &primed
+        }
+        _ => snapshot,
+    };
     let source = source.as_ref();
     if !snapshot.graph.nodes.iter().any(|n| n.id == id) {
         return Err("Container is not visible".into());
@@ -727,13 +825,7 @@ pub fn toggle_container(
     if let Some(container) = id.strip_prefix(arqlet_layout::communities::REST_PREFIX) {
         options.partial.remove(container);
         collapsed.retain(|c| c != id);
-        return relayout_collapsed(
-            snapshot,
-            canonical,
-            &options,
-            collapsed,
-            &[container.to_string()],
-        );
+        return relayout_collapsed(snapshot, &options, collapsed, &[container.to_string()]);
     }
     // A container toggled as a whole is shown whole when it opens again.
     if options.partial.remove(id).is_some() {
@@ -751,17 +843,19 @@ pub fn toggle_container(
     } else {
         Vec::new()
     };
-    relayout_collapsed(snapshot, canonical, &options, collapsed, &opened)
+    relayout_collapsed(snapshot, &options, collapsed, &opened)
 }
 
 /// The view with `collapsed` as its collapsed containers, `opened` the ones that were expanded (`toggle`, `reveal`).
 fn relayout_collapsed(
     snapshot: &Snapshot,
-    canonical: &Graph,
     options: &LayoutOptions,
     collapsed: Vec<String>,
     opened: &[String],
 ) -> Result<Snapshot, String> {
+    // The view's own source graph: the result shares it, and its structure when the options keep it.
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let (structure, kept, validated) = structure_of(snapshot, options)?;
     let expanding = !opened.is_empty();
     // With a node budget or communities, the edges a collapsed container aggregates are drawn once per pair, and the
     // collapsed containers keep sizes estimated from their content.
@@ -770,7 +864,7 @@ fn relayout_collapsed(
         collapsed,
         projected: graph,
         weights,
-    } = project_view(canonical, &collapsed, options, true)?;
+    } = project_view_on(structure, validated, &collapsed, options, true)?;
     let options = view_options(&source, &collapsed, options, &weights);
     // Expanding within a node budget is local (global layering plan, step 2 of the first view): the drawing continues the
     // earlier one; only the container and the areas around it are placed again (they start from their earlier order), the
@@ -800,7 +894,26 @@ fn relayout_collapsed(
     } else {
         arqlet_layout::compute(&graph, None, &BTreeSet::new(), &options)?
     };
-    result.source_graph = Some(canonical.clone());
+    // The same source graph, shared: the view changed, not the graph.
+    result.source_graph = Some(
+        snapshot
+            .source_graph
+            .clone()
+            .unwrap_or_else(|| std::sync::Arc::new(canonical.clone())),
+    );
+    // Projected once without error: the structured graph is valid, and the next views skip its validation.
+    result.structure = kept.map(|kept| {
+        if kept.validated {
+            kept
+        } else {
+            std::sync::Arc::new(ViewStructure {
+                source: kept.source.clone(),
+                key: kept.key.clone(),
+                view: kept.view.clone(),
+                validated: true,
+            })
+        }
+    });
     result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
     result.base_revision = Some(snapshot.revision);
@@ -829,7 +942,7 @@ pub fn reveal_nodes(
     if snapshot.revision != expected || snapshot.layout_version != layout {
         return Err("Stale view request".into());
     }
-    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     // The view without its rests: the way from each node up to the top.
     let mut options = snapshot.options.clone();
     let shown_in_part = std::mem::take(&mut options.partial);
@@ -890,7 +1003,7 @@ pub fn reveal_nodes(
         // Only what a rest holds changed: the partly shown containers are placed again.
         opened = options.partial.keys().cloned().collect();
     }
-    relayout_collapsed(snapshot, canonical, &options, collapsed, &opened)
+    relayout_collapsed(snapshot, &options, collapsed, &opened)
 }
 
 pub fn set_direction(
@@ -908,8 +1021,9 @@ pub fn set_direction(
     }
     let mut source = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     if let Some(id) = container {
         if !source
             .nodes
@@ -952,7 +1066,7 @@ fn recompute_source(snapshot: &Snapshot, source: Graph) -> Result<Snapshot, Stri
     };
     options.config_id = None;
     let mut result = arqlet_layout::compute(&graph, None, &BTreeSet::new(), &options)?;
-    result.source_graph = Some(source);
+    result.source_graph = Some(source.into());
     result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
     result.base_revision = Some(snapshot.revision);
@@ -981,8 +1095,9 @@ pub fn set_strategy(
     }
     let mut source = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     if let Some(id) = container {
         if !source
             .nodes
@@ -1022,8 +1137,9 @@ pub fn set_routing(
     }
     let mut source = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     match container {
         Some(id) => {
             if !source
@@ -1174,7 +1290,7 @@ fn dirty_with_ancestors(
 /// containers above them are placed again; every other area keeps its boxes. `None` for any other change, which re-places
 /// every node.
 fn local_dirty(snapshot: &Snapshot, options: &LayoutOptions) -> Option<BTreeSet<String>> {
-    let source = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let mut rest = options.clone();
     rest.pins = snapshot.options.pins.clone();
     rest.order_hints = snapshot.options.order_hints.clone();
@@ -1231,8 +1347,9 @@ fn recompute_layout(
 ) -> Result<Snapshot, String> {
     let source = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     let communities = abstracts(options);
     let View {
         graph: view,
@@ -1251,7 +1368,7 @@ fn recompute_layout(
     // a changed container reaches the drawing; only the start positions are taken from the previous layout.
     let dirty = dirty.unwrap_or_else(|| graph.nodes.iter().map(|n| n.id.clone()).collect());
     let mut result = arqlet_layout::compute(&graph, Some(snapshot), &dirty, options)?;
-    result.source_graph = Some(source);
+    result.source_graph = Some(source.into());
     result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
     result.base_revision = Some(snapshot.revision);
@@ -1275,8 +1392,9 @@ pub fn set_shape(
     check_current(snapshot, expected, layout)?;
     let mut source = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     let target = source
         .nodes
         .iter_mut()
@@ -1288,7 +1406,7 @@ pub fn set_shape(
     target.shape = shape;
     let dirty = uses_organic(&source).then(|| dirty_with_ancestors(&source, [node.to_string()]));
     let mut changed = snapshot.clone();
-    changed.source_graph = Some(source);
+    changed.source_graph = Some(source.into());
     recompute_layout(&changed, &snapshot.options, dirty)
 }
 
@@ -4082,6 +4200,7 @@ mod tests {
             recomputed_containers: Vec::new(),
             optimization: None,
             omitted_unresolved_edges,
+            structure: None,
             geometry_issues: Vec::new(),
             resolved_ports: Vec::new(),
             boundary_crossings: Vec::new(),

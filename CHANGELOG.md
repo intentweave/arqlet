@@ -23,6 +23,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- Resident sessions keep the prepared source (ADR 0019 step 3): the snapshot's source graph is shared (`Arc`), and the
+  view's structure (groups, communities) is kept with the snapshot (`Snapshot.structure`, not serialized) and reused by the
+  next view of the same source and structure options; a structured view projected once is not validated again. Opening a
+  container in a session of a 1 000 000-node graph: 8.5 s → 3.8 s; byte-identical answers
+  ([results](benchmarks/results/sessions-prepared-20261118.md)).
+
 - **Default:** `sharedBorderRanks` and `alignStacked` are on: free space beside stacked containers. In a container across
   its parent's flow the border nodes share the first or last rank with the side nodes instead of opening one of their
   own, which held only a long-edge dummy; and an edge that is the only one between two containers of adjacent ranks (a
