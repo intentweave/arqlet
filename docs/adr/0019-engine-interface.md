@@ -134,10 +134,14 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    browser path, an edit with its scene 1.2–1.6× (its time is layout work).
 4. **Columnar results**: positions and routes as typed arrays from a session, zero-copy in the browser; the overview
    moves onto the same buffers.
-   *Done (2026-11-18; ports, labels, rows and conflicts as columns stay open, nothing asks for them yet):* the `columns` request of a session (`arqlet_runtime::columns::SceneColumns`) answers
+   *Done (2026-11-18):* the `columns` request of a session (`arqlet_runtime::columns::SceneColumns`) answers
    with the id tables and each column's name, type and length, and keeps the numbers in the session until its snapshot
-   changes: node bounds (`f32`, x y width height), parent index, flags, route ends as node indices, weight, flags, route
-   offsets and one array of route points. WASM: `lw_session_column(id, index)` gives a column's address, and
+   changes: node bounds (`f32`, x y width height), parent index, flags, kind and shape, route ends as node indices, weight, flags,
+   route offsets and one array of route points, and the rest of the scene the same way: ports (node, edge, flags, side,
+   position), boundary crossings, placed labels, rows (with their node), conflicts (kind, and the nodes and routes each
+   names as indices behind offsets, `NONE` for one outside the scene) and junctions. Strings are kept once in tables
+   (ids, labels, texts, kinds, reasons; the edges that ports and crossings name), the extent, `showPorts` and the buses
+   stay in the JSON description. WASM: `lw_session_column(id, index)` gives a column's address, and
    `openSession().columns()` returns typed-array views into the module's memory (no copy; valid until the next request
    or a growth of the memory). In the worker the columns are copied once and transferred (`postMessage` with a transfer
    list). `createSession().columns()` falls back to `columnsOfScene(scene)` where the engine keeps no columns (backend,
@@ -147,10 +151,10 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    `lw_session_overview_column`, `createOverviewSession(run, {columns: true})` (opt-in: typed arrays index like arrays,
    but JSON cannot carry them, so a host that sends positions back as `start` gets plain arrays made for it). Positions
    stay `f64`; a test compares the numbers with the JSON answer and the viewer's model and vertex buffers from both.
-   **Measured** ([results](../../benchmarks/results/columns-20261118.md), load 17 on the machine, one run per size): the
-   scene is 8.4–9.2 times smaller as columns, and 10–12 times faster to the page in a small view (the transfer dominates
-   there) and 1.9–2.2 times in a full one (the engine's own work dominates). The overview's continuation is 1.8 and 3.6
-   times faster at 10 000 and 100 000 nodes, but its answer is 25–34 % larger in bytes (JSON positions are rounded to
+   **Measured** ([results](../../benchmarks/results/columns-20261118.md), load 4 to 2 on the machine, one run per size): the
+   scene is 3.3–3.7 times smaller as columns (the strings, a quarter of the column side, cap it), and 8.2–8.6 times faster
+   to the page in a small view (the transfer dominates there) and 1.8–1.9 times in a full one (the engine's own work
+   dominates). The overview's continuation is 1.7 times faster at 10 000 and 100 000 nodes, but its answer is 25–34 % larger in bytes (JSON positions are rounded to
    hundredths); the whole answer is layout time and shows no effect. So columns buy time, not bytes, and the binary
    frame of step 5 should weigh `i32` hundredths for positions.
 5. **Columnar input and binary frames** between backend and browser, if step 2 shows that parsing or transfer

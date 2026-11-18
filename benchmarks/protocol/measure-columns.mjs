@@ -52,7 +52,8 @@ const shape = {boxes: sceneAnswer.scene.nodes.length, routes: sceneAnswer.scene.
   routePoints: sceneAnswer.scene.routes.reduce((n, r) => n + r.points.length, 0)};
 const columns = session.columns();
 const columnBytes = Object.values(columns).filter(ArrayBuffer.isView).reduce((n, a) => n + a.byteLength, 0);
-const idBytes = JSON.stringify({nodeIds: columns.nodeIds, routeIds: columns.routeIds}).length;
+// Everything that is not a typed array travels as JSON: the id, label and text tables and the few scalars.
+const idBytes = JSON.stringify(Object.fromEntries(Object.entries(columns).filter(([, v]) => !ArrayBuffer.isView(v)))).length;
 console.log(JSON.stringify({view, nodes, ...shape, sceneJsonBytes: sceneText.length, columnBytes, idTableJsonBytes: idBytes}));
 
 const asObjects = async () => {

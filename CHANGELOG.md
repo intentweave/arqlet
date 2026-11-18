@@ -12,8 +12,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   them as views into WASM memory, as transferred copies from a worker, or builds them from the scene for a backend
   (`columnsOfScene`). WASM export `lw_session_column`. The overview too (opt-in `columns: true`, WASM export
   `lw_session_overview_column`): `x`, `y`, `r`, `parent`, `kind`, `edges` and `links` as typed arrays. Measured against
-  the JSON answers ([results](benchmarks/results/columns-20261118.md), a loaded machine): the scene is 8.4–9.2× smaller
-  and 1.9–12× faster to the page, an overview continuation 1.8–3.6× faster but larger in bytes. Benchmark:
+  the JSON answers ([results](benchmarks/results/columns-20261118.md), load 4 to 2, one run per size): the scene is
+  3.3–3.7× smaller and 1.8–8.6× faster to the page, an overview continuation 1.7× faster but larger in bytes. The columns
+  cover the whole scene: nodes, routes, ports, boundary crossings, labels, rows, conflicts and junctions. Benchmark:
   `benchmarks/protocol/measure-columns.sh`.
 
 ### Changed
