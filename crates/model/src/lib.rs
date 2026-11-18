@@ -1619,6 +1619,54 @@ fn renamed_to_level_of_detail<'de, D: serde::Deserializer<'de>>(_: D) -> Result<
     ))
 }
 
+/// Provisional (ADR 0019, interned ids): a graph's nodes and edges by dense index, for work that walks a large graph many
+/// times (a view's projection at every toggle). Built once per graph (`of`); valid only for the graph it was built from.
+#[derive(Debug, Clone, Default)]
+pub struct GraphIndex {
+    /// Node id → index into `Graph::nodes` (the first node of an id).
+    pub node: BTreeMap<String, usize>,
+    /// Each node's parent by index (`None` at the top level or for a parent the graph does not have).
+    pub parent: Vec<Option<usize>>,
+    /// Whether a node is a container (some node names it as its parent).
+    pub container: Vec<bool>,
+    /// Each edge's source and target by index (`None` for an unresolved target or an end the graph does not have).
+    pub ends: Vec<(Option<usize>, Option<usize>)>,
+}
+
+impl GraphIndex {
+    pub fn of(graph: &Graph) -> Self {
+        let mut node = BTreeMap::new();
+        for (i, n) in graph.nodes.iter().enumerate() {
+            node.entry(n.id.clone()).or_insert(i);
+        }
+        let parent: Vec<Option<usize>> = graph
+            .nodes
+            .iter()
+            .map(|n| n.parent_id.as_deref().and_then(|p| node.get(p).copied()))
+            .collect();
+        let mut container = vec![false; graph.nodes.len()];
+        for p in parent.iter().flatten() {
+            container[*p] = true;
+        }
+        let ends = graph
+            .edges
+            .iter()
+            .map(|e| {
+                (
+                    node.get(e.source.as_str()).copied(),
+                    e.target.as_deref().and_then(|t| node.get(t).copied()),
+                )
+            })
+            .collect();
+        GraphIndex {
+            node,
+            parent,
+            container,
+            ends,
+        }
+    }
+}
+
 /// Provisional (ADR 0019): a structured view of a source graph (`Snapshot::structure`): valid for `source` (the same
 /// shared graph, compared by identity) and the structure options in `key`.
 #[derive(Debug)]
@@ -1628,6 +1676,8 @@ pub struct ViewStructure {
     pub view: std::sync::Arc<Graph>,
     /// Whether `view` passed validation (a projection of it succeeded); later projections need not validate it again.
     pub validated: bool,
+    /// `view` by index, for its projections.
+    pub index: std::sync::Arc<GraphIndex>,
 }
 
 /// The level of detail (provisional): which containers a view shows collapsed at first, by depth and by kind; opening

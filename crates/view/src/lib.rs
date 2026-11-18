@@ -8,38 +8,28 @@ pub fn project(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, St
 
 /// `project` on a source validated before (by an earlier `project` of the same graph): the projection is still validated.
 pub fn project_validated(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, String> {
-    let nodes: BTreeMap<_, _> = source.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
-    // The containers, once: a search of all nodes for every collapsed id was quadratic.
-    let parents: BTreeSet<&str> = source
-        .nodes
-        .iter()
-        .filter_map(|n| n.parent_id.as_deref())
-        .collect();
+    project_indexed(source, &GraphIndex::of(source), collapsed)
+}
+
+/// `project_validated` with the source's index (`GraphIndex::of(source)`, kept by a caller that projects the same graph
+/// many times): nodes and edges are walked by index, and an edge is copied only when the view keeps it.
+pub fn project_indexed(
+    source: &Graph,
+    index: &GraphIndex,
+    collapsed: &BTreeSet<String>,
+) -> Result<Graph, String> {
+    let n = source.nodes.len();
+    let mut closed = vec![false; n];
     for id in collapsed {
-        if !nodes.contains_key(id.as_str()) || !parents.contains(id.as_str()) {
-            return Err(format!("Not a container: {id}"));
+        match index.node.get(id.as_str()) {
+            Some(&i) if index.container[i] => closed[i] = true,
+            _ => return Err(format!("Not a container: {id}")),
         }
     }
-    // What shows each node: its outermost collapsed ancestor, else itself; computed once per node from its parent's (a walk
-    // to the root for every node and edge end compared ids at every step, which took seconds on graphs of 300 000 nodes).
-    let index: BTreeMap<&str, usize> = source
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.id.as_str(), i))
-        .collect();
-    let parent: Vec<Option<usize>> = source
-        .nodes
-        .iter()
-        .map(|n| n.parent_id.as_deref().map(|p| index[p]))
-        .collect();
-    let closed: Vec<bool> = source
-        .nodes
-        .iter()
-        .map(|n| collapsed.contains(&n.id))
-        .collect();
-    let mut outer: Vec<Option<Option<usize>>> = vec![None; source.nodes.len()];
-    for start in 0..source.nodes.len() {
+    // What shows each node: its outermost collapsed ancestor, else itself; computed once per node from its parent's.
+    let parent = &index.parent;
+    let mut outer: Vec<Option<Option<usize>>> = vec![None; n];
+    for start in 0..n {
         let mut chain = Vec::new();
         let mut at = start;
         while outer[at].is_none() {
@@ -62,15 +52,8 @@ pub fn project_validated(source: &Graph, collapsed: &BTreeSet<String>) -> Result
         .enumerate()
         .map(|(i, o)| o.expect("every node resolved").unwrap_or(i))
         .collect();
-    let owner = |id: &str| source.nodes[shown[index[id]]].id.clone();
-    let visible: BTreeSet<_> = source
-        .nodes
-        .iter()
-        .filter(|n| owner(&n.id) == n.id)
-        .map(|n| n.id.clone())
-        .collect();
-    // The visible nodes only, in their order (a copy of the whole graph that then dropped the hidden ones cost a copy of
-    // every node of a large source per view).
+    let visible = |i: usize| shown[i] == i;
+    // The visible nodes only, in their order.
     let mut graph = Graph {
         default_direction: source.default_direction.clone(),
         container_directions: source.container_directions.clone(),
@@ -83,51 +66,61 @@ pub fn project_validated(source: &Graph, collapsed: &BTreeSet<String>) -> Result
         nodes: source
             .nodes
             .iter()
-            .filter(|n| visible.contains(&n.id))
-            .cloned()
+            .enumerate()
+            .filter(|(i, _)| visible(*i))
+            .map(|(_, node)| node.clone())
             .collect(),
         edges: Vec::new(),
         buses: source.buses.clone(),
     };
+    let id = |i: usize| source.nodes[i].id.clone();
     graph.edges = source
         .edges
         .iter()
-        .filter_map(|e| {
-            let mut edge = e.clone();
-            edge.source = owner(&e.source);
-            edge.target = e.target.as_deref().map(owner);
+        .zip(&index.ends)
+        .filter_map(|(e, &(s, t))| {
+            let s = s?;
+            let (owner_s, owner_t) = (shown[s], t.map(|t| shown[t]));
             // Hide connections internal to an aggregate; retain true visible self-loops.
-            if edge.target.as_ref() == Some(&edge.source)
-                && (edge.source != e.source || edge.target != e.target)
-            {
+            if owner_t == Some(owner_s) && (owner_s != s || owner_t != t) {
                 return None;
             }
+            let mut edge = e.clone();
+            edge.source = id(owner_s);
+            edge.target = owner_t.map(id);
             Some(edge)
         })
         .collect();
     graph.ports = source
         .ports
         .iter()
-        .filter(|port| visible.contains(&port.node_id))
+        .filter(|port| {
+            index
+                .node
+                .get(port.node_id.as_str())
+                .is_some_and(|&i| visible(i))
+        })
         .cloned()
         .collect();
-    let (old_edges, new_edges) = (first_by_id(&source.edges), first_by_id(&graph.edges));
-    graph.edge_ports = source
-        .edge_ports
-        .iter()
-        .filter_map(|b| {
-            let old = *old_edges.get(b.edge_id.as_str())?;
-            let new = *new_edges.get(b.edge_id.as_str())?;
-            let mut binding = b.clone();
-            if old.source != new.source {
-                binding.source_port = None;
-            }
-            if old.target != new.target {
-                binding.target_port = None;
-            }
-            Some(binding)
-        })
-        .collect();
+    if !source.edge_ports.is_empty() {
+        let (old_edges, new_edges) = (first_by_id(&source.edges), first_by_id(&graph.edges));
+        graph.edge_ports = source
+            .edge_ports
+            .iter()
+            .filter_map(|b| {
+                let old = *old_edges.get(b.edge_id.as_str())?;
+                let new = *new_edges.get(b.edge_id.as_str())?;
+                let mut binding = b.clone();
+                if old.source != new.source {
+                    binding.source_port = None;
+                }
+                if old.target != new.target {
+                    binding.target_port = None;
+                }
+                Some(binding)
+            })
+            .collect();
+    }
     validate(&graph)?;
     Ok(graph)
 }
@@ -737,5 +730,113 @@ mod lift_tests {
         // One edge for P–Q (e1 stands for e1 and e3 forward, e2 backward); the parallel siblings both stay.
         assert_eq!(ids, ["e1", "e4", "e5", "e6", "e7", "e8", "e9"]);
         assert_eq!((weights["e1"].forward, weights["e1"].backward), (2, 1));
+    }
+}
+
+#[cfg(test)]
+mod indexed_tests {
+    use super::*;
+
+    /// The projection as it was first written: a copy of the whole graph, each end's visible node found by a walk to the
+    /// root, the hidden dropped afterwards.
+    fn reference(source: &Graph, collapsed: &BTreeSet<String>) -> Graph {
+        let nodes: BTreeMap<_, _> = source.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+        let owner = |id: &str| {
+            let mut current = nodes[id].parent_id.as_deref();
+            let mut visible = id.to_string();
+            while let Some(p) = current {
+                if collapsed.contains(p) {
+                    visible = p.into();
+                }
+                current = nodes[p].parent_id.as_deref();
+            }
+            visible
+        };
+        let visible: BTreeSet<_> = source
+            .nodes
+            .iter()
+            .filter(|n| owner(&n.id) == n.id)
+            .map(|n| n.id.clone())
+            .collect();
+        let mut graph = source.clone();
+        graph.nodes.retain(|n| visible.contains(&n.id));
+        graph.edges = source
+            .edges
+            .iter()
+            .filter_map(|e| {
+                let mut edge = e.clone();
+                edge.source = owner(&e.source);
+                edge.target = e.target.as_deref().map(owner);
+                if edge.target.as_ref() == Some(&edge.source)
+                    && (edge.source != e.source || edge.target != e.target)
+                {
+                    return None;
+                }
+                Some(edge)
+            })
+            .collect();
+        graph.ports.retain(|port| visible.contains(&port.node_id));
+        graph.edge_ports = source
+            .edge_ports
+            .iter()
+            .filter_map(|b| {
+                let old = source.edges.iter().find(|e| e.id == b.edge_id)?;
+                let new = graph.edges.iter().find(|e| e.id == b.edge_id)?;
+                let mut binding = b.clone();
+                if old.source != new.source {
+                    binding.source_port = None;
+                }
+                if old.target != new.target {
+                    binding.target_port = None;
+                }
+                Some(binding)
+            })
+            .collect();
+        graph
+    }
+
+    #[test]
+    fn the_indexed_projection_equals_the_projection_for_every_collapsed_set() {
+        let node = |id: &str, parent: Option<&str>| serde_json::json!({"id": id, "kind": "n", "label": id, "parentId": parent});
+        let edge = |id: &str, s: &str, t: Option<&str>| serde_json::json!({"id": id, "kind": "k", "source": s, "target": t});
+        // A = {a1, B = {b1, b2}}, C = {c1}, z; ports on b1 and c1, bound to edges; a self-loop, parallel edges, an edge to a
+        // container, an unresolved one.
+        let g: Graph = serde_json::from_value(serde_json::json!({
+            "nodes": [node("A", None), node("a1", Some("A")), node("B", Some("A")), node("b1", Some("B")), node("b2", Some("B")),
+                node("C", None), node("c1", Some("C")), node("z", None)],
+            "edges": [edge("e1", "b1", Some("c1")), edge("e2", "b1", Some("b2")), edge("e3", "b2", Some("b2")),
+                edge("e4", "a1", Some("C")), edge("e5", "z", Some("b1")), edge("e6", "z", Some("b1")), edge("e7", "c1", None),
+                edge("e8", "c1", Some("a1"))],
+            "ports": [{"id": "p1", "nodeId": "b1", "side": "right", "offset": 0.5}, {"id": "p2", "nodeId": "c1", "side": "left", "offset": 0.5}],
+            "edgePorts": [{"edgeId": "e1", "sourcePort": "p1", "targetPort": "p2"}]
+        }))
+        .unwrap();
+        let index = GraphIndex::of(&g);
+        let containers = ["A", "B", "C"];
+        for mask in 0..8u8 {
+            let collapsed: BTreeSet<String> = containers
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| mask & (1 << i) != 0)
+                .map(|(_, c)| c.to_string())
+                .collect();
+            let plain = reference(&g, &collapsed);
+            assert_eq!(
+                serde_json::to_string(&project(&g, &collapsed).unwrap()).unwrap(),
+                serde_json::to_string(&plain).unwrap()
+            );
+            let indexed = project_indexed(&g, &index, &collapsed).unwrap();
+            assert_eq!(
+                serde_json::to_string(&indexed).unwrap(),
+                serde_json::to_string(&plain).unwrap(),
+                "collapsed {collapsed:?}"
+            );
+        }
+        // Not a container: refused alike.
+        let leaf = BTreeSet::from(["a1".to_string()]);
+        assert_eq!(
+            project(&g, &leaf).unwrap_err(),
+            project_indexed(&g, &index, &leaf).unwrap_err()
+        );
     }
 }

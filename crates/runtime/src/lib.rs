@@ -290,13 +290,14 @@ pub fn project_view(
     merge: bool,
 ) -> Result<View, String> {
     let view = std::sync::Arc::new(structured(source, options)?.into_owned());
-    project_view_on(view, false, collapsed, options, merge)
+    project_view_on(view, None, collapsed, options, merge)
 }
 
-/// `project_view` on a graph structured already (`structure_of`); `validated` when an earlier view projected it.
+/// `project_view` on a graph structured already (`structure_of`); with its index when an earlier view projected it (so it
+/// is valid).
 fn project_view_on(
     view: std::sync::Arc<Graph>,
-    validated: bool,
+    validated: Option<&GraphIndex>,
     collapsed: &[String],
     options: &LayoutOptions,
     merge: bool,
@@ -314,10 +315,9 @@ fn project_view_on(
         })
         .cloned()
         .collect();
-    let mut projected = if validated {
-        arqlet_view::project_validated(&view, &collapsed)?
-    } else {
-        arqlet_view::project(&view, &collapsed)?
+    let mut projected = match validated {
+        Some(index) => arqlet_view::project_indexed(&view, index, &collapsed)?,
+        None => arqlet_view::project(&view, &collapsed)?,
     };
     let mut weights = BTreeMap::new();
     if merge && aggregates(options) {
@@ -377,6 +377,7 @@ pub(crate) fn structure_of(
     let kept = std::sync::Arc::new(ViewStructure {
         source: source.clone(),
         key,
+        index: std::sync::Arc::new(GraphIndex::of(&view)),
         view: view.clone(),
         validated: false,
     });
@@ -641,8 +642,14 @@ pub fn import_graph_counted(
             let ids: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
             collapsed.extend(pulled.into_iter().filter(|id| ids.contains(id.as_str())));
         }
-        let (projected, weights) =
-            merge_view(view, arqlet_view::project(view, &collapsed)?, options);
+        // Validated once, then projected by index; the index is kept with the structure.
+        arqlet_model::validate(view)?;
+        let index = std::sync::Arc::new(GraphIndex::of(view));
+        let (projected, weights) = merge_view(
+            view,
+            arqlet_view::project_indexed(view, &index, &collapsed)?,
+            options,
+        );
         let key = structure_key(options);
         let options = view_options(view, &collapsed, options, &weights);
         let (mut snapshot, stages) =
@@ -651,6 +658,7 @@ pub fn import_graph_counted(
         snapshot.structure = Some(std::sync::Arc::new(ViewStructure {
             source,
             key,
+            index,
             view: shared,
             validated: true,
         }));
@@ -856,6 +864,10 @@ fn relayout_collapsed(
     // The view's own source graph: the result shares it, and its structure when the options keep it.
     let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let (structure, kept, validated) = structure_of(snapshot, options)?;
+    let index = kept
+        .as_ref()
+        .filter(|_| validated)
+        .map(|kept| kept.index.clone());
     let expanding = !opened.is_empty();
     // With a node budget or communities, the edges a collapsed container aggregates are drawn once per pair, and the
     // collapsed containers keep sizes estimated from their content.
@@ -864,7 +876,7 @@ fn relayout_collapsed(
         collapsed,
         projected: graph,
         weights,
-    } = project_view_on(structure, validated, &collapsed, options, true)?;
+    } = project_view_on(structure, index.as_deref(), &collapsed, options, true)?;
     let options = view_options(&source, &collapsed, options, &weights);
     // Expanding within a node budget is local (global layering plan, step 2 of the first view): the drawing continues the
     // earlier one; only the container and the areas around it are placed again (they start from their earlier order), the
@@ -911,6 +923,7 @@ fn relayout_collapsed(
                 key: kept.key.clone(),
                 view: kept.view.clone(),
                 validated: true,
+                index: kept.index.clone(),
             })
         }
     });
