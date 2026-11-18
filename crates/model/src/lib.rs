@@ -698,10 +698,16 @@ pub fn validate(graph: &Graph) -> Result<(), String> {
             return Err("Empty or duplicate node ID".into());
         }
     }
+    // Every node's walk to the top: it stops at a node whose own walk ended well already, so the whole check is linear. The
+    // first node (in order) whose walk fails gives the error, the same as a full walk from each node would.
+    let mut good: BTreeSet<&str> = BTreeSet::new();
     for n in &graph.nodes {
         let mut seen = BTreeSet::from([n.id.as_str()]);
         let mut parent = n.parent_id.as_deref();
         while let Some(id) = parent {
+            if good.contains(id) {
+                break;
+            }
             if !seen.insert(id) {
                 return Err(format!("Containment cycle: {id}"));
             }
@@ -711,6 +717,7 @@ pub fn validate(graph: &Graph) -> Result<(), String> {
                 .parent_id
                 .as_deref();
         }
+        good.extend(seen);
     }
     let mut edges = BTreeSet::new();
     for e in &graph.edges {
@@ -742,14 +749,18 @@ pub fn validate(graph: &Graph) -> Result<(), String> {
         }
     }
     let mut bindings = BTreeSet::new();
+    // Edge ids are unique here (checked above), so a map finds the edge a search would.
+    let by_id: BTreeMap<&str, &Edge> = if graph.edge_ports.is_empty() {
+        BTreeMap::new()
+    } else {
+        graph.edges.iter().map(|e| (e.id.as_str(), e)).collect()
+    };
     for binding in &graph.edge_ports {
         if !bindings.insert(&binding.edge_id) {
             return Err("Duplicate edge port binding".into());
         }
-        let edge = graph
-            .edges
-            .iter()
-            .find(|e| e.id == binding.edge_id)
+        let edge = *by_id
+            .get(binding.edge_id.as_str())
             .ok_or("Port binding references unknown edge")?;
         for (id, node) in [
             (binding.source_port.as_ref(), Some(&edge.source)),
@@ -3707,5 +3718,77 @@ mod eligibility_tests {
             &graph,
             &BTreeMap::new(),
         ));
+    }
+}
+
+#[cfg(test)]
+mod validate_tests {
+    use super::*;
+
+    /// The containment check as first written: a full walk to the top from every node.
+    fn reference(graph: &Graph) -> Result<(), String> {
+        let nodes: BTreeMap<&str, &Node> = graph.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+        for n in &graph.nodes {
+            let mut seen = BTreeSet::from([n.id.as_str()]);
+            let mut parent = n.parent_id.as_deref();
+            while let Some(id) = parent {
+                if !seen.insert(id) {
+                    return Err(format!("Containment cycle: {id}"));
+                }
+                parent = nodes
+                    .get(id)
+                    .ok_or_else(|| format!("Missing parent: {id}"))?
+                    .parent_id
+                    .as_deref();
+            }
+        }
+        Ok(())
+    }
+
+    fn graph(parents: &[(&str, Option<&str>)]) -> Graph {
+        let nodes: Vec<serde_json::Value> = parents
+            .iter()
+            .map(|(id, p)| serde_json::json!({"id": id, "kind": "k", "label": id, "parentId": p}))
+            .collect();
+        serde_json::from_value(serde_json::json!({"nodes": nodes, "edges": []})).unwrap()
+    }
+
+    #[test]
+    fn the_linear_containment_check_gives_the_errors_of_the_full_walk() {
+        let cases: Vec<Vec<(&str, Option<&str>)>> = vec![
+            vec![("a", None), ("b", Some("a")), ("c", Some("b"))],
+            vec![("a", Some("b")), ("b", Some("a"))],
+            vec![
+                ("x", None),
+                ("c", Some("b")),
+                ("a", Some("c")),
+                ("b", Some("a")),
+            ],
+            vec![("a", None), ("b", Some("a")), ("c", Some("missing"))],
+            vec![
+                ("a", None),
+                ("d", Some("c")),
+                ("c", Some("b")),
+                ("b", Some("a")),
+                ("e", Some("e")),
+            ],
+            vec![
+                ("a", Some("b")),
+                ("b", Some("c")),
+                ("c", Some("d")),
+                ("d", Some("b")),
+            ],
+            vec![
+                ("r", None),
+                ("s", Some("r")),
+                ("t", Some("s")),
+                ("u", Some("t")),
+                ("v", Some("nope")),
+            ],
+        ];
+        for parents in cases {
+            let g = graph(&parents);
+            assert_eq!(validate(&g), reference(&g), "{parents:?}");
+        }
     }
 }

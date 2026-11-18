@@ -461,11 +461,22 @@ fn select_connected(graph: &Graph, limit: usize) -> BTreeSet<String> {
 /// it can be opened; a container an edge reaches while none of its content is selected keeps its content too and starts
 /// collapsed (the second set). Otherwise as `select_connected`: the most connected neighbourhoods first, then the rest
 /// in input order.
+/// Also returns the structured graph it computed (when structuring changed the graph) and the containers the first view
+/// shows collapsed, for the import to reuse when the selection keeps every node.
+#[allow(clippy::type_complexity)]
 fn select_visible(
     graph: &Graph,
     limit: usize,
     options: &LayoutOptions,
-) -> Result<(BTreeSet<String>, BTreeSet<String>), String> {
+) -> Result<
+    (
+        BTreeSet<String>,
+        BTreeSet<String>,
+        Option<Graph>,
+        BTreeSet<String>,
+    ),
+    String,
+> {
     let view = structured(graph, options)?;
     let collapsed = initially_collapsed(&view, options);
     let parent: BTreeMap<&str, Option<&str>> = view
@@ -573,7 +584,11 @@ fn select_visible(
             }
         }
     }
-    Ok((selected, pulled))
+    let view = match view {
+        std::borrow::Cow::Owned(view) => Some(view),
+        std::borrow::Cow::Borrowed(_) => None,
+    };
+    Ok((selected, pulled, view, collapsed))
 }
 
 pub fn import_graph_counted(
@@ -595,20 +610,29 @@ pub fn import_graph_counted(
     graph.edges.retain(|e| e.target.is_some());
     // With an abstracting view, the limit counts what the first view shows (`select_visible`); otherwise the most
     // connected neighbourhoods of the graph's nodes.
+    // What the selection structured already: reused below when it keeps every node (the graph is then the same).
+    let mut prepared: Option<(Option<Graph>, BTreeSet<String>)> = None;
     let (mut selected, pulled) = if abstracts(options) && graph.nodes.len() > limit {
-        select_visible(&graph, limit, options)?
+        let (selected, pulled, view, collapsed) = select_visible(&graph, limit, options)?;
+        prepared = Some((view, collapsed));
+        (selected, pulled)
     } else {
         (select_connected(&graph, limit), BTreeSet::new())
     };
+    let whole = graph.nodes.len();
     let parents: BTreeMap<_, _> = graph
         .nodes
         .iter()
         .map(|n| (n.id.clone(), n.parent_id.clone()))
         .collect();
+    // Every selected node's ancestors. A walk stops at an ancestor selected already: it is either selected itself (and
+    // walks up on its own turn) or was added by a walk that went on up.
     for id in selected.clone() {
         let mut p = parents[&id].clone();
         while let Some(parent) = p {
-            selected.insert(parent.clone());
+            if !selected.insert(parent.clone()) {
+                break;
+            }
             p = parents[&parent].clone();
         }
     }
@@ -617,17 +641,23 @@ pub fn import_graph_counted(
     graph
         .edges
         .retain(|e| selected.contains(&e.source) && selected.contains(e.target.as_ref().unwrap()));
+    let kept: BTreeSet<&str> = graph.edges.iter().map(|e| e.id.as_str()).collect();
     graph
         .edge_ports
-        .retain(|b| graph.edges.iter().any(|e| e.id == b.edge_id));
+        .retain(|b| kept.contains(b.edge_id.as_str()));
     // Experimental (global layering, iteration 1): within a node budget the first view collapses containers, the
     // outermost first, and a collapsed container takes the size estimated from its content.
     if aggregates(options) {
         // The source graph shared, and its structure kept with the snapshot for the next views (`structure_of`).
+        let reuse = prepared.filter(|_| graph.nodes.len() == whole);
         let source = std::sync::Arc::new(graph);
-        let shared = match structured(&source, options)? {
-            std::borrow::Cow::Borrowed(_) => source.clone(),
-            std::borrow::Cow::Owned(view) => std::sync::Arc::new(view),
+        let (shared, first_collapsed) = match reuse {
+            Some((Some(view), collapsed)) => (std::sync::Arc::new(view), Some(collapsed)),
+            Some((None, collapsed)) => (source.clone(), Some(collapsed)),
+            None => match structured(&source, options)? {
+                std::borrow::Cow::Borrowed(_) => (source.clone(), None),
+                std::borrow::Cow::Owned(view) => (std::sync::Arc::new(view), None),
+            },
         };
         let view = shared.as_ref();
         // The first view: within a node budget, the outermost containers collapsed; and those `initially_collapsed` names.
@@ -637,7 +667,7 @@ pub fn import_graph_counted(
             BTreeSet::new()
         };
         if abstracts(options) {
-            collapsed.extend(initially_collapsed(&view, options));
+            collapsed.extend(first_collapsed.unwrap_or_else(|| initially_collapsed(view, options)));
             // Containers an edge pulled in without their content selected: whole, and collapsed (`select_visible`).
             let ids: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
             collapsed.extend(pulled.into_iter().filter(|id| ids.contains(id.as_str())));
