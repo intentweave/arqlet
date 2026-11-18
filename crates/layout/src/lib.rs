@@ -2675,6 +2675,7 @@ pub fn constructive_spacing(options: &LayoutOptions) -> constructive::Spacing {
         through_borders: options.hierarchical_ordering,
         probe: false,
         port_sides: options.port_sides && options.single_pass,
+        search_window: options.route_search_window,
     }
 }
 

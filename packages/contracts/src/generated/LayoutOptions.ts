@@ -391,6 +391,13 @@ layerSpacing?: number | null,
  */
 portSides?: boolean,
 /**
+ * Provisional: the constructed layered routes search their lanes across the flow only near their ends (as far across as
+ * the edge reaches along the flow, at least 16 tracks), and over the whole width only when they find no way there. A
+ * search over the whole width costs time quadratic in the number of boxes across the drawing. Off by default (omitted),
+ * so default drawings do not change.
+ */
+routeSearchWindow?: boolean,
+/**
  * Provisional (single pass): areas without a fixed flow (organic, tree, radial) and straight routing are allowed in a
  * single-pass layout. Those areas keep their own placement and their edges go to the router that completes single pass;
  * a layered child that grows moves its siblings apart. Off by default (omitted): such graphs use the pipeline before

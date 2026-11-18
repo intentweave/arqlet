@@ -87,6 +87,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   under single pass. A 1000-node view of synthetic-20k took more than 15 minutes, now 26 s; synthetic-20k with one level
   open (349 visible nodes, 8072 edges) more than 10 minutes, now 7 s.
 
+- `loopSpace` finds the nodes within reach of a node's loop corners once and tests their ancestors only for them; every
+  node was tested for every corner of every node with a loop (a 5 000-node view of synthetic-20k: 198 s → 78 s,
+  [measurement](benchmarks/results/structured-view-scale-20261115.md)). Byte-identical output.
+- Large views are routed faster, with byte-identical output: a route search whose first step (from the port to the first
+  corridor) or last step is blocked is no longer run (the way is impossible whatever lies between; more than half the
+  searches of a 5 000-node view); an edge's gaps and obstacle index are built at its first search and only once; its
+  obstacles are taken from the boxes as ranges between the ids it skips; and the fallback repair of the routes looks the
+  boxes' shapes up once and skips by index. A 5 000-node view of synthetic-20k: 77 s → 47 s
+  ([measurement](benchmarks/results/route-search-window-20261118.md)).
+
 ### Removed
 
 - `repairCompaction` (experimental, never released): with `organicForces` it added nothing.
@@ -111,6 +121,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
   equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
 - `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
+- `routeSearchWindow` (provisional, off): a constructed layered route searches the lanes across the flow only near its
+  ends (as far across as it reaches along the flow, at least 16 tracks) and over the whole width only when it finds no
+  way there. A search over the whole width is quadratic in the boxes across the drawing (4 000 lanes in a 5 000-node
+  view). The same metrics on every dataset of the benchmark set; on synthetic-20k slightly fewer crossings and bends, and
+  half the time (5 000-node view: 47 s → 22 s). `benchmarks/eval/search-window.mjs` compares it with the default
+  ([results](benchmarks/results/route-search-window-20261118.md)).
 
 ## 0.5.0 — 2026-11-14
 

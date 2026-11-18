@@ -552,11 +552,29 @@ impl<'g> PortContext<'g> {
                 // `loopSpace`: the boxes in the way of the loops at a corner, other than the node's own
                 // ancestors and descendants. The loops are drawn at the end and do not take part in the placement; a corner
                 // that a neighbour blocks makes the router take them around it, with bends.
+                // The nodes within reach of any corner, once per node: the corners below test only these (testing every node
+                // with its ancestors for every corner took more than a minute in a view of 7000 nodes with many loops).
+                let reach = LOOP_REACH + LOOP_STEP * self.loop_counts[node] as f64;
+                let near: Vec<&str> = if self.loop_space {
+                    // Node ids are unique, so a node's index in `node_ids` is its index in `rects`.
+                    self.node_ids
+                        .iter()
+                        .zip(rects.iter())
+                        .filter(|(_, o)| {
+                            o.x < r.x + r.width + reach
+                                && o.x + o.width > r.x - reach
+                                && o.y < r.y + r.height + reach
+                                && o.y + o.height > r.y - reach
+                        })
+                        .map(|(other, _)| *other)
+                        .collect()
+                } else {
+                    Vec::new()
+                };
                 let blocked = |(a, b): (PortSide, PortSide)| -> usize {
                     if !self.loop_space {
                         return 0;
                     }
-                    let reach = LOOP_REACH + LOOP_STEP * self.loop_counts[node] as f64;
                     let (cx, cy) = (r.x + r.width / 2., r.y + r.height / 2.);
                     let right = matches!(a, PortSide::Right) || matches!(b, PortSide::Right);
                     let bottom = matches!(a, PortSide::Bottom) || matches!(b, PortSide::Bottom);
@@ -583,13 +601,12 @@ impl<'g> PortContext<'g> {
                         };
                         other == node || up(node, other) || up(other, node)
                     };
-                    self.node_ids
-                        .iter()
-                        .filter(|other| !related(other))
+                    near.iter()
                         .filter(|other| {
                             let o = rect_for(other);
                             o.x < x1 && o.x + o.width > x0 && o.y < y1 && o.y + o.height > y0
                         })
+                        .filter(|other| !related(other))
                         .count()
                 };
                 let best = CORNERS

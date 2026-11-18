@@ -87,6 +87,9 @@ pub struct Spacing {
     /// Provisional (option `portSides`, single pass): an end whose port lies across the flow or against it gets a lead around
     /// its node (`Prepared::lead`).
     pub port_sides: bool,
+    /// Provisional (option `routeSearchWindow`): an edge's search takes the lanes across the flow only near its ends (see
+    /// `search_gaps`), and the whole width only when no way is found there.
+    pub search_window: bool,
 }
 
 /// Constructs the routes of the edges in a layered area. `boxes` are absolute, and `ports` are the resolved ports of the
@@ -198,6 +201,7 @@ impl Preparation {
         self.spacing.margin.to_bits() == spacing.margin.to_bits()
             && self.spacing.track.to_bits() == spacing.track.to_bits()
             && self.spacing.through_borders == spacing.through_borders
+            && self.spacing.search_window == spacing.search_window
             && self.boxes.len() == boxes.len()
             && self
                 .boxes
@@ -1439,12 +1443,38 @@ struct Prepared {
     band: (f64, f64),
     obstacles: Vec<Rect>,
     /// The index over `obstacles`, built once and shared by every search of the edge.
-    obstacle_index: std::rc::Rc<BoxIndex>,
+    obstacle_index: std::rc::Rc<std::cell::OnceCell<BoxIndex>>,
     start: Point,
     end: Point,
     /// With `Spacing::port_sides`: the points from the port to `start` (before it) and from `end` to the port (after it), in
     /// build order; empty for an end whose port lies on its flow side.
     lead: (Vec<Point>, Vec<Point>),
+    /// `Spacing::search_window`.
+    window: bool,
+    /// `edge_gaps` of the obstacles, computed at the first search and shared by the copies of the edge (which change only
+    /// its ends).
+    gaps: std::rc::Rc<std::cell::OnceCell<(Vec<(f64, f64)>, Vec<(f64, f64)>)>>,
+}
+
+impl Prepared {
+    /// The index over `obstacles`, built at the first search and shared by every search of the edge and its copies; many
+    /// edges are never searched.
+    fn obstacle_index(&self) -> &BoxIndex {
+        self.obstacle_index.get_or_init(|| {
+            BoxIndex::new(
+                &self
+                    .obstacles
+                    .iter()
+                    .map(|r| [r.x, r.y, r.x + r.width, r.y + r.height])
+                    .collect::<Vec<_>>(),
+            )
+        })
+    }
+
+    fn gaps(&self, track: f64) -> &(Vec<(f64, f64)>, Vec<(f64, f64)>) {
+        self.gaps
+            .get_or_init(|| edge_gaps(&self.obstacles, self.vertical, self.band, track))
+    }
 }
 
 /// The track an edge must take in a corridor, by the corridor's key (`gap_key`): its place in the corridor's order.
@@ -1657,11 +1687,7 @@ fn prepare_edge_inner(
     // The containers of both ends are left or entered through their borders, so they are not obstacles.
     let skip = endpoint_exclusions(parents, source, target);
     let obstacles: Vec<Rect> = if prepare_obstacles {
-        boxes
-            .iter()
-            .filter(|(id, _)| !skip.contains(id.as_str()))
-            .map(|(_, r)| inflate(r, spacing.margin))
-            .collect()
+        obstacles_without(boxes, &skip, spacing.margin)
     } else {
         Vec::new()
     };
@@ -1674,16 +1700,13 @@ fn prepare_edge_inner(
         from: (s_main, s_across),
         to: (t_main, t_across),
         band,
-        obstacle_index: std::rc::Rc::new(BoxIndex::new(
-            &obstacles
-                .iter()
-                .map(|r| [r.x, r.y, r.x + r.width, r.y + r.height])
-                .collect::<Vec<_>>(),
-        )),
+        obstacle_index: Default::default(),
         obstacles,
         start: first_at,
         end: last_at,
         lead: (lead_first, lead_last),
+        window: spacing.search_window,
+        gaps: Default::default(),
     })
 }
 
@@ -1993,20 +2016,24 @@ fn build_edge(
 ) -> Result<(Route, usize), Delegation> {
     work.borrow_mut().edge_searches += 1;
     let (vertical, edge_id) = (p.vertical, p.edge_id.as_str());
-    let search = |taken: &[Segment]| {
+    let search_in = |taken: &[Segment], window: bool| {
         monotone_path(
             edge_id,
             &p.obstacles,
-            &p.obstacle_index,
+            p.obstacle_index(),
             taken,
             vertical,
             p.from,
             p.to,
-            p.band,
+            p.gaps(track),
             track,
             desired,
+            window,
             work,
         )
+    };
+    let search = |taken: &[Segment]| {
+        search_in(taken, p.window).or_else(|| p.window.then(|| search_in(taken, false)).flatten())
     };
     let corners = match search(assigned) {
         Some(corners) => corners,
@@ -2043,18 +2070,16 @@ fn build_edge(
 /// How many tracks the outermost lanes reach beyond the boxes.
 const OUTER_TRACKS: f64 = 16.;
 
-fn search_gaps(
+/// The free gaps of an edge's obstacles before its ends are known: along the flow within its band, and across the flow up to
+/// OUTER_TRACKS tracks beyond the outermost box. They depend only on the obstacles, so an edge computes them once
+/// (`Prepared::gaps`) for all its searches.
+fn edge_gaps(
     obstacles: &[Rect],
     vertical: bool,
-    from: (f64, f64),
-    to: (f64, f64),
     band: (f64, f64),
     track: f64,
 ) -> (Vec<(f64, f64)>, Vec<(f64, f64)>) {
-    let x_gaps: Vec<(f64, f64)> = free_gaps(obstacles, vertical, band.0, band.1, track)
-        .into_iter()
-        .filter(|(lo, hi)| (lo + hi) / 2. > from.0 + EPS && (lo + hi) / 2. < to.0 - EPS)
-        .collect();
+    let x_gaps = free_gaps(obstacles, vertical, band.0, band.1, track);
     let (lo_across, hi_across) = obstacles.iter().fold((f64::MAX, f64::MIN), |(lo, hi), r| {
         let (a, b) = across_extent(r, vertical);
         (lo.min(a), hi.max(b))
@@ -2068,6 +2093,36 @@ fn search_gaps(
         hi_across + OUTER_TRACKS * track,
         track,
     );
+    (x_gaps, y_gaps)
+}
+
+/// The gaps a search from `from` to `to` passes: along the flow those whose centre lies strictly between the ends, across the
+/// flow all of them, or with a `window` only those that reach within `reach` of the ends' lanes, `reach` being the distance
+/// along the flow and at least OUTER_TRACKS tracks. The lanes in a window are the same as without, only fewer; the gaps
+/// across the whole drawing made a search quadratic in its width.
+fn search_gaps(
+    (x_all, y_all): &(Vec<(f64, f64)>, Vec<(f64, f64)>),
+    from: (f64, f64),
+    to: (f64, f64),
+    track: f64,
+    window: bool,
+) -> (Vec<(f64, f64)>, Vec<(f64, f64)>) {
+    let x_gaps: Vec<(f64, f64)> = x_all
+        .iter()
+        .copied()
+        .filter(|(lo, hi)| (lo + hi) / 2. > from.0 + EPS && (lo + hi) / 2. < to.0 - EPS)
+        .collect();
+    let y_gaps = if window {
+        let reach = (to.0 - from.0).abs().max(OUTER_TRACKS * track);
+        let (lo, hi) = (from.1.min(to.1) - reach, from.1.max(to.1) + reach);
+        y_all
+            .iter()
+            .copied()
+            .filter(|&(a, b)| b > lo && a < hi)
+            .collect()
+    } else {
+        y_all.clone()
+    };
     (x_gaps, y_gaps)
 }
 
@@ -2096,11 +2151,25 @@ fn lane_changes(
     work: &RefCell<ConstructionCounters>,
 ) -> Vec<((f64, f64), f64, f64)> {
     work.borrow_mut().lane_searches += 1;
-    let (x_gaps, y_gaps) = search_gaps(&p.obstacles, p.vertical, p.from, p.to, p.band, track);
+    let found = lane_changes_in(p, track, p.window, work);
+    if found.is_none() && p.window {
+        return lane_changes_in(p, track, false, work).unwrap_or_default();
+    }
+    found.unwrap_or_default()
+}
+
+/// `lane_changes` over the lanes of `search_gaps` with or without a window; `None` when no way is found.
+fn lane_changes_in(
+    p: &Prepared,
+    track: f64,
+    window: bool,
+    work: &RefCell<ConstructionCounters>,
+) -> Option<Vec<((f64, f64), f64, f64)>> {
+    let (x_gaps, y_gaps) = search_gaps(p.gaps(track), p.from, p.to, track, window);
     let empty_index = BoxIndex::new(&[]);
     let bare = Lookup {
         obstacles: &p.obstacles,
-        obstacle_index: &p.obstacle_index,
+        obstacle_index: p.obstacle_index(),
         assigned: &[],
         assigned_index: &empty_index,
         crossed: &[],
@@ -2117,16 +2186,18 @@ fn lane_changes(
         track,
         work,
     ) else {
-        return Vec::new();
+        return None;
     };
-    corners
-        .chunks(2)
-        .filter_map(|pair| {
-            let (x, before) = pair[0];
-            let after = pair.get(1)?.1;
-            Some((gap_of(&x_gaps, x)?, before, after))
-        })
-        .collect()
+    Some(
+        corners
+            .chunks(2)
+            .filter_map(|pair| {
+                let (x, before) = pair[0];
+                let after = pair.get(1)?.1;
+                Some((gap_of(&x_gaps, x)?, before, after))
+            })
+            .collect(),
+    )
 }
 
 /// The order of the lane changes in one corridor that crosses least. A change is (lane before, lane after); when `a` lies
@@ -2371,12 +2442,13 @@ fn monotone_path(
     vertical: bool,
     from: (f64, f64),
     to: (f64, f64),
-    band: (f64, f64),
+    gaps: &(Vec<(f64, f64)>, Vec<(f64, f64)>),
     track: f64,
     desired: &Desired,
+    window: bool,
     work: &RefCell<ConstructionCounters>,
 ) -> Option<Vec<(f64, f64)>> {
-    let (x_gaps, y_gaps) = search_gaps(obstacles, vertical, from, to, band, track);
+    let (x_gaps, y_gaps) = search_gaps(gaps, from, to, track, window);
     // Every step of the search lies between the ends along the flow (`from` to `to` on the main axis); a segment whose box
     // (with the track spacing) misses that range cannot meet a step, so only the others are indexed. The answers are those
     // over all segments; an edit, whose kept routes all count as built, indexes far fewer.
@@ -2687,6 +2759,11 @@ fn search_on_counted(
     let n = xs.len();
     let m = ys.len();
     work.states += n * m;
+    // The first step (from the start to the first corridor) and the last (from the last corridor to the end) lie on the ends'
+    // own lanes whatever the way between them; when either is blocked there is no way, and the search is not run.
+    if !clear(from, (xs[0], from.1)) || !clear((xs[n - 1], to.1), to) {
+        return None;
+    }
     let inf = f64::INFINITY;
     // For each corridor column, the cross-flow coordinates of the built segments that run along the flow through it, sorted:
     // the crossings of a lane change there are those strictly between its two lanes.
@@ -3130,6 +3207,32 @@ fn segment_hits(a: Point, b: Point, r: &Rect) -> bool {
 
 type Parents<'a> = BTreeMap<&'a str, Option<&'a str>>;
 
+/// The boxes, inflated by `margin`, in their order, without those of `skip`. The boxes between two skipped ids are taken as
+/// ranges of the map (both are ordered by id), so a box is not compared with the skipped ids one by one.
+pub(super) fn obstacles_without(
+    boxes: &BTreeMap<String, Rect>,
+    skip: &BTreeSet<&str>,
+    margin: f64,
+) -> Vec<Rect> {
+    use std::ops::Bound::{Excluded, Unbounded};
+    let mut obstacles = Vec::with_capacity(boxes.len());
+    let mut lower: std::ops::Bound<&str> = Unbounded;
+    for &id in skip {
+        obstacles.extend(
+            boxes
+                .range::<str, _>((lower, Excluded(id)))
+                .map(|(_, r)| inflate(r, margin)),
+        );
+        lower = Excluded(id);
+    }
+    obstacles.extend(
+        boxes
+            .range::<str, _>((lower, Unbounded))
+            .map(|(_, r)| inflate(r, margin)),
+    );
+    obstacles
+}
+
 fn endpoint_exclusions<'a>(
     parents: &Parents<'a>,
     source: &'a str,
@@ -3240,6 +3343,7 @@ mod tests {
         through_borders: false,
         probe: false,
         port_sides: false,
+        search_window: false,
     };
 
     fn node(id: &str, parent: Option<&str>) -> Node {
@@ -3327,6 +3431,60 @@ mod tests {
             work.search_nanos = 0;
         }
         assert_eq!(probe_work, full_work);
+    }
+
+    #[test]
+    fn search_window_falls_back_to_the_whole_width() {
+        // A wall far taller than the window between the two ends: the way around it lies outside the window, so the
+        // windowed search finds none and the search over the whole width builds the route of the default.
+        let g = graph(
+            vec![node("a", None), node("w", None), node("b", None)],
+            vec![("e", "a", "b")],
+        );
+        let wall = Rect {
+            x: 200.,
+            y: -1000.,
+            width: 40.,
+            height: 2040.,
+        };
+        let boxes = BTreeMap::from([
+            ("a".into(), rect(0., 0.)),
+            ("w".into(), wall),
+            ("b".into(), rect(400., 0.)),
+        ]);
+        let ports = ports("e", &boxes["a"], &boxes["b"]);
+        let plans = LayeredPlans::new();
+        let orientations = BTreeMap::new();
+        let windowed = Spacing {
+            search_window: true,
+            ..SPACING
+        };
+        let full = construct_planned(&g, &boxes, &ports, SPACING, &orientations, &plans);
+        let window = construct_planned(&g, &boxes, &ports, windowed, &orientations, &plans);
+        assert_eq!(full.routes.len(), 1, "the route is built, not delegated");
+        assert!(full.routes[0].points.len() > 2, "it goes around the wall");
+        assert_eq!(
+            serde_json::to_vec(&window.routes).unwrap(),
+            serde_json::to_vec(&full.routes).unwrap()
+        );
+        assert!(
+            window.work.searches > full.work.searches,
+            "the windowed searches came first"
+        );
+    }
+
+    #[test]
+    fn search_window_keeps_only_the_gaps_near_the_ends() {
+        let gaps = (
+            vec![(10., 90.)],
+            vec![(-500., -400.), (-50., -20.), (20., 40.), (300., 400.)],
+        );
+        let (_, all) = search_gaps(&gaps, (0., 0.), (100., 30.), 6., false);
+        assert_eq!(all, gaps.1);
+        // The ends' lanes 0 and 30, the reach 100 along the flow: the gaps that reach into -100..130.
+        let (xs, near) = search_gaps(&gaps, (0., 0.), (100., 30.), 6., true);
+        assert_eq!(near, vec![(-50., -20.), (20., 40.)]);
+        assert_eq!(xs, gaps.0);
     }
 
     #[test]

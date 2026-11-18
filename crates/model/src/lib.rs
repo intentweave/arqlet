@@ -2036,6 +2036,12 @@ pub struct LayoutOptions {
     /// default (omitted), so default drawings do not change.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub port_sides: bool,
+    /// Provisional: the constructed layered routes search their lanes across the flow only near their ends (as far across as
+    /// the edge reaches along the flow, at least 16 tracks), and over the whole width only when they find no way there. A
+    /// search over the whole width costs time quadratic in the number of boxes across the drawing. Off by default (omitted),
+    /// so default drawings do not change.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub route_search_window: bool,
     /// Provisional (single pass): areas without a fixed flow (organic, tree, radial) and straight routing are allowed in a
     /// single-pass layout. Those areas keep their own placement and their edges go to the router that completes single pass;
     /// a layered child that grows moves its siblings apart. Off by default (omitted): such graphs use the pipeline before
@@ -2174,6 +2180,7 @@ impl Default for LayoutOptions {
             node_spacing: None,
             layer_spacing: None,
             port_sides: false,
+            route_search_window: false,
             single_pass_mixed: false,
             required_clearance: default_required_clearance(),
             incremental_clearance_widening: false,
