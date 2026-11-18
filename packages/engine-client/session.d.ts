@@ -88,6 +88,8 @@ export interface ResidentSession {
   close(): unknown;
   /** Provisional (ADR 0019, step 4): the scene as columns, where the engine keeps them (WASM, a worker). */
   columns?(): SceneColumns | Promise<SceneColumns>;
+  /** Provisional (step 4): an `overview` request answered with typed arrays for the numbers, where the engine can. */
+  overview?(request: EngineRequest, init?: {copy?: boolean}): EngineResponse | Promise<EngineResponse>;
 }
 
 /** Creates a session on an engine `run`, synchronous (`loadEngine`) or asynchronous (`workerRun`). */
@@ -165,7 +167,17 @@ export function createOverviewSession(
   run: (Run | ((request: EngineRequest) => Promise<EngineResponse>)) & {
     openSession?: () => ResidentSession | Promise<ResidentSession>;
   },
-  init?: {resident?: boolean | 'auto'},
+  init?: {
+    resident?: boolean | 'auto';
+    /**
+     * Provisional (ADR 0019, step 4): the overview's numbers (`parent`, `x`, `y`, `r`, `kind`, `edges`, `links`) as typed
+     * arrays instead of JSON arrays, moved without JSON (copied once out of the engine's memory, transferred from a
+     * worker). Needs a resident session in an engine that offers `overview` (WASM, a worker); an answer says so
+     * otherwise. Default false: the arrays are plain, as before. Typed arrays index like arrays; a `start` built from
+     * them is sent as plain arrays.
+     */
+    columns?: boolean;
+  },
 ): OverviewSession;
 
 /** The most nodes an import selects for its view; the default of `Session.import`'s limit. */

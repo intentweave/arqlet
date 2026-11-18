@@ -10,7 +10,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
   the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads
   them as views into WASM memory, as transferred copies from a worker, or builds them from the scene for a backend
-  (`columnsOfScene`). WASM export `lw_session_column`. Not measured against the JSON scene yet.
+  (`columnsOfScene`). WASM export `lw_session_column`. The overview too (opt-in `columns: true`, WASM export
+  `lw_session_overview_column`): `x`, `y`, `r`, `parent`, `kind`, `edges` and `links` as typed arrays. Measured against
+  the JSON answers ([results](benchmarks/results/columns-20261118.md), a loaded machine): the scene is 8.4–9.2× smaller
+  and 1.9–12× faster to the page, an overview continuation 1.8–3.6× faster but larger in bytes. Benchmark:
+  `benchmarks/protocol/measure-columns.sh`.
 
 ### Changed
 

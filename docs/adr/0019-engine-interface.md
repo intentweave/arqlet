@@ -1,7 +1,7 @@
 # ADR 0019: An own engine interface: typed operations, sessions in Rust and JavaScript, a columnar data path
 
 Date: 2026-11-12.
-Status: accepted (2026-11-12); step 1 implemented in part (see Steps).
+Status: accepted (2026-11-12); steps 1 and 3 implemented in part, step 2 and 4 done (see Steps).
 
 Related: [ADR 0006](0006-reactive-layout-session.md) (reactive sessions), [ADR 0008](0008-engine-client-viewer-boundaries.md)
 (engine, client, viewer), [ADR 0018](0018-cluster-overview.md) (cluster overview).
@@ -134,16 +134,25 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    browser path, an edit with its scene 1.2–1.6× (its time is layout work).
 4. **Columnar results**: positions and routes as typed arrays from a session, zero-copy in the browser; the overview
    moves onto the same buffers.
-   *Done in part (2026-11-18):* the `columns` request of a session (`arqlet_runtime::columns::SceneColumns`) answers
+   *Done (2026-11-18; ports, labels, rows and conflicts as columns stay open, nothing asks for them yet):* the `columns` request of a session (`arqlet_runtime::columns::SceneColumns`) answers
    with the id tables and each column's name, type and length, and keeps the numbers in the session until its snapshot
    changes: node bounds (`f32`, x y width height), parent index, flags, route ends as node indices, weight, flags, route
    offsets and one array of route points. WASM: `lw_session_column(id, index)` gives a column's address, and
    `openSession().columns()` returns typed-array views into the module's memory (no copy; valid until the next request
    or a growth of the memory). In the worker the columns are copied once and transferred (`postMessage` with a transfer
    list). `createSession().columns()` falls back to `columnsOfScene(scene)` where the engine keeps no columns (backend,
-   `resident: false`); a test checks that engine and fallback give the same arrays. Coordinates are `f32`. Not done: ports,
-   labels, rows and conflicts as columns; the overview does not use these buffers yet; no measurement against the JSON
-   scene (size, time) exists, so nothing here claims a speedup.
+   `resident: false`); a test checks that engine and fallback give the same arrays. Coordinates are `f32`.
+   The overview uses the same path: a session's `overview` request with `columns: true` keeps `x`, `y`, `r`, `parent`,
+   `kind`, `edges` and `links` as columns (`OverviewColumns`; a continuation with `positionsOnly` only `x`, `y`, `r`),
+   `lw_session_overview_column`, `createOverviewSession(run, {columns: true})` (opt-in: typed arrays index like arrays,
+   but JSON cannot carry them, so a host that sends positions back as `start` gets plain arrays made for it). Positions
+   stay `f64`; a test compares the numbers with the JSON answer and the viewer's model and vertex buffers from both.
+   **Measured** ([results](../../benchmarks/results/columns-20261118.md), load 17 on the machine, one run per size): the
+   scene is 8.4–9.2 times smaller as columns, and 10–12 times faster to the page in a small view (the transfer dominates
+   there) and 1.9–2.2 times in a full one (the engine's own work dominates). The overview's continuation is 1.8 and 3.6
+   times faster at 10 000 and 100 000 nodes, but its answer is 25–34 % larger in bytes (JSON positions are rounded to
+   hundredths); the whole answer is layout time and shows no effect. So columns buy time, not bytes, and the binary
+   frame of step 5 should weigh `i32` hundredths for positions.
 5. **Columnar input and binary frames** between backend and browser, if step 2 shows that parsing or transfer
    dominates.
 6. **Optional shared memory** (`SharedArrayBuffer`) for live positions and progressive publications, behind a capability

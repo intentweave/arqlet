@@ -59,6 +59,11 @@ impl EngineSession {
         self.columns.as_ref()
     }
 
+    /// The numbers of the last `overview` request with `columns: true`, valid until the session's next overview request.
+    pub fn overview_columns(&self) -> Option<&crate::columns::OverviewColumns> {
+        self.overview.columns()
+    }
+
     /// Runs one request given as JSON text and answers as JSON text.
     pub fn run(&mut self, input: &str) -> String {
         match serde_json::from_str::<Value>(input) {

@@ -42,6 +42,8 @@ export function workerRun(worker, {onPublication} = {}) {
         if (!answer.ok) throw Error(answer.error);
         return answer.columns;
       },
+      // Provisional: an overview request answered with typed arrays (see `createEngine`'s `overview`).
+      overview: request => post({session: opened.session, request, overview: true}),
     };
   };
   return run;
@@ -264,6 +266,15 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
   };
 }
 
+// A request whose `start` positions are typed arrays, with plain arrays instead (JSON has no typed arrays).
+const plain = request => {
+  const start = request.start;
+  if (!start || !['x', 'y', 'r'].some(k => ArrayBuffer.isView(start[k]))) return request;
+  const fixed = {...start};
+  for (const k of ['x', 'y', 'r']) if (ArrayBuffer.isView(fixed[k])) fixed[k] = Array.from(fixed[k]);
+  return {...request, start: fixed};
+};
+
 // The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
 // Defaults as the engine's (`communities` 120, `satellites` 0); `groups` and `hubs` compared as given.
 const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null, options?.hubs ?? null]);
@@ -275,7 +286,7 @@ const clustersOf = options => JSON.stringify([options?.communities ?? 120, optio
  * continues from the last overview. Without a resident session the graph and the last positions stay here and are sent
  * along; the answers are the same. A new `open` overtakes what is still under way (`{ok: false, stale: true}`).
  */
-export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
+export function createOverviewSession(run, {resident: wanted = 'auto', columns = false} = {}) {
   if (wanted === true && !run.openSession) throw Error('This engine has no resident sessions');
   const resident = wanted === true || (wanted === 'auto' && typeof run.openSession === 'function');
   const opened = resident ? Promise.resolve(run.openSession()) : null;
@@ -287,7 +298,11 @@ export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
       // On the graph the engine has, only what moves comes back (`positionsOnly`) while the clusters stay; it is put
       // together with the last overview here, so every answer is a whole overview.
       const asked = !request.graph && last ? {...request, positionsOnly: true} : request;
-      const answer = await (await opened).run(asked);
+      const kept = await opened;
+      // With `columns` the numbers come back as typed arrays (views are copied: `last` outlives the next request); a
+      // `start` a host built from them is sent as plain arrays.
+      if (columns && typeof kept.overview !== 'function') return {ok: false, error: 'This engine has no columnar overview'};
+      const answer = await (columns ? kept.overview(plain(asked), {copy: true}) : kept.run(asked));
       if (answer.ok && answer.overview?.positionsOnly) {
         const {positionsOnly: _moved, ...moved} = answer.overview;
         return {...answer, overview: {...last, ...moved}};

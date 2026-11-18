@@ -21,6 +21,8 @@ export type Run = ((request: EngineRequest) => EngineResponse) & {
     close(): void;
     /** Provisional (step 4): the scene as columns; the numbers are views into the module's memory, valid until the next request. */
     columns?(): import('./columns.js').SceneColumns;
+    /** Provisional (step 4): an `overview` request answered with typed arrays; `copy` copies them out of the memory. */
+    overview?(request: EngineRequest, init?: {copy?: boolean}): EngineResponse;
   };
 };
 

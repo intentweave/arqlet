@@ -112,9 +112,26 @@ pub extern "C" fn lw_session_column(id: u32, index: u32) -> u64 {
         let Some((_, column)) = columns.columns().into_iter().nth(index as usize) else {
             return 0;
         };
-        // Both column types have four bytes per element.
         let (ptr, _) = column.raw();
-        let bytes = column.len() as u64 * 4;
+        let bytes = column.bytes() as u64;
         (bytes << 32) | (ptr as u64 & 0xffffffff)
+    })
+}
+
+/// Provisional (ADR 0019, step 4): as `lw_session_column`, for the session's last `overview` request with `columns: true`
+/// (column `index` of the `columns` list in that answer's `overview`). Valid until the session's next overview request.
+#[no_mangle]
+pub extern "C" fn lw_session_overview_column(id: u32, index: u32) -> u64 {
+    SESSIONS.with(|s| {
+        let s = s.borrow();
+        let Some(column) =
+            s.1.get(&id)
+                .and_then(|session| session.overview_columns())
+                .and_then(|columns| columns.column(index as usize))
+        else {
+            return 0;
+        };
+        let (ptr, _) = column.raw();
+        ((column.bytes() as u64) << 32) | (ptr as u64 & 0xffffffff)
     })
 }

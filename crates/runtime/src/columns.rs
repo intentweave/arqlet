@@ -25,6 +25,8 @@ pub const ROUTE_ROUNDED: u32 = 2;
 pub enum Column<'a> {
     F32(&'a [f32]),
     U32(&'a [u32]),
+    I32(&'a [i32]),
+    F64(&'a [f64]),
 }
 
 impl Column<'_> {
@@ -33,18 +35,32 @@ impl Column<'_> {
         match self {
             Column::F32(c) => c.len(),
             Column::U32(c) => c.len(),
+            Column::I32(c) => c.len(),
+            Column::F64(c) => c.len(),
         }
+    }
+
+    /// Size of the column's memory in bytes.
+    pub fn bytes(&self) -> usize {
+        self.len()
+            * match self {
+                Column::F32(_) | Column::U32(_) | Column::I32(_) => 4,
+                Column::F64(_) => 8,
+            }
     }
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Address of the first element and the element type (`"f32"` or `"u32"`), for a host that views the memory.
+    /// Address of the first element and the element type (`"f32"`, `"u32"`, `"i32"` or `"f64"`), for a host that views
+    /// the memory.
     pub fn raw(&self) -> (*const u8, &'static str) {
         match self {
             Column::F32(c) => (c.as_ptr() as *const u8, "f32"),
             Column::U32(c) => (c.as_ptr() as *const u8, "u32"),
+            Column::I32(c) => (c.as_ptr() as *const u8, "i32"),
+            Column::F64(c) => (c.as_ptr() as *const u8, "f64"),
         }
     }
 }
@@ -156,5 +172,95 @@ impl SceneColumns {
             "routeIds": self.route_ids,
             "columns": columns,
         })
+    }
+}
+
+/// Provisional (ADR 0019, step 4): the numbers of an overview as columns, kept by an overview session after a request with
+/// `"columns": true`. The answer's `overview` is the overview without these arrays plus `columns` (name, type, length of
+/// each, in the order of `column`); the strings (`ids`, `labels`, `kinds`) and the scalars stay in it as JSON.
+///
+/// The positions stay `f64`, the values the JSON answer carries (rounded to hundredths): a viewer that finds chains by
+/// comparing discs gets the same ones from either path, which `f32` could not promise at large coordinates.
+#[derive(Clone, Debug, Default)]
+pub struct OverviewColumns {
+    x: Vec<f64>,
+    y: Vec<f64>,
+    r: Vec<f64>,
+    /// Empty when only positions were asked for (`positions_only`); the host keeps those of its last whole overview.
+    parent: Vec<i32>,
+    kind: Vec<u32>,
+    edges: Vec<u32>,
+    links: Vec<f64>,
+    positions_only: bool,
+    meta: serde_json::Value,
+}
+
+impl OverviewColumns {
+    /// The columns of an overview. With `positions_only` (a continuation on the same clusters) only `x`, `y` and `r`.
+    pub fn of(overview: arqlet_model::Overview, positions_only: bool) -> Self {
+        let mut meta = if positions_only {
+            serde_json::json!({
+                "schemaVersion": overview.schema_version,
+                "positionsOnly": true,
+                "representation": overview.representation,
+                "rootRadius": overview.root_radius,
+                "stats": overview.stats,
+            })
+        } else {
+            let mut whole = serde_json::to_value(&overview).unwrap_or_default();
+            if let Some(o) = whole.as_object_mut() {
+                for key in ["x", "y", "r", "parent", "kind", "edges", "links"] {
+                    o.remove(key);
+                }
+            }
+            whole
+        };
+        let mut c = OverviewColumns {
+            x: overview.x,
+            y: overview.y,
+            r: overview.r,
+            positions_only,
+            ..Default::default()
+        };
+        if !positions_only {
+            c.parent = overview.parent.iter().map(|&p| p as i32).collect();
+            c.kind = overview.kind;
+            c.edges = overview.edges;
+            c.links = overview.links;
+        }
+        let listed: Vec<_> = c
+            .columns()
+            .iter()
+            .map(|(name, col)| serde_json::json!({"name": name, "type": col.raw().1, "length": col.len()}))
+            .collect();
+        meta["columns"] = serde_json::Value::Array(listed);
+        c.meta = meta;
+        c
+    }
+
+    /// The columns in a fixed order; a positions-only set has the first three.
+    pub fn columns(&self) -> Vec<(&'static str, Column<'_>)> {
+        let mut all = vec![
+            ("x", Column::F64(&self.x)),
+            ("y", Column::F64(&self.y)),
+            ("r", Column::F64(&self.r)),
+        ];
+        if !self.positions_only {
+            all.push(("parent", Column::I32(&self.parent)));
+            all.push(("kind", Column::U32(&self.kind)));
+            all.push(("edges", Column::U32(&self.edges)));
+            all.push(("links", Column::F64(&self.links)));
+        }
+        all
+    }
+
+    /// Column `index` of `columns()`, for a host that views the memory.
+    pub fn column(&self, index: usize) -> Option<Column<'_>> {
+        self.columns().into_iter().nth(index).map(|(_, c)| c)
+    }
+
+    /// The overview without its numeric arrays, plus the list of columns.
+    pub fn describe(&self) -> serde_json::Value {
+        self.meta.clone()
     }
 }
