@@ -4,7 +4,7 @@
 //! level by level (in id order within a level) while the budget holds. A collapsed container takes a size estimated from
 //! its content, inside out, so that expanding it later moves the outer picture little.
 
-use arqlet_model::{DirectionConstraint, Graph, NodeSize};
+use arqlet_model::{DirectionConstraint, Graph, GraphIndex, NodeSize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// The size of a leaf without a measured size (as the layout's default).
@@ -69,17 +69,20 @@ pub fn level_budget_collapse(
     edges: usize,
     lift: bool,
 ) -> BTreeSet<String> {
-    let index: BTreeMap<&str, usize> = graph
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.id.as_str(), i))
-        .collect();
-    let parent: Vec<Option<usize>> = graph
-        .nodes
-        .iter()
-        .map(|n| n.parent_id.as_deref().and_then(|p| index.get(p).copied()))
-        .collect();
+    level_budget_collapse_indexed(graph, &GraphIndex::of(graph), fixed, nodes, edges, lift)
+}
+
+/// `level_budget_collapse` with the graph's index (`GraphIndex::of(graph)`), built once by a caller that has it.
+pub fn level_budget_collapse_indexed(
+    graph: &Graph,
+    graph_index: &GraphIndex,
+    fixed: &BTreeSet<String>,
+    nodes: usize,
+    edges: usize,
+    lift: bool,
+) -> BTreeSet<String> {
+    let index = &graph_index.node;
+    let parent: Vec<Option<usize>> = graph_index.parent.clone();
     let mut children: Vec<Vec<usize>> = vec![Vec::new(); graph.nodes.len()];
     for (i, p) in parent.iter().enumerate() {
         if let Some(p) = p {
@@ -124,13 +127,10 @@ pub fn level_budget_collapse(
         }
         unit
     };
-    let ends: Vec<(usize, usize)> = graph
-        .edges
+    let ends: Vec<(usize, usize)> = graph_index
+        .ends
         .iter()
-        .filter_map(|e| {
-            let target = e.target.as_deref()?;
-            Some((*index.get(e.source.as_str())?, *index.get(target)?))
-        })
+        .filter_map(|&(s, t)| Some((s?, t?)))
         .collect();
     // The drawn edges: those between two nodes shown as themselves (true self-loops too), plus the pairs.
     let mut plain = 0usize;

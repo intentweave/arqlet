@@ -23,6 +23,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- The import's selection, its collapsed containers and the budget walk the structured graph by index (`GraphIndex`,
+  built once): a 1 000 000-node import 16.5 s → 10.6 s, byte-identical
+  ([results](benchmarks/results/import-index-20261118.md)).
+- `omitSource` (provisional, import): the snapshot leaves the source graph out and carries its fingerprint
+  (`sourceDigest`); later requests on it bring the graph as `source`, checked against the fingerprint, and their answers
+  leave it out again (an answer whose source changed carries the new one). At 1M the import's answer is 7.3 MB instead
+  of 187 MB.
 - The import of a large graph: an abstracting import reuses the structure (communities) its selection computed, the
   selection and `validate` walk ancestors once (linear), edge-port bindings are found by maps, a typed request field is
   read without a copy, and an `import` is read from its text in one pass. A 1 000 000-node import: 22.5 s → 15.8 s;

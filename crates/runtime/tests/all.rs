@@ -104,6 +104,8 @@ mod shape_geometry;
 mod single_pass;
 #[path = "single_pass_reversed.rs"]
 mod single_pass_reversed;
+#[path = "source_delivery.rs"]
+mod source_delivery;
 #[path = "sparse_stress.rs"]
 mod sparse_stress;
 #[path = "stacked_containers.rs"]

@@ -137,7 +137,13 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    an index of its graph (`arqlet_model::GraphIndex`, decision 4 for the projection), and the projection walks it
    (`arqlet_view::project_indexed`): 3.9 s → 2.5 s per toggle at 1M on the same load, byte-identical
    ([results](../../benchmarks/results/sessions-indexed-20261118.md)); the layout of the view is now two thirds of a toggle.
-   Open: the import's preparation on string keys (21 s at 1M). Measured
+   The import walks the same index for its selection, collapsed containers and budget (1M: 16.5 s → 10.6 s,
+   byte-identical). *Lean snapshots (2026-11-18, provisional):* an import with `omitSource` leaves the source graph out
+   and sets `sourceDigest` (FNV-1a over its JSON); requests on that snapshot bring the graph as `source`, which the
+   engine resolves as the import did and checks before use, and answer without it again (a changed source comes back
+   whole); at 1M the import answers 7.3 MB instead of 187 MB
+   ([results](../../benchmarks/results/import-index-20261118.md)). One-shot requests still send the graph; sessions do
+   not. Measured
    ([results](../../benchmarks/results/protocol-resident-20261112.md)): a trace 20–30× and a scene 4–6× faster in the
    browser path, an edit with its scene 1.2–1.6× (its time is layout work).
 4. **Columnar results**: positions and routes as typed arrays from a session, zero-copy in the browser; the overview
