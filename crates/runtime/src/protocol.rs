@@ -339,13 +339,45 @@ fn body_of(v: &Value) -> Map<String, Value> {
     body
 }
 
+/// A typed field of a request, read from the value in place (a copy of the value first doubled the work for a large
+/// graph or snapshot).
 fn typed<T: serde::de::DeserializeOwned>(v: &Value) -> Result<T, String> {
-    serde_json::from_value(v.clone()).map_err(|e| e.to_string())
+    T::deserialize(v).map_err(|e| e.to_string())
+}
+
+/// An `import` request read straight from its text (`Request::from_json`): one pass instead of a JSON value and then
+/// types. `options` stays a value, `Some` whenever the field is there (also as `null`), as `v.get("options")` gives it.
+#[derive(serde::Deserialize)]
+struct ImportText {
+    op: String,
+    graph: Graph,
+    #[serde(default)]
+    limit: Value,
+    #[serde(default, deserialize_with = "present")]
+    options: Option<Value>,
+}
+
+fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
+    <Value as serde::Deserialize>::deserialize(d).map(Some)
 }
 
 impl Request {
     /// Reads a request from its JSON text, with the same errors the engine has always given.
     pub fn from_json(input: &str) -> Result<Request, String> {
+        // An import, read in one pass when it is well formed; anything else (and any import the fast reading refuses) goes
+        // the general way, which gives the errors the engine has always given.
+        if input.contains("\"import\"") {
+            if let Ok(fast) = serde_json::from_str::<ImportText>(input) {
+                let limit = fast.limit.as_u64();
+                if fast.op == "import" && limit.is_some_and(|l| usize::try_from(l).is_ok()) {
+                    return Ok(Request::Import {
+                        graph: Box::new(fast.graph),
+                        limit: limit.expect("checked"),
+                        options: fast.options,
+                    });
+                }
+            }
+        }
         let v: Value = serde_json::from_str(input).map_err(|e| e.to_string())?;
         Request::from_value(&v)
     }

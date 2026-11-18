@@ -23,6 +23,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- The import of a large graph: an abstracting import reuses the structure (communities) its selection computed, the
+  selection and `validate` walk ancestors once (linear), edge-port bindings are found by maps, a typed request field is
+  read without a copy, and an `import` is read from its text in one pass. A 1 000 000-node import: 22.5 s → 15.8 s;
+  byte-identical ([results](benchmarks/results/import-prepare-20261118.md)).
 - A view's projection walks the structured graph by index (`arqlet_model::GraphIndex`, kept with the structure;
   `arqlet_view::project_indexed`) and copies an edge only when the view keeps it. A toggle in a session of a 1 000 000-node
   graph: 3.9 s → 2.5 s on the same machine and load; byte-identical
