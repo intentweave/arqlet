@@ -217,13 +217,23 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     let mut positions: BTreeMap<&str, Rect> = BTreeMap::new();
     let mut nodes = Vec::with_capacity(graph.nodes.len());
     for node in &graph.nodes {
-        let bounds = absolute(
+        let mut bounds = absolute(
             &node.id,
             &by_id,
             snapshot,
             &mut positions,
             &mut BTreeSet::new(),
         )?;
+        // A bus drawn as a bar (`Snapshot::bus_lines`, relative to the parent as the box is): the bar instead of the box.
+        if let Some(bar) = snapshot.bus_lines.get(&node.id) {
+            let own = &snapshot.boxes[&node.id];
+            bounds = Rect {
+                x: bounds.x - own.x + bar.x,
+                y: bounds.y - own.y + bar.y,
+                width: bar.width,
+                height: bar.height,
+            };
+        }
         let rows = node_rows(snapshot, &node.id, &bounds);
         nodes.push(SceneNode {
             node: node.clone(),

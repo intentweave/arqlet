@@ -3,4 +3,4 @@
 /**
  * The outline of a leaf node (docs/...: step 1 of the shape support). Containers use the same names later.
  */
-export type NodeShape = "rect" | "square" | "circle";
+export type NodeShape = "rect" | "square" | "circle" | "busLine";

@@ -26,6 +26,7 @@ pub const PORT_TARGET: u32 = 2;
 pub const SHAPE_RECT: u32 = 0;
 pub const SHAPE_SQUARE: u32 = 1;
 pub const SHAPE_CIRCLE: u32 = 2;
+pub const SHAPE_BUS_LINE: u32 = 3;
 /// Values of the side columns (`portSide`, `crossingSide`).
 pub const SIDE_LEFT: u32 = 0;
 pub const SIDE_RIGHT: u32 = 1;
@@ -215,6 +216,7 @@ impl SceneColumns {
                 arqlet_model::NodeShape::Rect => SHAPE_RECT,
                 arqlet_model::NodeShape::Square => SHAPE_SQUARE,
                 arqlet_model::NodeShape::Circle => SHAPE_CIRCLE,
+                arqlet_model::NodeShape::BusLine => SHAPE_BUS_LINE,
             });
             let b = &n.bounds;
             c.node_bounds

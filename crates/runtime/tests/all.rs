@@ -4,6 +4,8 @@
 
 #[path = "abstract_pipeline.rs"]
 mod abstract_pipeline;
+#[path = "bus_line.rs"]
+mod bus_line;
 #[path = "channels_by_demand.rs"]
 mod channels_by_demand;
 #[path = "circle_containers.rs"]

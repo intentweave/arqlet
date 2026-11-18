@@ -7,7 +7,7 @@
 
 const NONE = 0xffffffff;
 const SIDES = ['left', 'right', 'top', 'bottom'];
-const SHAPES = ['rect', 'square', 'circle'];
+const SHAPES = ['rect', 'square', 'circle', 'busLine'];
 
 const rect = (a, i) => ({x: a[i * 4], y: a[i * 4 + 1], width: a[i * 4 + 2], height: a[i * 4 + 3]});
 const point = (a, i) => ({x: a[i * 2], y: a[i * 2 + 1]});

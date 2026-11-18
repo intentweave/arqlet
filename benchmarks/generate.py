@@ -824,6 +824,37 @@ def fixed_ports():
     return graph
 
 
+def vehicle_buses(strategy=None):
+    """Physical buses of a made-up vehicle: a powertrain CAN, a body CAN, a chassis FlexRay and a LIN bus under the body
+    controller, each a node of shape `busLine` (drawn as a bar past the ECUs on it, with one tap per ECU). Two gateways
+    sit on several buses. Every edge joins an ECU to its bus; there are no ECU-to-ECU edges."""
+    b = Builder("tb")
+    buses = [("pt-can", "Powertrain CAN 500k"), ("body-can", "Body CAN 125k"), ("chassis-fr", "Chassis FlexRay 10M"),
+             ("body-lin", "Body LIN 19.2k")]
+    for node_id, label in buses:
+        b.node(node_id, label, "bus", shape="busLine")
+    ecus = {
+        "pt-can": ["Engine ECU", "Transmission ECU", "Battery management", "Thermal management"],
+        "body-can": ["Body controller", "Door module FL", "Door module FR", "Seat module", "Climate control"],
+        "chassis-fr": ["Brake ECU", "Steering ECU", "Suspension ECU", "Airbag ECU"],
+        "body-lin": ["Window lifter RL", "Window lifter RR", "Rain sensor", "Mirror module"],
+    }
+    made = {}
+    for bus, labels in ecus.items():
+        for label in labels:
+            node_id = label.lower().replace(" ", "-")
+            if node_id not in made:
+                b.node(node_id, label, "ecu")
+                made[node_id] = True
+            b.edge(node_id, bus, "connects")
+    # Gateways: on several buses.
+    b.node("central-gateway", "Central gateway", "ecu")
+    for bus in ["pt-can", "body-can", "chassis-fr"]:
+        b.edge("central-gateway", bus, "connects")
+    b.edge("body-controller", "body-lin", "connects")
+    return b.graph(**({"defaultStrategy": strategy} if strategy else {}))
+
+
 def can_bus():
     """Vehicle speed limiter on a CAN bus: the ECUs that publish speed, engine and position data, the ECUs that receive them,
     and the limiter's wired outputs. The CAN messages (named by their kind) form one explicit bus between the sending
@@ -914,6 +945,8 @@ def main():
         ("self-loops", self_loops, "Self-loops", "States with none, one, two and three self-loops, parallel and antiparallel edges, round and rectangular, organic root and a layered container.", "hand-authored", True),
         ("fixed-ports", fixed_ports, "Placed ports", "A hub whose four edges leave at ports placed on different sides; the optimisation keeps them.", "hand-authored", True),
         ("can-bus", can_bus, "CAN bus (vehicle)", "Vehicle speed limiter on a CAN bus: ECUs on one shared bus line, the limiter's wired outputs as a second bus; the limiter ECU holds a layered software diagram, the engine ECU an organic one, and two ECUs share a housing.", "hand-authored", True),
+        ("vehicle-buses", vehicle_buses, "Vehicle buses (bus lines)", "Physical buses of a made-up vehicle as bars (shape busLine): four buses with their ECUs and a central gateway on three of them.", "hand-authored", True),
+        ("vehicle-buses-organic", lambda: vehicle_buses("organic"), "Vehicle buses, organic", "The same buses placed organically: each bar runs along its ECUs.", "hand-authored", True),
         ("synthetic-2k", lambda: synthetic(2000, 11), "Synthetic 2k", "Random hierarchy, 2,000 leaves, cycles, self-loops, parallel and unresolved edges.", "seeded (seed 11)", False),
         ("synthetic-20k", lambda: synthetic(20000, 12), "Synthetic 20k", "Random hierarchy, 20,000 leaves; scale probe for the view import path.", "seeded (seed 12)", False),
     ]

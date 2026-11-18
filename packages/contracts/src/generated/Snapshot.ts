@@ -67,6 +67,11 @@ straightEdges?: Array<string>,
  */
 busBoxes?: { [key in string]: Rect },
 /**
+ * Provisional: the bar of every node of shape `busLine`, relative to its parent as `boxes` are; the scene draws it
+ * instead of the node's box, which the layout keeps. Omitted when empty.
+ */
+busLines?: { [key in string]: Rect },
+/**
  * The move gesture in progress or the last one finished, for sequence checks. Omitted when there was none.
  */
 gesture?: Gesture | null,
