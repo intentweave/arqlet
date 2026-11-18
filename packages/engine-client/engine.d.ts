@@ -19,6 +19,29 @@ export function loadEngine(
 export function sceneOf(run: Run, snapshot: Snapshot): Scene;
 
 /**
+ * Provisional: the groups and communities the view of `graph` adds with `options` (`groups`, `communities`,
+ * `communityHubs`), as the `groups` option takes them: node id → path of labels. Given back as `options.groups`, the view
+ * gets the same containers (of kind `group`) without computing communities again. Throws the engine's error.
+ */
+export function communityGroups(
+  run: Run,
+  graph: import('@arqlet/contracts').Graph,
+  options?: import('@arqlet/contracts').LayoutOptions,
+): {[nodeId: string]: string[]};
+
+/**
+ * Provisional: the first view of `graph` (`import`). With `omitSource`, the snapshot leaves the source graph out and
+ * carries `sourceDigest`; later requests on it send the graph as `source`. Throws the engine's error.
+ */
+export function importGraph(
+  run: Run,
+  graph: import('@arqlet/contracts').Graph,
+  limit: number,
+  options?: import('@arqlet/contracts').LayoutOptions,
+  delivery?: {omitSource?: boolean},
+): Snapshot;
+
+/**
  * Starts a module worker that answers engine requests (browser only). Post `{requestId, request}`; the worker answers
  * `{requestId, ...response}` and, while a request runs, `{requestId, publication, emittedAt, bytes}` for each
  * progressive publication.

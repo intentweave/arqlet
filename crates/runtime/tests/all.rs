@@ -8,6 +8,8 @@ mod abstract_pipeline;
 mod channels_by_demand;
 #[path = "circle_containers.rs"]
 mod circle_containers;
+#[path = "community_groups.rs"]
+mod community_groups;
 #[path = "community_hubs.rs"]
 mod community_hubs;
 #[path = "containers_straight.rs"]
