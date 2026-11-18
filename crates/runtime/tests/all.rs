@@ -48,6 +48,8 @@ mod import_limit;
 mod interactive_continuation;
 #[path = "layered_construction.rs"]
 mod layered_construction;
+#[path = "level_budget.rs"]
+mod level_budget;
 #[path = "local_edit_large.rs"]
 mod local_edit_large;
 #[path = "move_gesture.rs"]
