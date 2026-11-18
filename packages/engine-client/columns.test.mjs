@@ -21,10 +21,10 @@ for (const wasm of candidates) {
 const graph = JSON.parse(readFileSync(new URL('../../examples/fixtures/small.json', import.meta.url), 'utf8'));
 // Every typed array of a scene's columns, and every table (strings and scalars) beside them.
 const names = ['nodeBounds', 'nodeParent', 'nodeFlags', 'nodeKind', 'nodeShape', 'routeSource', 'routeTarget', 'routeWeight', 'routeFlags',
-  'routeOffsets', 'routePoints', 'portNode', 'portEdge', 'portFlags', 'portSide', 'portPosition', 'crossingEdge', 'crossingContainer',
+  'routeOffsets', 'routePoints', 'routeKind', 'routeBackWeight', 'routeMemberOffsets', 'routeMembers', 'portNode', 'portEdge', 'portFlags', 'portSide', 'portPosition', 'crossingEdge', 'crossingContainer',
   'crossingOrdinal', 'crossingSide', 'crossingFlags', 'crossingPosition', 'labelKind', 'labelBounds', 'rowNode', 'rowBounds',
   'conflictKind', 'conflictNodeOffsets', 'conflictNodes', 'conflictRouteOffsets', 'conflictRoutes', 'junctions'];
-const tables = ['revision', 'layoutVersion', 'nodeIds', 'nodeLabels', 'nodeKinds', 'routeIds', 'portIds', 'edgeIds', 'labelIds',
+const tables = ['schemaVersion', 'routeKinds', 'revision', 'layoutVersion', 'nodeIds', 'nodeLabels', 'nodeKinds', 'routeIds', 'portIds', 'edgeIds', 'labelIds',
   'labelTexts', 'labelKinds', 'rowIds', 'rowLabels', 'conflictKinds', 'conflictReasons', 'buses', 'bounds', 'showPorts'];
 
 test('the engine\'s columns equal the columns built from the scene', {skip: !engine}, async () => {

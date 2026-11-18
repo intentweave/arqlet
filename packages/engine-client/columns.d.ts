@@ -5,6 +5,7 @@ import type {Scene} from '@arqlet/contracts';
  * row, conflict or edge `i`, and the typed arrays of the same part are indexed alike. Coordinates are `f32`.
  */
 export interface SceneColumns {
+  schemaVersion: number;
   revision: number;
   layoutVersion: number;
 
@@ -34,6 +35,13 @@ export interface SceneColumns {
   routeOffsets: Uint32Array;
   /** x and y alternating, all routes one after the other. */
   routePoints: Float32Array;
+  /** Each route's kind (index into `routeKinds`, '' for none), the edges it stands for in the other direction (`NONE`
+   * when it is not a two-way route), and the edges of a bundle (indices into `edgeIds`, behind `routeMemberOffsets`). */
+  routeKinds: string[];
+  routeKind: Uint32Array;
+  routeBackWeight: Uint32Array;
+  routeMemberOffsets: Uint32Array;
+  routeMembers: Uint32Array;
 
   /** Port ids by port index. */
   portIds: string[];

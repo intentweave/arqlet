@@ -108,6 +108,7 @@ impl Column<'_> {
 /// The scene of one revision and layout version, as columns.
 #[derive(Clone, Debug, Default)]
 pub struct SceneColumns {
+    pub schema_version: u32,
     pub revision: u64,
     pub layout_version: u64,
     /// Node ids by node index.
@@ -129,6 +130,14 @@ pub struct SceneColumns {
     pub route_target: Vec<u32>,
     pub route_weight: Vec<u32>,
     pub route_flags: Vec<u32>,
+    /// Each route's kind (index into `route_kinds`; "" when it has none), the edges it stands for in the other direction
+    /// (`NONE` when it is not a two-way route), and the edges of a bundle (indices into `edge_ids`, behind
+    /// `route_member_offsets`, route count + 1).
+    pub route_kinds: Vec<String>,
+    pub route_kind: Vec<u32>,
+    pub route_back_weight: Vec<u32>,
+    pub route_member_offsets: Vec<u32>,
+    pub route_members: Vec<u32>,
     /// `route_count + 1` offsets into `route_points`, counted in points: route `i` is points `offsets[i]..offsets[i+1]`.
     pub route_offsets: Vec<u32>,
     /// All route points in one array, x and y alternating.
@@ -192,6 +201,7 @@ impl SceneColumns {
             .collect();
         let at = |id: &str| index.get(id).copied().unwrap_or(NONE);
         let mut c = SceneColumns {
+            schema_version: scene.schema_version,
             revision: scene.revision,
             layout_version: scene.layout_version,
             ..Default::default()
@@ -220,6 +230,7 @@ impl SceneColumns {
         }
         c.node_kinds = node_kinds.items;
         c.route_offsets.push(0);
+        let mut route_kinds = Table::default();
         // Counted in u64: `usize` is 32 bits in WASM.
         let mut points = 0u64;
         for r in &scene.routes {
@@ -230,6 +241,11 @@ impl SceneColumns {
                 .push(u32::try_from(r.weight).unwrap_or(u32::MAX));
             c.route_flags
                 .push((r.invalid as u32 * ROUTE_INVALID) | (r.rounded as u32 * ROUTE_ROUNDED));
+            c.route_kind.push(route_kinds.id(&r.kind));
+            c.route_back_weight.push(
+                r.back_weight
+                    .map_or(NONE, |w| u32::try_from(w).unwrap_or(u32::MAX - 1)),
+            );
             for p in &r.points {
                 c.route_points.extend([p.x as f32, p.y as f32]);
             }
@@ -266,6 +282,16 @@ impl SceneColumns {
             c.crossing_position
                 .extend([x.position.x as f32, x.position.y as f32]);
         }
+        // The edges of bundles, after those of ports and crossings.
+        c.route_member_offsets.push(0);
+        for r in &scene.routes {
+            for member in &r.members {
+                let id = edges.id(member);
+                c.route_members.push(id);
+            }
+            c.route_member_offsets.push(c.route_members.len() as u32);
+        }
+        c.route_kinds = route_kinds.items;
         c.edge_ids = edges.items;
         let mut kinds = Table::default();
         for l in &scene.labels {
@@ -329,6 +355,13 @@ impl SceneColumns {
             ("routeFlags", Column::U32(&self.route_flags)),
             ("routeOffsets", Column::U32(&self.route_offsets)),
             ("routePoints", Column::F32(&self.route_points)),
+            ("routeKind", Column::U32(&self.route_kind)),
+            ("routeBackWeight", Column::U32(&self.route_back_weight)),
+            (
+                "routeMemberOffsets",
+                Column::U32(&self.route_member_offsets),
+            ),
+            ("routeMembers", Column::U32(&self.route_members)),
             ("portNode", Column::U32(&self.port_node)),
             ("portEdge", Column::U32(&self.port_edge)),
             ("portFlags", Column::U32(&self.port_flags)),
@@ -370,12 +403,14 @@ impl SceneColumns {
             )
             .collect();
         serde_json::json!({
+            "schemaVersion": self.schema_version,
             "revision": self.revision,
             "layoutVersion": self.layout_version,
             "nodeIds": self.node_ids,
             "nodeLabels": self.node_labels,
             "nodeKinds": self.node_kinds,
             "routeIds": self.route_ids,
+            "routeKinds": self.route_kinds,
             "portIds": self.port_ids,
             "edgeIds": self.edge_ids,
             "labelIds": self.label_ids,
@@ -562,7 +597,11 @@ mod tests {
         };
         let route = |id: &str, target: &str, n: usize| SceneRoute {
             id: id.into(),
-            kind: String::new(),
+            kind: if id == "e2" {
+                "calls".into()
+            } else {
+                String::new()
+            },
             source: "b".into(),
             target: target.into(),
             points: (0..n)
@@ -572,10 +611,14 @@ mod tests {
                 })
                 .collect(),
             weight: 1,
-            back_weight: None,
+            back_weight: (id == "e2").then_some(2),
             invalid: false,
             rounded: id == "e1",
-            members: vec![],
+            members: if id == "e2" {
+                vec!["m1".into(), "e0".into()]
+            } else {
+                vec![]
+            },
         };
         let port =
             |id: &str, edge: &str, endpoint: &str, side: PortSide, explicit: bool| ResolvedPort {
@@ -658,7 +701,11 @@ mod tests {
         assert_eq!(numbers(&c, "nodeParent"), [none, 0., 0.]);
         // Ports: node, edge (a table of the edges that ports and crossings name), flags, side, position.
         assert_eq!(c.port_ids, ["p0", "p1", "p2"]);
-        assert_eq!(c.edge_ids, ["e0", "e2"]);
+        assert_eq!(
+            c.edge_ids,
+            ["e0", "e2", "m1"],
+            "ports and crossings first, then bundle members"
+        );
         assert_eq!(numbers(&c, "portNode"), [1., 1., 1.]);
         assert_eq!(numbers(&c, "portEdge"), [0., 0., 1.]);
         assert_eq!(numbers(&c, "portFlags"), [1., 2., 0.]);
@@ -695,6 +742,15 @@ mod tests {
         // Routes keep their order, offsets and flags; the rest of the scene is in the description.
         assert_eq!(numbers(&c, "routeOffsets"), [0., 3., 3., 5.]);
         assert_eq!(numbers(&c, "routeFlags"), [0., 2., 0.]);
+        // Kind (a table), the edges of the other direction (NONE: not a two-way route) and bundle members (in the edge table
+        // after those of ports and crossings; "e0" is there already).
+        assert_eq!(c.route_kinds, ["", "calls"]);
+        assert_eq!(numbers(&c, "routeKind"), [0., 0., 1.]);
+        assert_eq!(numbers(&c, "routeBackWeight"), [none, none, 2.]);
+        assert_eq!(c.edge_ids, ["e0", "e2", "m1"]);
+        assert_eq!(numbers(&c, "routeMemberOffsets"), [0., 0., 0., 2.]);
+        assert_eq!(numbers(&c, "routeMembers"), [2., 0.]);
+        assert_eq!(c.describe()["schemaVersion"], 1);
         assert_eq!(numbers(&c, "junctions"), [5., 6.5]);
         let described = c.describe();
         assert_eq!(

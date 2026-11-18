@@ -156,7 +156,11 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    to the page in a small view (the transfer dominates there) and 1.8–1.9 times in a full one (the engine's own work
    dominates). The overview's continuation is 1.7 times faster at 10 000 and 100 000 nodes, but its answer is 25–34 % larger in bytes (JSON positions are rounded to
    hundredths); the whole answer is layout time and shows no effect. So columns buy time, not bytes, and the binary
-   frame of step 5 should weigh `i32` hundredths for positions.
+   frame of step 5 should weigh `i32` hundredths for positions. The SVG viewer takes columns (`renderSvg(host, columns)`
+   through `sceneOfColumns`; same markup as from the scene, tested). Drawn in Chrome (load 18.7, not quiet), the saving
+   is the engine call (small view 15.6 → 3.4 ms, 10 000 boxes 617 → 456 ms) and the page's total 1.4 times and 7 %
+   less; drawing itself is DOM work (158 000 elements, 550 ms with paint) and does not change, and the conversion costs
+   0.4 and 6.7 ms, so the viewer does not read the columns by index.
 5. **Columnar input and binary frames** between backend and browser, if step 2 shows that parsing or transfer
    dominates.
 6. **Optional shared memory** (`SharedArrayBuffer`) for live positions and progressive publications, behind a capability

@@ -68,6 +68,9 @@ export function columnsOfScene(scene) {
   const routeTarget = new Uint32Array(routes.length);
   const routeWeight = new Uint32Array(routes.length);
   const routeFlags = new Uint32Array(routes.length);
+  const routeKinds = table();
+  const routeKind = new Uint32Array(routes.length);
+  const routeBackWeight = new Uint32Array(routes.length);
   const routeOffsets = new Uint32Array(routes.length + 1);
   let total = 0;
   for (const r of routes) total += r.points.length;
@@ -78,6 +81,8 @@ export function columnsOfScene(scene) {
     routeTarget[i] = at(r.target);
     routeWeight[i] = Math.min(r.weight ?? 0, NONE);
     routeFlags[i] = (r.invalid ? 1 : 0) | (r.rounded ? 2 : 0);
+    routeKind[i] = routeKinds.id(r.kind ?? '');
+    routeBackWeight[i] = r.backWeight == null ? NONE : Math.min(r.backWeight, NONE - 1);
     for (const p of r.points) { routePoints[cursor++] = p.x; routePoints[cursor++] = p.y; }
     routeOffsets[i + 1] = cursor / 2;
   });
@@ -89,6 +94,12 @@ export function columnsOfScene(scene) {
   const portFlags = Uint32Array.from(ports, p => (p.explicit ? 1 : 0) | (p.endpoint === 'target' ? 2 : 0));
   const portSide = Uint32Array.from(ports, p => SIDES[p.side]);
   const crossingEdge = Uint32Array.from(crossings, x => edges.id(x.edgeId));
+  // The edges of bundles come after those of ports and crossings.
+  const routeMemberOffsets = [0], routeMembers = [];
+  for (const r of routes) {
+    for (const member of r.members ?? []) routeMembers.push(edges.id(member));
+    routeMemberOffsets.push(routeMembers.length);
+  }
   const labelKinds = table();
 
   const conflictKinds = table();
@@ -106,12 +117,14 @@ export function columnsOfScene(scene) {
   const b = scene.bounds;
 
   return {
+    schemaVersion: scene.schemaVersion,
     revision: scene.revision,
     layoutVersion: scene.layoutVersion,
     nodeIds: nodes.map(n => n.id),
     nodeLabels: nodes.map(n => n.label),
     nodeKinds: nodeKinds.items,
     routeIds: routes.map(r => r.id),
+    routeKinds: routeKinds.items,
     portIds: ports.map(p => p.id),
     edgeIds: edges.items,
     labelIds: labels.map(l => l.id),
@@ -126,6 +139,7 @@ export function columnsOfScene(scene) {
     showPorts: Boolean(scene.showPorts),
     nodeBounds, nodeParent, nodeFlags, nodeKind, nodeShape,
     routeSource, routeTarget, routeWeight, routeFlags, routeOffsets, routePoints,
+    routeKind, routeBackWeight, routeMemberOffsets: Uint32Array.from(routeMemberOffsets), routeMembers: Uint32Array.from(routeMembers),
     portNode, portEdge, portFlags, portSide, portPosition: points(ports, p => p.position),
     crossingEdge,
     crossingContainer: Uint32Array.from(crossings, x => at(x.containerId)),

@@ -1,3 +1,4 @@
+import {isSceneColumns,sceneOfColumns} from './scene-columns.js';
 let viewerId=0;
 const markerIds=new WeakMap();
 /** Paint a scene. Selection is an event; this module never mutates or computes layout. */
@@ -18,6 +19,8 @@ const ELEMENT_NS='http://www.w3.org/2000/svg';
  * functions, which read the current state, and anything they show is part of the markup that is compared.
  */
 export function renderSvg(host,scene,options={}){
+ // The columns of a scene (`session.columns()`, ADR 0019 step 4) draw as the scene they stand for.
+ if(isSceneColumns(scene))scene=sceneOfColumns(scene);
  const canKeep=options.keyed===true&&typeof host.insertBefore==='function'&&typeof host.removeChild==='function';
  if(!canKeep){keptHosts.delete(host);const out=drawScene(host,host,scene,options);markRests(host,scene);if(options.trace)applyTrace(host,options.trace);return out;}
  const document=options.document??host.ownerDocument;
