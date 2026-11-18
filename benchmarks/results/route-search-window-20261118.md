@@ -65,4 +65,7 @@ In both, the window gives slightly fewer crossings and bends and shorter routes,
 the benchmark set it changes nothing measured. Timing of the other views is the same (they have few lanes across).
 Raw rows: `route-search-window-20261118.jsonl`.
 
+The 10 000-node view of synthetic-20k (12 633 visible nodes, 23 584 edges), one run each after this change: 398 s with
+the default (912 s before the loop-corner prefilter and this change), 214 s with the window. Its metrics were not scored.
+
 Whether it becomes the default is open: the comparison against elk-rs and the refinement path are not measured yet.
