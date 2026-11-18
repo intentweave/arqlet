@@ -23,6 +23,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- A view's projection walks the structured graph by index (`arqlet_model::GraphIndex`, kept with the structure;
+  `arqlet_view::project_indexed`) and copies an edge only when the view keeps it. A toggle in a session of a 1 000 000-node
+  graph: 3.9 s → 2.5 s on the same machine and load; byte-identical
+  ([results](benchmarks/results/sessions-indexed-20261118.md)).
 - Resident sessions keep the prepared source (ADR 0019 step 3): the snapshot's source graph is shared (`Arc`), and the
   view's structure (groups, communities) is kept with the snapshot (`Snapshot.structure`, not serialized) and reused by the
   next view of the same source and structure options; a structured view projected once is not validated again. Opening a
