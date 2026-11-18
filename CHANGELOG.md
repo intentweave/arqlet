@@ -23,6 +23,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- `isolatedGridFrom` (provisional, unset): `isolatedGrid` only in the areas with at least this many children that no edge
+  joins to a sibling, so a container opened with hundreds of unlinked members is a grid instead of one long column while
+  every other area keeps its default layout. At 50 every dataset of the benchmark set keeps its metrics; `isolatedGrid`
+  everywhere changes five of them (line–node hits on `mixed-large`, more crossings on `workflow-dag`).
 - Precomputing for a host (provisional): `communities` (operation; `arqlet::community_groups`; npm `communityGroups`)
   answers the groups and communities a view adds as the `groups` option takes them (node id → path of labels). Computed
   once in a backend and given back as `groups`, the view gets the same members and labels without Louvain (the

@@ -132,6 +132,12 @@ alignStacked?: boolean,
  */
 isolatedGrid?: boolean,
 /**
+ * Provisional: `isolatedGrid` only in the areas with at least this many children that have no edge to another child
+ * of the area (a container opened with hundreds of unlinked members would stand as one long column). `None` (the
+ * default, omitted): as `isolatedGrid` says.
+ */
+isolatedGridFrom?: number | null,
+/**
  * ADR 0020, S1-0 and S1-0b: a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`) is laid out
  * with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header at its
  * top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses. On by default

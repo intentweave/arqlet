@@ -1634,6 +1634,21 @@ fn renamed_to_level_of_detail<'de, D: serde::Deserializer<'de>>(_: D) -> Result<
     ))
 }
 
+/// The key of the top level in `LayoutOptions::isolated_grid_areas` (no node id starts with the marker).
+pub const ISOLATED_GRID_ROOT: &str = "\u{1}root";
+
+impl LayoutOptions {
+    /// Whether the unconnected children of the area of `parent` (`None`: the top level) are spread as a grid
+    /// (`isolatedGrid`, or `isolatedGridFrom` for this area).
+    pub fn isolated_grid_in(&self, parent: Option<&str>) -> bool {
+        self.isolated_grid
+            || (!self.isolated_grid_areas.is_empty()
+                && self
+                    .isolated_grid_areas
+                    .contains(parent.unwrap_or(ISOLATED_GRID_ROOT)))
+    }
+}
+
 /// Provisional (ADR 0019): the fingerprint of a graph, FNV-1a (64 bits) over its JSON as this crate writes it. Two graphs
 /// with the same JSON have the same fingerprint; it checks that a host hands back the graph a snapshot was made from.
 pub fn source_digest(graph: &Graph) -> String {
@@ -1915,6 +1930,16 @@ pub struct LayoutOptions {
     /// Omitted when off, so the default output does not change.
     #[serde(default, skip_serializing_if = "is_false")]
     pub isolated_grid: bool,
+    /// Provisional: `isolatedGrid` only in the areas with at least this many children that have no edge to another child
+    /// of the area (a container opened with hundreds of unlinked members would stand as one long column). `None` (the
+    /// default, omitted): as `isolatedGrid` says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub isolated_grid_from: Option<usize>,
+    /// The areas `isolatedGridFrom` gives the grid (`ISOLATED_GRID_ROOT` for the top level), computed by the layout at its
+    /// start. Never written or read.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub isolated_grid_areas: BTreeSet<String>,
     /// ADR 0020, S1-0 and S1-0b: a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`) is laid out
     /// with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header at its
     /// top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses. On by default
@@ -2260,6 +2285,8 @@ impl Default for LayoutOptions {
             shared_border_ranks: true,
             align_stacked: true,
             isolated_grid: false,
+            isolated_grid_from: None,
+            isolated_grid_areas: BTreeSet::new(),
             single_pass_reversed: true,
             straight_detours: true,
             region_ports: true,
