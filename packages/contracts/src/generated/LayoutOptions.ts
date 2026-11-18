@@ -307,6 +307,13 @@ groups?: { [key in string]: Array<string> },
  */
 levelOfDetail?: LevelOfDetail | null,
 /**
+ * Provisional: an edge between nodes in different containers is drawn between the outermost containers its ends
+ * differ in, and those of one pair of containers as one route with their weights (as between collapsed containers);
+ * edges between siblings stay as they are. A view of many open groups with dense traffic between them draws one route
+ * per pair of groups instead of one per edge. Off by default (omitted).
+ */
+liftEdges?: boolean,
+/**
  * Provisional (view state, set by `filter`): what the view hides, keeping the place of the rest. Omitted when empty.
  */
 hidden?: Hidden,

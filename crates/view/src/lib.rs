@@ -169,6 +169,61 @@ pub fn merge_aggregated_pairs(
     (projected, weights)
 }
 
+/// Provisional (`LayoutOptions::lift_edges`): every edge between two nodes that are not siblings moves its ends up to the
+/// outermost containers in which they differ (the children of their lowest common container on either side), so that
+/// `merge_aggregated_pairs` then draws one weighted edge for every such pair of containers. Edges between siblings, and
+/// edges between a container and a node inside it, keep their ends; directions are kept (source stays source). A moved end
+/// loses its explicit port. Pure: the canonical graph is unchanged.
+pub fn lift_edges(mut projected: Graph) -> Graph {
+    let parent: BTreeMap<&str, Option<&str>> = projected
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    // The path from the top level down to a node.
+    let path = |id: &str| -> Vec<String> {
+        let mut out = vec![id.to_string()];
+        let mut at = parent.get(id).copied().flatten();
+        while let Some(p) = at {
+            out.push(p.to_string());
+            at = parent.get(p).copied().flatten();
+        }
+        out.reverse();
+        out
+    };
+    let mut moved: BTreeMap<String, (bool, bool)> = BTreeMap::new();
+    for edge in &mut projected.edges {
+        let Some(target) = edge.target.clone() else {
+            continue;
+        };
+        if parent.get(edge.source.as_str()) == parent.get(target.as_str()) {
+            continue;
+        }
+        let (a, b) = (path(&edge.source), path(&target));
+        let common = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+        // One end inside the other: kept.
+        if common == a.len() || common == b.len() {
+            continue;
+        }
+        let (source, target_lifted) = (a[common].clone(), b[common].clone());
+        let changed = (source != edge.source, target_lifted != target);
+        edge.source = source;
+        edge.target = Some(target_lifted);
+        moved.insert(edge.id.clone(), changed);
+    }
+    for binding in &mut projected.edge_ports {
+        if let Some(&(source, target)) = moved.get(&binding.edge_id) {
+            if source {
+                binding.source_port = None;
+            }
+            if target {
+                binding.target_port = None;
+            }
+        }
+    }
+    projected
+}
+
 /// Provisional (path cut-out): which paths between two nodes `trace` follows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TraceMode {
@@ -572,5 +627,44 @@ mod pair_tests {
             ("A", Some("B")),
             "the logical direction of its first edge"
         );
+    }
+}
+
+#[cfg(test)]
+mod lift_tests {
+    use super::*;
+
+    #[test]
+    fn edges_between_containers_are_lifted_and_merged_with_their_weights() {
+        // P = {p1, p2, R = {r1}}, Q = {q1, q2}, z at the top level.
+        let node = |id: &str, parent: Option<&str>| serde_json::json!({"id": id, "kind": "n", "label": id, "parentId": parent});
+        let edge = |id: &str, s: &str, t: &str| serde_json::json!({"id": id, "kind": "k", "source": s, "target": t});
+        let g: Graph = serde_json::from_value(serde_json::json!({
+            "nodes": [node("P", None), node("p1", Some("P")), node("p2", Some("P")), node("R", Some("P")),
+                node("r1", Some("R")), node("Q", None), node("q1", Some("Q")), node("q2", Some("Q")), node("z", None)],
+            "edges": [edge("e1", "p1", "q1"), edge("e2", "q2", "p2"), edge("e3", "r1", "q1"), edge("e4", "p1", "p2"),
+                edge("e5", "p1", "p2"), edge("e6", "r1", "p2"), edge("e7", "z", "q2"), edge("e8", "P", "p1"), edge("e9", "q1", "q1")]
+        }))
+        .unwrap();
+        let lifted = lift_edges(project(&g, &BTreeSet::new()).unwrap());
+        let ends = |id: &str| {
+            let e = lifted.edges.iter().find(|e| e.id == id).unwrap();
+            (e.source.as_str(), e.target.as_deref().unwrap())
+        };
+        // Between P and Q in both directions, keeping the direction; from inside R to P's child: R to p2.
+        assert_eq!(ends("e1"), ("P", "Q"));
+        assert_eq!(ends("e2"), ("Q", "P"));
+        assert_eq!(ends("e3"), ("P", "Q"));
+        assert_eq!(ends("e6"), ("R", "p2"));
+        assert_eq!(ends("e7"), ("z", "Q"));
+        // Siblings, a container to its own child and a self-loop keep their ends.
+        assert_eq!(ends("e4"), ("p1", "p2"));
+        assert_eq!(ends("e8"), ("P", "p1"));
+        assert_eq!(ends("e9"), ("q1", "q1"));
+        let (merged, weights) = merge_aggregated_pairs(&g, lifted);
+        let ids: Vec<&str> = merged.edges.iter().map(|e| e.id.as_str()).collect();
+        // One edge for P–Q (e1 stands for e1 and e3 forward, e2 backward); the parallel siblings both stay.
+        assert_eq!(ids, ["e1", "e4", "e5", "e6", "e7", "e8", "e9"]);
+        assert_eq!((weights["e1"].forward, weights["e1"].backward), (2, 1));
     }
 }

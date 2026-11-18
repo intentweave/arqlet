@@ -9,7 +9,7 @@ fn grouped() -> Graph {
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
     for g in 0..4 {
-        nodes.push(json!({"id": format!("g{g}"), "kind": "group", "label": format!("g{g}")}));
+        nodes.push(json!({"id": format!("g{g}"), "kind": "team", "label": format!("g{g}")}));
         for i in 0..6 {
             nodes.push(json!({"id": format!("n{g}-{i}"), "kind": "node", "label": "n", "parentId": format!("g{g}")}));
             edges.push(json!({"id": format!("r{g}-{i}"), "kind": "flow", "source": format!("n{g}-{i}"), "target": format!("n{g}-{}", (i + 1) % 6)}));
@@ -116,4 +116,55 @@ fn the_budget_fields_are_omitted_when_unset() {
     })
     .unwrap();
     assert_eq!(level, json!({"depth": 1}));
+}
+
+#[test]
+fn lifted_edges_join_open_groups_once_and_stay_lifted_after_a_toggle() {
+    let options: LayoutOptions = serde_json::from_value(json!({"liftEdges": true})).unwrap();
+    let snapshot = import_graph_with(grouped(), 100, &options).unwrap();
+    // Every group open: the rings stay, and the four edges between groups are drawn between the groups.
+    assert!(snapshot.collapsed_ids.is_empty());
+    let between: Vec<(String, String)> = snapshot
+        .graph
+        .edges
+        .iter()
+        .filter(|e| e.id.starts_with('x'))
+        .map(|e| (e.source.clone(), e.target.clone().unwrap()))
+        .collect();
+    assert_eq!(
+        between,
+        [("g0", "g1"), ("g1", "g2"), ("g2", "g3"), ("g3", "g0")]
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+    );
+    assert_eq!(snapshot.graph.edges.len(), 4 * 6 + 4);
+    assert!(snapshot.routes.iter().all(|r| r.points.len() >= 2));
+    // Closing a group keeps the others lifted.
+    let closed = arqlet_runtime::toggle_container(
+        &snapshot,
+        snapshot.revision,
+        snapshot.layout_version,
+        "g1",
+    )
+    .unwrap();
+    assert_eq!(closed.collapsed_ids, ["g1"]);
+    assert_eq!(
+        closed
+            .graph
+            .edges
+            .iter()
+            .filter(|e| e.id.starts_with('x'))
+            .count(),
+        4
+    );
+    assert_eq!(closed.graph.edges.len(), 3 * 6 + 4);
+}
+
+#[test]
+fn a_budget_counts_lifted_edges() {
+    // Lifted, a group open adds only its ring: 4 + 6 per open group. Budget 16: one group open... unlifted it would be 10.
+    let lifted: LayoutOptions =
+        serde_json::from_value(json!({"liftEdges": true, "levelOfDetail": {"edges": 16}})).unwrap();
+    let snapshot = import_graph_with(grouped(), 100, &lifted).unwrap();
+    assert_eq!(snapshot.collapsed_ids, ["g2", "g3"]);
+    assert_eq!(snapshot.graph.edges.len(), 16);
 }
