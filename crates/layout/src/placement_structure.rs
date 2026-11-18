@@ -115,7 +115,7 @@ impl Input {
             hierarchical: options.hierarchical_ordering,
             simplex: options.simplex_ranks,
             components: options.component_packing,
-            isolated: options.isolated_grid,
+            isolated: options.isolated_grid_in(parent),
             isolated_pitch: 1f64.to_bits(),
             track: options.track_spacing.to_bits(),
             grid: options.placement_grid.to_bits(),

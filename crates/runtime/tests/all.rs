@@ -50,6 +50,8 @@ mod graph_roundtrip;
 mod import_limit;
 #[path = "interactive_continuation.rs"]
 mod interactive_continuation;
+#[path = "isolated_grid_from.rs"]
+mod isolated_grid_from;
 #[path = "layered_construction.rs"]
 mod layered_construction;
 #[path = "level_budget.rs"]

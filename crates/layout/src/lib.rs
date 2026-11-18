@@ -764,6 +764,18 @@ fn compute_mode(
     options: &LayoutOptions,
     run: &mut Run,
 ) -> Result<Snapshot, Abort> {
+    // Provisional (`isolatedGridFrom`): the areas whose unlinked children reach the threshold get the grid.
+    let gridded;
+    let options = match options.isolated_grid_from {
+        Some(from) if options.isolated_grid_areas.is_empty() => {
+            gridded = LayoutOptions {
+                isolated_grid_areas: isolated_grid_areas(graph, from),
+                ..options.clone()
+            };
+            &gridded
+        }
+        _ => options,
+    };
     // Backbone buses take part in the layout as virtual nodes (`bus_layout`); the result is given back in the canonical graph.
     if let Some((expanded, expanded_options, expansion)) = bus_layout::expand(graph, options) {
         let earlier = previous.map(|p| bus_layout::expand_previous(p, &expanded));
@@ -780,6 +792,61 @@ fn compute_mode(
         return Ok(snapshot);
     }
     compute_mode_plain(graph, previous, dirty, optimize, options, run)
+}
+
+/// The areas (`ISOLATED_GRID_ROOT` for the top level) with at least `from` children that no edge joins to another child of
+/// the area: an edge joins the two children of its ends' lowest common container (none when one end holds the other).
+fn isolated_grid_areas(graph: &Graph, from: usize) -> BTreeSet<String> {
+    let parent: BTreeMap<&str, Option<&str>> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    fn path<'a>(parent: &BTreeMap<&'a str, Option<&'a str>>, id: &'a str) -> Vec<&'a str> {
+        let mut out = vec![id];
+        let mut at = parent.get(id).copied().flatten();
+        while let Some(p) = at {
+            out.push(p);
+            at = parent.get(p).copied().flatten();
+        }
+        out.reverse();
+        out
+    }
+    let mut linked: BTreeSet<&str> = BTreeSet::new();
+    for edge in &graph.edges {
+        let Some(target) = edge.target.as_deref() else {
+            continue;
+        };
+        if edge.source == target
+            || !parent.contains_key(edge.source.as_str())
+            || !parent.contains_key(target)
+        {
+            continue;
+        }
+        let (a, b) = (path(&parent, &edge.source), path(&parent, target));
+        let common = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
+        if common < a.len() && common < b.len() {
+            linked.insert(a[common]);
+            linked.insert(b[common]);
+        }
+    }
+    let mut unlinked: BTreeMap<&str, usize> = BTreeMap::new();
+    for node in &graph.nodes {
+        if !linked.contains(node.id.as_str()) {
+            *unlinked
+                .entry(
+                    node.parent_id
+                        .as_deref()
+                        .unwrap_or(arqlet_model::ISOLATED_GRID_ROOT),
+                )
+                .or_default() += 1;
+        }
+    }
+    unlinked
+        .into_iter()
+        .filter(|(_, n)| *n >= from)
+        .map(|(area, _)| area.to_string())
+        .collect()
 }
 
 fn compute_mode_plain(
@@ -5732,7 +5799,9 @@ fn area_ranks(
             vertical,
             &mut ranks,
         );
-    } else if options.isolated_grid && !flattened {
+    } else if options.isolated_grid_in(children.first().and_then(|c| c.parent_id.as_deref()))
+        && !flattened
+    {
         spread_isolated(&ids, &outgoing, &incoming, isolated_pitch, &mut ranks);
     }
     (child_position, links, ranks)
@@ -6016,7 +6085,7 @@ fn place(
     );
     // Experimental (`isolatedGrid`): how far apart two ranks stand against two neighbours in a rank, from the children's
     // mean size and the spacings, so that the grid of unconnected children comes out about square.
-    let isolated_pitch = if (options.isolated_grid || options.pack_components.is_some())
+    let isolated_pitch = if (options.isolated_grid_in(parent) || options.pack_components.is_some())
         && layered
         && !children.is_empty()
     {
@@ -6417,7 +6486,7 @@ fn place(
         // Experimental (`isolatedGrid`): the unconnected children form one block after the connected ones in every level,
         // so the grid stands beside the connected part instead of among it, where it would push its edges into detours.
         let mut component_of = component_of;
-        if options.isolated_grid && flattening.is_empty() {
+        if options.isolated_grid_in(parent) && flattening.is_empty() {
             let linked: BTreeSet<&String> = links.iter().flat_map(|(a, b)| [a, b]).collect();
             for child in &children {
                 if !linked.contains(&child.id) {
@@ -6426,7 +6495,7 @@ fn place(
             }
         }
         if options.component_packing
-            || options.isolated_grid
+            || options.isolated_grid_in(parent)
             || (options.pack_components.is_some() && layered)
         {
             for ids in levels.values_mut() {
