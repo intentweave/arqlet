@@ -3467,7 +3467,10 @@ mod tests {
             serde_json::to_vec(&window.routes).unwrap(),
             serde_json::to_vec(&full.routes).unwrap()
         );
-        assert!(window.work.searches > full.work.searches, "the windowed searches came first");
+        assert!(
+            window.work.searches > full.work.searches,
+            "the windowed searches came first"
+        );
     }
 
     #[test]
