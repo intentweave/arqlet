@@ -198,43 +198,40 @@ fn aggregates(options: &LayoutOptions) -> bool {
 
 /// The containers the first view of an import shows collapsed, besides a node budget's: those `level_of_detail` names
 /// (at a depth or deeper, of a kind), else the groups and communities the view added.
-fn initially_collapsed(view: &Graph, options: &LayoutOptions) -> BTreeSet<String> {
-    let parent: BTreeMap<&str, Option<&str>> = view
-        .nodes
-        .iter()
-        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
-        .collect();
-    let containers: BTreeSet<&str> = view
-        .nodes
-        .iter()
-        .filter_map(|n| n.parent_id.as_deref())
-        .collect();
-    let depth = |id: &str| {
+/// With the view's index, built once by the caller.
+fn initially_collapsed_indexed(
+    view: &Graph,
+    index: &GraphIndex,
+    options: &LayoutOptions,
+) -> BTreeSet<String> {
+    let depth = |i: usize| {
         let mut d = 0;
-        let mut at = parent.get(id).copied().flatten();
+        let mut at = index.parent[i];
         while let Some(p) = at {
             d += 1;
-            at = parent.get(p).copied().flatten();
+            at = index.parent[p];
         }
         d
     };
     let named: BTreeSet<String> = view
         .nodes
         .iter()
-        .filter(|n| containers.contains(n.id.as_str()))
-        .filter(|n| match &options.level_of_detail {
-            Some(c) => c.depth.is_some_and(|d| depth(&n.id) >= d) || c.kinds.contains(&n.kind),
+        .enumerate()
+        .filter(|(i, _)| index.container[*i])
+        .filter(|(i, n)| match &options.level_of_detail {
+            Some(c) => c.depth.is_some_and(|d| depth(*i) >= d) || c.kinds.contains(&n.kind),
             None => {
                 n.kind == arqlet_layout::communities::COMMUNITY_KIND
                     || n.kind == arqlet_layout::communities::GROUP_KIND
             }
         })
-        .map(|n| n.id.clone())
+        .map(|(_, n)| n.id.clone())
         .collect();
     // A budget (`nodes`, `edges`) opens the others level by level while the first view stays within it.
     match &options.level_of_detail {
-        Some(level) if level.budgeted() => budget::level_budget_collapse(
+        Some(level) if level.budgeted() => budget::level_budget_collapse_indexed(
             view,
+            index,
             &named,
             level.nodes.unwrap_or(usize::MAX),
             level.edges.unwrap_or(usize::MAX),
@@ -461,8 +458,11 @@ fn select_connected(graph: &Graph, limit: usize) -> BTreeSet<String> {
 /// it can be opened; a container an edge reaches while none of its content is selected keeps its content too and starts
 /// collapsed (the second set). Otherwise as `select_connected`: the most connected neighbourhoods first, then the rest
 /// in input order.
-/// Also returns the structured graph it computed (when structuring changed the graph) and the containers the first view
-/// shows collapsed, for the import to reuse when the selection keeps every node.
+/// Also returns the structured graph it computed (when structuring changed the graph), its index and the containers the
+/// first view shows collapsed, for the import to reuse when the selection keeps every node.
+///
+/// Walks the structured graph by index (`GraphIndex`); a node's rank in id order stands for its id wherever the order of
+/// ids decided (the order of the seeds among equals, of a node's neighbours), so the selection is the one by ids.
 #[allow(clippy::type_complexity)]
 fn select_visible(
     graph: &Graph,
@@ -473,41 +473,65 @@ fn select_visible(
         BTreeSet<String>,
         BTreeSet<String>,
         Option<Graph>,
+        GraphIndex,
         BTreeSet<String>,
     ),
     String,
 > {
     let view = structured(graph, options)?;
-    let collapsed = initially_collapsed(&view, options);
-    let parent: BTreeMap<&str, Option<&str>> = view
-        .nodes
-        .iter()
-        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
-        .collect();
-    let containers: BTreeSet<&str> = view
-        .nodes
-        .iter()
-        .filter_map(|n| n.parent_id.as_deref())
-        .collect();
-    // What stands for a node in the first view: the outermost collapsed container above it, or itself.
-    let unit = |id: &str| -> String {
-        let mut shown = id;
-        let mut at = Some(id);
-        while let Some(x) = at {
-            if collapsed.contains(x) {
-                shown = x;
+    let index = GraphIndex::of(&view);
+    let collapsed = initially_collapsed_indexed(&view, &index, options);
+    let n = view.nodes.len();
+    let closed: Vec<bool> = {
+        let mut closed = vec![false; n];
+        for id in &collapsed {
+            if let Some(&i) = index.node.get(id.as_str()) {
+                closed[i] = true;
             }
-            at = parent.get(x).copied().flatten();
         }
-        shown.to_string()
+        closed
     };
-    let mut neighbors: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    // Each node's rank in id order (the index's map is ordered by id), and the node of each rank.
+    let mut rank = vec![0u32; n];
+    let mut by_rank: Vec<usize> = Vec::with_capacity(n);
+    for (r, &i) in index.node.values().enumerate() {
+        rank[i] = r as u32;
+        by_rank.push(i);
+    }
+    // What stands for a node in the first view: the outermost collapsed node among itself and its ancestors, or itself.
+    // `outer[x]`: that outermost collapsed node, once known (`Some(None)` when there is none).
+    let mut outer: Vec<Option<Option<usize>>> = vec![None; n];
+    for start in 0..n {
+        let mut chain = Vec::new();
+        let mut at = Some(start);
+        while let Some(x) = at {
+            if outer[x].is_some() {
+                break;
+            }
+            chain.push(x);
+            at = index.parent[x];
+        }
+        for &x in chain.iter().rev() {
+            let above = index.parent[x].and_then(|p| outer[p].expect("parent resolved first"));
+            outer[x] = Some(above.or(closed[x].then_some(x)));
+        }
+    }
+    let unit: Vec<usize> = outer
+        .iter()
+        .enumerate()
+        .map(|(x, o)| o.expect("every node resolved").unwrap_or(x))
+        .collect();
+    let node_of = |id: &str| index.node[id];
+    let mut neighbors: BTreeMap<u32, BTreeSet<u32>> = BTreeMap::new();
     for e in &graph.edges {
-        let (a, b) = (unit(&e.source), unit(e.target.as_ref().unwrap()));
-        neighbors.entry(a.clone()).or_default().insert(b.clone());
+        let (a, b) = (
+            rank[unit[node_of(&e.source)]],
+            rank[unit[node_of(e.target.as_ref().unwrap())]],
+        );
+        neighbors.entry(a).or_default().insert(b);
         neighbors.entry(b).or_default().insert(a);
     }
-    let mut seeds: Vec<String> = neighbors.keys().cloned().collect();
+    let mut seeds: Vec<u32> = neighbors.keys().copied().collect();
     seeds.sort_by(|a, b| {
         neighbors[b]
             .len()
@@ -515,31 +539,39 @@ fn select_visible(
             .then_with(|| a.cmp(b))
     });
     // Then what has no edges, in input order: every leaf's unit once.
-    let mut seen: BTreeSet<String> = seeds.iter().cloned().collect();
+    let mut seen: Vec<bool> = vec![false; n];
+    for &s in &seeds {
+        seen[s as usize] = true;
+    }
     for node in &graph.nodes {
-        if containers.contains(node.id.as_str()) {
+        let i = node_of(&node.id);
+        if index.container[i] {
             continue;
         }
-        let u = unit(&node.id);
-        if seen.insert(u.clone()) {
+        let u = rank[unit[i]];
+        if !seen[u as usize] {
+            seen[u as usize] = true;
             seeds.push(u);
         }
     }
-    let mut units = BTreeSet::new();
+    let mut chosen = vec![false; n];
+    let mut count = 0usize;
     for seed in seeds {
-        if units.len() >= limit {
+        if count >= limit {
             break;
         }
         let mut queue = VecDeque::from([seed]);
-        while let Some(id) = queue.pop_front() {
-            if !units.insert(id.clone()) {
+        while let Some(r) = queue.pop_front() {
+            if chosen[r as usize] {
                 continue;
             }
-            if units.len() >= limit {
+            chosen[r as usize] = true;
+            count += 1;
+            if count >= limit {
                 break;
             }
-            if let Some(ns) = neighbors.get(&id) {
-                queue.extend(ns.iter().filter(|n| !units.contains(*n)).cloned());
+            if let Some(ns) = neighbors.get(&r) {
+                queue.extend(ns.iter().filter(|m| !chosen[**m as usize]).copied());
             }
         }
     }
@@ -547,40 +579,42 @@ fn select_visible(
     let mut selected: BTreeSet<String> = graph
         .nodes
         .iter()
-        .filter(|n| units.contains(&unit(&n.id)))
-        .map(|n| n.id.clone())
+        .filter(|node| chosen[rank[unit[node_of(&node.id)]] as usize])
+        .map(|node| node.id.clone())
         .collect();
     // A selected container that is not collapsed and holds nothing selected (an edge reached it): whole, collapsed.
-    let holds_selected: BTreeSet<&str> = selected
-        .iter()
-        .flat_map(|id| {
-            let mut up = Vec::new();
-            let mut at = parent.get(id.as_str()).copied().flatten();
-            while let Some(p) = at {
-                up.push(p);
-                at = parent.get(p).copied().flatten();
+    let mut holds_selected = vec![false; n];
+    for id in &selected {
+        let mut at = index.parent[node_of(id)];
+        while let Some(p) = at {
+            if holds_selected[p] {
+                break;
             }
-            up
-        })
-        .collect();
+            holds_selected[p] = true;
+            at = index.parent[p];
+        }
+    }
+    let mut pulled_at = vec![false; n];
     let mut pulled = BTreeSet::new();
-    for id in &units {
-        if containers.contains(id.as_str())
-            && !collapsed.contains(id.as_str())
-            && !holds_selected.contains(id.as_str())
-        {
-            pulled.insert(id.clone());
+    for r in 0..n {
+        if !chosen[r] {
+            continue;
+        }
+        let i = by_rank[r];
+        if index.container[i] && !closed[i] && !holds_selected[i] {
+            pulled_at[i] = true;
+            pulled.insert(view.nodes[i].id.clone());
         }
     }
     if !pulled.is_empty() {
         for node in &graph.nodes {
-            let mut at = parent.get(node.id.as_str()).copied().flatten();
+            let mut at = index.parent[node_of(&node.id)];
             while let Some(p) = at {
-                if pulled.contains(p) {
+                if pulled_at[p] {
                     selected.insert(node.id.clone());
                     break;
                 }
-                at = parent.get(p).copied().flatten();
+                at = index.parent[p];
             }
         }
     }
@@ -588,7 +622,7 @@ fn select_visible(
         std::borrow::Cow::Owned(view) => Some(view),
         std::borrow::Cow::Borrowed(_) => None,
     };
-    Ok((selected, pulled, view, collapsed))
+    Ok((selected, pulled, view, index, collapsed))
 }
 
 pub fn import_graph_counted(
@@ -607,14 +641,14 @@ pub fn import_graph_counted(
     let options = budgeted.as_ref().unwrap_or(options);
     validate(&graph)?;
     let omitted = graph.edges.iter().filter(|e| e.target.is_none()).count();
-    graph.edges.retain(|e| e.target.is_some());
+    resolved_source(&mut graph);
     // With an abstracting view, the limit counts what the first view shows (`select_visible`); otherwise the most
     // connected neighbourhoods of the graph's nodes.
     // What the selection structured already: reused below when it keeps every node (the graph is then the same).
-    let mut prepared: Option<(Option<Graph>, BTreeSet<String>)> = None;
+    let mut prepared: Option<(Option<Graph>, GraphIndex, BTreeSet<String>)> = None;
     let (mut selected, pulled) = if abstracts(options) && graph.nodes.len() > limit {
-        let (selected, pulled, view, collapsed) = select_visible(&graph, limit, options)?;
-        prepared = Some((view, collapsed));
+        let (selected, pulled, view, index, collapsed) = select_visible(&graph, limit, options)?;
+        prepared = Some((view, index, collapsed));
         (selected, pulled)
     } else {
         (select_connected(&graph, limit), BTreeSet::new())
@@ -651,13 +685,19 @@ pub fn import_graph_counted(
         // The source graph shared, and its structure kept with the snapshot for the next views (`structure_of`).
         let reuse = prepared.filter(|_| graph.nodes.len() == whole);
         let source = std::sync::Arc::new(graph);
-        let (shared, first_collapsed) = match reuse {
-            Some((Some(view), collapsed)) => (std::sync::Arc::new(view), Some(collapsed)),
-            Some((None, collapsed)) => (source.clone(), Some(collapsed)),
+        let (shared, first) = match reuse {
+            Some((Some(view), index, collapsed)) => {
+                (std::sync::Arc::new(view), Some((index, collapsed)))
+            }
+            Some((None, index, collapsed)) => (source.clone(), Some((index, collapsed))),
             None => match structured(&source, options)? {
                 std::borrow::Cow::Borrowed(_) => (source.clone(), None),
                 std::borrow::Cow::Owned(view) => (std::sync::Arc::new(view), None),
             },
+        };
+        let (index, first_collapsed) = match first {
+            Some((index, collapsed)) => (std::sync::Arc::new(index), Some(collapsed)),
+            None => (std::sync::Arc::new(GraphIndex::of(&shared)), None),
         };
         let view = shared.as_ref();
         // The first view: within a node budget, the outermost containers collapsed; and those `initially_collapsed` names.
@@ -667,14 +707,16 @@ pub fn import_graph_counted(
             BTreeSet::new()
         };
         if abstracts(options) {
-            collapsed.extend(first_collapsed.unwrap_or_else(|| initially_collapsed(view, options)));
+            collapsed.extend(
+                first_collapsed
+                    .unwrap_or_else(|| initially_collapsed_indexed(view, &index, options)),
+            );
             // Containers an edge pulled in without their content selected: whole, and collapsed (`select_visible`).
             let ids: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
             collapsed.extend(pulled.into_iter().filter(|id| ids.contains(id.as_str())));
         }
         // Validated once, then projected by index; the index is kept with the structure.
         arqlet_model::validate(view)?;
-        let index = std::sync::Arc::new(GraphIndex::of(view));
         let (projected, weights) = merge_view(
             view,
             arqlet_view::project_indexed(view, &index, &collapsed)?,
@@ -3866,9 +3908,26 @@ pub fn dispatch_streaming(input: &str, publish: &mut dyn FnMut(&str)) -> String 
 /// Every operation accepts an optional `threads` field (clamped to 1..=MAX_THREADS).
 /// The response is `{ok, snapshot}` or `{ok:false, error}`; it never panics on bad input.
 /// The engine's one entry point: a JSON request in, a JSON answer out (ADR 0019: through the typed [`protocol`]).
+/// The source graph a snapshot keeps of an import's graph when the selection keeps every node: without unresolved edges,
+/// and with the port bindings of the edges that remain. Applied by the import, and to a source a host hands back
+/// (`protocol::Delivery`), so both have the same fingerprint.
+pub fn resolved_source(graph: &mut Graph) {
+    graph.edges.retain(|e| e.target.is_some());
+    if !graph.edge_ports.is_empty() {
+        let kept: BTreeSet<&str> = graph.edges.iter().map(|e| e.id.as_str()).collect();
+        let ports: Vec<EdgePorts> = graph
+            .edge_ports
+            .iter()
+            .filter(|b| kept.contains(b.edge_id.as_str()))
+            .cloned()
+            .collect();
+        graph.edge_ports = ports;
+    }
+}
+
 pub fn dispatch(input: &str) -> String {
-    match protocol::Request::from_json(input) {
-        Ok(request) => protocol::handle(request).to_json(),
+    match protocol::Request::from_json_delivered(input) {
+        Ok((request, delivery)) => delivery.deliver(protocol::handle(request)).to_json(),
         Err(error) => protocol::Response::Error(error).to_json(),
     }
 }
@@ -4244,6 +4303,7 @@ mod tests {
             optimization: None,
             omitted_unresolved_edges,
             structure: None,
+            source_digest: None,
             geometry_issues: Vec::new(),
             resolved_ports: Vec::new(),
             boundary_crossings: Vec::new(),

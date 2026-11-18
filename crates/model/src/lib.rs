@@ -597,6 +597,10 @@ pub struct Snapshot {
     /// same graph; it is replaced, never changed in place).
     #[serde(default)]
     pub source_graph: Option<std::sync::Arc<Graph>>,
+    /// Provisional (ADR 0019): set when the source graph was left out of this snapshot (`omitSource`); the fingerprint of
+    /// that graph (`source_digest`). A request on such a snapshot brings the graph as `source`, and it must match.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_digest: Option<String>,
     #[serde(default)]
     pub collapsed_ids: Vec<String>,
     pub boxes: BTreeMap<String, Rect>,
@@ -1628,6 +1632,27 @@ fn renamed_to_level_of_detail<'de, D: serde::Deserializer<'de>>(_: D) -> Result<
     Err(serde::de::Error::custom(
         "initialCollapse was renamed to levelOfDetail in engine 0.4",
     ))
+}
+
+/// Provisional (ADR 0019): the fingerprint of a graph, FNV-1a (64 bits) over its JSON as this crate writes it. Two graphs
+/// with the same JSON have the same fingerprint; it checks that a host hands back the graph a snapshot was made from.
+pub fn source_digest(graph: &Graph) -> String {
+    struct Fnv(u64);
+    impl std::io::Write for Fnv {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            for b in bytes {
+                self.0 ^= u64::from(*b);
+                self.0 = self.0.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut hash = Fnv(0xcbf2_9ce4_8422_2325);
+    serde_json::to_writer(&mut hash, graph).expect("a graph serializes");
+    format!("{:016x}", hash.0)
 }
 
 /// Provisional (ADR 0019, interned ids): a graph's nodes and edges by dense index, for work that walks a large graph many

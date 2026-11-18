@@ -355,6 +355,75 @@ struct ImportText {
     limit: Value,
     #[serde(default, deserialize_with = "present")]
     options: Option<Value>,
+    #[serde(default, rename = "omitSource")]
+    omit_source: bool,
+}
+
+/// Provisional (ADR 0019): how the source graph travels with a request and its answer, beside the request itself
+/// (`Request::from_json_delivered`). The host keeps a large source graph and the snapshots leave it out.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Delivery {
+    /// `omitSource` on an import: the answer leaves the source graph out and carries its `sourceDigest`, when the view
+    /// kept every node of the graph (`input_nodes`); otherwise the host could not hand back the graph the snapshot keeps.
+    pub omit_source: bool,
+    pub input_nodes: usize,
+    /// The request's snapshot left its source out (`sourceDigest`) and the request brought it as `source`, matching:
+    /// the answer leaves it out again, with this digest.
+    pub digest: Option<String>,
+}
+
+impl Delivery {
+    /// Applies the delivery to an answer: a snapshot in it leaves its source graph out and carries the digest.
+    pub fn deliver(&self, response: Response) -> Response {
+        match response {
+            Response::Snapshot(mut snapshot) if self.omit_source || self.digest.is_some() => {
+                let Some(source) = snapshot.source_graph.as_deref() else {
+                    return Response::Snapshot(snapshot);
+                };
+                let now = arqlet_model::source_digest(source);
+                // An operation that changed the source graph (an added node, a patch) answers with the new graph whole: the
+                // host's copy is out of date then.
+                if self.digest.as_ref().is_some_and(|before| *before != now)
+                    || (self.omit_source && source.nodes.len() != self.input_nodes)
+                {
+                    snapshot.source_digest = None;
+                } else {
+                    snapshot.source_graph = None;
+                    snapshot.source_digest = Some(now);
+                }
+                Response::Snapshot(snapshot)
+            }
+            other => other,
+        }
+    }
+}
+
+/// A snapshot that left its source out (`sourceDigest`, no `sourceGraph`) gets it back from the request's `source`, after
+/// the fingerprint is checked; returns the digest, or `None` when the snapshot is whole (or there is none).
+fn attach_source(v: &mut Value) -> Result<Option<(String, Graph)>, String> {
+    let Some(snapshot) = v.get("snapshot").filter(|s| s.is_object()) else {
+        return Ok(None);
+    };
+    let Some(digest) = snapshot
+        .get("sourceDigest")
+        .and_then(Value::as_str)
+        .map(String::from)
+    else {
+        return Ok(None);
+    };
+    if snapshot.get("sourceGraph").is_some_and(|g| !g.is_null()) {
+        return Ok(None);
+    }
+    let source = v.as_object_mut().and_then(|o| o.remove("source")).ok_or(
+        "The snapshot left its source graph out (sourceDigest): send that graph as source",
+    )?;
+    // The graph as the import kept it: the host keeps the graph it sent.
+    let mut graph: Graph = typed(&source)?;
+    crate::resolved_source(&mut graph);
+    if arqlet_model::source_digest(&graph) != digest {
+        return Err("The source does not match the snapshot's sourceDigest".into());
+    }
+    Ok(Some((digest, graph)))
 }
 
 fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
@@ -362,24 +431,85 @@ fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Value>, D::E
 }
 
 impl Request {
+    /// The snapshot a request operates on, when it carries one as a typed value (not in a JSON body).
+    pub fn snapshot_mut(&mut self) -> Option<&mut Snapshot> {
+        match self {
+            Request::Direction { on, .. }
+            | Request::Strategy { on, .. }
+            | Request::Routing { on, .. }
+            | Request::Move { on, .. }
+            | Request::Toggle { on, .. }
+            | Request::Filter { on, .. }
+            | Request::Patch { on, .. }
+            | Request::Reveal { on, .. }
+            | Request::Configure { on, .. }
+            | Request::Port { on, .. }
+            | Request::Settle { on, .. }
+            | Request::Restore { on, .. }
+            | Request::Shape { on, .. }
+            | Request::Measure { on, .. }
+            | Request::Refine { on, .. }
+            | Request::RefineProgressive { on, .. } => Some(&mut on.snapshot),
+            Request::Add { snapshot, .. } | Request::Intent { snapshot } => Some(snapshot),
+            _ => None,
+        }
+    }
+
     /// Reads a request from its JSON text, with the same errors the engine has always given.
     pub fn from_json(input: &str) -> Result<Request, String> {
+        Request::from_json_delivered(input).map(|(request, _)| request)
+    }
+
+    /// `from_json`, with how the source graph travels (`Delivery`): `omitSource` on an import, and a snapshot whose source
+    /// was left out gets it back from `source` (checked against its `sourceDigest`).
+    pub fn from_json_delivered(input: &str) -> Result<(Request, Delivery), String> {
         // An import, read in one pass when it is well formed; anything else (and any import the fast reading refuses) goes
         // the general way, which gives the errors the engine has always given.
         if input.contains("\"import\"") {
             if let Ok(fast) = serde_json::from_str::<ImportText>(input) {
                 let limit = fast.limit.as_u64();
                 if fast.op == "import" && limit.is_some_and(|l| usize::try_from(l).is_ok()) {
-                    return Ok(Request::Import {
-                        graph: Box::new(fast.graph),
-                        limit: limit.expect("checked"),
-                        options: fast.options,
-                    });
+                    let delivery = Delivery {
+                        omit_source: fast.omit_source,
+                        input_nodes: fast.graph.nodes.len(),
+                        digest: None,
+                    };
+                    return Ok((
+                        Request::Import {
+                            graph: Box::new(fast.graph),
+                            limit: limit.expect("checked"),
+                            options: fast.options,
+                        },
+                        delivery,
+                    ));
                 }
             }
         }
-        let v: Value = serde_json::from_str(input).map_err(|e| e.to_string())?;
-        Request::from_value(&v)
+        let mut v: Value = serde_json::from_str(input).map_err(|e| e.to_string())?;
+        let attached = attach_source(&mut v)?;
+        // The source goes into a typed snapshot as it is; a request that keeps its snapshot as JSON gets it as JSON.
+        let (digest, request) = match attached {
+            None => (None, Request::from_value(&v)?),
+            Some((digest, graph)) => {
+                let mut request = Request::from_value(&v)?;
+                match request.snapshot_mut() {
+                    Some(snapshot) => snapshot.source_graph = Some(std::sync::Arc::new(graph)),
+                    None => {
+                        v["snapshot"]["sourceGraph"] =
+                            serde_json::to_value(&graph).map_err(|e| e.to_string())?;
+                        request = Request::from_value(&v)?;
+                    }
+                }
+                (Some(digest), request)
+            }
+        };
+        let delivery = Delivery {
+            omit_source: v["op"].as_str() == Some("import")
+                && v["omitSource"].as_bool() == Some(true),
+            input_nodes: v["graph"]["nodes"].as_array().map_or(0, Vec::len),
+            digest,
+        };
+        Ok((request, delivery))
     }
 
     /// Reads a request from its JSON value. The checks run in the engine's historical order, so that a malformed request

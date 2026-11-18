@@ -50,7 +50,12 @@ routeConflicts?: Array<RouteConflict>, schemaVersion: number, engineVersion: str
  * The whole graph a view was taken from (shared, not copied: snapshots of one view, and a session's requests, hold the
  * same graph; it is replaced, never changed in place).
  */
-sourceGraph: Graph | null, collapsedIds: Array<string>, boxes: { [key in string]: Rect }, routes: Array<Route>, recomputedContainers: Array<string>, optimization?: OptimizationReport | null, omittedUnresolvedEdges: number, geometryIssues: Array<GeometryIssue>, resolvedPorts: Array<ResolvedPort>, boundaryCrossings: Array<BoundaryCrossing>,
+sourceGraph: Graph | null,
+/**
+ * Provisional (ADR 0019): set when the source graph was left out of this snapshot (`omitSource`); the fingerprint of
+ * that graph (`source_digest`). A request on such a snapshot brings the graph as `source`, and it must match.
+ */
+sourceDigest?: string | null, collapsedIds: Array<string>, boxes: { [key in string]: Rect }, routes: Array<Route>, recomputedContainers: Array<string>, optimization?: OptimizationReport | null, omittedUnresolvedEdges: number, geometryIssues: Array<GeometryIssue>, resolvedPorts: Array<ResolvedPort>, boundaryCrossings: Array<BoundaryCrossing>,
 /**
  * The edges drawn as straight segments (the others are orthogonal). Empty when every edge is orthogonal.
  */
