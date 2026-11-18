@@ -121,6 +121,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
   equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
 - `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
+- `levelOfDetail` takes a budget (provisional): `nodes` and `edges` bound the first view of an import, which opens
+  containers level by level while it stays within both; edges are counted as drawn (one per pair of collapsed ends). With
+  `nodes` and no `communities`, containers with more children than the budget are divided into communities, so a flat
+  graph starts collapsed too. synthetic-20k (22 819 nodes) with `{nodes: 1000, edges: 2000}`: 94 boxes and 2 000 edges in 4.2 s;
+  a flat graph of 20 000 nodes with `{nodes: 300}`: 300 boxes in 41 s (loaded machine)
+  ([results](benchmarks/results/first-view-budget-20261118.md)).
 - `routeSearchWindow` (provisional, off): a constructed layered route searches the lanes across the flow only near its
   ends (as far across as it reaches along the flow, at least 16 tracks) and over the whole width only when it finds no
   way there. A search over the whole width is quadratic in the boxes across the drawing (4 000 lanes in a 5 000-node

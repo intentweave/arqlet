@@ -217,7 +217,8 @@ fn initially_collapsed(view: &Graph, options: &LayoutOptions) -> BTreeSet<String
         }
         d
     };
-    view.nodes
+    let named: BTreeSet<String> = view
+        .nodes
         .iter()
         .filter(|n| containers.contains(n.id.as_str()))
         .filter(|n| match &options.level_of_detail {
@@ -228,7 +229,17 @@ fn initially_collapsed(view: &Graph, options: &LayoutOptions) -> BTreeSet<String
             }
         })
         .map(|n| n.id.clone())
-        .collect()
+        .collect();
+    // A budget (`nodes`, `edges`) opens the others level by level while the first view stays within it.
+    match &options.level_of_detail {
+        Some(level) if level.budgeted() => budget::level_budget_collapse(
+            view,
+            &named,
+            level.nodes.unwrap_or(usize::MAX),
+            level.edges.unwrap_or(usize::MAX),
+        ),
+        _ => named,
+    }
 }
 
 /// The view of a source graph (`project_view`).
@@ -294,6 +305,17 @@ pub fn project_view(
         collapsed,
         projected,
         weights,
+    })
+}
+
+/// Provisional: with a node budget (`LevelOfDetail::nodes`) and no `communities` of its own, a container with more
+/// children than the budget is divided into communities, so that the hierarchy can keep the first view within it where
+/// it alone cannot (a flat graph above all). The options of the snapshot carry it, so later views keep the communities.
+fn budget_communities(options: &LayoutOptions) -> Option<LayoutOptions> {
+    let nodes = options.level_of_detail.as_ref()?.nodes?;
+    (options.communities == 0).then(|| LayoutOptions {
+        communities: nodes.max(2),
+        ..options.clone()
     })
 }
 
@@ -490,6 +512,8 @@ pub fn import_graph_counted(
         .single_pass_auto
         .then(|| single_pass_options(options));
     let options = single_pass.as_ref().unwrap_or(options);
+    let budgeted = budget_communities(options);
+    let options = budgeted.as_ref().unwrap_or(options);
     validate(&graph)?;
     let omitted = graph.edges.iter().filter(|e| e.target.is_none()).count();
     graph.edges.retain(|e| e.target.is_some());

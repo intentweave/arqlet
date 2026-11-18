@@ -1624,6 +1624,22 @@ pub struct LevelOfDetail {
     /// Containers of these kinds.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub kinds: Vec<String>,
+    /// Provisional (layered view only): the most nodes the first view shows (leaves and collapsed containers; an open
+    /// container is a frame and does not count). The containers start collapsed and are opened level by level, the
+    /// outermost first, while the view stays within `nodes` and `edges`; those `depth` and `kinds` name stay collapsed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nodes: Option<usize>,
+    /// Provisional (layered view only): the most edges the first view draws, counted as the view draws them (one edge for
+    /// each pair of ends a collapsed container joins, none inside one). See `nodes`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edges: Option<usize>,
+}
+
+impl LevelOfDetail {
+    /// Whether it bounds the first view by a budget (`nodes` or `edges`).
+    pub fn budgeted(&self) -> bool {
+        self.nodes.is_some() || self.edges.is_some()
+    }
 }
 
 /// What a view hides (provisional, view state set by the `filter` operation): nodes of these kinds, these nodes (each with

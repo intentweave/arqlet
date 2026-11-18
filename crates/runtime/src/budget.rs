@@ -54,6 +54,155 @@ pub fn initial_collapse(graph: &Graph, budget: usize) -> BTreeSet<String> {
     collapsed
 }
 
+/// Provisional (`LevelOfDetail::nodes` and `edges`): the containers the first view shows collapsed so that it stays within
+/// `nodes` visible nodes and `edges` drawn edges. Every container starts collapsed; they are opened level by level, the
+/// outermost first and in the graph's order within a level, each when the view after opening it stays within both
+/// budgets; one that does not fit stays collapsed, and the next is tried. Those in `fixed` stay collapsed. The edges are
+/// counted as the projection draws them with merged pairs (`arqlet_view::merge_aggregated_pairs`): an edge between two
+/// nodes shown as themselves each, one edge per unordered pair of ends of which one is a collapsed container, and none
+/// inside a collapsed container. Unresolved edges are left out.
+pub fn level_budget_collapse(
+    graph: &Graph,
+    fixed: &BTreeSet<String>,
+    nodes: usize,
+    edges: usize,
+) -> BTreeSet<String> {
+    let index: BTreeMap<&str, usize> = graph
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+    let parent: Vec<Option<usize>> = graph
+        .nodes
+        .iter()
+        .map(|n| n.parent_id.as_deref().and_then(|p| index.get(p).copied()))
+        .collect();
+    let mut children: Vec<Vec<usize>> = vec![Vec::new(); graph.nodes.len()];
+    for (i, p) in parent.iter().enumerate() {
+        if let Some(p) = p {
+            children[*p].push(i);
+        }
+    }
+    let container = |i: usize| !children[i].is_empty();
+    let mut open = vec![false; graph.nodes.len()];
+    // What shows a node: its outermost ancestor (or itself) that is a collapsed container, else itself.
+    let shown = |open: &[bool], i: usize| {
+        let mut at = Some(i);
+        let mut unit = i;
+        while let Some(x) = at {
+            if container(x) && !open[x] {
+                unit = x;
+            }
+            at = parent[x];
+        }
+        unit
+    };
+    let ends: Vec<(usize, usize)> = graph
+        .edges
+        .iter()
+        .filter_map(|e| {
+            let target = e.target.as_deref()?;
+            Some((*index.get(e.source.as_str())?, *index.get(target)?))
+        })
+        .collect();
+    // The drawn edges: those between two nodes shown as themselves (true self-loops too), plus the pairs.
+    let mut plain = 0usize;
+    let mut pairs: BTreeMap<(usize, usize), usize> = BTreeMap::new();
+    let mut by_unit: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    let mut units: Vec<(usize, usize)> = Vec::with_capacity(ends.len());
+    let count = |(s, t): (usize, usize),
+                 (a, b): (usize, usize),
+                 plain: &mut usize,
+                 pairs: &mut BTreeMap<(usize, usize), usize>,
+                 add: bool| {
+        if a == s && b == t {
+            if add {
+                *plain += 1;
+            } else {
+                *plain -= 1;
+            }
+        } else if a != b {
+            let key = (a.min(b), a.max(b));
+            let n = pairs.entry(key).or_default();
+            if add {
+                *n += 1;
+            } else {
+                *n -= 1;
+                if *n == 0 {
+                    pairs.remove(&key);
+                }
+            }
+        }
+    };
+    for (k, &(s, t)) in ends.iter().enumerate() {
+        let u = (shown(&open, s), shown(&open, t));
+        count((s, t), u, &mut plain, &mut pairs, true);
+        by_unit.entry(u.0).or_default().push(k);
+        if u.1 != u.0 {
+            by_unit.entry(u.1).or_default().push(k);
+        }
+        units.push(u);
+    }
+    let roots: Vec<usize> = (0..graph.nodes.len())
+        .filter(|&i| parent[i].is_none())
+        .collect();
+    let mut visible = roots.len();
+    let fixed: BTreeSet<usize> = fixed
+        .iter()
+        .filter_map(|id| index.get(id.as_str()).copied())
+        .collect();
+    let mut queue: VecDeque<usize> = roots.iter().copied().filter(|&i| container(i)).collect();
+    while let Some(c) = queue.pop_front() {
+        if fixed.contains(&c) {
+            continue;
+        }
+        let after = visible - 1 + children[c].len();
+        if after > nodes {
+            continue;
+        }
+        // Open it, and count the edges again that have an end shown by it.
+        open[c] = true;
+        let mut touched: Vec<usize> = by_unit.get(&c).cloned().unwrap_or_default();
+        touched.sort_unstable();
+        touched.dedup();
+        let mut changes: Vec<(usize, (usize, usize))> = Vec::with_capacity(touched.len());
+        for &k in &touched {
+            let before = units[k];
+            let now = (shown(&open, ends[k].0), shown(&open, ends[k].1));
+            count(ends[k], before, &mut plain, &mut pairs, false);
+            count(ends[k], now, &mut plain, &mut pairs, true);
+            changes.push((k, now));
+        }
+        if plain + pairs.len() > edges {
+            // Too many edges: closed again.
+            for &(k, now) in changes.iter().rev() {
+                count(ends[k], now, &mut plain, &mut pairs, false);
+                count(ends[k], units[k], &mut plain, &mut pairs, true);
+            }
+            open[c] = false;
+            continue;
+        }
+        visible = after;
+        by_unit.remove(&c);
+        // Each edge is listed under its units once: under a new one, not again under one it kept.
+        for (k, now) in changes {
+            let before = units[k];
+            units[k] = now;
+            for (i, u) in [now.0, now.1].into_iter().enumerate() {
+                if u != before.0 && u != before.1 && (i == 0 || now.1 != now.0) {
+                    by_unit.entry(u).or_default().push(k);
+                }
+            }
+        }
+        queue.extend(children[c].iter().copied().filter(|&i| container(i)));
+    }
+    (0..graph.nodes.len())
+        .filter(|&i| container(i) && !open[i])
+        .map(|i| graph.nodes[i].id.clone())
+        .collect()
+}
+
 /// The drawn size of every collapsed container: a miniature of the size its content would take laid out in its flow
 /// (ranks along the flow from the longest path over the edges between its children, the largest rank across it), with
 /// child containers estimated the same way.
@@ -240,6 +389,83 @@ mod tests {
         assert_eq!(initial_collapse(&g, 5), BTreeSet::from(["B".to_string()]));
         // Everything fits.
         assert!(initial_collapse(&g, 100).is_empty());
+    }
+
+    #[test]
+    fn a_level_budget_opens_containers_level_by_level_within_nodes_and_edges() {
+        let g = sample();
+        let set = |ids: &[&str]| {
+            ids.iter()
+                .map(|s| s.to_string())
+                .collect::<BTreeSet<String>>()
+        };
+        let none = BTreeSet::new();
+        // Nodes as `initial_collapse`; the result names every container left closed, inner ones too.
+        assert_eq!(
+            level_budget_collapse(&g, &none, 2, usize::MAX),
+            set(&["A", "B", "A1"])
+        );
+        assert_eq!(level_budget_collapse(&g, &none, 5, usize::MAX), set(&["B"]));
+        assert!(level_budget_collapse(&g, &none, 100, usize::MAX).is_empty());
+        // A named container stays closed, and the budget goes to the next.
+        assert_eq!(
+            level_budget_collapse(&g, &set(&["A"]), 5, usize::MAX),
+            set(&["A", "A1"])
+        );
+        // Edges: closed, e1 and e2 lie inside A and none is drawn; B holds no edge and opens at any budget. Opening A draws
+        // e1 and the pair a2-A1 (two edges); opening A1 then draws e2 as itself, still two.
+        assert_eq!(level_budget_collapse(&g, &none, 100, 0), set(&["A", "A1"]));
+        assert_eq!(level_budget_collapse(&g, &none, 100, 1), set(&["A", "A1"]));
+        assert!(level_budget_collapse(&g, &none, 100, 2).is_empty());
+    }
+
+    #[test]
+    fn a_level_budget_counts_the_edges_the_merged_projection_draws() {
+        let node = |id: &str, parent: Option<&str>| json!({"id": id, "kind": "k", "label": id, "parentId": parent});
+        let edge =
+            |id: &str, s: &str, t: &str| json!({"id": id, "kind": "k", "source": s, "target": t});
+        // Cross edges in both directions, parallel ones, a self-loop and an edge inside a container.
+        let g = graph(
+            json!([
+                node("P", None),
+                node("Q", None),
+                node("R", Some("P")),
+                node("p1", Some("P")),
+                node("p2", Some("P")),
+                node("r1", Some("R")),
+                node("r2", Some("R")),
+                node("q1", Some("Q")),
+                node("q2", Some("Q")),
+                node("z", None)
+            ]),
+            json!([
+                edge("e1", "p1", "q1"),
+                edge("e2", "q2", "p2"),
+                edge("e3", "r1", "q1"),
+                edge("e4", "r2", "z"),
+                edge("e5", "z", "z"),
+                edge("e6", "p1", "p2"),
+                edge("e7", "p1", "p2"),
+                edge("e8", "r1", "r2"),
+                edge("e9", "q1", "r2"),
+                edge("e10", "z", "p1")
+            ]),
+        );
+        for budget in 0..12 {
+            let collapsed = level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, budget);
+            let projected = arqlet_view::project(&g, &collapsed).unwrap();
+            let (drawn, _) = arqlet_view::merge_aggregated_pairs(&g, projected);
+            let closed = level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, 0);
+            let (start, _) =
+                arqlet_view::merge_aggregated_pairs(&g, arqlet_view::project(&g, &closed).unwrap());
+            assert!(
+                drawn.edges.len() <= budget.max(start.edges.len()),
+                "budget {budget}: {} drawn",
+                drawn.edges.len()
+            );
+        }
+        // Without a limit everything opens and all ten edges are drawn.
+        assert!(level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, usize::MAX).is_empty());
     }
 
     #[test]

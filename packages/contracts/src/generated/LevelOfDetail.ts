@@ -13,4 +13,15 @@ depth?: number | null,
 /**
  * Containers of these kinds.
  */
-kinds?: Array<string>, };
+kinds?: Array<string>,
+/**
+ * Provisional (layered view only): the most nodes the first view shows (leaves and collapsed containers; an open
+ * container is a frame and does not count). The containers start collapsed and are opened level by level, the
+ * outermost first, while the view stays within `nodes` and `edges`; those `depth` and `kinds` name stay collapsed.
+ */
+nodes?: number | null,
+/**
+ * Provisional (layered view only): the most edges the first view draws, counted as the view draws them (one edge for
+ * each pair of ends a collapsed container joins, none inside one). See `nodes`.
+ */
+edges?: number | null, };
