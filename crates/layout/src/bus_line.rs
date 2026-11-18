@@ -9,7 +9,7 @@
 //! its node on the side facing the bar and meets the bar square; a node beyond the bar's ends meets it at the nearer end
 //! with one bend. Edges keep their logical direction.
 
-use arqlet_model::{NodeShape, Point, Rect, Snapshot};
+use arqlet_model::{Graph, NodeShape, Point, Rect, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// How thick a bar is drawn.
@@ -383,5 +383,120 @@ fn axes(r: &Rect, horizontal: bool) -> ((f64, f64), (f64, f64)) {
         ((r.x, r.x + r.width), (r.y, r.y + r.height))
     } else {
         ((r.y, r.y + r.height), (r.x, r.x + r.width))
+    }
+}
+
+/// Provisional: the edges of the `busLine` nodes, turned for the layering so that the bus network reads as a tree: in every
+/// connected network of nodes and buses, the node on the most buses (the earliest in the graph on a tie) is the root, a
+/// breadth-first search goes node → bus → node from it, and every bus edge points from the end reached first to the end
+/// reached later. A gateway then stands above its buses, a node on one bus below it, a node on two buses below both. Only
+/// the layout sees the turned edges (`restore` gives the graph back); `None` when the graph has no bus line.
+pub(crate) fn orient(graph: &Graph) -> Option<(Graph, BTreeSet<String>)> {
+    let buses: BTreeSet<&str> = graph
+        .nodes
+        .iter()
+        .filter(|n| n.shape == NodeShape::BusLine)
+        .map(|n| n.id.as_str())
+        .collect();
+    if buses.is_empty() {
+        return None;
+    }
+    let order: BTreeMap<&str, usize> = graph
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+    // The bus edges: between a bus and a node that is not a bus.
+    let mut adjacent: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut bus_edges: Vec<usize> = Vec::new();
+    for (k, e) in graph.edges.iter().enumerate() {
+        let Some(t) = e.target.as_deref() else {
+            continue;
+        };
+        let (s, t) = (e.source.as_str(), t);
+        if s == t
+            || buses.contains(s) == buses.contains(t)
+            || !order.contains_key(s)
+            || !order.contains_key(t)
+        {
+            continue;
+        }
+        adjacent.entry(s).or_default().insert(t);
+        adjacent.entry(t).or_default().insert(s);
+        bus_edges.push(k);
+    }
+    if bus_edges.is_empty() {
+        return None;
+    }
+    // Breadth-first levels from the roots, network by network; the roots by bus count, then by graph order.
+    let mut roots: Vec<&str> = adjacent
+        .keys()
+        .copied()
+        .filter(|id| !buses.contains(id))
+        .collect();
+    roots.sort_by(|a, b| {
+        adjacent[b]
+            .len()
+            .cmp(&adjacent[a].len())
+            .then(order[a].cmp(&order[b]))
+    });
+    let mut level: BTreeMap<&str, usize> = BTreeMap::new();
+    for root in roots {
+        if level.contains_key(root) {
+            continue;
+        }
+        level.insert(root, 0);
+        let mut queue = std::collections::VecDeque::from([root]);
+        while let Some(at) = queue.pop_front() {
+            // Neighbours in graph order, so the search does not depend on the ids.
+            let mut next: Vec<&str> = adjacent[at].iter().copied().collect();
+            next.sort_by_key(|id| order[id]);
+            for n in next {
+                if !level.contains_key(n) {
+                    level.insert(n, level[at] + 1);
+                    queue.push_back(n);
+                }
+            }
+        }
+    }
+    let mut oriented = graph.clone();
+    let mut flipped = BTreeSet::new();
+    for k in bus_edges {
+        let e = &mut oriented.edges[k];
+        let t = e.target.clone().expect("a bus edge has a target");
+        if level.get(e.source.as_str()) > level.get(t.as_str()) {
+            e.target = Some(std::mem::replace(&mut e.source, t));
+            flipped.insert(e.id.clone());
+        }
+    }
+    if flipped.is_empty() {
+        return None;
+    }
+    for binding in &mut oriented.edge_ports {
+        if flipped.contains(&binding.edge_id) {
+            std::mem::swap(&mut binding.source_port, &mut binding.target_port);
+        }
+    }
+    Some((oriented, flipped))
+}
+
+/// The snapshot of a layout of `orient`'s graph, given back on `graph`: the turned edges' routes run in their own direction
+/// again and their ports name their own ends (the taps are drawn anew by `apply`).
+pub(crate) fn restore(snapshot: &mut Snapshot, graph: &Graph, flipped: &BTreeSet<String>) {
+    snapshot.graph = graph.clone();
+    for route in &mut snapshot.routes {
+        if flipped.contains(&route.id) {
+            route.points.reverse();
+        }
+    }
+    for port in &mut snapshot.resolved_ports {
+        if flipped.contains(&port.edge_id) {
+            port.endpoint = if port.endpoint == "source" {
+                "target".into()
+            } else {
+                "source".into()
+            };
+        }
     }
 }
