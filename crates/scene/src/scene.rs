@@ -196,7 +196,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
         .iter()
         .filter_map(|n| n.parent_id.as_deref())
         .collect();
-    let source = snapshot.source_graph.as_ref().unwrap_or(graph);
+    let source = snapshot.source_graph.as_deref().unwrap_or(graph);
     let aggregates: BTreeSet<&str> = source
         .nodes
         .iter()

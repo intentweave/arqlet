@@ -5274,6 +5274,7 @@ fn placed_snapshot(
             changed
         },
         omitted_unresolved_edges: previous.map_or(0, |s| s.omitted_unresolved_edges),
+        structure: None,
     }
 }
 

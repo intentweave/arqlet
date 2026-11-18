@@ -44,7 +44,7 @@ pub fn trace_answer_on(snapshot: &Snapshot, v: &Value) -> Result<TraceAnswer, St
         Some(other) => return Err(format!("Unknown trace mode: {other}")),
     };
     let kinds = edge_kinds_of(v, "Trace")?;
-    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let path = trace_along(canonical, from, to, mode, |e| {
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;
@@ -101,7 +101,7 @@ pub(crate) fn on_view(
     path_edges: &[String],
     kinds: &Option<BTreeSet<String>>,
 ) -> Result<OnView, String> {
-    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     // The visible node of every node of the view: itself, or the outermost collapsed container above it.
     let view = structured(canonical, &snapshot.options)?;
     let parent: BTreeMap<&str, Option<&str>> = view
@@ -273,7 +273,7 @@ pub fn neighbourhood_answer_on(
         }
     };
     let kinds = edge_kinds_of(v, "Neighbourhood")?;
-    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let found = neighbourhood(canonical, &starts, hops, reach, |e| {
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;

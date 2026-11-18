@@ -21,7 +21,7 @@ pub fn filter_view(
     if snapshot.revision != expected || snapshot.layout_version != layout {
         return Err("Stale view request".into());
     }
-    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     // Known nodes: those of the view with nothing hidden (a compacting filter leaves the hidden out of the view).
     let mut shown_all = snapshot.options.clone();
     shown_all.hidden = Hidden::default();
@@ -57,7 +57,7 @@ pub fn scene_of(snapshot: &Snapshot) -> Result<Scene, String> {
 /// Leaves out of `scene` what the snapshot's view hides. The bounds stay, so that the drawing does not jump.
 fn hide(snapshot: &Snapshot, scene: &mut Scene) -> Result<(), String> {
     let hidden = &snapshot.options.hidden;
-    let canonical = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     // The whole view (with the containers it adds), and the nodes it shows now.
     let view = crate::structured(canonical, &snapshot.options)?;
     let parent: BTreeMap<&str, Option<&str>> = view

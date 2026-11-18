@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 /// The decisions a snapshot carries. The source graph is the one the user edited; a collapsed view reads from it too.
 pub fn intent_of(snapshot: &Snapshot) -> Intent {
-    let graph = snapshot.source_graph.as_ref().unwrap_or(&snapshot.graph);
+    let graph = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let options = &snapshot.options;
     Intent {
         pins: options.pins.clone(),
@@ -48,8 +48,9 @@ pub fn restore_intent(
     }
     let mut source = snapshot
         .source_graph
-        .clone()
-        .unwrap_or_else(|| snapshot.graph.clone());
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
     let known: BTreeSet<&str> = source.nodes.iter().map(|n| n.id.as_str()).collect();
     let unknown = intent
         .pins
@@ -89,7 +90,7 @@ pub fn restore_intent(
     super::validate_order_hints(&source, &options.order_hints)?;
 
     let mut changed = snapshot.clone();
-    changed.source_graph = Some(source);
+    changed.source_graph = Some(source.into());
     changed.collapsed_ids = intent.collapsed_ids.clone();
     changed.gesture = None;
     recompute_layout(&changed, &options, None)

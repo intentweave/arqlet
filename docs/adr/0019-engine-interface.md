@@ -129,7 +129,12 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    is one long-running process with one JSON message per line; the playground backend serves it at `/api/session` with
    random keys, one message at a time, a time limit per message (it restarts the process; the sessions are lost and
    answered as unknown) and at most 32 sessions; `httpRun` is its `run` in JavaScript. Open: a size limit in bytes for
-   the sessions; deltas instead of whole scenes. Measured
+   the sessions; deltas instead of whole scenes.
+   *Prepared source (2026-11-18):* the snapshot shares its source graph (`Arc<Graph>`) and keeps the view's structure
+   (`Snapshot.structure`, not serialized: groups, communities and rests, keyed by the source and the options they depend
+   on), so a session's toggle does not copy, structure and validate the whole source again; at 1 000 000 nodes 8.5 s →
+   3.8 s per toggle, byte-identical ([results](../../benchmarks/results/sessions-prepared-20261118.md)). Open: an index of
+   the structured graph (interned ids) for the projection. Measured
    ([results](../../benchmarks/results/protocol-resident-20261112.md)): a trace 20–30× and a scene 4–6× faster in the
    browser path, an edit with its scene 1.2–1.6× (its time is layout work).
 4. **Columnar results**: positions and routes as typed arrays from a session, zero-copy in the browser; the overview

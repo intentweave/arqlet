@@ -151,7 +151,7 @@ fn laid_out(document: &ReferenceDocument, keep_pins: bool) -> Result<Snapshot, S
         options.pins.clear();
     }
     let mut snapshot = arqlet_layout::compute(&graph, None, &BTreeSet::new(), &options)?;
-    snapshot.source_graph = Some(input.graph.clone());
+    snapshot.source_graph = Some(input.graph.clone().into());
     snapshot.collapsed_ids = input.collapsed_ids.clone();
     Ok(snapshot)
 }
