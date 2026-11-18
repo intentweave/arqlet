@@ -60,12 +60,14 @@ pub fn initial_collapse(graph: &Graph, budget: usize) -> BTreeSet<String> {
 /// budgets; one that does not fit stays collapsed, and the next is tried. Those in `fixed` stay collapsed. The edges are
 /// counted as the projection draws them with merged pairs (`arqlet_view::merge_aggregated_pairs`): an edge between two
 /// nodes shown as themselves each, one edge per unordered pair of ends of which one is a collapsed container, and none
-/// inside a collapsed container. Unresolved edges are left out.
+/// inside a collapsed container; with `lift` (`LayoutOptions::lift_edges`) an edge between ends that are not siblings counts
+/// as a pair of the outermost containers they differ in (`arqlet_view::lift_edges`). Unresolved edges are left out.
 pub fn level_budget_collapse(
     graph: &Graph,
     fixed: &BTreeSet<String>,
     nodes: usize,
     edges: usize,
+    lift: bool,
 ) -> BTreeSet<String> {
     let index: BTreeMap<&str, usize> = graph
         .nodes
@@ -85,6 +87,30 @@ pub fn level_budget_collapse(
         }
     }
     let container = |i: usize| !children[i].is_empty();
+    // The ends an edge between `a` and `b` is drawn between: with `lift`, those of ends that are not siblings moved up to
+    // the children of their lowest common container (not when one lies inside the other).
+    let path = |i: usize| {
+        let mut out = vec![i];
+        let mut at = parent[i];
+        while let Some(p) = at {
+            out.push(p);
+            at = parent[p];
+        }
+        out.reverse();
+        out
+    };
+    let drawn = |(a, b): (usize, usize)| {
+        if !lift || parent[a] == parent[b] {
+            return (a, b);
+        }
+        let (pa, pb) = (path(a), path(b));
+        let common = pa.iter().zip(&pb).take_while(|(x, y)| x == y).count();
+        if common == pa.len() || common == pb.len() {
+            (a, b)
+        } else {
+            (pa[common], pb[common])
+        }
+    };
     let mut open = vec![false; graph.nodes.len()];
     // What shows a node: its outermost ancestor (or itself) that is a collapsed container, else itself.
     let shown = |open: &[bool], i: usize| {
@@ -137,7 +163,7 @@ pub fn level_budget_collapse(
     };
     for (k, &(s, t)) in ends.iter().enumerate() {
         let u = (shown(&open, s), shown(&open, t));
-        count((s, t), u, &mut plain, &mut pairs, true);
+        count((s, t), drawn(u), &mut plain, &mut pairs, true);
         by_unit.entry(u.0).or_default().push(k);
         if u.1 != u.0 {
             by_unit.entry(u.1).or_default().push(k);
@@ -170,15 +196,15 @@ pub fn level_budget_collapse(
         for &k in &touched {
             let before = units[k];
             let now = (shown(&open, ends[k].0), shown(&open, ends[k].1));
-            count(ends[k], before, &mut plain, &mut pairs, false);
-            count(ends[k], now, &mut plain, &mut pairs, true);
+            count(ends[k], drawn(before), &mut plain, &mut pairs, false);
+            count(ends[k], drawn(now), &mut plain, &mut pairs, true);
             changes.push((k, now));
         }
         if plain + pairs.len() > edges {
             // Too many edges: closed again.
             for &(k, now) in changes.iter().rev() {
-                count(ends[k], now, &mut plain, &mut pairs, false);
-                count(ends[k], units[k], &mut plain, &mut pairs, true);
+                count(ends[k], drawn(now), &mut plain, &mut pairs, false);
+                count(ends[k], drawn(units[k]), &mut plain, &mut pairs, true);
             }
             open[c] = false;
             continue;
@@ -402,21 +428,30 @@ mod tests {
         let none = BTreeSet::new();
         // Nodes as `initial_collapse`; the result names every container left closed, inner ones too.
         assert_eq!(
-            level_budget_collapse(&g, &none, 2, usize::MAX),
+            level_budget_collapse(&g, &none, 2, usize::MAX, false),
             set(&["A", "B", "A1"])
         );
-        assert_eq!(level_budget_collapse(&g, &none, 5, usize::MAX), set(&["B"]));
-        assert!(level_budget_collapse(&g, &none, 100, usize::MAX).is_empty());
+        assert_eq!(
+            level_budget_collapse(&g, &none, 5, usize::MAX, false),
+            set(&["B"])
+        );
+        assert!(level_budget_collapse(&g, &none, 100, usize::MAX, false).is_empty());
         // A named container stays closed, and the budget goes to the next.
         assert_eq!(
-            level_budget_collapse(&g, &set(&["A"]), 5, usize::MAX),
+            level_budget_collapse(&g, &set(&["A"]), 5, usize::MAX, false),
             set(&["A", "A1"])
         );
         // Edges: closed, e1 and e2 lie inside A and none is drawn; B holds no edge and opens at any budget. Opening A draws
         // e1 and the pair a2-A1 (two edges); opening A1 then draws e2 as itself, still two.
-        assert_eq!(level_budget_collapse(&g, &none, 100, 0), set(&["A", "A1"]));
-        assert_eq!(level_budget_collapse(&g, &none, 100, 1), set(&["A", "A1"]));
-        assert!(level_budget_collapse(&g, &none, 100, 2).is_empty());
+        assert_eq!(
+            level_budget_collapse(&g, &none, 100, 0, false),
+            set(&["A", "A1"])
+        );
+        assert_eq!(
+            level_budget_collapse(&g, &none, 100, 1, false),
+            set(&["A", "A1"])
+        );
+        assert!(level_budget_collapse(&g, &none, 100, 2, false).is_empty());
     }
 
     #[test]
@@ -451,21 +486,26 @@ mod tests {
                 edge("e10", "z", "p1")
             ]),
         );
-        for budget in 0..12 {
-            let collapsed = level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, budget);
-            let projected = arqlet_view::project(&g, &collapsed).unwrap();
+        for (budget, lift) in (0..12).flat_map(|b| [(b, false), (b, true)]) {
+            let lifted = |p: Graph| if lift { arqlet_view::lift_edges(p) } else { p };
+            let collapsed = level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, budget, lift);
+            let projected = lifted(arqlet_view::project(&g, &collapsed).unwrap());
             let (drawn, _) = arqlet_view::merge_aggregated_pairs(&g, projected);
-            let closed = level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, 0);
-            let (start, _) =
-                arqlet_view::merge_aggregated_pairs(&g, arqlet_view::project(&g, &closed).unwrap());
+            let closed = level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, 0, lift);
+            let (start, _) = arqlet_view::merge_aggregated_pairs(
+                &g,
+                lifted(arqlet_view::project(&g, &closed).unwrap()),
+            );
             assert!(
                 drawn.edges.len() <= budget.max(start.edges.len()),
-                "budget {budget}: {} drawn",
+                "budget {budget}, lift {lift}: {} drawn",
                 drawn.edges.len()
             );
         }
         // Without a limit everything opens and all ten edges are drawn.
-        assert!(level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, usize::MAX).is_empty());
+        assert!(
+            level_budget_collapse(&g, &BTreeSet::new(), usize::MAX, usize::MAX, false).is_empty()
+        );
     }
 
     #[test]

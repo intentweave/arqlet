@@ -121,6 +121,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
   equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
 - `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
+- `liftEdges` (provisional, off): an edge whose ends are not siblings is drawn between the outermost containers its ends
+  differ in, and the edges of one pair of containers as one route with their weights in both directions; edges between
+  siblings stay. synthetic-20k with `levelOfDetail: {nodes: 300}`: 1 126 instead of 7 730 drawn edges, no line–node hits
+  instead of 10 775, 33 940 crossings instead of 8.4 million, 1.6 s instead of 7.2 s
+  ([results](benchmarks/results/lift-edges-20261118.md)).
 - `levelOfDetail` takes a budget (provisional): `nodes` and `edges` bound the first view of an import, which opens
   containers level by level while it stays within both; edges are counted as drawn (one per pair of collapsed ends). With
   `nodes` and no `communities`, containers with more children than the budget are divided into communities, so a flat

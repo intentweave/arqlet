@@ -1,0 +1,12 @@
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"nodes":300}},"boxes":298,"edges":7730,"delegated":7324,"lineNodeHits":10775,"crossings":8410185,"bends":15328,"area":4833896394.03469,"ms":7188}
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"nodes":300},"liftEdges":true},"boxes":298,"edges":1126,"delegated":2,"lineNodeHits":0,"crossings":33940,"bends":3412,"area":707709910.875,"ms":1579}
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"nodes":1000}},"boxes":999,"edges":10463,"delegated":8092,"lineNodeHits":17237,"crossings":10374118,"bends":24747,"area":18620655473.044575,"ms":11229}
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"nodes":1000},"liftEdges":true},"boxes":999,"edges":2727,"delegated":3,"lineNodeHits":0,"crossings":34150,"bends":6708,"area":3547031952.9375,"ms":1498}
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"depth":1}},"boxes":311,"edges":8072,"delegated":7644,"lineNodeHits":14108,"crossings":9200547,"bends":16014,"area":4895571577.62096,"ms":7496}
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"depth":1},"liftEdges":true},"boxes":311,"edges":1147,"delegated":2,"lineNodeHits":0,"crossings":33944,"bends":3448,"area":748961717.125,"ms":1024}
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"depth":2}},"boxes":2470,"edges":15063,"delegated":8599,"lineNodeHits":26455,"crossings":9980333,"bends":41923,"area":54136819541.99584,"ms":13473}
+{"graph":"synthetic-20k","options":{"levelOfDetail":{"depth":2},"liftEdges":true},"boxes":2470,"edges":6027,"delegated":1,"lineNodeHits":0,"crossings":34623,"bends":13476,"area":19102376886.5625,"ms":2342}
+{"graph":"synthetic-20k (flat)","options":{"levelOfDetail":{"nodes":300}},"boxes":300,"edges":6904,"delegated":6581,"lineNodeHits":7326,"crossings":6583782,"bends":13668,"area":6809589117.974405,"ms":21488}
+{"graph":"synthetic-20k (flat)","options":{"levelOfDetail":{"nodes":300},"liftEdges":true},"boxes":300,"edges":2409,"delegated":478,"lineNodeHits":329,"crossings":378501,"bends":7620,"area":1442875120.5,"ms":3731}
+{"graph":"synthetic-20k (flat)","options":{"levelOfDetail":{"nodes":1000}},"boxes":1000,"edges":10375,"delegated":9004,"lineNodeHits":20550,"crossings":11454987,"bends":20655,"area":15194050146.893097,"ms":31344}
+{"graph":"synthetic-20k (flat)","options":{"levelOfDetail":{"nodes":1000},"liftEdges":true},"boxes":1000,"edges":3605,"delegated":194,"lineNodeHits":33,"crossings":338375,"bends":10927,"area":5096734708.28125,"ms":6273}

@@ -1974,6 +1974,12 @@ pub struct LayoutOptions {
     /// containers that `communities` and `groups` add, which start collapsed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub level_of_detail: Option<LevelOfDetail>,
+    /// Provisional: an edge between nodes in different containers is drawn between the outermost containers its ends
+    /// differ in, and those of one pair of containers as one route with their weights (as between collapsed containers);
+    /// edges between siblings stay as they are. A view of many open groups with dense traffic between them draws one route
+    /// per pair of groups instead of one per edge. Off by default (omitted).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub lift_edges: bool,
     /// Provisional (view state, set by `filter`): what the view hides, keeping the place of the rest. Omitted when empty.
     #[serde(default, skip_serializing_if = "Hidden::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Hidden>"))]
@@ -2179,6 +2185,7 @@ impl Default for LayoutOptions {
             communities: 0,
             groups: BTreeMap::new(),
             level_of_detail: None,
+            lift_edges: false,
             hidden: Hidden::default(),
             community_hubs: CommunityHubs::default(),
             renamed_initial_collapse: (),
