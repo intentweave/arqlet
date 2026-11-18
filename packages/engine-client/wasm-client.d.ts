@@ -16,7 +16,12 @@ export type EngineResponse =
  * snapshot stays in the engine: its requests leave the snapshot out, and its answers bring the scene.
  */
 export type Run = ((request: EngineRequest) => EngineResponse) & {
-  openSession?: () => {run(request: EngineRequest): EngineResponse; close(): void};
+  openSession?: () => {
+    run(request: EngineRequest): EngineResponse;
+    close(): void;
+    /** Provisional (step 4): the scene as columns; the numbers are views into the module's memory, valid until the next request. */
+    columns?(): import('./columns.js').SceneColumns;
+  };
 };
 
 export interface CreateEngineOptions {

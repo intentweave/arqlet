@@ -1,4 +1,5 @@
 import type {Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
+import type {SceneColumns} from './columns.js';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
@@ -67,6 +68,12 @@ export interface Session {
   filter(hide?: Hidden): Promise<SessionResult>;
   /** The scene of the current snapshot, computed once per snapshot. Throws the engine's error. */
   scene(): Promise<Scene>;
+  /**
+   * Provisional (ADR 0019, step 4): the scene of the current snapshot as columns. In a resident WASM session called
+   * directly, the arrays are views into the engine's memory, valid until the next request to the session (copy what
+   * you keep); through a worker they are copies transferred once; otherwise they are built from the scene.
+   */
+  columns(): Promise<SceneColumns>;
   /** The whole snapshot: the current one, or with `resident` the one the engine keeps (for saving or hand-over). */
   exportSnapshot(): Promise<Snapshot | null>;
   /** Whether the snapshot stays in the engine. */
@@ -79,6 +86,8 @@ export interface Session {
 export interface ResidentSession {
   run(request: EngineRequest): EngineResponse | Promise<EngineResponse>;
   close(): unknown;
+  /** Provisional (ADR 0019, step 4): the scene as columns, where the engine keeps them (WASM, a worker). */
+  columns?(): SceneColumns | Promise<SceneColumns>;
 }
 
 /** Creates a session on an engine `run`, synchronous (`loadEngine`) or asynchronous (`workerRun`). */

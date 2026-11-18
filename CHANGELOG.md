@@ -5,6 +5,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
+  the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads
+  them as views into WASM memory, as transferred copies from a worker, or builds them from the scene for a backend
+  (`columnsOfScene`). WASM export `lw_session_column`. Not measured against the JSON scene yet.
+
 ### Changed
 
 - **Default:** `sharedBorderRanks` and `alignStacked` are on: free space beside stacked containers. In a container across

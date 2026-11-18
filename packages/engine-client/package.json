@@ -47,6 +47,10 @@
       "types": "./session.d.ts",
       "default": "./session.js"
     },
+    "./columns.js": {
+      "types": "./columns.d.ts",
+      "default": "./columns.js"
+    },
     "./worker.js": "./worker.js",
     "./arqlet.wasm": "./arqlet.wasm"
   },
@@ -56,11 +60,13 @@
     "presets.js",
     "elk.js",
     "session.js",
+    "columns.js",
     "engine.d.ts",
     "wasm-client.d.ts",
     "presets.d.ts",
     "elk.d.ts",
     "session.d.ts",
+    "columns.d.ts",
     "worker.js",
     "arqlet.wasm",
     "README.md",

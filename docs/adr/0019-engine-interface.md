@@ -134,6 +134,16 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    browser path, an edit with its scene 1.2–1.6× (its time is layout work).
 4. **Columnar results**: positions and routes as typed arrays from a session, zero-copy in the browser; the overview
    moves onto the same buffers.
+   *Done in part (2026-11-18):* the `columns` request of a session (`arqlet_runtime::columns::SceneColumns`) answers
+   with the id tables and each column's name, type and length, and keeps the numbers in the session until its snapshot
+   changes: node bounds (`f32`, x y width height), parent index, flags, route ends as node indices, weight, flags, route
+   offsets and one array of route points. WASM: `lw_session_column(id, index)` gives a column's address, and
+   `openSession().columns()` returns typed-array views into the module's memory (no copy; valid until the next request
+   or a growth of the memory). In the worker the columns are copied once and transferred (`postMessage` with a transfer
+   list). `createSession().columns()` falls back to `columnsOfScene(scene)` where the engine keeps no columns (backend,
+   `resident: false`); a test checks that engine and fallback give the same arrays. Coordinates are `f32`. Not done: ports,
+   labels, rows and conflicts as columns; the overview does not use these buffers yet; no measurement against the JSON
+   scene (size, time) exists, so nothing here claims a speedup.
 5. **Columnar input and binary frames** between backend and browser, if step 2 shows that parsing or transfer
    dominates.
 6. **Optional shared memory** (`SharedArrayBuffer`) for live positions and progressive publications, behind a capability

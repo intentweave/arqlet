@@ -11,7 +11,10 @@
 //!   snapshot; `expectedRevision` and `expectedLayoutVersion` default to the session's own, and a request that names
 //!   other ones is refused as stale;
 //! - `scene`, `trace`, `neighbourhood`, `intent`: read the session's snapshot;
-//! - `export`: the whole snapshot.
+//! - `export`: the whole snapshot;
+//! - `columns` (provisional, step 4): the scene as columns (`columns::SceneColumns`). The answer lists the id tables and
+//!   each column's name, type and length; the numbers stay in the session (`EngineSession::columns`, in WASM
+//!   `lw_session_column`) until the snapshot changes.
 //!
 //! Answers to `import`, `load` and the operations: `{ok, revision, layoutVersion, collapsedIds, scene}` (`"scene": false`
 //! in the request leaves the scene out).
@@ -28,6 +31,8 @@ use serde_json::{json, Value};
 #[derive(Default)]
 pub struct EngineSession {
     snapshot: Option<Snapshot>,
+    /// The scene as columns, built by a `columns` request; dropped when the snapshot changes.
+    columns: Option<crate::columns::SceneColumns>,
     overview: crate::overview::OverviewSession,
 }
 
@@ -45,6 +50,13 @@ impl EngineSession {
     /// Starts the session on a snapshot (a hand-over from another engine, or a saved one).
     pub fn load(&mut self, snapshot: Snapshot) {
         self.snapshot = Some(snapshot);
+        self.columns = None;
+    }
+
+    /// The scene's columns of the last `columns` request, valid until the snapshot changes (provisional, ADR 0019
+    /// step 4). A host that views them as memory must not keep the view across a change of this session.
+    pub fn columns(&self) -> Option<&crate::columns::SceneColumns> {
+        self.columns.as_ref()
     }
 
     /// Runs one request given as JSON text and answers as JSON text.
@@ -74,7 +86,18 @@ impl EngineSession {
                 let snapshot: Snapshot =
                     serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
                 self.snapshot = Some(snapshot);
+                self.columns = None;
                 self.summary(with_scene)
+            }
+            // Provisional (ADR 0019, step 4): the scene as columns. The answer describes them (versions, id tables,
+            // name, type and length of each column); the numbers stay in the session, see `columns()`.
+            Some("columns") => {
+                let scene = crate::filter::scene_of(self.current()?)?;
+                let columns = crate::columns::SceneColumns::from_scene(&scene);
+                let mut answer = columns.describe();
+                answer["ok"] = json!(true);
+                self.columns = Some(columns);
+                Ok(answer)
             }
             Some("export") => Ok(json!({"ok": true, "snapshot": self.current()?})),
             Some("scene") => Ok(json!({"ok": true, "scene": scene_of(self.current()?)?})),
@@ -133,6 +156,7 @@ impl EngineSession {
         match response {
             Response::Snapshot(snapshot) => {
                 self.snapshot = Some(*snapshot);
+                self.columns = None;
                 self.summary(with_scene)
             }
             Response::Error(e) => Err(e),
@@ -208,6 +232,74 @@ mod tests {
         assert_eq!(toggled["scene"], scene(&by_dispatch["snapshot"]));
         let exported = session.run_value(&json!({"op": "export"}));
         assert_eq!(exported["snapshot"], by_dispatch["snapshot"]);
+    }
+
+    /// The columns hold what the scene's JSON holds (as `f32`), in the scene's order, and are dropped by a change.
+    #[test]
+    fn columns_match_the_scene_and_end_with_a_change() {
+        let mut session = EngineSession::new();
+        let first = session.run_value(&json!({"op": "import", "graph": fixture(), "limit": 100}));
+        let scene = &first["scene"];
+        assert!(session.columns().is_none());
+        let described = session.run_value(&json!({"op": "columns"}));
+        assert_eq!(described["ok"], json!(true), "{described}");
+        let c = session.columns().expect("columns kept");
+        let nodes = scene["nodes"].as_array().unwrap();
+        let routes = scene["routes"].as_array().unwrap();
+        assert!(!nodes.is_empty() && !routes.is_empty());
+        assert_eq!(c.node_ids.len(), nodes.len());
+        assert_eq!(c.node_bounds.len(), nodes.len() * 4);
+        for (i, n) in nodes.iter().enumerate() {
+            assert_eq!(c.node_ids[i], n["id"].as_str().unwrap());
+            for (k, key) in ["x", "y", "width", "height"].iter().enumerate() {
+                assert_eq!(
+                    c.node_bounds[i * 4 + k],
+                    n["bounds"][key].as_f64().unwrap() as f32
+                );
+            }
+            let parent = n["parentId"]
+                .as_str()
+                .and_then(|p| nodes.iter().position(|m| m["id"] == p));
+            assert_eq!(
+                c.node_parent[i],
+                parent.map_or(crate::columns::NONE, |p| p as u32)
+            );
+            assert_eq!(
+                c.node_flags[i] & crate::columns::FLAG_CONTAINER != 0,
+                n["container"] == json!(true)
+            );
+        }
+        assert_eq!(c.route_offsets.len(), routes.len() + 1);
+        for (i, r) in routes.iter().enumerate() {
+            let points = r["points"].as_array().unwrap();
+            let (a, b) = (c.route_offsets[i] as usize, c.route_offsets[i + 1] as usize);
+            assert_eq!(b - a, points.len());
+            for (k, p) in points.iter().enumerate() {
+                assert_eq!(c.route_points[(a + k) * 2], p["x"].as_f64().unwrap() as f32);
+                assert_eq!(
+                    c.route_points[(a + k) * 2 + 1],
+                    p["y"].as_f64().unwrap() as f32
+                );
+            }
+            let end = |id: &str| {
+                nodes
+                    .iter()
+                    .position(|m| m["id"] == id)
+                    .map_or(crate::columns::NONE, |p| p as u32)
+            };
+            assert_eq!(c.route_source[i], end(r["source"].as_str().unwrap()));
+            assert_eq!(c.route_target[i], end(r["target"].as_str().unwrap()));
+        }
+        // The description names every column with its length.
+        let listed = described["columns"].as_array().unwrap();
+        assert_eq!(listed.len(), c.columns().len());
+        assert_eq!(listed[0]["name"], json!("nodeBounds"));
+        assert_eq!(listed[0]["length"], json!(nodes.len() * 4));
+        // The same view gives the same columns again; a change drops them.
+        let again = session.run_value(&json!({"op": "columns"}));
+        assert_eq!(again, described);
+        session.run_value(&json!({"op": "toggle", "nodeId": "root", "scene": false}));
+        assert!(session.columns().is_none());
     }
 
     #[test]
