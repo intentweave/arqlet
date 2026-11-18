@@ -4,27 +4,60 @@ use std::collections::{BTreeMap, BTreeSet};
 pub fn project(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, String> {
     validate(source)?;
     let nodes: BTreeMap<_, _> = source.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+    // The containers, once: a search of all nodes for every collapsed id was quadratic.
+    let parents: BTreeSet<&str> = source
+        .nodes
+        .iter()
+        .filter_map(|n| n.parent_id.as_deref())
+        .collect();
     for id in collapsed {
-        if !nodes.contains_key(id.as_str())
-            || !source
-                .nodes
-                .iter()
-                .any(|n| n.parent_id.as_ref() == Some(id))
-        {
+        if !nodes.contains_key(id.as_str()) || !parents.contains(id.as_str()) {
             return Err(format!("Not a container: {id}"));
         }
     }
-    let owner = |id: &str| {
-        let mut current = nodes[id].parent_id.as_deref();
-        let mut visible = id.to_string();
-        while let Some(p) = current {
-            if collapsed.contains(p) {
-                visible = p.into();
+    // What shows each node: its outermost collapsed ancestor, else itself; computed once per node from its parent's (a walk
+    // to the root for every node and edge end compared ids at every step, which took seconds on graphs of 300 000 nodes).
+    let index: BTreeMap<&str, usize> = source
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+    let parent: Vec<Option<usize>> = source
+        .nodes
+        .iter()
+        .map(|n| n.parent_id.as_deref().map(|p| index[p]))
+        .collect();
+    let closed: Vec<bool> = source
+        .nodes
+        .iter()
+        .map(|n| collapsed.contains(&n.id))
+        .collect();
+    let mut outer: Vec<Option<Option<usize>>> = vec![None; source.nodes.len()];
+    for start in 0..source.nodes.len() {
+        let mut chain = Vec::new();
+        let mut at = start;
+        while outer[at].is_none() {
+            chain.push(at);
+            match parent[at] {
+                Some(p) => at = p,
+                None => break,
             }
-            current = nodes[p].parent_id.as_deref();
         }
-        visible
-    };
+        for &i in chain.iter().rev() {
+            outer[i] = Some(parent[i].and_then(|p| {
+                outer[p]
+                    .expect("parent resolved first")
+                    .or(closed[p].then_some(p))
+            }));
+        }
+    }
+    let shown: Vec<usize> = outer
+        .iter()
+        .enumerate()
+        .map(|(i, o)| o.expect("every node resolved").unwrap_or(i))
+        .collect();
+    let owner = |id: &str| source.nodes[shown[index[id]]].id.clone();
     let visible: BTreeSet<_> = source
         .nodes
         .iter()
@@ -50,12 +83,13 @@ pub fn project(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, St
         })
         .collect();
     graph.ports.retain(|port| visible.contains(&port.node_id));
+    let (old_edges, new_edges) = (first_by_id(&source.edges), first_by_id(&graph.edges));
     graph.edge_ports = source
         .edge_ports
         .iter()
         .filter_map(|b| {
-            let old = source.edges.iter().find(|e| e.id == b.edge_id)?;
-            let new = graph.edges.iter().find(|e| e.id == b.edge_id)?;
+            let old = *old_edges.get(b.edge_id.as_str())?;
+            let new = *new_edges.get(b.edge_id.as_str())?;
             let mut binding = b.clone();
             if old.source != new.source {
                 binding.source_port = None;
@@ -68,6 +102,15 @@ pub fn project(source: &Graph, collapsed: &BTreeSet<String>) -> Result<Graph, St
         .collect();
     validate(&graph)?;
     Ok(graph)
+}
+
+/// The first edge of each id, as a search from the front finds it.
+fn first_by_id(edges: &[Edge]) -> BTreeMap<&str, &Edge> {
+    let mut by: BTreeMap<&str, &Edge> = BTreeMap::new();
+    for e in edges {
+        by.entry(e.id.as_str()).or_insert(e);
+    }
+    by
 }
 
 /// Provisional (global layering, iteration 1): the projection with the edges that a collapsed container aggregates drawn
