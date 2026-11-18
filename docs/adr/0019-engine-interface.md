@@ -1,7 +1,7 @@
 # ADR 0019: An own engine interface: typed operations, sessions in Rust and JavaScript, a columnar data path
 
 Date: 2026-11-12.
-Status: accepted (2026-11-12); step 1 implemented in part (see Steps).
+Status: accepted (2026-11-12); steps 1 and 3 implemented in part, step 2 and 4 done (see Steps).
 
 Related: [ADR 0006](0006-reactive-layout-session.md) (reactive sessions), [ADR 0008](0008-engine-client-viewer-boundaries.md)
 (engine, client, viewer), [ADR 0018](0018-cluster-overview.md) (cluster overview).
@@ -134,6 +134,33 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    browser path, an edit with its scene 1.2–1.6× (its time is layout work).
 4. **Columnar results**: positions and routes as typed arrays from a session, zero-copy in the browser; the overview
    moves onto the same buffers.
+   *Done (2026-11-18):* the `columns` request of a session (`arqlet_runtime::columns::SceneColumns`) answers
+   with the id tables and each column's name, type and length, and keeps the numbers in the session until its snapshot
+   changes: node bounds (`f32`, x y width height), parent index, flags, kind and shape, route ends as node indices, weight, flags,
+   route offsets and one array of route points, and the rest of the scene the same way: ports (node, edge, flags, side,
+   position), boundary crossings, placed labels, rows (with their node), conflicts (kind, and the nodes and routes each
+   names as indices behind offsets, `NONE` for one outside the scene) and junctions. Strings are kept once in tables
+   (ids, labels, texts, kinds, reasons; the edges that ports and crossings name), the extent, `showPorts` and the buses
+   stay in the JSON description. WASM: `lw_session_column(id, index)` gives a column's address, and
+   `openSession().columns()` returns typed-array views into the module's memory (no copy; valid until the next request
+   or a growth of the memory). In the worker the columns are copied once and transferred (`postMessage` with a transfer
+   list). `createSession().columns()` falls back to `columnsOfScene(scene)` where the engine keeps no columns (backend,
+   `resident: false`); a test checks that engine and fallback give the same arrays. Coordinates are `f32`.
+   The overview uses the same path: a session's `overview` request with `columns: true` keeps `x`, `y`, `r`, `parent`,
+   `kind`, `edges` and `links` as columns (`OverviewColumns`; a continuation with `positionsOnly` only `x`, `y`, `r`),
+   `lw_session_overview_column`, `createOverviewSession(run, {columns: true})` (opt-in: typed arrays index like arrays,
+   but JSON cannot carry them, so a host that sends positions back as `start` gets plain arrays made for it). Positions
+   stay `f64`; a test compares the numbers with the JSON answer and the viewer's model and vertex buffers from both.
+   **Measured** ([results](../../benchmarks/results/columns-20261118.md), load 4 to 2 on the machine, one run per size): the
+   scene is 3.3–3.7 times smaller as columns (the strings, a quarter of the column side, cap it), and 8.2–8.6 times faster
+   to the page in a small view (the transfer dominates there) and 1.8–1.9 times in a full one (the engine's own work
+   dominates). The overview's continuation is 1.7 times faster at 10 000 and 100 000 nodes, but its answer is 25–34 % larger in bytes (JSON positions are rounded to
+   hundredths); the whole answer is layout time and shows no effect. So columns buy time, not bytes, and the binary
+   frame of step 5 should weigh `i32` hundredths for positions. The SVG viewer takes columns (`renderSvg(host, columns)`
+   through `sceneOfColumns`; same markup as from the scene, tested). Drawn in Chrome (load 18.7, not quiet), the saving
+   is the engine call (small view 15.6 → 3.4 ms, 10 000 boxes 617 → 456 ms) and the page's total 1.4 times and 7 %
+   less; drawing itself is DOM work (158 000 elements, 550 ms with paint) and does not change, and the conversion costs
+   0.4 and 6.7 ms, so the viewer does not read the columns by index.
 5. **Columnar input and binary frames** between backend and browser, if step 2 shows that parsing or transfer
    dominates.
 6. **Optional shared memory** (`SharedArrayBuffer`) for live positions and progressive publications, behind a capability

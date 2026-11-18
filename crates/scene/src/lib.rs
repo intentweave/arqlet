@@ -6,7 +6,9 @@ pub mod metrics;
 pub mod quality;
 pub mod realize;
 mod scene;
-pub use scene::{build_corner_scene, build_scene, Scene, SceneConflict, SceneNode, SceneRoute};
+pub use scene::{
+    build_corner_scene, build_scene, Scene, SceneConflict, SceneNode, SceneRoute, SceneRow,
+};
 
 #[derive(Clone, Copy)]
 pub struct GeometryRules {

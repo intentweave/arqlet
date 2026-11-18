@@ -13,6 +13,7 @@ gestures.
 
 - `gesture-robustness.mjs`: gestures that end badly: a release outside the window, `pointercancel`, Escape, an engine error and a model change in the middle of a drag. After each, nothing may be left running and the next drag must work. It starts its own server and Chrome (`launch.mjs`). Against the previous `app.js`, the `pointercancel` and Escape checks fail (the node stayed 70 and 60 px away); the release outside the window passed there too, because the pointer capture caught it.
 - `latency.mjs`: pointer-to-preview and release-to-result times of a drag, and the number of messages to the workers. Prints one JSON line; see the results in `benchmarks/results/`.
+- `overview-columns.mjs`: the cluster overview page with the box "typed arrays" (ADR 0019, step 4) off and on: both must draw the same picture (screenshots of the stage, byte for byte), and the page's own times are printed. Starts its own server and Chrome.
 - `launch.mjs`: starts the server and a headless Chrome for the scripts above (`node launch.mjs` keeps them running).
 
 A check whose precondition is missing in the draft is reported as `SKIPPED`, never as a pass.

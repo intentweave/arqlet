@@ -570,6 +570,93 @@ fn a_session_answers_only_what_moves_while_the_clusters_stay() {
     assert!(other["overview"].get("positionsOnly").is_none());
 }
 
+/// The numbers of a columnar overview answer are those of the JSON answer to the same request, and the rest of it stays
+/// as it was (provisional, ADR 0019 step 4).
+#[test]
+fn a_columnar_overview_equals_the_json_overview() {
+    use arqlet_runtime::columns::Column;
+    use arqlet_runtime::engine_session::EngineSession;
+    let graph = hierarchical(4, 3, 6);
+    let options = json!({"communities": 0});
+    let mut columnar = EngineSession::new();
+    let mut plain = EngineSession::new();
+    let first = json!({"op": "overview", "graph": graph, "options": options});
+    let mut asked = first.clone();
+    asked["columns"] = json!(true);
+    let whole = plain.run_value(&first)["overview"].clone();
+    let answer = columnar.run_value(&asked);
+    assert_eq!(answer["ok"], true, "{answer}");
+    let meta = &answer["overview"];
+    let columns = columnar.overview_columns().expect("columns kept");
+    let numbers = |name: &str| -> Value {
+        match columns
+            .columns()
+            .into_iter()
+            .find(|(n, _)| *n == name)
+            .unwrap()
+            .1
+        {
+            Column::F64(c) => json!(c),
+            Column::U32(c) => json!(c),
+            Column::I32(c) => json!(c),
+            Column::F32(c) => json!(c),
+        }
+    };
+    for key in ["x", "y", "r", "parent", "kind", "edges", "links"] {
+        assert!(
+            meta.get(key).is_none(),
+            "{key} is a column, not in the answer"
+        );
+        assert_eq!(numbers(key), whole[key], "{key}");
+    }
+    for key in [
+        "schemaVersion",
+        "representation",
+        "ids",
+        "labels",
+        "kinds",
+        "rootRadius",
+        "stats",
+    ] {
+        assert_eq!(meta[key], whole[key], "{key}");
+    }
+    let listed: Vec<_> = meta["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["name"].clone())
+        .collect();
+    assert_eq!(
+        listed,
+        json!(["x", "y", "r", "parent", "kind", "edges", "links"])
+            .as_array()
+            .unwrap()
+            .clone()
+    );
+    // A continuation on the same clusters with positionsOnly: three columns, equal to the whole answer's.
+    let next = json!({"op": "overview", "options": options, "radii": {"g1": 120.0}, "start": {}});
+    let mut moved_request = next.clone();
+    moved_request["columns"] = json!(true);
+    moved_request["positionsOnly"] = json!(true);
+    let moved = columnar.run_value(&moved_request);
+    assert_eq!(moved["overview"]["positionsOnly"], true, "{moved}");
+    assert!(moved["overview"].get("ids").is_none());
+    let twin_whole = plain.run_value(&next)["overview"].clone();
+    let columns = columnar.overview_columns().unwrap();
+    assert_eq!(columns.columns().len(), 3);
+    assert!(columns.column(3).is_none());
+    for (name, column) in columns.columns() {
+        let Column::F64(c) = column else {
+            panic!("{name}")
+        };
+        assert_eq!(json!(c), twin_whole[name], "{name}");
+    }
+    assert_eq!(moved["overview"]["rootRadius"], twin_whole["rootRadius"]);
+    // A request without columns drops them.
+    columnar.run_value(&json!({"op": "overview", "options": options}));
+    assert!(columnar.overview_columns().is_none());
+}
+
 #[test]
 fn paths_and_neighbourhoods_on_the_overview_graph() {
     use arqlet_runtime::engine_session::EngineSession;

@@ -2,6 +2,7 @@
 #[cfg(test)]
 use arqlet_model::math::PortableMath;
 pub mod budget;
+pub mod columns;
 pub mod components;
 pub mod containers;
 pub mod coordinator;

@@ -95,3 +95,43 @@ pub unsafe extern "C" fn lw_session_run(id: u32, ptr: *const u8, len: usize) -> 
     let address = Box::into_raw(out) as *mut u8 as u64;
     (size << 32) | (address & 0xffffffff)
 }
+
+/// Provisional (ADR 0019, step 4): the memory of one column of the session's last `columns` request, as pointer (low 32
+/// bits) and length in bytes (high 32 bits). `index` is the column's position in that answer's `columns` list. The
+/// memory belongs to the session: the host must not free it, reads it as a typed-array view of the module's memory and
+/// copies it if it needs the numbers after the next request to this session (any change drops or moves them, and a
+/// growth of the module's memory detaches views: take the view again from `memory.buffer`). Answers 0 for an unknown
+/// session, a session without columns, or an unknown index.
+#[no_mangle]
+pub extern "C" fn lw_session_column(id: u32, index: u32) -> u64 {
+    SESSIONS.with(|s| {
+        let s = s.borrow();
+        let Some(columns) = s.1.get(&id).and_then(|session| session.columns()) else {
+            return 0;
+        };
+        let Some((_, column)) = columns.columns().into_iter().nth(index as usize) else {
+            return 0;
+        };
+        let (ptr, _) = column.raw();
+        let bytes = column.bytes() as u64;
+        (bytes << 32) | (ptr as u64 & 0xffffffff)
+    })
+}
+
+/// Provisional (ADR 0019, step 4): as `lw_session_column`, for the session's last `overview` request with `columns: true`
+/// (column `index` of the `columns` list in that answer's `overview`). Valid until the session's next overview request.
+#[no_mangle]
+pub extern "C" fn lw_session_overview_column(id: u32, index: u32) -> u64 {
+    SESSIONS.with(|s| {
+        let s = s.borrow();
+        let Some(column) =
+            s.1.get(&id)
+                .and_then(|session| session.overview_columns())
+                .and_then(|columns| columns.column(index as usize))
+        else {
+            return 0;
+        };
+        let (ptr, _) = column.raw();
+        ((column.bytes() as u64) << 32) | (ptr as u64 & 0xffffffff)
+    })
+}

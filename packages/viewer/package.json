@@ -33,6 +33,10 @@
       "types": "./navigation.d.ts",
       "default": "./navigation.js"
     },
+    "./scene-columns.js": {
+      "types": "./scene-columns.d.ts",
+      "default": "./scene-columns.js"
+    },
     "./scene.js": {
       "types": "./scene.d.ts",
       "default": "./scene.js"
@@ -58,6 +62,8 @@
     "svg.js",
     "navigation.js",
     "scene.js",
+    "scene-columns.js",
+    "scene-columns.d.ts",
     "react-flow.js",
     "routes.js",
     "svg.d.ts",

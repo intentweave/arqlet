@@ -344,6 +344,8 @@ pub struct OverviewSession {
     hierarchy: Option<(Value, Graph, overview::Hierarchy)>,
     /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout.
     last: Option<(Value, Value)>,
+    /// The numbers of the last answer to a request with `columns: true`; dropped by the next request.
+    columns: Option<crate::columns::OverviewColumns>,
 }
 
 impl OverviewSession {
@@ -357,9 +359,26 @@ impl OverviewSession {
         self.graph.as_ref()
     }
 
+    /// The columns of the last request with `columns: true` (provisional, ADR 0019 step 4), valid until the next request.
+    pub fn columns(&self) -> Option<&crate::columns::OverviewColumns> {
+        self.columns.as_ref()
+    }
+
     /// Answers one `overview` request (`{ok, overview}`, or `{ok: false, error}`); a refused request changes nothing.
+    /// With `"columns": true` the numeric arrays stay in the session (`columns()`) and the answer's `overview` lists them.
     pub fn run(&mut self, v: &Value, threads: usize) -> Value {
+        self.columns = None;
+        let columnar = v["columns"].as_bool() == Some(true);
         match self.overview(v, threads) {
+            Ok((overview, same)) if columnar => {
+                let columns = crate::columns::OverviewColumns::of(
+                    overview,
+                    same && v["positionsOnly"].as_bool() == Some(true),
+                );
+                let answer = json!({"ok": true, "overview": columns.describe()});
+                self.columns = Some(columns);
+                answer
+            }
             // `positionsOnly`: on the clusters of the last overview, only what moves (`OverviewPositions`); the host keeps
             // the rest from its last answer.
             Ok((overview, true)) if v["positionsOnly"].as_bool() == Some(true) => {

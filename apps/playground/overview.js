@@ -42,11 +42,12 @@ function loadSettings() {
     for (const id of [...LAYOUT, ...ZOOM]) if (saved[id] !== undefined) $(id).value = saved[id];
     if (saved.auto !== undefined) $('auto').checked = saved.auto;
     if (saved.chains !== undefined) $('chains').checked = saved.chains;
+    if (saved.columns !== undefined) $('columns').checked = saved.columns;
   } catch { /* no storage: the defaults */ }
 }
 function saveSettings() {
   try {
-    const out = {auto: $('auto').checked, chains: $('chains').checked};
+    const out = {auto: $('auto').checked, chains: $('chains').checked, columns: $('columns').checked};
     for (const id of [...LAYOUT, ...ZOOM]) out[id] = $(id).value;
     localStorage.setItem(STORE, JSON.stringify(out));
   } catch { /* no storage */ }
@@ -66,11 +67,14 @@ const execute = request => engine()(request);
 // The overview session of the mode (ADR 0019 for the overview): the graph is sent once and stays in the engine; a
 // relayout and a change of room send only what changed.
 let overviews = null, overviewsMode = null, overviewsGraph = null;
+// The numbers as typed arrays (provisional, ADR 0019 step 4): only where the engine keeps columns, the WASM worker; the
+// backend answers JSON arrays, so the box does nothing there.
+const columnar = () => $('mode').value === 'browser' && $('columns').checked;
 function overviewSession() {
-  const mode = $('mode').value;
+  const mode = `${$('mode').value}${columnar() ? ':columns' : ''}`;
   if (overviews && overviewsMode === mode) return overviews;
   overviews?.close().catch(() => {});
-  overviews = createOverviewSession(engine());
+  overviews = createOverviewSession(engine(), {columns: columnar()});
   overviewsMode = mode;
   overviewsGraph = null;
   return overviews;
@@ -171,6 +175,8 @@ async function layOut(fresh = true) {
  */
 function show(overview, keep = false, anchor = -1, showWhole = -1) {
   const next = overviewModel(overview, resolvedEdgeIds(graph));
+  // What the numbers of the model are (`Float64Array` with typed arrays, `Array` with JSON), for the browser checks.
+  document.body.dataset.numbers = overview.x.constructor.name;
   if (keep && renderer) {
     const view = renderer.view, o = model.overview, c = $('canvas');
     // One move: to the new layout and, for a cluster the user just structured, to the view that shows it whole.

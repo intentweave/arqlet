@@ -26,6 +26,20 @@ self.onmessage=async({data})=>{
    const session=sessions.get(data.session);
    if(!session)throw Error('Unknown session');
    if(data.close){session.close();sessions.delete(data.session);self.postMessage({requestId:data.requestId,ok:true});return;}
+   if(data.columns){
+    // The page cannot view this module's memory: copy each column once and hand the copies over (transferred, not cloned).
+    if(!session.columns)throw Error('This engine has no columns');
+    const result=session.columns();const transfer=[];
+    for(const [k,v] of Object.entries(result))if(ArrayBuffer.isView(v)){result[k]=v.slice();transfer.push(result[k].buffer);}
+    self.postMessage({requestId:data.requestId,ok:true,columns:result},transfer);return;
+   }
+   if(data.overview){
+    // As for the scene's columns: the numbers of the overview are copied once and transferred.
+    if(!session.overview)throw Error('This engine has no columnar overview');
+    const result=session.overview(data.request,{copy:true});const transfer=[];
+    if(result.ok)for(const v of Object.values(result.overview))if(ArrayBuffer.isView(v))transfer.push(v.buffer);
+    self.postMessage({requestId:data.requestId,...result},transfer);return;
+   }
    running=data.requestId;const result=session.run(data.request);running=null;
    self.postMessage({requestId:data.requestId,...result});return;
   }

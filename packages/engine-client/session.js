@@ -6,6 +6,8 @@
 // layout version to every change, runs changes one after the other on the newest snapshot, and never applies an answer
 // that was overtaken: after a new `import`, or `reset`, a change still under way resolves to `{ok: false, stale: true}`.
 
+import {columnsOfScene} from './columns.js';
+
 /**
  * Wraps a worker of `createEngineWorker` as an asynchronous `run`: each request gets an id, and the answer with that id
  * resolves it. Progressive publications are passed to `onPublication(requestId, message)`.
@@ -31,7 +33,18 @@ export function workerRun(worker, {onPublication} = {}) {
   run.openSession = async () => {
     const opened = await post({session: 'open'});
     if (!opened.ok) throw Error(opened.error);
-    return {run: request => post({session: opened.session, request}), close: () => post({session: opened.session, close: true})};
+    return {
+      run: request => post({session: opened.session, request}),
+      close: () => post({session: opened.session, close: true}),
+      // Provisional (ADR 0019, step 4): the columns arrive as transferred buffers, copied once in the worker.
+      columns: async () => {
+        const answer = await post({session: opened.session, columns: true});
+        if (!answer.ok) throw Error(answer.error);
+        return answer.columns;
+      },
+      // Provisional: an overview request answered with typed arrays (see `createEngine`'s `overview`).
+      overview: request => post({session: opened.session, request, overview: true}),
+    };
   };
   return run;
 }
@@ -215,6 +228,23 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
       return answer.scene;
     },
 
+    /**
+     * Provisional (ADR 0019, step 4): the scene of the current snapshot as columns (`SceneColumns`): id tables and typed
+     * arrays for bounds, parents, flags and route points. In a resident WASM session called directly, the arrays are
+     * views into the engine's memory (no copy), valid until the next request to the session; through a worker they are
+     * copies transferred once; for a backend or a session that sends the snapshot they are built from the scene. The
+     * content is the same in every case.
+     */
+    async columns() {
+      if (!snapshot) throw Error('Nothing imported yet.');
+      if (resident) {
+        await queue;
+        const kept = await opened;
+        if (typeof kept.columns === 'function') return kept.columns();
+      }
+      return columnsOfScene(await this.scene());
+    },
+
     /** The whole snapshot: the current one, or with `resident` the one the engine keeps (for saving or hand-over). */
     async exportSnapshot() {
       if (!snapshot) return null;
@@ -236,6 +266,15 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
   };
 }
 
+// A request whose `start` positions are typed arrays, with plain arrays instead (JSON has no typed arrays).
+const plain = request => {
+  const start = request.start;
+  if (!start || !['x', 'y', 'r'].some(k => ArrayBuffer.isView(start[k]))) return request;
+  const fixed = {...start};
+  for (const k of ['x', 'y', 'r']) if (ArrayBuffer.isView(fixed[k])) fixed[k] = Array.from(fixed[k]);
+  return {...request, start: fixed};
+};
+
 // The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
 // Defaults as the engine's (`communities` 120, `satellites` 0); `groups` and `hubs` compared as given.
 const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null, options?.hubs ?? null]);
@@ -247,7 +286,7 @@ const clustersOf = options => JSON.stringify([options?.communities ?? 120, optio
  * continues from the last overview. Without a resident session the graph and the last positions stay here and are sent
  * along; the answers are the same. A new `open` overtakes what is still under way (`{ok: false, stale: true}`).
  */
-export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
+export function createOverviewSession(run, {resident: wanted = 'auto', columns = false} = {}) {
   if (wanted === true && !run.openSession) throw Error('This engine has no resident sessions');
   const resident = wanted === true || (wanted === 'auto' && typeof run.openSession === 'function');
   const opened = resident ? Promise.resolve(run.openSession()) : null;
@@ -259,7 +298,11 @@ export function createOverviewSession(run, {resident: wanted = 'auto'} = {}) {
       // On the graph the engine has, only what moves comes back (`positionsOnly`) while the clusters stay; it is put
       // together with the last overview here, so every answer is a whole overview.
       const asked = !request.graph && last ? {...request, positionsOnly: true} : request;
-      const answer = await (await opened).run(asked);
+      const kept = await opened;
+      // With `columns` the numbers come back as typed arrays (views are copied: `last` outlives the next request); a
+      // `start` a host built from them is sent as plain arrays.
+      if (columns && typeof kept.overview !== 'function') return {ok: false, error: 'This engine has no columnar overview'};
+      const answer = await (columns ? kept.overview(plain(asked), {copy: true}) : kept.run(asked));
       if (answer.ok && answer.overview?.positionsOnly) {
         const {positionsOnly: _moved, ...moved} = answer.overview;
         return {...answer, overview: {...last, ...moved}};

@@ -5,6 +5,22 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
+  the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads
+  them as views into WASM memory, as transferred copies from a worker, or builds them from the scene for a backend
+  (`columnsOfScene`). WASM export `lw_session_column`. The overview too (opt-in `columns: true`, WASM export
+  `lw_session_overview_column`): `x`, `y`, `r`, `parent`, `kind`, `edges` and `links` as typed arrays. Measured against
+  the JSON answers ([results](benchmarks/results/columns-20261118.md), load 4 to 2, one run per size): the scene is
+  3.3–3.7× smaller and 1.8–8.6× faster to the page, an overview continuation 1.7× faster but larger in bytes. The columns
+  cover the whole scene: nodes, routes (kind, two-way weight, bundle members too), ports, boundary crossings, labels, rows,
+  conflicts and junctions. The SVG viewer draws columns (`renderSvg(host, columns)`, `sceneOfColumns` in
+  `@arqlet/viewer/scene-columns.js`) with the same markup; in Chrome the page's total for a scene is 1.4× (107 boxes) and
+  1.07× (10 000 boxes) smaller, all of it the engine call ([results](benchmarks/results/columns-20261118.md), load 18.7).
+  The overview page has a "typed arrays" box. Benchmark:
+  `benchmarks/protocol/measure-columns.sh`.
+
 ### Changed
 
 - **Default:** `sharedBorderRanks` and `alignStacked` are on: free space beside stacked containers. In a container across

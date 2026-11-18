@@ -1,4 +1,5 @@
 import type {PlacedLabel, ResolvedPort, Scene, SceneNode} from '@arqlet/contracts';
+import type {SceneColumnsLike} from './scene-columns.js';
 
 export interface RenderSvgOptions {
   /** Compare with the previous drawing and keep unchanged elements (needs a real DOM). Default `false`. */
@@ -38,4 +39,5 @@ export interface RenderSvgOptions {
  * Paints a scene into an `<svg>` element. Pure rendering: it never computes layout or changes the scene; interaction is
  * reported through the callbacks.
  */
-export function renderSvg(host: SVGSVGElement, scene: Scene, options?: RenderSvgOptions): void;
+/** Paints a scene, or the columns of one (`SceneColumnsLike`, ADR 0019 step 4: provisional), which are turned into the scene they stand for first. */
+export function renderSvg(host: SVGSVGElement, scene: Scene | SceneColumnsLike, options?: RenderSvgOptions): void;

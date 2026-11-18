@@ -1,0 +1,34 @@
+{"machine":"Apple M3","os":"Darwin 25.0.0","cores":8,"revision":"9f2b5e0","dirty":true,"rustc":"rustc 1.99.0 (b940084d7 2026-09-28)","node":"v24.21.0","load":4,"utc":"2026-11-18T14:07:09Z"}
+{"view":"lod","nodes":10000,"boxes":107,"routes":781,"routePoints":5332,"sceneJsonBytes":571030,"columnBytes":126584,"idTableJsonBytes":45632}
+{"engine":"wasm-node","view":"lod","request":"scene (JSON objects), to the page","nodes":10000,"reps":5,"ms":19.769000000000005,"boxes":107,"routes":781,"routePoints":5332,"bytes":571030}
+{"engine":"wasm-node","view":"lod","request":"columns, copied and transferred","nodes":10000,"reps":5,"ms":2.268624999999929,"boxes":107,"routes":781,"routePoints":5332,"bytes":172216}
+{"engine":"wasm-node","view":"lod","request":"columns, views (no worker)","nodes":10000,"reps":5,"ms":1.6690000000000964,"boxes":107,"routes":781,"routePoints":5332,"bytes":0}
+{"engine":"wasm-node","view":"lod","request":"scene (JSON), engine call and parse, nothing moved","nodes":10000,"reps":5,"ms":11.727790999999797,"boxes":107,"routes":781,"routePoints":5332}
+{"view":"overview","kind":"JSON arrays","nodes":10000,"firstOpenMs":747.8547920000001,"bytes":692849}
+{"engine":"wasm-node","view":"overview","request":"overview whole answer, JSON arrays","nodes":10000,"reps":3,"ms":761.3692500000002,"bytes":692849}
+{"engine":"wasm-node","view":"overview","request":"overview continuation (positionsOnly), JSON arrays","nodes":10000,"reps":3,"ms":9.582875000000058,"bytes":183066}
+{"view":"overview","kind":"typed arrays","nodes":10000,"firstOpenMs":729.7694580000007,"bytes":865963}
+{"engine":"wasm-node","view":"overview","request":"overview whole answer, typed arrays","nodes":10000,"reps":3,"ms":741.6877920000006,"bytes":865963}
+{"engine":"wasm-node","view":"overview","request":"overview continuation (positionsOnly), typed arrays","nodes":10000,"reps":3,"ms":5.586083000000144,"bytes":245702}
+{"view":"full","nodes":10000,"boxes":10000,"routes":15111,"routePoints":84215,"sceneJsonBytes":12672694,"columnBytes":2502300,"idTableJsonBytes":1023467}
+{"engine":"wasm-node","view":"full","request":"scene (JSON objects), to the page","nodes":10000,"reps":5,"ms":760.491750000001,"boxes":10000,"routes":15111,"routePoints":84215,"bytes":12672694}
+{"engine":"wasm-node","view":"full","request":"columns, copied and transferred","nodes":10000,"reps":5,"ms":405.46179100000154,"boxes":10000,"routes":15111,"routePoints":84215,"bytes":3525767}
+{"engine":"wasm-node","view":"full","request":"columns, views (no worker)","nodes":10000,"reps":5,"ms":398.2236249999987,"boxes":10000,"routes":15111,"routePoints":84215,"bytes":0}
+{"engine":"wasm-node","view":"full","request":"scene (JSON), engine call and parse, nothing moved","nodes":10000,"reps":5,"ms":599.162083999996,"boxes":10000,"routes":15111,"routePoints":84215}
+{"view":"lod","nodes":100000,"boxes":521,"routes":8570,"routePoints":71098,"sceneJsonBytes":7029003,"columnBytes":1546452,"idTableJsonBytes":520785}
+{"engine":"wasm-node","view":"lod","request":"scene (JSON objects), to the page","nodes":100000,"reps":5,"ms":264.7312499999971,"boxes":521,"routes":8570,"routePoints":71098,"bytes":7029003}
+{"engine":"wasm-node","view":"lod","request":"columns, copied and transferred","nodes":100000,"reps":5,"ms":32.28995799999393,"boxes":521,"routes":8570,"routePoints":71098,"bytes":2067237}
+{"engine":"wasm-node","view":"lod","request":"columns, views (no worker)","nodes":100000,"reps":5,"ms":28.67316700000083,"boxes":521,"routes":8570,"routePoints":71098,"bytes":0}
+{"engine":"wasm-node","view":"lod","request":"scene (JSON), engine call and parse, nothing moved","nodes":100000,"reps":5,"ms":167.82045800000196,"boxes":521,"routes":8570,"routePoints":71098}
+{"view":"overview","kind":"JSON arrays","nodes":100000,"firstOpenMs":7588.239708000008,"bytes":7749501}
+{"engine":"wasm-node","view":"overview","request":"overview whole answer, JSON arrays","nodes":100000,"reps":3,"ms":7774.429166999995,"bytes":7749501}
+{"engine":"wasm-node","view":"overview","request":"overview continuation (positionsOnly), JSON arrays","nodes":100000,"reps":3,"ms":111.02054200001294,"bytes":1917068}
+{"view":"overview","kind":"typed arrays","nodes":100000,"firstOpenMs":7472.306291999994,"bytes":8789377}
+{"engine":"wasm-node","view":"overview","request":"overview whole answer, typed arrays","nodes":100000,"reps":3,"ms":7670.103583000018,"bytes":8789377}
+{"engine":"wasm-node","view":"overview","request":"overview continuation (positionsOnly), typed arrays","nodes":100000,"reps":3,"ms":63.56004199999734,"bytes":2454307}
+{"view":"full","nodes":100000,"boxes":12714,"routes":11831,"routePoints":78019,"sceneJsonBytes":12967102,"columnBytes":2583972,"idTableJsonBytes":929751}
+{"engine":"wasm-node","view":"full","request":"scene (JSON objects), to the page","nodes":100000,"reps":5,"ms":900.5932919999977,"boxes":12714,"routes":11831,"routePoints":78019,"bytes":12967102}
+{"engine":"wasm-node","view":"full","request":"columns, copied and transferred","nodes":100000,"reps":5,"ms":501.52445799999987,"boxes":12714,"routes":11831,"routePoints":78019,"bytes":3513723}
+{"engine":"wasm-node","view":"full","request":"columns, views (no worker)","nodes":100000,"reps":5,"ms":492.21524999999383,"boxes":12714,"routes":11831,"routePoints":78019,"bytes":0}
+{"engine":"wasm-node","view":"full","request":"scene (JSON), engine call and parse, nothing moved","nodes":100000,"reps":5,"ms":736.5421250000072,"boxes":12714,"routes":11831,"routePoints":78019}
+{"loadAtEnd":2}

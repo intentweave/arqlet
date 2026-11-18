@@ -1,4 +1,5 @@
 import type {Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
+import type {SceneColumns} from './columns.js';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
@@ -67,6 +68,12 @@ export interface Session {
   filter(hide?: Hidden): Promise<SessionResult>;
   /** The scene of the current snapshot, computed once per snapshot. Throws the engine's error. */
   scene(): Promise<Scene>;
+  /**
+   * Provisional (ADR 0019, step 4): the scene of the current snapshot as columns. In a resident WASM session called
+   * directly, the arrays are views into the engine's memory, valid until the next request to the session (copy what
+   * you keep); through a worker they are copies transferred once; otherwise they are built from the scene.
+   */
+  columns(): Promise<SceneColumns>;
   /** The whole snapshot: the current one, or with `resident` the one the engine keeps (for saving or hand-over). */
   exportSnapshot(): Promise<Snapshot | null>;
   /** Whether the snapshot stays in the engine. */
@@ -79,6 +86,10 @@ export interface Session {
 export interface ResidentSession {
   run(request: EngineRequest): EngineResponse | Promise<EngineResponse>;
   close(): unknown;
+  /** Provisional (ADR 0019, step 4): the scene as columns, where the engine keeps them (WASM, a worker). */
+  columns?(): SceneColumns | Promise<SceneColumns>;
+  /** Provisional (step 4): an `overview` request answered with typed arrays for the numbers, where the engine can. */
+  overview?(request: EngineRequest, init?: {copy?: boolean}): EngineResponse | Promise<EngineResponse>;
 }
 
 /** Creates a session on an engine `run`, synchronous (`loadEngine`) or asynchronous (`workerRun`). */
@@ -156,7 +167,17 @@ export function createOverviewSession(
   run: (Run | ((request: EngineRequest) => Promise<EngineResponse>)) & {
     openSession?: () => ResidentSession | Promise<ResidentSession>;
   },
-  init?: {resident?: boolean | 'auto'},
+  init?: {
+    resident?: boolean | 'auto';
+    /**
+     * Provisional (ADR 0019, step 4): the overview's numbers (`parent`, `x`, `y`, `r`, `kind`, `edges`, `links`) as typed
+     * arrays instead of JSON arrays, moved without JSON (copied once out of the engine's memory, transferred from a
+     * worker). Needs a resident session in an engine that offers `overview` (WASM, a worker); an answer says so
+     * otherwise. Default false: the arrays are plain, as before. Typed arrays index like arrays; a `start` built from
+     * them is sent as plain arrays.
+     */
+    columns?: boolean;
+  },
 ): OverviewSession;
 
 /** The most nodes an import selects for its view; the default of `Session.import`'s limit. */
