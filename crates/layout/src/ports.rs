@@ -556,16 +556,17 @@ impl<'g> PortContext<'g> {
                 // with its ancestors for every corner took more than a minute in a view of 7000 nodes with many loops).
                 let reach = LOOP_REACH + LOOP_STEP * self.loop_counts[node] as f64;
                 let near: Vec<&str> = if self.loop_space {
+                    // Node ids are unique, so a node's index in `node_ids` is its index in `rects`.
                     self.node_ids
                         .iter()
-                        .copied()
-                        .filter(|other| {
-                            let o = rect_for(other);
+                        .zip(rects.iter())
+                        .filter(|(_, o)| {
                             o.x < r.x + r.width + reach
                                 && o.x + o.width > r.x - reach
                                 && o.y < r.y + r.height + reach
                                 && o.y + o.height > r.y - reach
                         })
+                        .map(|(other, _)| *other)
                         .collect()
                 } else {
                     Vec::new()

@@ -1094,11 +1094,7 @@ fn prepare_leg(
     }
     let skip = endpoint_exclusions(parents, &edge.source, target);
     let obstacles: Vec<Rect> = if prepare_obstacles {
-        boxes
-            .iter()
-            .filter(|(id, _)| !skip.contains(id.as_str()))
-            .map(|(_, r)| inflate(r, spacing.margin))
-            .collect()
+        obstacles_without(boxes, &skip, spacing.margin)
     } else {
         Vec::new()
     };
@@ -1111,16 +1107,13 @@ fn prepare_leg(
         from: (s_main, s_across),
         to: (t_main, t_across),
         band: (s_far + spacing.margin, t_near - spacing.margin),
-        obstacle_index: std::rc::Rc::new(BoxIndex::new(
-            &obstacles
-                .iter()
-                .map(|r| [r.x, r.y, r.x + r.width, r.y + r.height])
-                .collect::<Vec<_>>(),
-        )),
+        obstacle_index: Default::default(),
         obstacles,
         start,
         end,
         lead: (Vec::new(), Vec::new()),
+        window: spacing.search_window,
+        gaps: Default::default(),
     })
 }
 
@@ -1146,6 +1139,7 @@ mod tests {
         through_borders: true,
         probe: false,
         port_sides: false,
+        search_window: false,
     };
 
     pub(super) fn rect(x: f64, y: f64, width: f64, height: f64) -> Rect {

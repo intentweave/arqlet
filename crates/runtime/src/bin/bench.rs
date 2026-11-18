@@ -1847,6 +1847,7 @@ fn constructive_report(name: &str, base: &Snapshot, import_ms: &Value) -> Result
         through_borders: false,
         probe: false,
         port_sides: false,
+        search_window: options.route_search_window,
     };
     let none = std::collections::BTreeMap::new();
     // Port sides (flow-facing or the automatic ones) and the order in which the edges take their tracks.

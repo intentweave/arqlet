@@ -423,7 +423,13 @@ impl Default for Params {
 /// A node's rectangle as an obstacle. Endpoints of the routed edge keep their true body, so the stub
 /// leaving a port is not judged against its own node.
 fn obstacle(id: &str, rect: &Rect, shape: NodeShape, edge: &Edge, params: Params) -> Outline {
-    if params.clearance <= 0. || id == edge.source || edge.target.as_deref() == Some(id) {
+    let end = id == edge.source || edge.target.as_deref() == Some(id);
+    obstacle_with(end, rect, shape, params)
+}
+
+/// `obstacle` for a box that is (`end`) or is not one of the edge's ends.
+fn obstacle_with(end: bool, rect: &Rect, shape: NodeShape, params: Params) -> Outline {
+    if params.clearance <= 0. || end {
         return Outline::of(shape, rect);
     }
     // The clearance grows the box, and a circle's disc inscribed in it grows by the same amount.
@@ -1645,6 +1651,12 @@ fn repair_raw(
 ) -> Vec<Route> {
     let edges: BTreeMap<_, _> = graph.edges.iter().map(|e| (e.id.as_str(), e)).collect();
     let info = parent_map(graph);
+    // The boxes in id order with their shapes, looked up once for all routes.
+    let all: Vec<(&str, &Rect, NodeShape)> = rects
+        .iter()
+        .map(|(id, r)| (id.as_str(), r, shape_in(&info, id)))
+        .collect();
+    let position = |id: &str| all.binary_search_by(|(other, _, _)| (*other).cmp(id)).ok();
     routes
         .iter()
         .map(|route| {
@@ -1661,17 +1673,17 @@ fn repair_raw(
             let grow = params.clearance.max(0.);
             let hit = rects
                 .iter()
+                // The box test first: it is cheap, and few boxes pass it.
                 .filter(|(id, r)| {
-                    allowed(id)
-                        && !apart(
-                            &bounds,
-                            &[
-                                r.x - grow,
-                                r.y - grow,
-                                r.x + r.width + grow,
-                                r.y + r.height + grow,
-                            ],
-                        )
+                    !apart(
+                        &bounds,
+                        &[
+                            r.x - grow,
+                            r.y - grow,
+                            r.x + r.width + grow,
+                            r.y + r.height + grow,
+                        ],
+                    ) && allowed(id)
                 })
                 .any(|(id, r)| {
                     hits_outline(route, &obstacle(id, r, shape_in(&info, id), edge, params))
@@ -1679,21 +1691,28 @@ fn repair_raw(
             if !hit {
                 return route.clone();
             }
-            let owned: Vec<Outline> = rects
+            // The boxes left out (the ends' ancestors) and the ends, by their place in `all`: the boxes are taken by index, not
+            // compared with the ids one by one.
+            let ends: Vec<usize> = [Some(edge.source.as_str()), edge.target.as_deref()]
+                .into_iter()
+                .flatten()
+                .filter_map(position)
+                .collect();
+            let left_out: Vec<usize> = skip
                 .iter()
-                .filter(|(id, _)| {
-                    !skip.contains(*id) || *id == &edge.source || edge.target.as_ref() == Some(*id)
-                })
-                .map(|(id, r)| obstacle(id, r, shape_in(&info, id), edge, params))
+                .filter_map(|id| position(id))
+                .filter(|i| !ends.contains(i))
+                .collect();
+            let kept = || {
+                all.iter()
+                    .enumerate()
+                    .filter(|(i, _)| !left_out.contains(i))
+            };
+            let owned: Vec<Outline> = kept()
+                .map(|(i, (_, r, shape))| obstacle_with(ends.contains(&i), r, *shape, params))
                 .collect();
             let obstacles: Vec<&Outline> = owned.iter().collect();
-            let own: Vec<bool> = rects
-                .keys()
-                .filter(|id| {
-                    !skip.contains(*id) || *id == &edge.source || edge.target.as_ref() == Some(*id)
-                })
-                .map(|id| id == &edge.source || edge.target.as_ref() == Some(id))
-                .collect();
+            let own: Vec<bool> = kept().map(|(i, _)| ends.contains(&i)).collect();
             if obstacles.iter().any(|o| hits_outline(route, o)) {
                 grid_route(route, &obstacles, &own, params.own_clearance, counters)
                     .unwrap_or_else(|| route.clone())
