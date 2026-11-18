@@ -121,6 +121,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
   equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
 - `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
+- The projection of a view (`arqlet_view::project`) checked for every collapsed container that it has children by a
+  search of all nodes, and walked from every node and edge end to the root by id lookups; both are computed once now, and
+  two more searches of all nodes per id (pulled containers at import, pins) use a set. A first view of a 300 000-node
+  graph: 24 s → 6.4 s, of 1 000 000 nodes: 71 s → 23 s, opening a container there 74 s → 14 s; byte-identical output.
+  `benchmarks/scaling/series.py` measures overview, first view and opening a container from 20K to 1M nodes
+  ([results](benchmarks/results/scaling-series-20261118.md)).
 - `liftEdges` (provisional, off): an edge whose ends are not siblings is drawn between the outermost containers its ends
   differ in, and the edges of one pair of containers as one route with their weights in both directions; edges between
   siblings stay. synthetic-20k with `levelOfDetail: {nodes: 300}`: 1 126 instead of 7 730 drawn edges, no line–node hits

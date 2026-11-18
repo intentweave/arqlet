@@ -563,11 +563,8 @@ pub fn import_graph_counted(
         if abstracts(options) {
             collapsed.extend(initially_collapsed(&view, options));
             // Containers an edge pulled in without their content selected: whole, and collapsed (`select_visible`).
-            collapsed.extend(
-                pulled
-                    .into_iter()
-                    .filter(|id| view.nodes.iter().any(|n| &n.id == id)),
-            );
+            let ids: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
+            collapsed.extend(pulled.into_iter().filter(|id| ids.contains(id.as_str())));
         }
         let (projected, weights) =
             merge_view(&view, arqlet_view::project(&view, &collapsed)?, options);
@@ -1718,8 +1715,13 @@ pub fn validate_order_hints(
 }
 
 pub fn validate_pins(graph: &Graph, pins: &BTreeMap<String, Point>) -> Result<(), String> {
+    let ids: BTreeSet<&str> = if pins.is_empty() {
+        BTreeSet::new()
+    } else {
+        graph.nodes.iter().map(|n| n.id.as_str()).collect()
+    };
     for (id, point) in pins {
-        if !graph.nodes.iter().any(|node| node.id == *id) {
+        if !ids.contains(id.as_str()) {
             return Err(format!("Pin names an unknown node: {id}"));
         }
         if !point.x.is_finite() || !point.y.is_finite() {

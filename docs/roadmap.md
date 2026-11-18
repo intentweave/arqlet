@@ -73,7 +73,11 @@ engine choice rerouting everything with the channel router, open). The SVG viewe
 1. Remove the pathological paths of the structured view and make it measurable up to 10K visible nodes (time budgets
    or no whole reroute at that size, no quadratic helpers).
 2. A measurement plan for 20K, 50K, 100K, 300K and 1M: overview, first structured view within a budget, opening a
-   container, memory, transfer size, frame time in the browser; hardware, build and seed recorded.
+   container, memory, transfer size, frame time in the browser; hardware, build and seed recorded. Done natively
+   (2026-11-18, `benchmarks/scaling/series.py`, [results](../benchmarks/results/scaling-series-20261118.md)): with
+   `levelOfDetail: {nodes, edges}` and `liftEdges` every size works up to 1M; time and memory grow with the source graph
+   (first view 23 s and 3.3 GiB at 1M on a loaded machine), opening a container resends the whole snapshot (208 MB at
+   1M). Frame time in the browser is not measured yet.
 3. Rendering: viewport culling (draw what lies in the visible window and a margin, from a spatial index of the scene),
    detail by zoom (labels, ports and arrows left out below a scale, containers as filled areas), then WebGL for the
    structured scene as for the overview.
