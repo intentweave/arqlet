@@ -13,7 +13,7 @@ export const PORT_FLAGS = {explicit: 1, target: 2};
 /** Values of `portSide` and `crossingSide`. */
 export const SIDES = {left: 0, right: 1, top: 2, bottom: 3};
 /** Values of `nodeShape` (an unknown shape counts as `rect`). */
-export const SHAPES = {rect: 0, square: 1, circle: 2};
+export const SHAPES = {rect: 0, square: 1, circle: 2, busLine: 3};
 
 // Strings kept once, numbered in the order they first occur.
 const table = () => {

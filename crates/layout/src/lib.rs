@@ -6,6 +6,7 @@ mod block_placement;
 mod border_alignment;
 mod bus;
 mod bus_layout;
+mod bus_line;
 pub mod constructive;
 mod engine_choice;
 mod global;
@@ -330,6 +331,18 @@ pub fn compute(
 /// `compute` that also returns the stage work of the first layout (placement, routing, and so on), so that a caller can
 /// report where the time of an import goes. The snapshot is the same as `compute` returns.
 pub fn compute_counted(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    let (mut snapshot, stages) = compute_counted_forced(graph, previous, dirty, options)?;
+    // Provisional: nodes of shape `busLine` are drawn as bars with their edges as taps, on the finished layout.
+    bus_line::apply(&mut snapshot);
+    Ok((snapshot, stages))
+}
+
+fn compute_counted_forced(
     graph: &Graph,
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
@@ -5250,6 +5263,7 @@ fn placed_snapshot(
         boundary_crossings: vec![],
         straight_edges: vec![],
         bus_boxes: BTreeMap::new(),
+        bus_lines: BTreeMap::new(),
         gesture: None,
         layered_plans: plans
             .iter()

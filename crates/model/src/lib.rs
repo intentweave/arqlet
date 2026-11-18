@@ -68,6 +68,10 @@ pub enum NodeShape {
     Rect,
     Square,
     Circle,
+    /// Provisional: a physical bus (CAN, LIN, FlexRay, …). Laid out as a rectangle, then drawn as a bar past the nodes its
+    /// edges attach, with the edges as taps onto it (`Snapshot::bus_lines`).
+    #[serde(rename = "busLine")]
+    BusLine,
 }
 
 impl NodeShape {
@@ -78,7 +82,7 @@ impl NodeShape {
     /// The size of a node of this shape from its requested size: square and circle take the larger side on both axes.
     pub fn fit(self, width: f64, height: f64) -> (f64, f64) {
         match self {
-            Self::Rect => (width, height),
+            Self::Rect | Self::BusLine => (width, height),
             Self::Square | Self::Circle => {
                 let side = width.max(height);
                 (side, side)
@@ -629,6 +633,10 @@ pub struct Snapshot {
     /// graph has none.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bus_boxes: BTreeMap<String, Rect>,
+    /// Provisional: the bar of every node of shape `busLine`, relative to its parent as `boxes` are; the scene draws it
+    /// instead of the node's box, which the layout keeps. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bus_lines: BTreeMap<String, Rect>,
     /// The move gesture in progress or the last one finished, for sequence checks. Omitted when there was none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gesture: Option<Gesture>,

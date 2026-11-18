@@ -23,7 +23,7 @@ impl Outline {
     /// The outline of a node of `shape` in the box `rect`. A circle is the disc inscribed in the box.
     pub fn of(shape: NodeShape, rect: &Rect) -> Outline {
         match shape {
-            NodeShape::Rect | NodeShape::Square => Outline::Rect(rect.clone()),
+            NodeShape::Rect | NodeShape::Square | NodeShape::BusLine => Outline::Rect(rect.clone()),
             NodeShape::Circle => Outline::Disc {
                 x: rect.x + rect.width / 2.,
                 y: rect.y + rect.height / 2.,

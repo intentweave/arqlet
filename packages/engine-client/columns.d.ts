@@ -105,7 +105,7 @@ export const NODE_FLAGS: {readonly container: 1; readonly aggregate: 2; readonly
 export const ROUTE_FLAGS: {readonly invalid: 1; readonly rounded: 2};
 export const PORT_FLAGS: {readonly explicit: 1; readonly target: 2};
 export const SIDES: {readonly left: 0; readonly right: 1; readonly top: 2; readonly bottom: 3};
-export const SHAPES: {readonly rect: 0; readonly square: 1; readonly circle: 2};
+export const SHAPES: {readonly rect: 0; readonly square: 1; readonly circle: 2; readonly busLine: 3};
 
 /** The columns of a scene object, as the engine builds them (`f32` coordinates). Provisional. */
 export function columnsOfScene(scene: Scene): SceneColumns;

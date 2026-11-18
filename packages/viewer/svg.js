@@ -168,7 +168,7 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  // Entity-relationship notation: an attribute is a row of text in its entity; relationships are labelled edges.
  const attribute=n.kind==='attribute';
  const shape=attribute?element('rect',{...r,rx:4,fill:'transparent',stroke:'transparent'})
-  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:7,...look});
+  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:n.shape==='busLine'?Math.min(r.width,r.height)/2:7,...look});
  g.append(shape);
  g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);
  g.onpointerleave=()=>shape.setAttribute('stroke',attribute?'transparent':look.stroke);if(pinned.has(n.id)){g.setAttribute('data-pinned-id',n.id);if(!onPin){const pin=element('circle',{cx:round?cx+rad*.62:r.x+r.width-10,cy:round?cy-rad*.62:r.y+10,r:4,fill:'#edc477','pointer-events':'none'});pin.append(element('title',{},'Pinned: layout keeps this position'));g.append(pin);}}
