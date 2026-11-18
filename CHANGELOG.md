@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Node shape `busLine` (provisional): a physical bus (CAN, LIN, FlexRay, …) as a node keeps its box for the layout and is
+  drawn as a bar past the nodes its edges attach (`Snapshot.busLines`), with the edges as square taps onto the bar. The
+  bar lies across the flow of its area, or along the axis its nodes spread on; it stops short of other boxes and of a node
+  on its own line; bars that would overlap take parallel lanes away from their nodes. Applied on every snapshot an
+  operation answers, so refinement and edits keep it; the scene, the columns, the SVG viewer and the playground's shape
+  menu know it. Examples *Vehicle buses (bus lines)* and *Vehicle buses, organic* (made up).
+
 - **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
   the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads
   them as views into WASM memory, as transferred copies from a worker, or builds them from the scene for a backend

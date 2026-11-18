@@ -746,6 +746,18 @@ impl Request {
 
 /// Handles one request.
 pub fn handle(request: Request) -> Response {
+    match handle_request(request) {
+        // Provisional: nodes of shape `busLine` are drawn as bars with taps on every snapshot an operation answers (the
+        // layout does it too; refinement and other paths that finish a snapshot without it get it here).
+        Response::Snapshot(mut snapshot) => {
+            arqlet_layout::apply_bus_lines(&mut snapshot);
+            Response::Snapshot(snapshot)
+        }
+        other => other,
+    }
+}
+
+fn handle_request(request: Request) -> Response {
     use crate::*;
     let snapshot = |r: Result<Snapshot, String>| match r {
         Ok(s) => Response::Snapshot(Box::new(s)),

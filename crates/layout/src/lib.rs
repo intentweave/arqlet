@@ -342,6 +342,13 @@ pub fn compute_counted(
     Ok((snapshot, stages))
 }
 
+/// Provisional: draws the nodes of shape `busLine` of a finished snapshot as bars with their edges as taps
+/// (`Snapshot::bus_lines`); computed anew from the boxes, so applying it again changes nothing. Nothing changes without such
+/// a node.
+pub fn apply_bus_lines(snapshot: &mut Snapshot) {
+    bus_line::apply(snapshot);
+}
+
 fn compute_counted_forced(
     graph: &Graph,
     previous: Option<&Snapshot>,

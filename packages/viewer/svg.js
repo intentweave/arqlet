@@ -168,12 +168,14 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  // Entity-relationship notation: an attribute is a row of text in its entity; relationships are labelled edges.
  const attribute=n.kind==='attribute';
  const shape=attribute?element('rect',{...r,rx:4,fill:'transparent',stroke:'transparent'})
-  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:n.shape==='busLine'?Math.min(r.width,r.height)/2:7,...look});
+  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):n.shape==='busLine'?element('rect',{...r,rx:Math.min(r.width,r.height)/2,...look,fill:n.id===selected?'#90e4c3':'#6f93b8'}):element('rect',{...r,rx:7,...look});
  g.append(shape);
  g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);
  g.onpointerleave=()=>shape.setAttribute('stroke',attribute?'transparent':look.stroke);if(pinned.has(n.id)){g.setAttribute('data-pinned-id',n.id);if(!onPin){const pin=element('circle',{cx:round?cx+rad*.62:r.x+r.width-10,cy:round?cy-rad*.62:r.y+10,r:4,fill:'#edc477','pointer-events':'none'});pin.append(element('title',{},'Pinned: layout keeps this position'));g.append(pin);}}
  const size=controlSize(Math.min(r.height*.5,r.width/5,24)),toggled=onToggle&&collapsed.has(n.id);
- if(!n.rows?.length)g.append(element('text',round?{x:cx,y:cy+5,'text-anchor':'middle',fill:'#edf5ff','font-size':13,'pointer-events':'none'}:{x:toggled?r.x+8+size:r.x+10,y:n.kind==='attribute'?r.y+r.height/2+5:r.y+32,fill:'#edf5ff','font-size':13},(collapsed.has(n.id)&&!onToggle?'▸ ':'')+n.label.slice(0,23)));
+ // A bus drawn as a bar (shape busLine): its name beside the bar's middle, not inside it.
+ const bar=n.shape==='busLine',flat=r.width>=r.height;
+ if(!n.rows?.length)g.append(element('text',bar?(flat?{x:cx,y:r.y-6,'text-anchor':'middle',fill:'#9fc3e6','font-size':12,'pointer-events':'none'}:{x:r.x+r.width+14,y:cy,'text-anchor':'middle',transform:`rotate(-90 ${r.x+r.width+14} ${cy})`,fill:'#9fc3e6','font-size':12,'pointer-events':'none'}):round?{x:cx,y:cy+5,'text-anchor':'middle',fill:'#edf5ff','font-size':13,'pointer-events':'none'}:{x:toggled?r.x+8+size:r.x+10,y:n.kind==='attribute'?r.y+r.height/2+5:r.y+32,fill:'#edf5ff','font-size':13},(collapsed.has(n.id)&&!onToggle?'▸ ':'')+n.label.slice(0,23)));
  if(toggled)g.append(toggleControl(n,r.x+4,r.y+(r.height-size)/2,size));
  // Rows of a node (ADR 0011): the engine gives each row its rectangle; the viewer draws the text inside it. The first row
 // is the title, a rule separates it from the others.

@@ -89,20 +89,35 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
         let mut lo = along.0;
         let mut hi = along.1;
         let mut lower = 0usize;
+        let band = (
+            centre_across - THICKNESS / 2.,
+            centre_across + THICKNESS / 2.,
+        );
+        // A node on the bar's own line bounds the bar: it stops a gap short of it, and the node's tap runs along the line.
+        let (mut cap_lo, mut cap_hi) = (f64::MIN, f64::MAX);
         for m in &members {
             let r = &absolute[*m];
+            let (a, c) = axes(r, horizontal);
+            if c.1 > band.0 && c.0 < band.1 {
+                if centre(r) >= centre(own) {
+                    cap_hi = cap_hi.min(a.0 - CLEARANCE);
+                    hi = hi.max(a.0 - CLEARANCE);
+                } else {
+                    cap_lo = cap_lo.max(a.1 + CLEARANCE);
+                    lo = lo.min(a.1 + CLEARANCE);
+                }
+                continue;
+            }
             lo = lo.min(centre(r));
             hi = hi.max(centre(r));
             if centre_of_across(r) < centre_across {
                 lower += 1;
             }
         }
+        hi = hi.min(cap_hi);
+        lo = lo.max(cap_lo);
         // Stop short of the boxes in the bar's way that are neither a bus, an attached node, nor one that holds the bus.
         let bus_centre = centre(own);
-        let band = (
-            centre_across - THICKNESS / 2.,
-            centre_across + THICKNESS / 2.,
-        );
         let holds_bus = |id: &str| {
             let mut at = parent.get(bus.as_str()).copied().flatten();
             while let Some(p) = at {
@@ -133,24 +148,43 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
             lo,
             hi,
             across: centre_across,
-            away: if 2 * lower >= members.len() { 1. } else { -1. },
+            away: if 2 * lower >= members.len().max(1) {
+                1.
+            } else {
+                -1.
+            },
             attached,
         });
     }
     // Bars on one line, axis and side that overlap take lanes beside each other, away from their nodes: in the order of
     // their starts, each the first lane free at its start (a schematic of parallel bus lines).
-    let mut groups: BTreeMap<(Option<&str>, bool, i64, i64), Vec<usize>> = BTreeMap::new();
+    // A group: the bars of one area, axis and side whose lines lie closer than a lane apart (in the order of their lines).
+    let mut by_side: BTreeMap<(Option<&str>, bool, i64), Vec<usize>> = BTreeMap::new();
     for (i, plan) in plans.iter().enumerate() {
-        let key = (
-            parent[plan.bus.as_str()],
-            plan.horizontal,
-            (plan.across * 2.).round() as i64,
-            plan.away as i64,
-        );
-        groups.entry(key).or_default().push(i);
+        by_side
+            .entry((parent[plan.bus.as_str()], plan.horizontal, plan.away as i64))
+            .or_default()
+            .push(i);
+    }
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    for mut side in by_side.into_values() {
+        side.sort_by(|&a, &b| {
+            plans[a]
+                .across
+                .total_cmp(&plans[b].across)
+                .then(plans[a].bus.cmp(&plans[b].bus))
+        });
+        let mut start = f64::MIN;
+        for i in side {
+            if plans[i].across - start > THICKNESS + CLEARANCE || groups.is_empty() {
+                groups.push(Vec::new());
+                start = plans[i].across;
+            }
+            groups.last_mut().expect("a group").push(i);
+        }
     }
     let mut offset = vec![0f64; plans.len()];
-    for members in groups.values_mut() {
+    for members in groups.iter_mut() {
         members.sort_by(|&a, &b| {
             plans[a]
                 .lo
@@ -158,6 +192,11 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
                 .then(plans[a].hi.total_cmp(&plans[b].hi))
                 .then(plans[a].bus.cmp(&plans[b].bus))
         });
+        // Every bar of the group on the line of its first, then lanes away from their nodes.
+        let line = members
+            .iter()
+            .map(|&i| plans[i].across)
+            .fold(f64::MAX, f64::min);
         let mut lanes: Vec<f64> = Vec::new();
         for &i in members.iter() {
             let lane = match lanes.iter().position(|&end| end + CLEARANCE < plans[i].lo) {
@@ -168,7 +207,16 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
                 }
             };
             lanes[lane] = plans[i].hi;
-            offset[i] = lane as f64 * (THICKNESS + CLEARANCE) * plans[i].away;
+            let base = if plans[i].away > 0. {
+                line
+            } else {
+                members
+                    .iter()
+                    .map(|&j| plans[j].across)
+                    .fold(f64::MIN, f64::max)
+            };
+            offset[i] =
+                base - plans[i].across + lane as f64 * (THICKNESS + CLEARANCE) * plans[i].away;
         }
     }
     let mut taps: BTreeMap<String, Vec<Point>> = BTreeMap::new();
@@ -290,6 +338,23 @@ fn tap(member: &Rect, bar: &Rect, horizontal: bool) -> Vec<Point> {
     let (m_along, m_across) = axes(member, horizontal);
     let (b_along, b_across) = axes(bar, horizontal);
     let c = (m_along.0 + m_along.1) / 2.;
+    let mid = (b_across.0 + b_across.1) / 2.;
+    // A node on the bar's line: from its side facing the bar along the line to the bar's end.
+    if m_across.1 > b_across.0 && m_across.0 < b_across.1 {
+        return if c >= b_along.1 {
+            vec![point(m_along.0, mid), point(b_along.1, mid)]
+        } else if c <= b_along.0 {
+            vec![point(m_along.1, mid), point(b_along.0, mid)]
+        } else {
+            // Across the bar (it was moved to a lane over the node): square from the nearer side.
+            let side = if (m_across.0 + m_across.1) / 2. < mid {
+                m_across.1
+            } else {
+                m_across.0
+            };
+            vec![point(c, side), point(c, mid)]
+        };
+    }
     // The member's side towards the bar, and the bar's side towards the member.
     let above = m_across.1 <= b_across.0 + 1e-9
         || (m_across.0 + m_across.1) / 2. < (b_across.0 + b_across.1) / 2.;
@@ -298,11 +363,16 @@ fn tap(member: &Rect, bar: &Rect, horizontal: bool) -> Vec<Point> {
     } else {
         (m_across.0, b_across.1)
     };
+    // Square onto the bar where the node and the bar share a stretch along it: at the node's centre when the bar reaches
+    // it, else as near to it as the shared stretch allows.
+    let (shared_lo, shared_hi) = (m_along.0.max(b_along.0), m_along.1.min(b_along.1));
     if c >= b_along.0 && c <= b_along.1 {
         vec![point(c, leave), point(c, meet)]
+    } else if shared_lo + 2. * CLEARANCE <= shared_hi {
+        let at = c.clamp(shared_lo + CLEARANCE, shared_hi - CLEARANCE);
+        vec![point(at, leave), point(at, meet)]
     } else {
         let end = if c < b_along.0 { b_along.0 } else { b_along.1 };
-        let mid = (b_across.0 + b_across.1) / 2.;
         vec![point(c, leave), point(c, mid), point(end, mid)]
     }
 }
