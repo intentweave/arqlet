@@ -355,6 +355,12 @@ fn trace_directed(
         .map(|(i, n)| (n.id.as_str(), i))
         .collect();
     let n = graph.nodes.len();
+    // A bus drawn as a bus line is a shared medium: its edges are followed both ways, so a path runs node → bus → node.
+    let medium: Vec<bool> = graph
+        .nodes
+        .iter()
+        .map(|node| node.shape == NodeShape::BusLine)
+        .collect();
     let edges: Vec<(usize, usize, &str)> = graph
         .edges
         .iter()
@@ -362,6 +368,10 @@ fn trace_directed(
         .filter_map(|e| {
             let t = *index.get(e.target.as_deref()?)?;
             Some((*index.get(e.source.as_str())?, t, e.id.as_str()))
+        })
+        .flat_map(|(a, b, id)| {
+            let both = (medium[a] || medium[b]) && a != b;
+            std::iter::once((a, b, id)).chain(both.then_some((b, a, id)))
         })
         .collect();
     let mut out = vec![Vec::new(); n];
@@ -404,11 +414,15 @@ fn trace_directed(
             .filter(|&v| on_node(v))
             .map(|v| graph.nodes[v].id.clone())
             .collect(),
-        edges: edges
-            .iter()
-            .filter(|&&(a, b, _)| on_edge(a, b))
-            .map(|&(_, _, id)| id.to_string())
-            .collect(),
+        edges: {
+            let mut seen = BTreeSet::new();
+            edges
+                .iter()
+                .filter(|&&(a, b, _)| on_edge(a, b))
+                .filter(|&&(_, _, id)| seen.insert(id))
+                .map(|&(_, _, id)| id.to_string())
+                .collect()
+        },
         length: Some(length),
         reversed: false,
     }
@@ -838,5 +852,30 @@ mod indexed_tests {
             project(&g, &leaf).unwrap_err(),
             project_indexed(&g, &index, &leaf).unwrap_err()
         );
+    }
+}
+
+#[cfg(test)]
+mod bus_trace_tests {
+    use super::*;
+
+    #[test]
+    fn a_trace_crosses_a_bus_line_from_node_to_node() {
+        // Two nodes on one bus, every edge from the node to the bus: no directed path, but the bus is a shared medium.
+        let node = |id: &str, shape: &str| serde_json::json!({"id": id, "kind": "k", "label": id, "shape": shape});
+        let edge = |id: &str, s: &str, t: &str| serde_json::json!({"id": id, "kind": "connects", "source": s, "target": t});
+        let g: Graph = serde_json::from_value(serde_json::json!({
+            "nodes": [node("bus", "busLine"), node("a", "rect"), node("b", "rect"), node("c", "rect")],
+            "edges": [edge("ab", "a", "bus"), edge("bb", "b", "bus"), edge("ca", "c", "a")]
+        }))
+        .unwrap();
+        let found = trace(&g, "a", "b", TraceMode::Shortest).unwrap();
+        assert_eq!(found.length, Some(2));
+        assert_eq!(found.edges, ["ab", "bb"]);
+        assert!(!found.reversed);
+        // An edge between two ordinary nodes keeps its direction: from a to c there is no path, from c to a one.
+        let back = trace(&g, "a", "c", TraceMode::Shortest).unwrap();
+        assert!(back.reversed);
+        assert_eq!(back.edges, ["ca"]);
     }
 }
