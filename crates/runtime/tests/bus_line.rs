@@ -99,3 +99,59 @@ fn applying_the_bars_again_changes_nothing_and_a_graph_without_them_has_none() {
         .unwrap()
         .contains("busLines"));
 }
+
+#[test]
+fn a_bus_network_reads_as_a_tree_from_its_gateway() {
+    // A gateway on two buses, a node on each, and one node on both buses; every edge points from the node to its bus, as
+    // in an export of bus connections. The gateway and the node on both buses tie on buses: the earlier in the graph is
+    // the root, so the gateway comes first.
+    let node = |id: &str, shape: Option<&str>| {
+        let mut n = json!({"id": id, "kind": "ecu", "label": id});
+        if let Some(s) = shape {
+            n["shape"] = json!(s);
+        }
+        n
+    };
+    let edge = |id: &str, s: &str, t: &str| json!({"id": id, "kind": "connects", "source": s, "target": t});
+    let g: Graph = serde_json::from_value(json!({
+        "defaultDirection": "tb",
+        "nodes": [node("gateway", None), node("a", Some("busLine")), node("b", Some("busLine")), node("leaf-a", None), node("leaf-b", None), node("both", None)],
+        "edges": [edge("ga", "gateway", "a"), edge("gb", "gateway", "b"), edge("la", "leaf-a", "a"), edge("lb", "leaf-b", "b"),
+            edge("xa", "both", "a"), edge("xb", "both", "b")]
+    }))
+    .unwrap();
+    let s = import_graph_with(g, 100, &LayoutOptions::default()).unwrap();
+    let top = |id: &str| s.boxes[id].y;
+    let bar = |id: &str| s.bus_lines[id].y;
+    // The gateway (on the most buses) above both bars, every other node below them: a node on both below both.
+    for bus in ["a", "b"] {
+        assert!(
+            top("gateway") + s.boxes["gateway"].height <= bar(bus),
+            "gateway above {bus}"
+        );
+        for n in ["leaf-a", "leaf-b", "both"] {
+            assert!(top(n) >= bar(bus), "{n} below {bus}");
+        }
+    }
+    // Every route keeps its logical direction: it starts at its source's node (the export's edges point to the bus).
+    for route in &s.routes {
+        let edge = s.graph.edges.iter().find(|e| e.id == route.id).unwrap();
+        let start = route.points.first().unwrap();
+        let b = &s.boxes[&edge.source];
+        assert!(
+            start.x >= b.x - 1e-6
+                && start.x <= b.x + b.width + 1e-6
+                && start.y >= b.y - 1e-6
+                && start.y <= b.y + b.height + 1e-6,
+            "{} starts at {}",
+            route.id,
+            edge.source
+        );
+        assert_eq!(
+            edge.target.as_deref().map(|t| t.len() == 1),
+            Some(true),
+            "the graph keeps its edges: {}",
+            edge.id
+        );
+    }
+}

@@ -13,6 +13,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   on its own line; bars that would overlap take parallel lanes away from their nodes. Applied on every snapshot an
   operation answers, so refinement and edits keep it; the scene, the columns, the SVG viewer and the playground's shape
   menu know it. Examples *Vehicle buses (bus lines)* and *Vehicle buses, organic* (made up).
+- A network of `busLine` nodes reads as a tree (provisional): for the layering, the bus edges are turned so that in every
+  connected network the node on the most buses (the earliest in the graph on a tie) is the root, and every bus edge
+  points from the end a breadth-first search reaches first to the one it reaches later. A gateway stands above its
+  buses, a node on one bus below it, a node on two buses below both; the edges keep their logical direction in every
+  output. In *Vehicle buses (bus lines)* the central gateway heads its three buses and the body controller its LIN bus.
 
 - **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
   the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads

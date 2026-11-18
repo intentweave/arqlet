@@ -776,6 +776,23 @@ fn compute_mode(
         }
         _ => options,
     };
+    // Provisional: the edges of bus lines turned for the layering, so the bus network reads as a tree (`bus_line::orient`).
+    if let Some((oriented, flipped)) = bus_line::orient(graph) {
+        let mut snapshot = compute_mode_buses(&oriented, previous, dirty, optimize, options, run)?;
+        bus_line::restore(&mut snapshot, graph, &flipped);
+        return Ok(snapshot);
+    }
+    compute_mode_buses(graph, previous, dirty, optimize, options, run)
+}
+
+fn compute_mode_buses(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    optimize: usize,
+    options: &LayoutOptions,
+    run: &mut Run,
+) -> Result<Snapshot, Abort> {
     // Backbone buses take part in the layout as virtual nodes (`bus_layout`); the result is given back in the canonical graph.
     if let Some((expanded, expanded_options, expansion)) = bus_layout::expand(graph, options) {
         let earlier = previous.map(|p| bus_layout::expand_previous(p, &expanded));
