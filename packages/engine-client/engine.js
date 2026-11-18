@@ -44,6 +44,28 @@ export function sceneOf(run, snapshot) {
 }
 
 /**
+ * Provisional: the groups and communities the view of `graph` adds with `options` (`groups`, `communities`,
+ * `communityHubs`), as the `groups` option takes them: node id → path of labels. Computed once (in a backend, for a large
+ * graph) and given back as `options.groups`, the view gets the same containers without computing communities again.
+ * Throws the engine's error.
+ */
+export function communityGroups(run, graph, options = {}) {
+  const result = run({op: 'communities', graph, options});
+  if (!result.ok) throw Error(result.error);
+  return result.groups;
+}
+
+/**
+ * Provisional: the first view of `graph` (`import`). With `omitSource`, the snapshot leaves the source graph out and
+ * carries its fingerprint (`sourceDigest`); later requests on it send the graph as `source`. Throws the engine's error.
+ */
+export function importGraph(run, graph, limit, options = {}, {omitSource = false} = {}) {
+  const result = run({op: 'import', graph, limit, options, ...(omitSource ? {omitSource: true} : {})});
+  if (!result.ok) throw Error(result.error);
+  return result.snapshot;
+}
+
+/**
  * Starts a module worker that answers engine requests for the WASM at `wasmUrl`. The worker's own URL is
  * resolved from this module, so the same package works from any host page or import map.
  */

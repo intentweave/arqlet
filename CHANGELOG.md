@@ -23,6 +23,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- Precomputing for a host (provisional): `communities` (operation; `arqlet::community_groups`; npm `communityGroups`)
+  answers the groups and communities a view adds as the `groups` option takes them (node id → path of labels). Computed
+  once in a backend and given back as `groups`, the view gets the same members and labels without Louvain (the
+  containers are of kind `group`). `arqlet::import` and npm `importGraph` (with `omitSource`) run the import as a
+  library call. Tests `community_groups.rs`, `precompute.test.mjs`.
 - The import's selection, its collapsed containers and the budget walk the structured graph by index (`GraphIndex`,
   built once): a 1 000 000-node import 16.5 s → 10.6 s, byte-identical
   ([results](benchmarks/results/import-index-20261118.md)).

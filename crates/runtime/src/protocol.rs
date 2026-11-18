@@ -186,6 +186,12 @@ pub enum Request {
         #[serde(flatten)]
         body: Map<String, Value>,
     },
+    /// Provisional: the groups and communities the view of `graph` adds with `options`, as the `groups` option takes them
+    /// (`crate::community_groups`), answered as `{groups}`.
+    Communities {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
     /// The conflicts of one route in a drawing.
     RouteConflicts {
         #[serde(flatten)]
@@ -531,6 +537,7 @@ impl Request {
             Some("containerRefine") => return Ok(Request::ContainerRefine { body: body() }),
             Some("structuredRefine") => return Ok(Request::StructuredRefine { body: body() }),
             Some("metrics") => return Ok(Request::Metrics { body: body() }),
+            Some("communities") => return Ok(Request::Communities { body: body() }),
             Some("routeConflicts") => return Ok(Request::RouteConflicts { body: body() }),
             Some("referenceCreate") => return Ok(Request::ReferenceCreate { body: body() }),
             Some("referenceRefresh") => return Ok(Request::ReferenceRefresh { body: body() }),
@@ -952,6 +959,23 @@ pub fn handle(request: Request) -> Response {
             )
         }
         Request::ElkLayout { body } => Response::Encoded(elk_response(&with_op("elkLayout", body))),
+        Request::Communities { body } => {
+            let v = with_op("communities", body);
+            let answer = typed::<Graph>(&v["graph"]).and_then(|graph| {
+                let options: arqlet_model::LayoutOptions = if v["options"].is_null() {
+                    Default::default()
+                } else {
+                    typed(&v["options"])?
+                };
+                crate::community_groups(&graph, &options)
+            });
+            match answer {
+                Ok(groups) => {
+                    Response::Encoded(serde_json::json!({"ok": true, "groups": groups}).to_string())
+                }
+                Err(e) => Response::Error(e),
+            }
+        }
         Request::Metrics { body } => {
             let v = with_op("metrics", body);
             typed_answer(

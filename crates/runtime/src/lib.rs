@@ -171,6 +171,69 @@ pub fn structured<'a>(
     }))
 }
 
+/// Provisional: the groups and communities the view of `graph` adds (`structured` with `options`' `groups`,
+/// `communities` and `communityHubs`), as the `groups` option takes them: for every node that one of them holds, the path
+/// of their labels from its container down (outermost first). Computed once by a host (in a backend, for a large graph),
+/// kept with the graph, and given back as `groups`, it makes the view's containers without Louvain: an import with these
+/// groups and the same `communities` divides nothing further. The containers are then of kind `group` (ids `group:…`),
+/// with the same members and labels; two of one container whose labels are equal are told apart by ` (2)`, ` (3)`, … in
+/// the order of the view.
+pub fn community_groups(
+    graph: &Graph,
+    options: &LayoutOptions,
+) -> Result<BTreeMap<String, Vec<String>>, String> {
+    validate(graph)?;
+    let structure_only = LayoutOptions {
+        groups: options.groups.clone(),
+        communities: options.communities,
+        community_hubs: options.community_hubs.clone(),
+        ..LayoutOptions::default()
+    };
+    let view = structured(graph, &structure_only)?;
+    let original: BTreeSet<&str> = graph.nodes.iter().map(|n| n.id.as_str()).collect();
+    let parent: BTreeMap<&str, Option<&str>> = view
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    // A name for every added container, unique among the added containers of its parent.
+    let mut used: BTreeMap<(Option<&str>, String), usize> = BTreeMap::new();
+    let mut name: BTreeMap<&str, String> = BTreeMap::new();
+    for node in view
+        .nodes
+        .iter()
+        .filter(|n| !original.contains(n.id.as_str()))
+    {
+        let seen = used
+            .entry((node.parent_id.as_deref(), node.label.clone()))
+            .or_insert(0);
+        *seen += 1;
+        let unique = if *seen == 1 {
+            node.label.clone()
+        } else {
+            format!("{} ({})", node.label, seen)
+        };
+        name.insert(node.id.as_str(), unique);
+    }
+    let mut groups = BTreeMap::new();
+    for node in &graph.nodes {
+        let mut path = Vec::new();
+        let mut at = parent.get(node.id.as_str()).copied().flatten();
+        while let Some(p) = at {
+            match name.get(p) {
+                Some(n) => path.push(n.clone()),
+                None => break,
+            }
+            at = parent.get(p).copied().flatten();
+        }
+        if !path.is_empty() {
+            path.reverse();
+            groups.insert(node.id.clone(), path);
+        }
+    }
+    Ok(groups)
+}
+
 /// The hubs `communities` leaves out (`LayoutOptions::community_hubs`), for the layout crate.
 pub(crate) fn hubs_of(hubs: &arqlet_model::CommunityHubs) -> arqlet_layout::overview::Hubs {
     arqlet_layout::overview::Hubs {

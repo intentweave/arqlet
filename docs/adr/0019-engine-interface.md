@@ -143,7 +143,11 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    engine resolves as the import did and checks before use, and answer without it again (a changed source comes back
    whole); at 1M the import answers 7.3 MB instead of 187 MB
    ([results](../../benchmarks/results/import-index-20261118.md)). One-shot requests still send the graph; sessions do
-   not. Measured
+   not.
+   *Precomputing for a host (2026-11-18, provisional):* the `communities` operation (`arqlet::community_groups`, npm
+   `communityGroups`) answers the view's groups and communities as the `groups` option takes them, so a backend computes
+   them once and later views (also in a browser) take them without Louvain; `arqlet::import` and npm `importGraph` run the
+   import as a library call. A native Node binding (`crates/node`) is still a placeholder. Measured
    ([results](../../benchmarks/results/protocol-resident-20261112.md)): a trace 20–30× and a scene 4–6× faster in the
    browser path, an edit with its scene 1.2–1.6× (its time is layout work).
 4. **Columnar results**: positions and routes as typed arrays from a session, zero-copy in the browser; the overview

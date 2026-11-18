@@ -46,6 +46,32 @@
 //! assert!(answer.contains(r#""collapsedIds":["g"]"#));
 //! ```
 //!
+//! A host can prepare a large graph once (provisional): [`community_groups`] gives the groups and communities of the view
+//! as the `groups` option takes them, so later views need not compute communities again, and [`import`] lays out the
+//! first view (with `omitSource` through [`dispatch`], the snapshot leaves the source graph out).
+//!
+//! ```
+//! use arqlet::model::{Graph, LayoutOptions};
+//! // Three rings of eight nodes, at the top level.
+//! let (mut nodes, mut edges) = (Vec::new(), Vec::new());
+//! for ring in ["a", "b", "c"] {
+//!     for i in 0..8 {
+//!         nodes.push(serde_json::json!({"id": format!("{ring}{i}"), "kind": "fn", "label": format!("{ring}{i}")}));
+//!         edges.push(serde_json::json!({"id": format!("{ring}{i}e"), "kind": "calls",
+//!             "source": format!("{ring}{i}"), "target": format!("{ring}{}", (i + 1) % 8)}));
+//!     }
+//! }
+//! let graph: Graph = serde_json::from_value(serde_json::json!({"nodes": nodes, "edges": edges})).unwrap();
+//! let options = LayoutOptions { communities: 6, ..Default::default() };
+//! // In the backend, once: node id → path of group labels.
+//! let groups = arqlet::community_groups(&graph, &options).unwrap();
+//! assert_eq!(groups.len(), 24);
+//! // Later: the same containers from the groups, without Louvain; they start collapsed.
+//! let given = LayoutOptions { groups, ..options };
+//! let snapshot = arqlet::import(graph, 100, &given).unwrap();
+//! assert_eq!(snapshot.collapsed_ids.len(), 3);
+//! ```
+//!
 //! The crates, in order of the pipeline:
 //!
 //! - [`model`]: canonical graph, identities, revisions and layout options;
@@ -70,4 +96,13 @@ pub use arqlet_scene as scene;
 pub use arqlet_topology as topology;
 pub use arqlet_view as view;
 
-pub use arqlet_runtime::{dispatch, dispatch_streaming};
+pub use arqlet_runtime::{community_groups, dispatch, dispatch_streaming};
+
+/// Provisional: the first view of `graph` within `limit` (the `import` operation, as [`dispatch`] runs it).
+pub fn import(
+    graph: model::Graph,
+    limit: usize,
+    options: &model::LayoutOptions,
+) -> Result<model::Snapshot, String> {
+    arqlet_runtime::import_graph_with(graph, limit, options)
+}
