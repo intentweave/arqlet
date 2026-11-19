@@ -105,7 +105,7 @@ export function overviewBuffers(
   expanded?: Expanded,
   collapsed?: Set<number>,
   selected?: number,
-  options?: {shapes?: Record<string, Outline>; trace?: OverviewPath | null},
+  options?: {shapes?: Record<string, Outline>; trace?: OverviewPath | null; galaxy?: boolean},
 ): OverviewBuffers;
 
 /** Provisional: a path or neighbourhood in model indices (`pathOf`). */

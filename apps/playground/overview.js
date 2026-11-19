@@ -195,7 +195,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   }
   unbind?.(); renderer?.destroy();
   model = next;
-  renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes});
+  renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes, galaxy: $('galaxy').checked});
   unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   focus = -1;
   zoomTo(-1);
@@ -686,3 +686,5 @@ for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
     unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   });
 }
+
+$('galaxy').onchange = () => { renderer?.setGalaxy($('galaxy').checked); };

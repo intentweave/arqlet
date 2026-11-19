@@ -239,7 +239,7 @@ export function representationsOf(model, view, width, height, {
  * scene), and per structured cluster its `back` boxes (containers), `routes` (lines), `arrows` (triangles at each route's
  * target, so the logical direction shows) and `front` boxes (leaves).
  */
-export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null} = {}) {
+export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null, galaxy = false} = {}) {
   const {overview: o, n, children, depth, cluster, tops} = model;
   // A path (`pathOf`): its discs and lines are drawn in amber; with `fade` everything else is dimmed.
   const AMBER = [1, 0.78, 0.38];
@@ -264,6 +264,15 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const discs = [];
   for (const i of order) {
     if (lines.has(i)) continue;
+    if (galaxy) {
+      // A cluster is a cloud of light (a glow fainter the deeper it is, so nested clouds add up towards their cores),
+      // a collapsed one a brighter glow, a leaf a star; the colours of the clusters as in the disc style.
+      const [red, green, blue] = dim(colour(i), i);
+      if (children[i].length > 0 && !collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.15, o.r[i] * 1.15, [red, green, blue], 0.22 / (1 + depth[i]), 4);
+      else if (collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.3, o.r[i] * 1.3, [red, green, blue], 0.8, 4);
+      else pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.6, o.r[i] * 1.6, [Math.min(1, red * 1.25 + 0.1), Math.min(1, green * 1.25 + 0.1), Math.min(1, blue * 1.25 + 0.1)], 0.95, 5);
+      continue;
+    }
     // A collapsed cluster is one filled disc, a little darker than a leaf.
     const ring = children[i].length > 0 && !collapsed.has(i);
     const shade = ring ? 0.35 + 0.1 * Math.min(depth[i], 4) : collapsed.has(i) ? 0.72 : 1;
@@ -340,11 +349,12 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
       return port ?? boxCentre.get(o.ids[i]) ?? [o.x[owner[i]], o.y[owner[i]]];
     };
     const from = end(a), to = end(b);
-    const [red, green, blue] = cluster[a] === cluster[b] ? colour(a) : [0.62, 0.7, 0.82];
+    // In the galaxy style every edge takes its source's colour: where a cluster's edges run, its light runs.
+    const [red, green, blue] = galaxy || cluster[a] === cluster[b] ? colour(a) : [0.62, 0.7, 0.82];
     // An edge that leaves a structured cluster is drawn stronger: it is one of few. It ends in an arrow at a disc outside.
     const leg = owner[a] >= 0 || owner[b] >= 0;
     const lit = trace?.edges.has(k);
-    const alpha = lit ? 0.95 : (leg ? 0.3 : 0.06) * (trace?.fade ? 0.3 : 1);
+    const alpha = lit ? 0.95 : (leg ? 0.3 : galaxy ? 0.11 : 0.06) * (trace?.fade ? 0.3 : 1);
     const [er, eg, eb] = lit ? AMBER : [red, green, blue];
     edges.push(...from, er, eg, eb, alpha, ...to, er, eg, eb, alpha);
     if (leg && owner[a] >= 0 && expanded.has(owner[a]) && !(owner[b] >= 0 && expanded.has(owner[b]))) {
