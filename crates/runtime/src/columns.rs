@@ -458,13 +458,17 @@ impl OverviewColumns {
     /// The columns of an overview. With `positions_only` (a continuation on the same clusters) only `x`, `y` and `r`.
     pub fn of(overview: arqlet_model::Overview, positions_only: bool) -> Self {
         let mut meta = if positions_only {
-            serde_json::json!({
+            let mut meta = serde_json::json!({
                 "schemaVersion": overview.schema_version,
                 "positionsOnly": true,
                 "representation": overview.representation,
                 "rootRadius": overview.root_radius,
                 "stats": overview.stats,
-            })
+            });
+            if !overview.bus_lines.is_empty() {
+                meta["busLines"] = serde_json::to_value(&overview.bus_lines).unwrap_or_default();
+            }
+            meta
         } else {
             let mut whole = serde_json::to_value(&overview).unwrap_or_default();
             if let Some(o) = whole.as_object_mut() {

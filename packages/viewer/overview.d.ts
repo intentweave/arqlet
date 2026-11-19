@@ -26,6 +26,8 @@ export interface OverviewModel {
   /** The outermost node of every node's chain: a node that is its parent's only child and has the same disc (overview
    * option `chains`) is drawn, named and picked with its parent. The node itself when it is in no chain. */
   chainTop: Int32Array;
+  /** The bus lines by node index (`busLinesOf`), built at the first use. */
+  busLines?: Map<number, import('@arqlet/contracts').OverviewBusLine>;
 }
 
 export interface OverviewView {
@@ -66,12 +68,14 @@ export type Expanded = Map<number, StructuredCluster>;
 export interface OverviewBuffers {
   discs: Float32Array;
   edges: Float32Array;
+  /** Bus connectors (`busLines`) as triangles, drawn under the discs. */
+  buses: Float32Array;
   back: Float32Array;
   routes: Float32Array;
   arrows: Float32Array;
   front: Float32Array;
   /** Vertices per part. */
-  count: {discs: number; edges: number; back: number; routes: number; arrows: number; front: number};
+  count: {discs: number; edges: number; buses: number; back: number; routes: number; arrows: number; front: number};
 }
 
 /** The part of a structured cluster's scene its disc shows: the cluster's own box, or the whole scene. */
@@ -191,8 +195,11 @@ export interface OverviewLens {
 export function lensAt(lens: OverviewLens | null, x: number, y: number): [number, number, number];
 /** The screen point the lens shows at (`x`, `y`): the inverse of `lensAt`. */
 export function lensInverse(lens: OverviewLens | null, x: number, y: number): [number, number];
-/** The deepest node whose disc holds the world point, or -1; a collapsed cluster is picked as a whole. */
+/** The deepest node whose disc holds the world point, or -1; a collapsed cluster is picked as a whole. A bus drawn as a
+ * line (`busLines`) is picked by its bar where no disc is, not by its disc. */
 export function pickNode(model: OverviewModel, x: number, y: number, collapsed?: Set<number>): number;
+/** Provisional: the overview's bus lines by the bus node's index. */
+export function busLinesOf(model: OverviewModel): Map<number, import('@arqlet/contracts').OverviewBusLine>;
 /** The view that shows node `i` (-1: everything) in a viewport of `width` × `height` CSS pixels. */
 export function viewOf(model: OverviewModel, i: number, width: number, height: number, margin?: number): OverviewView;
 export function subtreeOf(model: OverviewModel, i: number): string[];

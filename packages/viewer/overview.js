@@ -258,8 +258,12 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const folded = i => model.chainTop && model.chainTop[i] !== i && children[i].length > 0;
   const order = [...Array(n).keys()].filter(i => owner[i] < 0 && !folded(i)).sort((a, b) =>
     (children[b].length > 0) - (children[a].length > 0) || depth[a] - depth[b] || a - b);
+  // Provisional: a bus of shape busLine that stands on its own (not inside a collapsed or structured cluster) is drawn as
+  // its line with taps (`busLines`), not as a disc; its edges are its taps.
+  const lines = new Map((o.busLines ?? []).filter(l => owner[l.node] < 0).map(l => [l.node, l]));
   const discs = [];
   for (const i of order) {
+    if (lines.has(i)) continue;
     // A collapsed cluster is one filled disc, a little darker than a leaf.
     const ring = children[i].length > 0 && !collapsed.has(i);
     const shade = ring ? 0.35 + 0.1 * Math.min(depth[i], 4) : collapsed.has(i) ? 0.72 : 1;
@@ -277,7 +281,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     }
   }
   // The selected cluster: a bright ring on top of its disc.
-  if (selected >= 0 && owner[selected] < 0) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
+  if (selected >= 0 && owner[selected] < 0 && !lines.has(selected)) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
   // Scene geometry per structured cluster, where each of its nodes' boxes is, and the border port of each edge that
   // leaves it.
   const back = [], routes = [], arrows = [], front = [];
@@ -317,6 +321,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const bundled = new Map(), litBundles = new Set();
   for (let k = 0; k < o.edges.length / 2; k++) {
     const a = o.edges[2 * k], b = o.edges[2 * k + 1];
+    if (lines.has(a) || lines.has(b)) continue;
     if (owner[a] >= 0 && owner[a] === owner[b]) continue;
     const ra = owner[a] >= 0 && collapsed.has(owner[a]) ? owner[a] : a;
     const rb = owner[b] >= 0 && collapsed.has(owner[b]) ? owner[b] : b;
@@ -358,11 +363,38 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     const alpha = lit ? 0.95 : Math.min(0.55, 0.06 + 0.04 * Math.sqrt(count)) * (trace?.fade ? 0.3 : 1);
     edges.push(o.x[ra], o.y[ra], red, green, blue, alpha, o.x[rb], o.y[rb], red, green, blue, alpha);
   }
+  // The bus lines as thick orthogonal connectors: the line, and from each member (or the cluster that shows it) a tap that
+  // leaves its disc at the rim (the stub), runs at a right angle to the line and, for a member beyond the line's ends,
+  // along it to the end; a square junction where it meets the line. All as triangles, so they keep their width.
+  const BUS = [0.44, 0.58, 0.72], buses = [];
+  for (const [i, l] of lines) {
+    const lit = !!trace && trace.nodes.has(i);
+    const [red, green, blue] = i === selected ? [1, 1, 1] : lit ? AMBER : dim(BUS, i);
+    const half = Math.max(o.r[i] * 0.12, 0.25), across = l.y1 === l.y2;
+    thickSegment(buses, [l.x1, l.y1], [l.x2, l.y2], half, [red, green, blue], 1);
+    l.taps.forEach((m, k) => {
+      const shown = owner[m] >= 0 && collapsed.has(owner[m]) ? owner[m] : m;
+      const centre = owner[m] >= 0 && !collapsed.has(owner[m]) ? boxCentre.get(o.ids[m]) ?? [o.x[owner[m]], o.y[owner[m]]] : [o.x[shown], o.y[shown]];
+      const rim = owner[m] >= 0 && !collapsed.has(owner[m]) ? 0 : o.r[shown];
+      const foot = [l.feet[2 * k], l.feet[2 * k + 1]];
+      // Where the tap meets the line's level: straight below or beside the member; the foot when the member is within
+      // the line's span, else a corner from which the tap runs along the line to its end.
+      const corner = across ? [centre[0], l.y1] : [l.x1, centre[1]];
+      const away = Math.hypot(corner[0] - centre[0], corner[1] - centre[1]);
+      const start = away > rim ? [centre[0] + (corner[0] - centre[0]) / away * rim, centre[1] + (corner[1] - centre[1]) / away * rim] : corner;
+      const tapLit = lit && (trace.nodes.has(m) || trace.clusters.has(shown));
+      const [tr, tg, tb] = tapLit ? AMBER : i === selected ? [1, 1, 1] : dim(BUS, i);
+      const alpha = tapLit || i === selected ? 1 : trace?.fade ? 0.35 : 0.9;
+      if (away > rim) thickSegment(buses, start, corner, half * 0.8, [tr, tg, tb], alpha);
+      if (Math.hypot(foot[0] - corner[0], foot[1] - corner[1]) > 1e-6) thickSegment(buses, corner, foot, half * 0.8, [tr, tg, tb], alpha);
+      thickSegment(buses, [foot[0] - half * 1.6, foot[1]], [foot[0] + half * 1.6, foot[1]], half * 1.6, [red, green, blue], 1);
+    });
+  }
   const f = a => new Float32Array(a);
   return {
-    discs: f(discs), edges: f(edges), back: f(back), routes: f(routes), arrows: f(arrows), front: f(front),
+    discs: f(discs), edges: f(edges), buses: f(buses), back: f(back), routes: f(routes), arrows: f(arrows), front: f(front),
     count: {
-      discs: discs.length / SHAPE_STRIDE, edges: edges.length / LINE_STRIDE, back: back.length / SHAPE_STRIDE,
+      discs: discs.length / SHAPE_STRIDE, edges: edges.length / LINE_STRIDE, buses: buses.length / LINE_STRIDE, back: back.length / SHAPE_STRIDE,
       routes: routes.length / LINE_STRIDE, arrows: arrows.length / LINE_STRIDE, front: front.length / SHAPE_STRIDE,
     },
   };
@@ -490,6 +522,16 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
     if (!visible(x, y + r, r)) continue;
     out.push({text, x, y: y + 12, size: Math.min(13 + r / 60, 18), weight: r, kind: 'cluster'});
   }
+  // A bus drawn as a line carries its name above the middle of its bar, once the bar is long enough on screen.
+  for (const [i, l] of busLinesOf(model)) {
+    if (owner[i] >= 0) continue;
+    const [x1, y1, f1] = screen(l.x1, l.y1), [x2, y2] = screen(l.x2, l.y2);
+    const long = Math.hypot(x2 - x1, y2 - y1);
+    if (long < 40 * f1) continue;
+    const [x, y] = [(x1 + x2) / 2, (y1 + y2) / 2];
+    if (!visible(x, y, long)) continue;
+    out.push({text: nameOf(model, i), x, y: y - 9, size: Math.min(11 + long / 120, 14), weight: long / 2, kind: 'node'});
+  }
   for (const [i, {scene}] of expanded) {
     const place = placeScene(model, i, scene);
     const placed = new Set((scene.labels ?? []).map(l => l.id));
@@ -536,16 +578,39 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
 /** The deepest node whose disc holds the world point (`x`, `y`), or -1. Descends from the top level. */
 export function pickNode(model, x, y, collapsed = new Set()) {
   const {overview: o, children, roots} = model;
-  const inside = i => (o.x[i] - x) ** 2 + (o.y[i] - y) ** 2 <= o.r[i] ** 2;
+  // A bus drawn as a line (`busLines`) is picked by its bar (within the bar's width, at least a tenth of a leaf beyond
+  // it), not by its disc; a disc under the point comes first.
+  const lines = busLinesOf(model);
+  const onBar = i => {
+    const l = lines.get(i), dx = l.x2 - l.x1, dy = l.y2 - l.y1, len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - l.x1) * dx + (y - l.y1) * dy) / len2)) : 0;
+    const px = l.x1 + t * dx, py = l.y1 + t * dy, reach = Math.max(o.r[i] / 3, 0.5) * 1.5;
+    return (x - px) ** 2 + (y - py) ** 2 <= reach * reach;
+  };
+  const inside = i => !lines.has(i) && (o.x[i] - x) ** 2 + (o.y[i] - y) ** 2 <= o.r[i] ** 2;
   let found = -1, candidates = roots;
   for (;;) {
-    const next = candidates.find(inside);
+    const next = candidates.find(inside) ?? candidates.find(i => lines.has(i) && onBar(i));
     if (next === undefined) return found >= 0 && model.chainTop ? model.chainTop[found] : found;
     found = next;
     // A collapsed cluster is picked as a whole.
     if (collapsed.has(next)) return found;
     candidates = children[next];
   }
+}
+
+// A segment from `a` to `b` as two triangles `half` wide on each side (line vertices: x, y, red, green, blue, alpha).
+function thickSegment(out, a, b, half, [red, green, blue], alpha) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len * half, ny = dx / len * half;
+  const quad = [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]];
+  for (const k of [0, 1, 2, 0, 2, 3]) out.push(...quad[k], red, green, blue, alpha);
+}
+
+/** The bus lines of a model by node index (`busLines` of the overview), kept with the model. */
+export function busLinesOf(model) {
+  if (!model.busLines) model.busLines = new Map((model.overview.busLines ?? []).map(l => [l.node, l]));
+  return model.busLines;
 }
 
 /** The view (`centreX`, `centreY`, `scale` in pixels per unit) that shows the disc of node `i` (-1: everything). */

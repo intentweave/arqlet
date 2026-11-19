@@ -704,3 +704,87 @@ fn paths_and_neighbourhoods_on_the_overview_graph() {
         session.run_value(&json!({"op": "overviewTrace", "from": "nowhere", "to": "g0/f0/n2"}));
     assert_eq!(unknown["ok"], false);
 }
+
+#[test]
+fn a_bus_line_node_is_a_line_with_taps_in_the_overview() {
+    // A bus with five members and a second bus with one: each a line; the members' taps meet it at their projections.
+    let mut nodes = vec![
+        json!({"id": "can", "kind": "bus", "label": "CAN", "shape": "busLine"}),
+        json!({"id": "lin", "kind": "bus", "label": "LIN", "shape": "busLine"}),
+    ];
+    let mut edges = Vec::new();
+    for i in 0..5 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("E{i}")}));
+        edges.push(json!({"id": format!("c{i}"), "kind": "connects", "source": format!("e{i}"), "target": "can"}));
+    }
+    edges.push(json!({"id": "l0", "kind": "connects", "source": "e0", "target": "lin"}));
+    let graph = json!({"nodes": nodes, "edges": edges});
+    let o = overview(&graph, 1);
+    let lines = o["busLines"].as_array().unwrap();
+    assert_eq!(lines.len(), 2);
+    let can = &lines[0];
+    assert_eq!(can["node"], 0);
+    assert_eq!(can["taps"], json!([2, 3, 4, 5, 6]));
+    let (x1, y1, x2, y2) = (
+        can["x1"].as_f64().unwrap(),
+        can["y1"].as_f64().unwrap(),
+        can["x2"].as_f64().unwrap(),
+        can["y2"].as_f64().unwrap(),
+    );
+    let len = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
+    assert!(len > 0.);
+    // Every foot lies on the line, and a tap is perpendicular to it (within rounding).
+    let feet = can["feet"].as_array().unwrap();
+    for (k, tap) in can["taps"].as_array().unwrap().iter().enumerate() {
+        let (fx, fy) = (
+            feet[2 * k].as_f64().unwrap(),
+            feet[2 * k + 1].as_f64().unwrap(),
+        );
+        let cross = ((x2 - x1) * (fy - y1) - (y2 - y1) * (fx - x1)) / len;
+        assert!(cross.abs() < 0.05, "foot off the line: {cross}");
+        let j = tap.as_u64().unwrap() as usize;
+        let (mx, my) = (o["x"][j].as_f64().unwrap(), o["y"][j].as_f64().unwrap());
+        let dot = ((x2 - x1) * (mx - fx) + (y2 - y1) * (my - fy)) / len;
+        assert!(dot.abs() < 0.05, "tap not perpendicular: {dot}");
+    }
+    // The bus with one member: a short line across its own centre.
+    assert_eq!(lines[1]["taps"], json!([2]));
+    // Without busLine nodes nothing is added.
+    let plain = overview(
+        &json!({"nodes": [{"id": "a", "kind": "k", "label": "a"}], "edges": []}),
+        1,
+    );
+    assert!(plain.get("busLines").is_none());
+    // The same for any thread count.
+    assert_eq!(overview(&graph, 4)["busLines"], o["busLines"]);
+}
+
+#[test]
+fn a_member_in_another_cluster_taps_the_bus_line_without_stretching_it() {
+    // A zone with a bus and four members, and a gateway outside on the same bus: the line stays within the zone's disc.
+    let mut nodes = vec![
+        json!({"id": "zone", "kind": "zone", "label": "zone"}),
+        json!({"id": "can", "kind": "bus", "label": "CAN", "shape": "busLine", "parentId": "zone"}),
+        json!({"id": "gw", "kind": "ecu", "label": "gw"}),
+        json!({"id": "far", "kind": "ecu", "label": "far"}),
+    ];
+    let mut edges = vec![
+        json!({"id": "g", "kind": "connects", "source": "gw", "target": "can"}),
+        json!({"id": "f", "kind": "connects", "source": "gw", "target": "far"}),
+    ];
+    for i in 0..4 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("E{i}"), "parentId": "zone"}));
+        edges.push(json!({"id": format!("c{i}"), "kind": "connects", "source": format!("e{i}"), "target": "can"}));
+    }
+    let o = overview(&json!({"nodes": nodes, "edges": edges}), 1);
+    let line = &o["busLines"][0];
+    let len = (line["x2"].as_f64().unwrap() - line["x1"].as_f64().unwrap())
+        .hypot(line["y2"].as_f64().unwrap() - line["y1"].as_f64().unwrap());
+    let zone = o["r"][0].as_f64().unwrap();
+    assert!(len <= 2. * zone, "line {len} within the zone's disc {zone}");
+    assert_eq!(
+        line["taps"].as_array().unwrap().len(),
+        5,
+        "the gateway taps it too"
+    );
+}

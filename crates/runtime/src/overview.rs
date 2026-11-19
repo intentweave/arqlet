@@ -318,6 +318,16 @@ fn lay_out(
         root_radius: round(o.root_radius),
         kinds: kinds.iter().map(|k| k.to_string()).collect(),
         kind,
+        bus_lines: overview::bus_lines(graph, &h.parent, &h.edges, &o.x, &o.y, options.node_radius)
+            .into_iter()
+            .map(|mut l| {
+                for v in [&mut l.x1, &mut l.y1, &mut l.x2, &mut l.y2] {
+                    *v = round(*v);
+                }
+                l.feet.iter_mut().for_each(|v| *v = round(*v));
+                l
+            })
+            .collect(),
         edges,
         links,
         stats: OverviewStats {
