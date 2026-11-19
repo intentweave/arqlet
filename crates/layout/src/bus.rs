@@ -41,7 +41,8 @@ pub(crate) fn draw_buses(
             ]
         })
         .collect();
-    for bus in buses {
+    // A bus line (`Bus::taps`) is drawn as a bar, not on shared routes.
+    for bus in buses.iter().filter(|b| b.taps.is_empty()) {
         let members: Vec<usize> = bus
             .edges
             .iter()
@@ -1043,6 +1044,7 @@ mod tests {
             id: "bus".into(),
             edges: vec!["sa".into(), "sb".into(), "sc".into()],
             label: None,
+            ..Default::default()
         };
         let diagnostics = draw_buses(&g, &rects, &mut routes, &[bus], 12., &BTreeMap::new());
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -1086,6 +1088,7 @@ mod tests {
             id: "x".into(),
             edges: vec!["sa".into(), "ab".into()],
             label: None,
+            ..Default::default()
         };
         let diagnostics = draw_buses(&g, &rects, &mut routes, &[bus], 12., &BTreeMap::new());
         assert!(routes

@@ -20,6 +20,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   output. In *Vehicle buses (bus lines)* the central gateway heads its three buses and the body controller its LIN bus.
 - `trace` follows the edges of a `busLine` node both ways (a bus is a shared medium), so a path runs node → bus → node;
   other edges keep their direction.
+- Bus lines are a view (provisional, ADR 0019 view model): the source graph keeps a `busLine` node with its edges; the
+  view (`Snapshot.graph`) leaves them out and keeps a `Bus` with `taps` (one per edge: edge, node, direction, kind) and the
+  bus's label, kind and parent. The layout sees the bus as a node again; `Snapshot.busLines` holds each bar and its taps'
+  points (absolute, in each edge's direction), `Snapshot.busTaps` the taps' layout state for the next operation, the bus
+  box stays in `busBoxes`. Every operation continues the layout with the bus nodes and answers the view
+  (`expand_bus_lines`/`apply_bus_lines`). The scene has `busLines` (id, label, kind, bar, taps) instead of a node with a
+  bar; the columns carry them, the SVG viewer draws them (selectable, traced by the bus's and the edges' ids), and a trace
+  or neighbourhood marks the bar and taps it runs over.
 
 - **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
   the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads

@@ -36,8 +36,34 @@ pub struct Scene {
     /// them as junction dots. Omitted when there is none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub junctions: Vec<Point>,
+    /// Provisional: the bus lines of the view (a bus kept as a node of shape `busLine` in the source graph): each a bar with
+    /// its taps, one per edge of the bus, in the edge's direction. Omitted when there is none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bus_lines: Vec<SceneBusLine>,
     /// Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
     pub bounds: Rect,
+}
+
+/// Provisional: one bus line of a scene (`Scene::bus_lines`).
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SceneBusLine {
+    pub id: String,
+    pub label: String,
+    pub kind: String,
+    pub bounds: Rect,
+    pub taps: Vec<SceneTap>,
+}
+
+/// Provisional: one tap of a bus line: the edge it stands for, the node it attaches, and its points.
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SceneTap {
+    pub edge: String,
+    pub node: String,
+    pub points: Vec<Point>,
 }
 
 /// One conflict of the drawing. A renderer marks every node and route it names and shows `reason` for them.
@@ -217,23 +243,13 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     let mut positions: BTreeMap<&str, Rect> = BTreeMap::new();
     let mut nodes = Vec::with_capacity(graph.nodes.len());
     for node in &graph.nodes {
-        let mut bounds = absolute(
+        let bounds = absolute(
             &node.id,
             &by_id,
             snapshot,
             &mut positions,
             &mut BTreeSet::new(),
         )?;
-        // A bus drawn as a bar (`Snapshot::bus_lines`, relative to the parent as the box is): the bar instead of the box.
-        if let Some(bar) = snapshot.bus_lines.get(&node.id) {
-            let own = &snapshot.boxes[&node.id];
-            bounds = Rect {
-                x: bounds.x - own.x + bar.x,
-                y: bounds.y - own.y + bar.y,
-                width: bar.width,
-                height: bar.height,
-            };
-        }
         let rows = node_rows(snapshot, &node.id, &bounds);
         nodes.push(SceneNode {
             node: node.clone(),
@@ -376,6 +392,35 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     for node in &nodes {
         include(&node.bounds);
     }
+    // Provisional: the bus lines of the view (`Bus::taps`), each with its bar and taps.
+    let bus_lines: Vec<SceneBusLine> = snapshot
+        .graph
+        .buses
+        .iter()
+        .filter_map(|bus| {
+            let line = snapshot.bus_lines.get(&bus.id)?;
+            Some(SceneBusLine {
+                id: bus.id.clone(),
+                label: bus.label.clone().unwrap_or_else(|| bus.id.clone()),
+                kind: bus.kind.clone().unwrap_or_default(),
+                bounds: line.bar.clone(),
+                taps: bus
+                    .taps
+                    .iter()
+                    .filter_map(|tap| {
+                        Some(SceneTap {
+                            edge: tap.edge.clone(),
+                            node: tap.node.clone(),
+                            points: line.taps.get(&tap.edge)?.clone(),
+                        })
+                    })
+                    .collect(),
+            })
+        })
+        .collect();
+    for line in &bus_lines {
+        include(&line.bounds);
+    }
     for label in &labels {
         include(&label.bounds);
     }
@@ -444,6 +489,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             .map(|b| b.edges.clone())
             .collect(),
         junctions,
+        bus_lines,
         bounds: Rect {
             x: left - 30.,
             y: top - 30.,

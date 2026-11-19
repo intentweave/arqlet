@@ -633,10 +633,14 @@ pub struct Snapshot {
     /// graph has none.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bus_boxes: BTreeMap<String, Rect>,
-    /// Provisional: the bar of every node of shape `busLine`, relative to its parent as `boxes` are; the scene draws it
-    /// instead of the node's box, which the layout keeps. Omitted when empty.
+    /// Provisional: every bus line of the view (`Bus::taps`), by bus id: its bar and its taps. Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub bus_lines: BTreeMap<String, Rect>,
+    pub bus_lines: BTreeMap<String, BusLine>,
+    /// Provisional: the layout state of the bus lines' taps (their routes, ports and border crossings, as the layout left
+    /// them), kept apart from the view's, so that an operation can continue the layout of the graph with the bus nodes.
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "BusTapLayout::is_empty")]
+    pub bus_taps: BusTapLayout,
     /// The move gesture in progress or the last one finished, for sequence checks. Omitted when there was none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gesture: Option<Gesture>,
@@ -2254,6 +2258,62 @@ pub struct Bus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub label: Option<String>,
+    /// Provisional: a bus line, the view of a node of shape `busLine` (ADR 0019 view model): the source graph keeps the bus
+    /// as a node with its edges; the view leaves the node and those edges out and keeps them here, one tap per edge, drawn
+    /// as a bar past the nodes they attach (`Snapshot::bus_lines`). Omitted when empty (a bus of shared edges).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<BusTap>>"))]
+    pub taps: Vec<BusTap>,
+    /// Provisional: with `taps`, the bus node's kind and parent in the source graph. Omitted when unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub parent_id: Option<String>,
+}
+
+/// Provisional: one edge of a bus line (`Bus::taps`): the edge, the node at its other end, whether the edge runs from that
+/// node to the bus (`toBus`) or from the bus to it, and the edge's kind.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct BusTap {
+    pub edge: String,
+    pub node: String,
+    pub to_bus: bool,
+    pub kind: String,
+}
+
+/// Provisional: where a bus line is drawn (`Snapshot::bus_lines`), in absolute coordinates as the routes are: its bar, and
+/// the points of every tap by edge id, in the edge's own direction.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct BusLine {
+    pub bar: Rect,
+    pub taps: BTreeMap<String, Vec<Point>>,
+}
+
+/// Provisional: the layout state of the taps of the bus lines (`Snapshot::bus_taps`).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct BusTapLayout {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub routes: Vec<Route>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resolved_ports: Vec<ResolvedPort>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub boundary_crossings: Vec<BoundaryCrossing>,
+}
+
+impl BusTapLayout {
+    pub fn is_empty(&self) -> bool {
+        self.routes.is_empty()
+            && self.resolved_ports.is_empty()
+            && self.boundary_crossings.is_empty()
+    }
 }
 
 /// Where a node stands in its rank, chosen by the user (`LayoutOptions::order_hints`).

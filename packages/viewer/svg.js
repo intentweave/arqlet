@@ -151,6 +151,19 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
   svg.append(line);
   if(onSelectRoute){const hit=element('polyline',{points,fill:'none',stroke:'transparent','stroke-width':10,'pointer-events':'stroke',class:'route-hit','data-route-id':route.id});hit.onclick=()=>onSelectRoute(route.id);svg.append(hit);}
  }
+  // Provisional: bus lines (a bus kept as a node of shape busLine in the source graph): a bar past the nodes it attaches, with
+  // one tap per edge of the bus in the edge's direction. The bar answers to the bus's id as a node does (selection, trace),
+  // each tap to its edge's id as a route does.
+  for(const bus of scene.busLines??[]){const r=bus.bounds,flat=r.width>=r.height,cx=r.x+r.width/2,cy=r.y+r.height/2;
+   for(const tap of bus.taps){const dim=!!active;svg.append(element('polyline',{'data-route-id':tap.edge,points:tap.points.map(p=>`${p.x},${p.y}`).join(' '),fill:'none',stroke:'#73bba7','stroke-width':1.6,'stroke-opacity':dim?.2:.75,'marker-end':`url(#${markerId})`,'pointer-events':'none'}));}
+   const g=element('g',{class:'node lw-bus-line',tabindex:0,role:'button','aria-label':bus.label,'data-node-id':bus.id});
+   const shape=element('rect',{...r,rx:Math.min(r.width,r.height)/2,fill:bus.id===selected?'#90e4c3':'#6f93b8',stroke:bus.id===selected?'#90e4c3':'#4c6682'});
+   g.append(element('rect',{x:r.x-4,y:r.y-4,width:r.width+8,height:r.height+8,fill:'transparent',class:'lw-hit'}),shape);
+   g.append(element('text',flat?{x:cx,y:r.y-6,'text-anchor':'middle',fill:'#9fc3e6','font-size':12,'pointer-events':'none'}:{x:r.x+r.width+14,y:cy,'text-anchor':'middle',transform:`rotate(-90 ${r.x+r.width+14} ${cy})`,fill:'#9fc3e6','font-size':12,'pointer-events':'none'},bus.label.slice(0,40)));
+   g.append(element('title',{},`${bus.id} · ${bus.taps.length} connection${bus.taps.length===1?'':'s'}`));
+   const node={id:bus.id,label:bus.label,kind:bus.kind,shape:'busLine'};g.onclick=e=>choose(node,e);g.onkeydown=e=>{if(e.key==='Enter')choose(node,e);};
+   g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);g.onpointerleave=()=>shape.setAttribute('stroke',bus.id===selected?'#90e4c3':'#4c6682');
+   svg.append(g);}
   // Junctions of explicit buses: where the bus's lines branch (ADR 0005).
   for(const j of scene.junctions??[])svg.append(element('circle',{cx:j.x,cy:j.y,r:3.5,fill:'#73bba7',stroke:'#142133','stroke-width':1,'pointer-events':'none',class:'lw-junction'}));
   // The rings and the controls of the containers are drawn above the routes, so a route crossing a container's border does
@@ -168,14 +181,12 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  // Entity-relationship notation: an attribute is a row of text in its entity; relationships are labelled edges.
  const attribute=n.kind==='attribute';
  const shape=attribute?element('rect',{...r,rx:4,fill:'transparent',stroke:'transparent'})
-  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):n.shape==='busLine'?element('rect',{...r,rx:Math.min(r.width,r.height)/2,...look,fill:n.id===selected?'#90e4c3':'#6f93b8'}):element('rect',{...r,rx:7,...look});
+  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:7,...look});
  g.append(shape);
  g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);
  g.onpointerleave=()=>shape.setAttribute('stroke',attribute?'transparent':look.stroke);if(pinned.has(n.id)){g.setAttribute('data-pinned-id',n.id);if(!onPin){const pin=element('circle',{cx:round?cx+rad*.62:r.x+r.width-10,cy:round?cy-rad*.62:r.y+10,r:4,fill:'#edc477','pointer-events':'none'});pin.append(element('title',{},'Pinned: layout keeps this position'));g.append(pin);}}
  const size=controlSize(Math.min(r.height*.5,r.width/5,24)),toggled=onToggle&&collapsed.has(n.id);
- // A bus drawn as a bar (shape busLine): its name beside the bar's middle, not inside it.
- const bar=n.shape==='busLine',flat=r.width>=r.height;
- if(!n.rows?.length)g.append(element('text',bar?(flat?{x:cx,y:r.y-6,'text-anchor':'middle',fill:'#9fc3e6','font-size':12,'pointer-events':'none'}:{x:r.x+r.width+14,y:cy,'text-anchor':'middle',transform:`rotate(-90 ${r.x+r.width+14} ${cy})`,fill:'#9fc3e6','font-size':12,'pointer-events':'none'}):round?{x:cx,y:cy+5,'text-anchor':'middle',fill:'#edf5ff','font-size':13,'pointer-events':'none'}:{x:toggled?r.x+8+size:r.x+10,y:n.kind==='attribute'?r.y+r.height/2+5:r.y+32,fill:'#edf5ff','font-size':13},(collapsed.has(n.id)&&!onToggle?'▸ ':'')+n.label.slice(0,23)));
+ if(!n.rows?.length)g.append(element('text',round?{x:cx,y:cy+5,'text-anchor':'middle',fill:'#edf5ff','font-size':13,'pointer-events':'none'}:{x:toggled?r.x+8+size:r.x+10,y:n.kind==='attribute'?r.y+r.height/2+5:r.y+32,fill:'#edf5ff','font-size':13},(collapsed.has(n.id)&&!onToggle?'▸ ':'')+n.label.slice(0,23)));
  if(toggled)g.append(toggleControl(n,r.x+4,r.y+(r.height-size)/2,size));
  // Rows of a node (ADR 0011): the engine gives each row its rectangle; the viewer draws the text inside it. The first row
 // is the title, a rule separates it from the others.

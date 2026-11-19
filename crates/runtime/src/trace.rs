@@ -109,7 +109,20 @@ pub(crate) fn on_view(
         .iter()
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
         .collect();
-    let visible: BTreeSet<&str> = snapshot.graph.nodes.iter().map(|n| n.id.as_str()).collect();
+    // A drawn bus line (`Bus::taps`) is shown as its bus node is, its taps as the bus's edges.
+    let lines: Vec<&arqlet_model::Bus> = snapshot
+        .graph
+        .buses
+        .iter()
+        .filter(|b| snapshot.bus_lines.contains_key(&b.id))
+        .collect();
+    let visible: BTreeSet<&str> = snapshot
+        .graph
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .chain(lines.iter().map(|b| b.id.as_str()))
+        .collect();
     let owner = |id: &str| -> Option<String> {
         let mut at = Some(id);
         let mut shown = None;
@@ -135,17 +148,31 @@ pub(crate) fn on_view(
         .iter()
         .map(|e| (e.id.as_str(), (e.source.as_str(), e.target.as_deref())))
         .collect();
+    let taps = || {
+        lines.iter().flat_map(|b| {
+            b.taps.iter().map(move |t| {
+                let ends = if t.to_bus {
+                    (t.node.as_str(), b.id.as_str())
+                } else {
+                    (b.id.as_str(), t.node.as_str())
+                };
+                (t.edge.as_str(), ends, t.kind.as_str())
+            })
+        })
+    };
     let drawn: BTreeMap<&str, (&str, &str)> = snapshot
         .graph
         .edges
         .iter()
         .filter_map(|e| Some((e.id.as_str(), (e.source.as_str(), e.target.as_deref()?))))
+        .chain(taps().map(|(id, ends, _)| (id, ends)))
         .collect();
     let drawn_kind: BTreeMap<&str, &str> = snapshot
         .graph
         .edges
         .iter()
         .map(|e| (e.id.as_str(), e.kind.as_str()))
+        .chain(taps().map(|(id, _, kind)| (id, kind)))
         .collect();
     let followed = |id: &str| {
         kinds
