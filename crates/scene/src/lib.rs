@@ -7,7 +7,8 @@ pub mod quality;
 pub mod realize;
 mod scene;
 pub use scene::{
-    build_corner_scene, build_scene, Scene, SceneConflict, SceneNode, SceneRoute, SceneRow,
+    build_corner_scene, build_scene, Scene, SceneBusLine, SceneConflict, SceneNode, SceneRoute,
+    SceneRow, SceneTap,
 };
 
 #[derive(Clone, Copy)]

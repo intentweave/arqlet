@@ -745,10 +745,13 @@ impl Request {
 }
 
 /// Handles one request.
-pub fn handle(request: Request) -> Response {
+pub fn handle(mut request: Request) -> Response {
+    // Provisional (bus lines, ADR 0019 view model): an operation continues the layout of the graph with the bus nodes, and
+    // every snapshot it answers is the view again, with its bars and taps drawn.
+    if let Some(snapshot) = request.snapshot_mut() {
+        arqlet_layout::expand_bus_lines(snapshot);
+    }
     match handle_request(request) {
-        // Provisional: nodes of shape `busLine` are drawn as bars with taps on every snapshot an operation answers (the
-        // layout does it too; refinement and other paths that finish a snapshot without it get it here).
         Response::Snapshot(mut snapshot) => {
             arqlet_layout::apply_bus_lines(&mut snapshot);
             Response::Snapshot(snapshot)

@@ -4373,6 +4373,7 @@ mod tests {
             straight_edges: Vec::new(),
             bus_boxes: BTreeMap::new(),
             bus_lines: BTreeMap::new(),
+            bus_taps: Default::default(),
             gesture: None,
             layered_plans: Default::default(),
         }

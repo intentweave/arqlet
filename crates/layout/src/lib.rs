@@ -336,17 +336,37 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
-    let (mut snapshot, stages) = compute_counted_forced(graph, previous, dirty, options)?;
-    // Provisional: nodes of shape `busLine` are drawn as bars with their edges as taps, on the finished layout.
-    bus_line::apply(&mut snapshot);
+    // Provisional (ADR 0019 view model): a node of shape `busLine` is a bus line in the view (`Bus::taps`), without its node
+    // and edges; the layout sees it as a node again, and its bar and taps come back in `Snapshot::bus_lines`.
+    let projected = bus_line::project(graph);
+    let view = projected.as_ref().unwrap_or(graph);
+    let Some(expanded) = bus_line::expand(view) else {
+        return compute_counted_forced(graph, previous, dirty, options);
+    };
+    // The earlier layout as the layout left it, with the bus nodes, where its continuation finds them.
+    let earlier = previous.map(|p| {
+        let mut p = p.clone();
+        bus_line::expand_snapshot(&mut p);
+        p
+    });
+    let (mut snapshot, stages) =
+        compute_counted_forced(&expanded, earlier.as_ref(), dirty, options)?;
+    bus_line::collapse(&mut snapshot, view);
     Ok((snapshot, stages))
 }
 
-/// Provisional: draws the nodes of shape `busLine` of a finished snapshot as bars with their edges as taps
-/// (`Snapshot::bus_lines`); computed anew from the boxes, so applying it again changes nothing. Nothing changes without such
-/// a node.
+/// Provisional: the view of a finished snapshot with bus lines (`Bus::taps`): a graph with nodes of shape `busLine` (as an
+/// operation on `expand_bus_lines`'s snapshot leaves it) becomes the view, and the bars and taps are drawn anew from the
+/// boxes (`Snapshot::bus_lines`); applying it again changes nothing. Nothing changes without a bus.
 pub fn apply_bus_lines(snapshot: &mut Snapshot) {
-    bus_line::apply(snapshot);
+    bus_line::collapse_snapshot(snapshot);
+}
+
+/// Provisional: the snapshot of a view with bus lines turned back into the one of the graph the layout sees, with the bus
+/// nodes, their edges, boxes and routes, for an operation that continues a layout; `apply_bus_lines` gives the view back.
+/// `false`, and nothing changes, without a bus line.
+pub fn expand_bus_lines(snapshot: &mut Snapshot) -> bool {
+    bus_line::expand_snapshot(snapshot)
 }
 
 fn compute_counted_forced(
@@ -5355,6 +5375,7 @@ fn placed_snapshot(
         straight_edges: vec![],
         bus_boxes: BTreeMap::new(),
         bus_lines: BTreeMap::new(),
+        bus_taps: Default::default(),
         gesture: None,
         layered_plans: plans
             .iter()

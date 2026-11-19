@@ -9,7 +9,7 @@
 //! its node on the side facing the bar and meets the bar square; a node beyond the bar's ends meets it at the nearer end
 //! with one bend. Edges keep their logical direction.
 
-use arqlet_model::{Graph, NodeShape, Point, Rect, Snapshot};
+use arqlet_model::{Bus, BusLine, BusTap, Edge, Graph, Node, NodeShape, Point, Rect, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// How thick a bar is drawn.
@@ -17,22 +17,24 @@ pub(crate) const THICKNESS: f64 = 8.;
 /// The gap a bar keeps from a box it stops short of.
 const CLEARANCE: f64 = 12.;
 
-/// Draws the `busLine` nodes of `snapshot` as bars, with their edges as taps. Nothing changes without such a node.
-pub(crate) fn apply(snapshot: &mut Snapshot) {
-    let buses: Vec<String> = snapshot
-        .graph
+/// The bars and taps of the `busLine` nodes of a laid-out graph (`boxes` relative to their parents, as a snapshot keeps
+/// them), in absolute coordinates; the taps in each edge's own direction. Empty without such a node.
+pub(crate) fn draw(
+    graph: &Graph,
+    boxes: &BTreeMap<String, Rect>,
+    orientations: &BTreeMap<String, arqlet_model::Orientation>,
+) -> BTreeMap<String, BusLine> {
+    let buses: Vec<String> = graph
         .nodes
         .iter()
-        .filter(|n| n.shape == NodeShape::BusLine && snapshot.boxes.contains_key(&n.id))
+        .filter(|n| n.shape == NodeShape::BusLine && boxes.contains_key(&n.id))
         .map(|n| n.id.clone())
         .collect();
-    snapshot.bus_lines.clear();
     if buses.is_empty() {
-        return;
+        return BTreeMap::new();
     }
-    let absolute = crate::absolute_all(&snapshot.graph, &snapshot.boxes);
-    let parent: BTreeMap<&str, Option<&str>> = snapshot
-        .graph
+    let absolute = crate::absolute_all(graph, boxes);
+    let parent: BTreeMap<&str, Option<&str>> = graph
         .nodes
         .iter()
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
@@ -53,8 +55,7 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
     for bus in &buses {
         let own = &absolute[bus];
         // The edges between the bus and another visible node, with that node.
-        let attached: Vec<(String, String, bool)> = snapshot
-            .graph
+        let attached: Vec<(String, String, bool)> = graph
             .edges
             .iter()
             .filter_map(|e| {
@@ -75,7 +76,13 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
             continue;
         }
         let members: BTreeSet<&str> = attached.iter().map(|(_, m, _)| m.as_str()).collect();
-        let horizontal = horizontal_bar(snapshot, parent[bus.as_str()], &members, &absolute);
+        let horizontal = horizontal_bar(
+            graph,
+            orientations,
+            parent[bus.as_str()],
+            &members,
+            &absolute,
+        );
         let (along, across) = axes(own, horizontal);
         let centre_across = (across.0 + across.1) / 2.;
         let centre = |r: &Rect| {
@@ -219,8 +226,7 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
                 base - plans[i].across + lane as f64 * (THICKNESS + CLEARANCE) * plans[i].away;
         }
     }
-    let mut taps: BTreeMap<String, Vec<Point>> = BTreeMap::new();
-    let mut lines: BTreeMap<String, Rect> = BTreeMap::new();
+    let mut lines: BTreeMap<String, BusLine> = BTreeMap::new();
     for (i, plan) in plans.iter().enumerate() {
         let across = plan.across + offset[i] - THICKNESS / 2.;
         let bar = if plan.horizontal {
@@ -238,6 +244,7 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
                 height: plan.hi - plan.lo,
             }
         };
+        let mut taps = BTreeMap::new();
         for (edge, member, from_member) in &plan.attached {
             let mut points = tap(&absolute[member], &bar, plan.horizontal);
             if !from_member {
@@ -245,65 +252,24 @@ pub(crate) fn apply(snapshot: &mut Snapshot) {
             }
             taps.insert(edge.clone(), points);
         }
-        lines.insert(plan.bus.clone(), bar);
+        lines.insert(plan.bus.clone(), BusLine { bar, taps });
     }
-    // The bars relative to the bus node's parent, as the boxes are.
-    for (bus, bar) in lines {
-        let origin = parent[bus.as_str()]
-            .and_then(|p| absolute.get(p))
-            .map_or((0., 0.), |p| (p.x, p.y));
-        snapshot.bus_lines.insert(
-            bus,
-            Rect {
-                x: bar.x - origin.0,
-                y: bar.y - origin.1,
-                ..bar
-            },
-        );
-    }
-    for route in &mut snapshot.routes {
-        if route.bundle_of.is_some() {
-            continue;
-        }
-        if let Some(points) = taps.remove(&route.id) {
-            route.points = points;
-        }
-    }
-    // The automatic ports at the taps' ends.
-    let ends: BTreeMap<&str, (Point, Point)> = snapshot
-        .routes
-        .iter()
-        .filter_map(|r| {
-            Some((
-                r.id.as_str(),
-                (r.points.first()?.clone(), r.points.last()?.clone()),
-            ))
-        })
-        .collect();
-    for port in snapshot.resolved_ports.iter_mut().filter(|p| !p.explicit) {
-        if let Some((first, last)) = ends.get(port.edge_id.as_str()) {
-            port.position = if port.endpoint == "source" {
-                first.clone()
-            } else {
-                last.clone()
-            };
-        }
-    }
+    lines
 }
 
 /// Whether a bus's bar lies along x: across the flow of its area when the area has one (chosen or fixed), else along the
 /// axis its attached nodes spread more on.
 fn horizontal_bar(
-    snapshot: &Snapshot,
+    graph: &Graph,
+    orientations: &BTreeMap<String, arqlet_model::Orientation>,
     parent: Option<&str>,
     members: &BTreeSet<&str>,
     absolute: &BTreeMap<String, Rect>,
 ) -> bool {
-    let chosen = snapshot
-        .area_orientations
+    let chosen = orientations
         .get(parent.unwrap_or("<root>"))
         .copied()
-        .or_else(|| arqlet_model::direction_for(&snapshot.graph, parent).orientation());
+        .or_else(|| arqlet_model::direction_for(graph, parent).orientation());
     if let Some(orientation) = chosen {
         return orientation.vertical();
     }
@@ -498,5 +464,194 @@ pub(crate) fn restore(snapshot: &mut Snapshot, graph: &Graph, flipped: &BTreeSet
                 "source".into()
             };
         }
+    }
+}
+
+/// The view of a graph with `busLine` nodes (ADR 0019 view model): every such node and its edges leave the graph and become
+/// a bus line (`Bus::taps`, one tap per edge, the node's id, label, kind and parent). Edges between two bus nodes, and loops
+/// on one, are left out. `None` when the graph has no `busLine` node.
+pub(crate) fn project(graph: &Graph) -> Option<Graph> {
+    let buses: Vec<&Node> = graph
+        .nodes
+        .iter()
+        .filter(|n| n.shape == NodeShape::BusLine)
+        .collect();
+    if buses.is_empty() {
+        return None;
+    }
+    let ids: BTreeSet<&str> = buses.iter().map(|n| n.id.as_str()).collect();
+    let mut taps: BTreeMap<&str, Vec<BusTap>> = BTreeMap::new();
+    for e in &graph.edges {
+        let (s, t) = (e.source.as_str(), e.target.as_deref());
+        match (ids.contains(s), t.map(|t| ids.contains(t))) {
+            (true, Some(false)) => taps.entry(s).or_default().push(BusTap {
+                edge: e.id.clone(),
+                node: t.expect("a target").to_string(),
+                to_bus: false,
+                kind: e.kind.clone(),
+            }),
+            (false, Some(true)) => taps.entry(t.expect("a target")).or_default().push(BusTap {
+                edge: e.id.clone(),
+                node: s.to_string(),
+                to_bus: true,
+                kind: e.kind.clone(),
+            }),
+            _ => {}
+        }
+    }
+    let touches = |e: &Edge| {
+        ids.contains(e.source.as_str()) || e.target.as_deref().is_some_and(|t| ids.contains(t))
+    };
+    let dropped: BTreeSet<&str> = graph
+        .edges
+        .iter()
+        .filter(|e| touches(e))
+        .map(|e| e.id.as_str())
+        .collect();
+    let mut view = graph.clone();
+    view.nodes.retain(|n| !ids.contains(n.id.as_str()));
+    view.edges.retain(|e| !touches(e));
+    view.edge_ports
+        .retain(|b| !dropped.contains(b.edge_id.as_str()));
+    view.ports.retain(|p| !ids.contains(p.node_id.as_str()));
+    for node in buses {
+        view.buses.push(Bus {
+            id: node.id.clone(),
+            edges: Vec::new(),
+            label: Some(node.label.clone()),
+            taps: taps.remove(node.id.as_str()).unwrap_or_default(),
+            kind: Some(node.kind.clone()),
+            parent_id: node.parent_id.clone(),
+        });
+    }
+    Some(view)
+}
+
+/// The graph the layout sees for a view with bus lines: every bus line as a node of shape `busLine` again, with one edge per
+/// tap, after the other nodes and edges. `None` when the view has no bus line.
+pub(crate) fn expand(view: &Graph) -> Option<Graph> {
+    if !view.buses.iter().any(|b| !b.taps.is_empty()) {
+        return None;
+    }
+    let present: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
+    let mut graph = view.clone();
+    graph.buses.retain(|b| b.taps.is_empty());
+    for bus in view.buses.iter().filter(|b| !b.taps.is_empty()) {
+        graph.nodes.push(Node {
+            id: bus.id.clone(),
+            kind: bus.kind.clone().unwrap_or_else(|| "bus".into()),
+            label: bus.label.clone().unwrap_or_else(|| bus.id.clone()),
+            parent_id: bus
+                .parent_id
+                .clone()
+                .filter(|p| present.contains(p.as_str())),
+            shape: NodeShape::BusLine,
+        });
+        for tap in bus
+            .taps
+            .iter()
+            .filter(|t| present.contains(t.node.as_str()))
+        {
+            let (source, target) = if tap.to_bus {
+                (tap.node.clone(), bus.id.clone())
+            } else {
+                (bus.id.clone(), tap.node.clone())
+            };
+            graph.edges.push(Edge {
+                id: tap.edge.clone(),
+                kind: tap.kind.clone(),
+                source,
+                target: Some(target),
+                weight: None,
+            });
+        }
+    }
+    Some(graph)
+}
+
+/// A laid-out snapshot of `expand`'s graph, given back on the view: the bus nodes' boxes move to `bus_boxes` (where the next
+/// layout finds them), their taps' routes, ports and border crossings leave, and the bars and taps go to `bus_lines`.
+pub(crate) fn collapse(snapshot: &mut Snapshot, view: &Graph) {
+    let lines = draw(
+        &snapshot.graph,
+        &snapshot.boxes,
+        &snapshot.area_orientations,
+    );
+    let line_buses: Vec<&Bus> = view.buses.iter().filter(|b| !b.taps.is_empty()).collect();
+    let taps: BTreeSet<&str> = line_buses
+        .iter()
+        .flat_map(|b| b.taps.iter().map(|t| t.edge.as_str()))
+        .collect();
+    for bus in &line_buses {
+        if let Some(r) = snapshot.boxes.remove(&bus.id) {
+            snapshot.bus_boxes.insert(bus.id.clone(), r);
+        }
+    }
+    // The taps' layout state stays apart from the view's (`Snapshot::bus_taps`).
+    let (routes, kept) = std::mem::take(&mut snapshot.routes)
+        .into_iter()
+        .partition(|r| !taps.contains(r.id.as_str()));
+    snapshot.routes = routes;
+    snapshot.bus_taps.routes = kept;
+    let (ports, kept) = std::mem::take(&mut snapshot.resolved_ports)
+        .into_iter()
+        .partition(|p| !taps.contains(p.edge_id.as_str()));
+    snapshot.resolved_ports = ports;
+    snapshot.bus_taps.resolved_ports = kept;
+    let (crossings, kept) = std::mem::take(&mut snapshot.boundary_crossings)
+        .into_iter()
+        .partition(|c| !taps.contains(c.edge_id.as_str()));
+    snapshot.boundary_crossings = crossings;
+    snapshot.bus_taps.boundary_crossings = kept;
+    snapshot.graph = view.clone();
+    snapshot.bus_lines = lines;
+}
+
+/// The bars and taps of a view's bus lines drawn anew from the snapshot's boxes and the bus boxes the layout left
+/// (`bus_boxes`), for an operation that finishes a snapshot without the layout's last step. Nothing changes without a bus
+/// line.
+pub(crate) fn redraw(snapshot: &mut Snapshot) {
+    let Some(graph) = expand(&snapshot.graph) else {
+        snapshot.bus_lines.clear();
+        return;
+    };
+    let mut boxes = snapshot.boxes.clone();
+    for bus in snapshot.graph.buses.iter().filter(|b| !b.taps.is_empty()) {
+        if let Some(r) = snapshot.bus_boxes.get(&bus.id) {
+            boxes.insert(bus.id.clone(), r.clone());
+        }
+    }
+    snapshot.bus_lines = draw(&graph, &boxes, &snapshot.area_orientations);
+}
+
+/// A snapshot of a view with bus lines, turned back into the snapshot of the graph the layout sees (`expand`): the bus nodes
+/// and their edges in the graph, their boxes, and the taps' routes, ports and crossings as the layout left them. An
+/// operation that continues a layout works on this; `collapse_snapshot` gives the view back. Nothing changes (and `false`)
+/// without a bus line.
+pub(crate) fn expand_snapshot(snapshot: &mut Snapshot) -> bool {
+    let Some(graph) = expand(&snapshot.graph) else {
+        return false;
+    };
+    for bus in snapshot.graph.buses.iter().filter(|b| !b.taps.is_empty()) {
+        if let Some(r) = snapshot.bus_boxes.remove(&bus.id) {
+            snapshot.boxes.insert(bus.id.clone(), r);
+        }
+    }
+    let kept = std::mem::take(&mut snapshot.bus_taps);
+    snapshot.routes.extend(kept.routes);
+    snapshot.resolved_ports.extend(kept.resolved_ports);
+    snapshot.boundary_crossings.extend(kept.boundary_crossings);
+    snapshot.bus_lines.clear();
+    snapshot.graph = graph;
+    true
+}
+
+/// The view of a snapshot whose graph has nodes of shape `busLine` (from `expand_snapshot`, or an operation that finished
+/// one): every such node becomes a bus line, drawn from the boxes. A snapshot of a view already is its own view: its bus
+/// lines are drawn anew. Applying it again changes nothing.
+pub(crate) fn collapse_snapshot(snapshot: &mut Snapshot) {
+    match project(&snapshot.graph) {
+        Some(view) => collapse(snapshot, &view),
+        None => redraw(snapshot),
     }
 }

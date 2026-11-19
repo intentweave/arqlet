@@ -71,6 +71,7 @@ export function sceneOfColumns(c) {
   };
   if (conflicts.length) scene.conflicts = conflicts;
   if (c.buses.length) scene.buses = c.buses;
+  if (c.busLines?.length) scene.busLines = c.busLines;
   if (c.junctions.length) scene.junctions = range(c.junctions.length / 2).map(i => point(c.junctions, i));
   scene.bounds = {x: c.bounds[0], y: c.bounds[1], width: c.bounds[2], height: c.bounds[3]};
   return scene;

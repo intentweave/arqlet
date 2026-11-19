@@ -4,6 +4,7 @@ import type { PlacedLabel } from "./PlacedLabel";
 import type { Point } from "./Point";
 import type { Rect } from "./Rect";
 import type { ResolvedPort } from "./ResolvedPort";
+import type { SceneBusLine } from "./SceneBusLine";
 import type { SceneConflict } from "./SceneConflict";
 import type { SceneNode } from "./SceneNode";
 import type { SceneRoute } from "./SceneRoute";
@@ -24,6 +25,11 @@ buses?: Array<Array<string>>,
  * them as junction dots. Omitted when there is none.
  */
 junctions?: Array<Point>,
+/**
+ * Provisional: the bus lines of the view (a bus kept as a node of shape `busLine` in the source graph): each a bar with
+ * its taps, one per edge of the bus, in the edge's direction. Omitted when there is none.
+ */
+busLines?: Array<SceneBusLine>,
 /**
  * Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
  */
