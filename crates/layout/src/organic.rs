@@ -7,8 +7,9 @@
 //! 3. Separation by the real sizes: overlapping boxes move apart, along the axis of smaller overlap, in index order.
 //!
 //! Pure and deterministic. The dense distance matrix is quadratic in the number of children, so an area above `MAX_NODES` is
-//! refused before placement (`check_organic_areas`). With `sparseStress`, the stress uses only graph neighbours and pivots
-//! (`SparseTargets`), and the larger bound `SPARSE_MAX_NODES` applies.
+//! not placed densely: without a chosen stress the layout places it by the scalable stress (bound `SCALABLE_MAX_NODES`),
+//! and `check_organic_areas` refuses what is above the bound in force. With `sparseStress`, the stress uses only graph
+//! neighbours and pivots (`SparseTargets`), and the larger bound `SPARSE_MAX_NODES` applies.
 
 use crate::{spatial::SpatialHash, vpsc};
 use arqlet_model::math::PortableMath;
