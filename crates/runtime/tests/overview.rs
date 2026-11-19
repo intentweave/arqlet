@@ -934,3 +934,55 @@ fn a_moved_cluster_takes_its_children_along() {
     );
     assert_eq!(moved["stats"]["overlaps"], 0);
 }
+
+#[test]
+fn a_leaf_moved_out_of_its_cluster_recentres_the_cluster_and_stays_put() {
+    // A leaf of g1 is moved far out: it stays at the target, and g1 is centred on its children again, so its disc is
+    // about half the new span, not the distance from its old centre.
+    let graph = hierarchical(3, 2, 4);
+    let first = overview(&graph, 1);
+    let ids: Vec<&str> = first["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let parent = |o: &Value, i: usize| o["parent"][i].as_i64().unwrap();
+    let file = (0..ids.len())
+        .find(|&i| {
+            ids[i].starts_with("g1/")
+                && parent(&first, i) >= 0
+                && ids[parent(&first, i) as usize] == "g1"
+        })
+        .unwrap();
+    let leaf = (0..ids.len())
+        .find(|&i| parent(&first, i) == file as i64)
+        .unwrap();
+    let at = |o: &Value, i: usize| (o["x"][i].as_f64().unwrap(), o["y"][i].as_f64().unwrap());
+    let (lx, ly) = at(&first, leaf);
+    let target = (lx + 120., ly);
+    let start = json!({"x": first["x"], "y": first["y"], "r": first["r"], "moved": {ids[leaf]: {"x": target.0, "y": target.1}}});
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "start": start}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let o = &response["overview"];
+    let (mx, my) = at(o, leaf);
+    assert!(
+        (mx - target.0).abs() < 0.05 && (my - target.1).abs() < 0.05,
+        "held at the target: {mx}, {my}"
+    );
+    let r = |i: usize| o["r"][i].as_f64().unwrap();
+    let (fx, fy) = at(o, file);
+    let from_old =
+        ((target.0 - at(&first, file).0).powi(2) + (target.1 - at(&first, file).1).powi(2)).sqrt();
+    assert!(
+        r(file) < from_old,
+        "centred again: radius {} against {from_old} from the old centre",
+        r(file)
+    );
+    // The leaf lies in its cluster's disc.
+    assert!(((mx - fx).powi(2) + (my - fy).powi(2)).sqrt() + r(leaf) <= r(file) + 0.05);
+    assert_eq!(o["stats"]["overlaps"], 0);
+}
