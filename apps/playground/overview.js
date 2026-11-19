@@ -42,12 +42,13 @@ function loadSettings() {
     for (const id of [...LAYOUT, ...ZOOM]) if (saved[id] !== undefined) $(id).value = saved[id];
     if (saved.auto !== undefined) $('auto').checked = saved.auto;
     if (saved.chains !== undefined) $('chains').checked = saved.chains;
+    if (saved.busRows !== undefined) $('bus-rows').checked = saved.busRows;
     if (saved.columns !== undefined) $('columns').checked = saved.columns;
   } catch { /* no storage: the defaults */ }
 }
 function saveSettings() {
   try {
-    const out = {auto: $('auto').checked, chains: $('chains').checked, columns: $('columns').checked};
+    const out = {auto: $('auto').checked, chains: $('chains').checked, busRows: $('bus-rows').checked, columns: $('columns').checked};
     for (const id of [...LAYOUT, ...ZOOM]) out[id] = $(id).value;
     localStorage.setItem(STORE, JSON.stringify(out));
   } catch { /* no storage */ }
@@ -130,7 +131,8 @@ function request(extra = {}) {
     charge: number('charge'), gravity: number('gravity'), communities: number('communities'),
     ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {}),
     ...(number('hub-links') > 0 ? {hubs: {minLinks: Math.round(number('hub-links'))}} : {}),
-    ...($('chains').checked ? {chains: true} : {})};
+    ...($('chains').checked ? {chains: true} : {}),
+    ...($('bus-rows').checked ? {busRows: true} : {})};
   const values = {threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
   // The level of detail travels in the config set, so that the engine checks it (a config set needs its base: without
   // one it acts in the viewer only).
@@ -535,6 +537,7 @@ $('relayout').onclick = () => { saveSettings(); layOut(false); };
 $('defaults').onclick = () => {
   for (const [id, value] of Object.entries(DEFAULTS)) $(id).value = value;
   $('chains').checked = false;
+  $('bus-rows').checked = false;
   saveSettings();
   schedule();
 };

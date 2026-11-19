@@ -38,6 +38,10 @@ pub struct OverviewOptions {
     /// A container with a single child takes that child's disc, without padding of its own, so that a chain of single
     /// children (a package holding one module holding one file) is one disc a viewer draws once. Off by default.
     pub chains: bool,
+    /// Provisional (`busRows`): per bus node (shape `busLine`) its members, by node index. In every container, the
+    /// members of such a bus that it holds are set in one row after the forces (across x or y, whichever they spread more
+    /// along, in the order they lay), so its line runs through them; the bus's own disc goes beside the row. Empty: off.
+    pub rows: BTreeMap<usize, Vec<usize>>,
 }
 
 impl Default for OverviewOptions {
@@ -52,6 +56,7 @@ impl Default for OverviewOptions {
             communities: 120,
             satellites: 0.,
             chains: false,
+            rows: BTreeMap::new(),
         }
     }
 }
@@ -795,6 +800,71 @@ const SEPARATION_ROUNDS: usize = 600;
 const STRETCH_EVERY: usize = 12;
 const STRETCH: f64 = 1.02;
 
+/// `OverviewOptions::rows` in one container (`members` with their `local` indices, places `x`, radii `r`): the members of
+/// each bus it holds, two or more and not yet in a row, in one row through their centroid, spaced by their radii and the
+/// gap, in the order of their places along the row's axis (ties by index); the bus's disc beside the row's middle.
+/// Whether anything moved.
+fn in_rows(
+    members: &[usize],
+    local: &BTreeMap<usize, usize>,
+    x: &mut [(f64, f64)],
+    r: &[f64],
+    options: &OverviewOptions,
+) -> bool {
+    if options.rows.is_empty() {
+        return false;
+    }
+    let mut placed: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
+    let mut moved = false;
+    for &bus in members {
+        let Some(of) = options.rows.get(&bus) else {
+            continue;
+        };
+        let row: Vec<usize> = of
+            .iter()
+            .filter_map(|m| local.get(m).copied())
+            .filter(|j| !placed.contains(j))
+            .collect();
+        if row.len() < 2 {
+            continue;
+        }
+        let n = row.len() as f64;
+        let cx = row.iter().map(|&j| x[j].0).sum::<f64>() / n;
+        let cy = row.iter().map(|&j| x[j].1).sum::<f64>() / n;
+        let sxx: f64 = row.iter().map(|&j| (x[j].0 - cx) * (x[j].0 - cx)).sum();
+        let syy: f64 = row.iter().map(|&j| (x[j].1 - cy) * (x[j].1 - cy)).sum();
+        let across = sxx >= syy;
+        let mut order = row.clone();
+        order.sort_by(|&a, &b| {
+            let (pa, pb) = if across {
+                (x[a].0, x[b].0)
+            } else {
+                (x[a].1, x[b].1)
+            };
+            pa.total_cmp(&pb).then(a.cmp(&b))
+        });
+        let width: f64 = order.iter().map(|&j| 2. * r[j]).sum::<f64>() + options.gap * (n - 1.);
+        let mut at = -width / 2.;
+        for &j in &order {
+            let t = at + r[j];
+            x[j] = if across { (cx + t, cy) } else { (cx, cy + t) };
+            at += 2. * r[j] + options.gap;
+            placed.insert(j);
+        }
+        // The bus's disc (not drawn when it is a line) beside the row's middle, out of its way.
+        if let Some(&b) = local.get(&bus) {
+            let reach = order.iter().map(|&j| r[j]).fold(0., f64::max) + r[b] + options.gap;
+            x[b] = if across {
+                (cx, cy + reach)
+            } else {
+                (cx + reach, cy)
+            };
+        }
+        moved = true;
+    }
+    moved
+}
+
 /// Lays out the children of `container`, whose discs have the radii `radius` (indexed by node; leaves carry the leaf
 /// radius, containers the radius their own arrangement gave). Starts from a phyllotaxis spiral in the order of a
 /// breadth-first walk over the links (so linked children start near each other), then runs a force simulation: springs on
@@ -887,7 +957,10 @@ pub fn arrange(
     };
     let alpha = if start.is_some() { SETTLE_ALPHA } else { 1. };
     simulate(&mut x, &r, &links, options, alpha);
-    let overlaps = separate(&mut x, &r, options.gap);
+    let mut overlaps = separate(&mut x, &r, options.gap);
+    if in_rows(&members, &local, &mut x, &r, options) {
+        overlaps = separate(&mut x, &r, options.gap);
+    }
     // Centre the disc on (nearly) the smallest circle around the children, and take the radius that holds them.
     let (cx, cy) = enclosing_centre(&x, &r);
     for p in &mut x {

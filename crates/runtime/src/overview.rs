@@ -42,6 +42,15 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
                     .as_bool()
                     .ok_or("Overview option chains must be true or false")?;
             }
+            // Provisional: the members of every bus line in a row (`OverviewOptions::rows`, filled with the graph).
+            "busRows" => {
+                if value
+                    .as_bool()
+                    .ok_or("Overview option busRows must be true or false")?
+                {
+                    options.rows.insert(usize::MAX, Vec::new());
+                }
+            }
             "satellites" => {
                 options.satellites = value.as_f64().filter(|x| (0. ..=1.).contains(x)).ok_or(
                     "Overview option satellites must be a share between 0 and 1 (0: never)",
@@ -253,6 +262,30 @@ fn lay_out(
     threads: usize,
 ) -> Result<Overview, String> {
     let hints = hints_of(v, h)?;
+    // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
+    let rows_wanted = options.rows.contains_key(&usize::MAX);
+    let mut options = options.clone();
+    if rows_wanted {
+        options.rows.clear();
+        let bus: Vec<bool> = graph
+            .nodes
+            .iter()
+            .map(|n| n.shape == arqlet_model::NodeShape::BusLine)
+            .collect();
+        let is_bus = |i: usize| bus.get(i).copied().unwrap_or(false);
+        for &(a, b) in &h.edges {
+            if is_bus(a) && !is_bus(b) {
+                options.rows.entry(a).or_default().push(b);
+            } else if is_bus(b) && !is_bus(a) {
+                options.rows.entry(b).or_default().push(a);
+            }
+        }
+        for members in options.rows.values_mut() {
+            members.sort_unstable();
+            members.dedup();
+        }
+    }
+    let options = &options;
     let levels = overview::levels(&h);
     let mut arrangements: BTreeMap<Container, Arrangement> = BTreeMap::new();
     for level in &levels {

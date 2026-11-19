@@ -517,6 +517,7 @@ fn every_answer_is_the_typed_overview_contract() {
             communities: Some(4),
             satellites: Some(0.5),
             chains: Some(true),
+            bus_rows: Some(true),
             ticks: Some(50),
             groups: Some([("g0/f0".to_string(), vec!["A".to_string()])].into()),
             hubs: Some(arqlet_model::CommunityHubs {
@@ -787,4 +788,59 @@ fn a_member_in_another_cluster_taps_the_bus_line_without_stretching_it() {
         5,
         "the gateway taps it too"
     );
+}
+
+#[test]
+fn with_bus_rows_the_members_of_a_bus_stand_in_a_row_on_its_line() {
+    // Eight members of one bus: without the option the forces place them around it; with it they stand in a row, and the
+    // line runs through their centres.
+    let mut nodes = vec![json!({"id": "can", "kind": "bus", "label": "CAN", "shape": "busLine"})];
+    let mut edges = Vec::new();
+    for i in 0..8 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("E{i}")}));
+        edges.push(json!({"id": format!("c{i}"), "kind": "connects", "source": format!("e{i}"), "target": "can"}));
+    }
+    let graph = json!({"nodes": nodes, "edges": edges});
+    let run = |options: Value| -> Value {
+        let response: Value = serde_json::from_str(&dispatch(
+            &json!({"op": "overview", "graph": graph, "options": options}).to_string(),
+        ))
+        .unwrap();
+        assert_eq!(response["ok"], true, "{response}");
+        response["overview"].clone()
+    };
+    let off_line = |o: &Value| -> f64 {
+        let l = &o["busLines"][0];
+        let horizontal = l["y1"] == l["y2"];
+        (1..=8)
+            .map(|j| {
+                let (x, y) = (o["x"][j].as_f64().unwrap(), o["y"][j].as_f64().unwrap());
+                if horizontal {
+                    (y - l["y1"].as_f64().unwrap()).abs()
+                } else {
+                    (x - l["x1"].as_f64().unwrap()).abs()
+                }
+            })
+            .fold(0., f64::max)
+    };
+    let free = run(json!({}));
+    let rows = run(json!({"busRows": true}));
+    assert!(
+        off_line(&free) > 1.,
+        "around the bus without the option: {}",
+        off_line(&free)
+    );
+    assert!(
+        off_line(&rows) < 0.05,
+        "in a row with it: {}",
+        off_line(&rows)
+    );
+    // No overlaps, and the same for any thread count.
+    assert_eq!(rows["stats"]["overlaps"], 0);
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "options": {"busRows": true}, "threads": 4})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["overview"]["x"], rows["x"]);
 }

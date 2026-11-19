@@ -17,6 +17,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   bus, white when selected; a bus is picked by its bar where no disc is
   (`pickNode`, new `busLinesOf`) and named above the middle of its bar. The overview page offers *Vehicle network, bus lines* (371 nodes, 40 buses,
   made up, `benchmarks/generate.py vehicle_network`) and the two vehicle examples.
+- `busRows` (provisional overview option, off): after the forces, the members of every bus line that a cluster holds
+  stand in one row on the bus's line (across x or y, whichever they spread more along, in the order they lay), the
+  bus's own disc beside the row; the separation then makes room for the other children. The same for any thread count.
+  Overview page: *Members of a bus in a row on its line*.
 
 ## 0.6.0 — 2026-11-19
 
