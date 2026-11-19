@@ -466,11 +466,13 @@ function select(i, event) {
 
 /**
  * What a drag that starts over node `i` moves: inside the selected cluster, that cluster with all it holds (click a
- * cluster first to move it); else a leaf itself; else nothing, and the drag pans.
+ * cluster first to move it); a collapsed cluster as a whole; else a leaf itself; else nothing, and the drag pans.
  */
 function draggable(i) {
   if (i < 0) return -1;
   for (let k = i; k >= 0; k = model.overview.parent[k]) if (k === selected) return selected;
+  // A collapsed cluster is one thing on the screen (one disc, one glow): it moves as a whole.
+  for (let k = i; k >= 0; k = model.overview.parent[k]) if (renderer?.collapsed.has(k)) return k;
   return model.children[i].length ? -1 : i;
 }
 

@@ -21,17 +21,34 @@ vec3 lens(vec2 p) {
   return vec3(u_lens.xy + d * f, f);
 }`;
 
+// Cosmic motion (galaxy style, idle): u_cosmic = (seconds, strength 0..1, extent of the drawing in world units). Every
+// world point turns a little around the drawing's centre, by an angle that oscillates slowly and differs with the
+// distance from the centre, so the galaxies seem to rotate and shear against each other; bounded, it never drifts away.
+// The same field moves stars and line ends, so lines stay on their stars.
+const COSMIC = `
+uniform vec3 u_cosmic;
+vec2 cosmic(vec2 p) {
+  if (u_cosmic.y <= 0.0) return p;
+  float d = length(p) / max(u_cosmic.z, 1.0);
+  float a = u_cosmic.y * (0.045 * sin(u_cosmic.x * 0.21 + d * 5.0) + 0.025 * sin(u_cosmic.x * 0.13 - d * 9.0 + 1.3));
+  float c = cos(a), s = sin(a);
+  return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+}`;
+
 const SHAPE_VS = `
 attribute vec2 a_centre; attribute vec2 a_half; attribute vec2 a_centre2; attribute vec2 a_half2;
 attribute vec2 a_corner; attribute vec4 a_colour; attribute float a_kind;
 uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size; uniform float u_ratio; uniform float u_t;
-varying vec2 v_local; varying vec4 v_colour; varying float v_kind; varying vec2 v_pixels;
+varying vec2 v_local; varying vec4 v_colour; varying float v_kind; varying vec2 v_pixels; varying float v_seed;
 // Breathing (idle): (phase in radians, amplitude, wavelength in device pixels); amplitude 0 for none. A disc grows and
 // shrinks by the amplitude around its middle, in a wave that runs outwards from the canvas centre.
 uniform vec3 u_breath;
 ${LENS}
+${COSMIC}
 void main() {
-  vec2 centre = mix(a_centre, a_centre2, u_t), extent = mix(a_half, a_half2, u_t);
+  vec2 centre = cosmic(mix(a_centre, a_centre2, u_t)), extent = mix(a_half, a_half2, u_t);
+  // A phase of its own per star, for the twinkle.
+  v_seed = fract(sin(dot(mix(a_centre, a_centre2, u_t), vec2(12.9898, 78.233))) * 43758.5453);
   // At least 1.5 pixels across, so that a leaf far out stays visible as a dot.
   vec2 pixels = max(extent * u_scale * u_ratio, vec2(0.75));
   vec2 middle = (centre - u_centre) * u_scale * u_ratio;
@@ -46,8 +63,10 @@ void main() {
 }`;
 const SHAPE_FS = `
 precision mediump float;
-varying vec2 v_local; varying vec4 v_colour; varying float v_kind; varying vec2 v_pixels;
+varying vec2 v_local; varying vec4 v_colour; varying float v_kind; varying vec2 v_pixels; varying float v_seed;
 uniform float u_fade;
+// The twinkle of the cosmic motion: (seconds, strength 0..1); its own uniform, as the precisions of the shaders differ.
+uniform vec2 u_twinkle;
 // The distance from the middle, 1 on the outline: a circle, or a square, octagon or diamond inscribed in it. The
 // outline is the tenths of the kind (0 to 3).
 float outlineDistance(vec2 p, float outline) {
@@ -65,6 +84,8 @@ void main() {
     if (d > 1.0) discard;
     float glow = exp(-d * d * 4.5) * (1.0 - d);
     float a = v_kind < 4.5 ? glow : max(1.0 - smoothstep(0.22, 0.34, d), glow * 0.55);
+    // Stars twinkle while the drawing is in cosmic motion, each on its own phase.
+    if (v_kind > 4.5 && u_twinkle.y > 0.0) a *= 1.0 - 0.4 * u_twinkle.y * (0.5 + 0.5 * sin(u_twinkle.x * 2.3 + v_seed * 6.2831853));
     colour = vec4(v_colour.rgb, v_colour.a * a);
   } else if (v_kind < 1.5) {
     float base = floor(v_kind + 0.05);
@@ -96,8 +117,9 @@ attribute vec2 a_position; attribute vec2 a_position2; attribute vec4 a_colour;
 uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size; uniform float u_ratio; uniform float u_t;
 varying vec4 v_colour;
 ${LENS}
+${COSMIC}
 void main() {
-  vec2 clip = lens((mix(a_position, a_position2, u_t) - u_centre) * u_scale * u_ratio).xy / (u_size * 0.5);
+  vec2 clip = lens((cosmic(mix(a_position, a_position2, u_t)) - u_centre) * u_scale * u_ratio).xy / (u_size * 0.5);
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
   v_colour = a_colour;
 }`;
@@ -203,7 +225,13 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       lens ? (lens.x - canvas.clientWidth / 2) * r : 0, lens ? (lens.y - canvas.clientHeight / 2) * r : 0,
       lens ? lens.radius * r : 0, lens ? lens.magnification : 1);
     const b = breathState();
-    gl.uniform3f(gl.getUniformLocation(p, 'u_breath'), b.phase, b.amplitude, (breath?.wavelength ?? 600) * r);
+    // In the galaxy style the idle breath is cosmic motion instead (its strength fades in and out as the breath does).
+    const strength = galaxy && breath ? b.amplitude / Math.max(breath.amplitude, 1e-9) : 0;
+    gl.uniform3f(gl.getUniformLocation(p, 'u_breath'), b.phase, galaxy ? 0 : b.amplitude, (breath?.wavelength ?? 600) * r);
+    const seconds = breath ? (performance.now() - breath.start) / 1000 : 0;
+    gl.uniform3f(gl.getUniformLocation(p, 'u_cosmic'), seconds, strength, model.overview.rootRadius || 1);
+    // Wrapped, so that the fragment shader's lower precision stays fine over a long idle time.
+    gl.uniform2f(gl.getUniformLocation(p, 'u_twinkle'), seconds % 2732, strength);
   };
   const drawPart = (l, part, mode, view, t, fade) => {
     if (!l.counts[part]) return;

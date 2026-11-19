@@ -354,8 +354,9 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     // An edge that leaves a structured cluster is drawn stronger: it is one of few. It ends in an arrow at a disc outside.
     const leg = owner[a] >= 0 || owner[b] >= 0;
     const lit = trace?.edges.has(k);
-    const alpha = lit ? 0.95 : (leg ? 0.3 : galaxy ? 0.11 : 0.06) * (trace?.fade ? 0.3 : 1);
-    const [er, eg, eb] = lit ? AMBER : [red, green, blue];
+    const alpha = lit ? 0.95 : (leg ? 0.3 : galaxy ? 0.05 : 0.06) * (trace?.fade ? 0.3 : 1);
+    // In the galaxy style the lines are a darker shade of their cluster's colour: faint threads, not light.
+    const [er, eg, eb] = lit ? AMBER : galaxy && !leg ? [red * 0.7, green * 0.7, blue * 0.7] : [red, green, blue];
     edges.push(...from, er, eg, eb, alpha, ...to, er, eg, eb, alpha);
     if (leg && owner[a] >= 0 && expanded.has(owner[a]) && !(owner[b] >= 0 && expanded.has(owner[b]))) {
       const target = owner[b] >= 0 ? owner[b] : b;
