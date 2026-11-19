@@ -7,6 +7,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Cosmic motion in the galaxy style (provisional): when idle, instead of breathing, every point turns a little around the
+  drawing's centre by a slowly oscillating angle that differs with its distance (the galaxies seem to rotate and shear
+  against each other; bounded, it never drifts), the same field for stars and line ends so lines stay on their stars,
+  and the stars twinkle on phases of their own; it fades in and out with the idle breath. Galaxy lines are fainter and a
+  darker shade of their cluster's colour. In the overview page a collapsed cluster can be dragged directly.
+- Overview built in steps (provisional, overview page, *Rough overview first, then bloom*): for a graph with a
+  containment hierarchy larger than 600 nodes, a rough overview of its top levels is laid out first (at most 600 nodes; a
+  cut container stands for what it holds with a radius for its leaves, and only the strongest lifted edges, two per node)
+  and shown at once (0.1 s for the synthetic 50 000-node code index, whose whole overview takes 3.8 s in the browser);
+  when the whole overview is done, every node starts at its rough ancestor's place and moves to its own, so the clusters
+  bloom out of the rough picture. `apps/playground/progressive.js` (`coarseGraph`, `bloomStart`), tested.
 - Galaxy style of the WebGL overview (provisional, `createOverviewRenderer(..., {galaxy})`, `setGalaxy`): clusters as
   clouds of light (a Gaussian glow, fainter the deeper the cluster, so nested clouds add up towards their cores), a
   collapsed cluster as a brighter glow, every leaf as a star (a bright core in its own glow), every edge as a faint line in

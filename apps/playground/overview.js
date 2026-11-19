@@ -6,6 +6,7 @@
 // Stale replies are dropped.
 import {overviewModel, viewOf, viewOfNodes, pathOf, revealPathDecisions, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES} from '@arqlet/viewer/overview.js';
 import {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
+import {coarseGraph, bloomStart} from './progressive.js';
 import {createEngineWorker} from '@arqlet/engine-client/engine.js';
 import {createOverviewSession, workerRun, httpRun} from '@arqlet/engine-client/session.js';
 
@@ -152,11 +153,24 @@ async function layOut(fresh = true) {
     status(`Laying out ${graph.nodes.length.toLocaleString()} nodes, ${graph.edges.length.toLocaleString()} edges …`);
     const started = performance.now();
     if (fresh) overviewsGraph = null;
+    // Built in steps: a rough overview of the top levels first, shown at once, while the whole one is laid out.
+    let rough = null;
+    const cut = fresh && $('progressive').checked ? coarseGraph(graph, {limit: 600, radius: number('node-radius')}) : null;
+    if (cut) {
+      const quick = await execute({op: 'overview', graph: cut.graph, options: request().options, radii: cut.radii, threads: 4});
+      if (ticket !== epoch) return;
+      if (quick.ok) {
+        rough = quick.overview;
+        showRough(rough, cut.graph, cut.radii);
+        status(`Rough overview of the top ${cut.cut + 1} levels (${cut.graph.nodes.length.toLocaleString()} nodes) in ${((performance.now() - started) / 1000).toFixed(2)} s; the whole one follows …`);
+      }
+    }
     const result = await overviewOf();
     if (ticket !== epoch || result.stale) return;
     if (!result.ok) throw Error(result.error);
     const elapsed = performance.now() - started;
-    show(result.overview);
+    if (rough) bloom(result.overview, rough);
+    else show(result.overview);
     const s = result.overview.stats;
     status(`${s.nodes.toLocaleString()} nodes in ${s.containers.toLocaleString()} clusters` +
       (s.communities ? ` (${s.communities} found as communities)` : '') + `, ${s.edges.toLocaleString()} edges` +
@@ -202,6 +216,35 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   renderRules();
   renderPanel();
   crumbs();
+}
+
+/** The rough overview (`coarseGraph`), drawn while the whole one is laid out; it takes no clicks. */
+function showRough(overview, roughGraph, cut) {
+  unbind?.(); renderer?.destroy();
+  model = overviewModel(overview, resolvedEdgeIds(roughGraph));
+  renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: () => {}, shapes, galaxy: $('galaxy').checked, edgeAlpha: 0.5});
+  unbind = bindOverviewNavigation($('canvas'), renderer, {});
+  // The view that holds every disc (the extent of the places, not the root's radius: the radii a host set for the cut
+  // containers can reach past it).
+  const c = $('canvas'), o = model.overview;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (let i = 0; i < o.ids.length; i++) {
+    x0 = Math.min(x0, o.x[i] - o.r[i]); x1 = Math.max(x1, o.x[i] + o.r[i]);
+    y0 = Math.min(y0, o.y[i] - o.r[i]); y1 = Math.max(y1, o.y[i] + o.r[i]);
+  }
+  const scale = 0.92 * Math.min(c.clientWidth / Math.max(x1 - x0, 1), c.clientHeight / Math.max(y1 - y0, 1));
+  renderer.setView({centreX: (x0 + x1) / 2, centreY: (y0 + y1) / 2, scale});
+  // A cut container stands for what it holds: drawn as a collapsed cluster (a glow, a filled disc), not as a leaf.
+  renderer.setState({collapsed: new Set(Object.keys(cut).map(id => model.index.get(id)).filter(i => i !== undefined))});
+}
+
+/** The whole overview after the rough one: every node starts at its rough ancestor's place and moves to its own. */
+function bloom(overview, rough) {
+  const from = renderer.view;
+  show(overview);
+  const to = renderer.view;
+  renderer.morph(overviewModel(bloomStart(overview, rough), resolvedEdgeIds(graph)), {duration: 0, view: from});
+  renderer.morph(model, {duration: 1400, view: to});
 }
 
 /** The key of a cluster's layered layout: its id and the flow it is laid out in. */
@@ -423,11 +466,13 @@ function select(i, event) {
 
 /**
  * What a drag that starts over node `i` moves: inside the selected cluster, that cluster with all it holds (click a
- * cluster first to move it); else a leaf itself; else nothing, and the drag pans.
+ * cluster first to move it); a collapsed cluster as a whole; else a leaf itself; else nothing, and the drag pans.
  */
 function draggable(i) {
   if (i < 0) return -1;
   for (let k = i; k >= 0; k = model.overview.parent[k]) if (k === selected) return selected;
+  // A collapsed cluster is one thing on the screen (one disc, one glow): it moves as a whole.
+  for (let k = i; k >= 0; k = model.overview.parent[k]) if (renderer?.collapsed.has(k)) return k;
   return model.children[i].length ? -1 : i;
 }
 

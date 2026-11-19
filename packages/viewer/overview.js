@@ -269,7 +269,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
       // a collapsed one a brighter glow, a leaf a star; the colours of the clusters as in the disc style.
       const [red, green, blue] = dim(colour(i), i);
       if (children[i].length > 0 && !collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.15, o.r[i] * 1.15, [red, green, blue], 0.22 / (1 + depth[i]), 4);
-      else if (collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.3, o.r[i] * 1.3, [red, green, blue], 0.8, 4);
+      else if (collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.3, o.r[i] * 1.3, [red, green, blue], 0.45, 4);
       else pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.6, o.r[i] * 1.6, [Math.min(1, red * 1.25 + 0.1), Math.min(1, green * 1.25 + 0.1), Math.min(1, blue * 1.25 + 0.1)], 0.95, 5);
       continue;
     }
@@ -354,8 +354,9 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     // An edge that leaves a structured cluster is drawn stronger: it is one of few. It ends in an arrow at a disc outside.
     const leg = owner[a] >= 0 || owner[b] >= 0;
     const lit = trace?.edges.has(k);
-    const alpha = lit ? 0.95 : (leg ? 0.3 : galaxy ? 0.11 : 0.06) * (trace?.fade ? 0.3 : 1);
-    const [er, eg, eb] = lit ? AMBER : [red, green, blue];
+    const alpha = lit ? 0.95 : (leg ? 0.3 : galaxy ? 0.05 : 0.06) * (trace?.fade ? 0.3 : 1);
+    // In the galaxy style the lines are a darker shade of their cluster's colour: faint threads, not light.
+    const [er, eg, eb] = lit ? AMBER : galaxy && !leg ? [red * 0.7, green * 0.7, blue * 0.7] : [red, green, blue];
     edges.push(...from, er, eg, eb, alpha, ...to, er, eg, eb, alpha);
     if (leg && owner[a] >= 0 && expanded.has(owner[a]) && !(owner[b] >= 0 && expanded.has(owner[b]))) {
       const target = owner[b] >= 0 ? owner[b] : b;
