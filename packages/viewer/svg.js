@@ -159,7 +159,10 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
    const g=element('g',{class:'node lw-bus-line',tabindex:0,role:'button','aria-label':bus.label,'data-node-id':bus.id});
    const shape=element('rect',{...r,rx:Math.min(r.width,r.height)/2,fill:bus.id===selected?'#90e4c3':'#6f93b8',stroke:bus.id===selected?'#90e4c3':'#4c6682'});
    g.append(element('rect',{x:r.x-4,y:r.y-4,width:r.width+8,height:r.height+8,fill:'transparent',class:'lw-hit'}),shape);
-   g.append(element('text',flat?{x:cx,y:r.y-6,'text-anchor':'middle',fill:'#9fc3e6','font-size':12,'pointer-events':'none'}:{x:r.x+r.width+14,y:cy,'text-anchor':'middle',transform:`rotate(-90 ${r.x+r.width+14} ${cy})`,fill:'#9fc3e6','font-size':12,'pointer-events':'none'},bus.label.slice(0,40)));
+   // The name beside the bar (above a flat one, right of a standing one), in the widest stretch that no tap reaches from
+   // that side, so it does not sit on a tap.
+   const at=busLabelAt(bus,flat);
+   g.append(element('text',flat?{x:at,y:r.y-6,'text-anchor':'middle',fill:'#9fc3e6','font-size':12,'pointer-events':'none'}:{x:r.x+r.width+14,y:at,'text-anchor':'middle',transform:`rotate(-90 ${r.x+r.width+14} ${at})`,fill:'#9fc3e6','font-size':12,'pointer-events':'none'},bus.label.slice(0,40)));
    g.append(element('title',{},`${bus.id} · ${bus.taps.length} connection${bus.taps.length===1?'':'s'}`));
    const node={id:bus.id,label:bus.label,kind:bus.kind,shape:'busLine'};g.onclick=e=>choose(node,e);g.onkeydown=e=>{if(e.key==='Enter')choose(node,e);};
    g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);g.onpointerleave=()=>shape.setAttribute('stroke',bus.id===selected?'#90e4c3':'#4c6682');
@@ -201,6 +204,23 @@ if(onPin&&n.kind!=='attribute')g.append(pinControl(n,round?cx+rad*.62-size/2:r.x
   if(onPortDragStart){const hit=element('circle',{'data-port-hit':port.id,cx:port.position.x,cy:port.position.y,r:Math.min(9/Math.max(scale||1,.0001),6),fill:'transparent','pointer-events':'all',style:'cursor:grab'});hit.onpointerdown=e=>{e.stopPropagation();onPortDragStart(port,e);};svg.append(hit);}}
  for(const crossing of scene.crossings){const mark=element('rect',{x:crossing.position.x-3,y:crossing.position.y-3,width:6,height:6,fill:'#edc477','pointer-events':'none'});mark.append(element('title',{},`${crossing.edgeId} → ${crossing.containerId}`));svg.append(mark);}
  for(const label of scene.labels){const r=label.bounds;const box=element('rect',{...r,rx:3,fill:'#142133','pointer-events':onLabelDragStart?'all':'none','data-label-id':label.id,...(onLabelDragStart?{style:'cursor:grab'}:{})});if(onLabelDragStart)box.onpointerdown=e=>{e.stopPropagation();onLabelDragStart(label,e);};svg.append(box);svg.append(element('text',{x:r.x+4,y:r.y+r.height/2,'dominant-baseline':'middle',fill:'#edf5ff','font-size':12,'pointer-events':'none'},label.text));}
+}
+
+// Provisional (bus lines): where along a bar its name goes: the middle of the widest stretch between the taps that reach
+// the bar from the name's side (above a flat bar, right of a standing one), the bar's middle when none does.
+function busLabelAt(bus,flat){
+ const r=bus.bounds,lo=flat?r.x:r.y,hi=flat?r.x+r.width:r.y+r.height;
+ const cuts=[];
+ for(const tap of bus.taps)for(const p of tap.points){
+  // A point beyond the bar on the name's side belongs to a tap from that side; it cuts the bar where it meets it.
+  const beyond=flat?p.y<r.y-0.5:p.x>r.x+r.width+0.5;
+  if(beyond)cuts.push(flat?p.x:p.y);
+ }
+ if(!cuts.length)return (lo+hi)/2;
+ const marks=[lo,...cuts.filter(c=>c>lo&&c<hi).sort((a,b)=>a-b),hi];
+ let best=[lo,hi],width=-1;
+ for(let i=1;i<marks.length;i++)if(marks[i]-marks[i-1]>width){width=marks[i]-marks[i-1];best=[marks[i-1],marks[i]];}
+ return (best[0]+best[1])/2;
 }
 
 // Provisional (path cut-out): marks a trace on a drawn scene. The routes and nodes of the path are drawn in amber and

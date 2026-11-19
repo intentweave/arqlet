@@ -83,5 +83,5 @@ fn an_organic_area_above_the_dense_bound_is_placed_by_the_scalable_stress() {
     assert!(!small.options.scalable_stress);
     // Above the scalable bound the area is still refused.
     let err = import_graph(organic_ring(2001), 3000).unwrap_err();
-    assert!(err.contains("bounded"), "{err}");
+    assert!(err.contains("bounded to 2000"), "{err}");
 }

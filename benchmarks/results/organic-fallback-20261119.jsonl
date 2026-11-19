@@ -1,0 +1,8 @@
+{"nodes": 200, "edges": 240, "times": [0.872307792014908, 0.3192872920189984, 0.307426041981671], "peakBytes": 9584640, "scalableStress": false, "error": null}
+{"nodes": 300, "edges": 360, "times": [0.48726029199315235, 0.4744116659858264, 0.4664950839942321], "peakBytes": 11485184, "scalableStress": false, "error": null}
+{"nodes": 301, "edges": 362, "times": [0.45718750002561137, 0.38849329098593444, 0.5010181249817833], "peakBytes": 12697600, "scalableStress": true, "error": null}
+{"nodes": 500, "edges": 600, "times": [0.7079846660490148, 0.7718036670121364, 0.9028904579463415], "peakBytes": 16990208, "scalableStress": true, "error": null}
+{"nodes": 1000, "edges": 1200, "times": [1.7069585839635693, 1.5036201659822837, 1.496240290987771], "peakBytes": 31309824, "scalableStress": true, "error": null}
+{"nodes": 1500, "edges": 1800, "times": [2.4231004170142114, 2.615035208000336, 2.507329332991503], "peakBytes": 49938432, "scalableStress": true, "error": null}
+{"nodes": 2000, "edges": 2400, "times": [3.3626672080135904, 3.63993779104203, 3.3688947500195354], "peakBytes": 71696384, "scalableStress": true, "error": null}
+{"nodes": 2001, "edges": 2402, "times": [], "peakBytes": null, "scalableStress": null, "error": "organic placement is bounded to 2000 children per area; the root has 2001"}
