@@ -353,10 +353,94 @@ fn axes(r: &Rect, horizontal: bool) -> ((f64, f64), (f64, f64)) {
 }
 
 /// Provisional: the edges of the `busLine` nodes, turned for the layering so that the bus network reads as a tree: in every
-/// connected network of nodes and buses, the node on the most buses (the earliest in the graph on a tie) is the root, a
-/// breadth-first search goes node → bus → node from it, and every bus edge points from the end reached first to the end
+/// connected network of nodes and buses one root (`root_of`: a gateway, else the middle of the network), a breadth-first
+/// search goes node → bus → node from it, and every bus edge points from the end reached first to the end
 /// reached later. A gateway then stands above its buses, a node on one bus below it, a node on two buses below both. Only
 /// the layout sees the turned edges (`restore` gives the graph back); `None` when the graph has no bus line.
+/// The largest bus network whose middle is found exactly (a search from every member, quadratic); a larger one takes the
+/// middle of a longest path found by two searches.
+const EXACT_MIDDLE_MAX: usize = 2000;
+
+/// The root of one bus network (`network`: its members; `far`: the member a search from its first member reached last): the
+/// node on the most buses when it is on three or more (a gateway; the earliest in the graph on a tie), else the middle of the
+/// network, which may be a bus (a trunk without gateways, the backbone of zones): the member whose farthest member is
+/// nearest, or above `EXACT_MIDDLE_MAX` members the middle of a longest path found by a second search from `far`.
+fn root_of<'a>(
+    network: &BTreeMap<&'a str, usize>,
+    far: &'a str,
+    buses: &BTreeSet<&str>,
+    adjacent: &BTreeMap<&'a str, BTreeSet<&'a str>>,
+    order: &BTreeMap<&str, usize>,
+) -> &'a str {
+    let gateway = network
+        .keys()
+        .copied()
+        .filter(|id| !buses.contains(id) && adjacent[id].len() >= 3)
+        .min_by(|a, b| {
+            adjacent[b]
+                .len()
+                .cmp(&adjacent[a].len())
+                .then(order[a].cmp(&order[b]))
+        });
+    if let Some(g) = gateway {
+        return g;
+    }
+    // The exact middle: the member whose farthest member is nearest, then the one on more edges, then the earliest.
+    if network.len() <= EXACT_MIDDLE_MAX {
+        return network
+            .keys()
+            .copied()
+            .map(|id| {
+                let reach = bfs(id, adjacent, order).0;
+                (reach.values().copied().max().unwrap_or(0), id)
+            })
+            .min_by(|(ea, a), (eb, b)| {
+                ea.cmp(eb)
+                    .then(adjacent[b].len().cmp(&adjacent[a].len()))
+                    .then(order[a].cmp(&order[b]))
+            })
+            .map(|(_, id)| id)
+            .expect("a member");
+    }
+    let (_, parent, end) = bfs(far, adjacent, order);
+    let mut path = vec![end];
+    while let Some(&p) = parent.get(path.last().expect("a node")) {
+        path.push(p);
+    }
+    path[path.len() / 2]
+}
+
+/// Breadth-first search over the bus network from `from`, neighbours in graph order (so it does not depend on the ids): the
+/// level and the parent of every member, and the member reached last.
+type Search<'a> = (
+    BTreeMap<&'a str, usize>,
+    BTreeMap<&'a str, &'a str>,
+    &'a str,
+);
+fn bfs<'a>(
+    from: &'a str,
+    adjacent: &BTreeMap<&'a str, BTreeSet<&'a str>>,
+    order: &BTreeMap<&str, usize>,
+) -> Search<'a> {
+    let mut level: BTreeMap<&str, usize> = BTreeMap::from([(from, 0)]);
+    let mut parent: BTreeMap<&str, &str> = BTreeMap::new();
+    let mut queue = std::collections::VecDeque::from([from]);
+    let mut last = from;
+    while let Some(at) = queue.pop_front() {
+        last = at;
+        let mut next: Vec<&str> = adjacent[at].iter().copied().collect();
+        next.sort_by_key(|id| order[id]);
+        for n in next {
+            if !level.contains_key(n) {
+                level.insert(n, level[at] + 1);
+                parent.insert(n, at);
+                queue.push_back(n);
+            }
+        }
+    }
+    (level, parent, last)
+}
+
 pub(crate) fn orient(graph: &Graph) -> Option<(Graph, BTreeSet<String>)> {
     let buses: BTreeSet<&str> = graph
         .nodes
@@ -395,36 +479,17 @@ pub(crate) fn orient(graph: &Graph) -> Option<(Graph, BTreeSet<String>)> {
     if bus_edges.is_empty() {
         return None;
     }
-    // Breadth-first levels from the roots, network by network; the roots by bus count, then by graph order.
-    let mut roots: Vec<&str> = adjacent
-        .keys()
-        .copied()
-        .filter(|id| !buses.contains(id))
-        .collect();
-    roots.sort_by(|a, b| {
-        adjacent[b]
-            .len()
-            .cmp(&adjacent[a].len())
-            .then(order[a].cmp(&order[b]))
-    });
+    // Breadth-first levels from one root per network (`root_of`).
+    let mut starts: Vec<&str> = adjacent.keys().copied().collect();
+    starts.sort_by_key(|id| order[id]);
     let mut level: BTreeMap<&str, usize> = BTreeMap::new();
-    for root in roots {
-        if level.contains_key(root) {
+    for start in starts {
+        if level.contains_key(start) {
             continue;
         }
-        level.insert(root, 0);
-        let mut queue = std::collections::VecDeque::from([root]);
-        while let Some(at) = queue.pop_front() {
-            // Neighbours in graph order, so the search does not depend on the ids.
-            let mut next: Vec<&str> = adjacent[at].iter().copied().collect();
-            next.sort_by_key(|id| order[id]);
-            for n in next {
-                if !level.contains_key(n) {
-                    level.insert(n, level[at] + 1);
-                    queue.push_back(n);
-                }
-            }
-        }
+        let (network, _, far) = bfs(start, &adjacent, &order);
+        let root = root_of(&network, far, &buses, &adjacent, &order);
+        level.extend(bfs(root, &adjacent, &order).0);
     }
     let mut oriented = graph.clone();
     let mut flipped = BTreeSet::new();

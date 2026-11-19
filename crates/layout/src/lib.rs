@@ -605,6 +605,23 @@ fn compute_counted_inner(
 ) -> Result<(Snapshot, SearchCounters), String> {
     check_rows(graph, options)?;
     tree::check_tree_areas(graph)?;
+    // Provisional: an organic area above the dense bound (`organic::MAX_NODES`) is placed by the scalable stress when no
+    // stress was chosen, instead of being refused; the snapshot records the option, so its continuations place alike.
+    // Graphs within the bound are unchanged.
+    let scaled;
+    let options = if !options.sparse_stress
+        && !options.scalable_stress
+        && organic::check_organic_areas(graph, false, false).is_err()
+        && organic::check_organic_areas(graph, false, true).is_ok()
+    {
+        scaled = LayoutOptions {
+            scalable_stress: true,
+            ..options.clone()
+        };
+        &scaled
+    } else {
+        options
+    };
     organic::check_organic_areas(graph, options.sparse_stress, options.scalable_stress)?;
     let mut run = Run::new(&|| false);
     let mut snapshot = uninterrupted(compute_mode(graph, previous, dirty, 0, options, &mut run))?;

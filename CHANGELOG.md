@@ -28,6 +28,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   (`expand_bus_lines`/`apply_bus_lines`). The scene has `busLines` (id, label, kind, bar, taps) instead of a node with a
   bar; the columns carry them, the SVG viewer draws them (selectable, traced by the bus's and the edges' ids), and a trace
   or neighbourhood marks the bar and taps it runs over.
+- Root of a bus tree (provisional): a node on three or more buses (a gateway) as before; without one, the middle of the
+  network (the member whose farthest member is nearest; above 2 000 members the middle of a longest path), which may be a
+  bus. A trunk without gateways stands on top with its branches below; zones hang below their backbone, and a unit on two
+  zone buses below both. Examples *Vehicle trunk bus (no gateway)* and *Zonal vehicle (zones, redundant unit)* (made up).
+- An organic area above the dense bound of 300 children is placed by the scalable stress (up to 2 000) when no stress was
+  chosen, instead of being refused; the snapshot records `scalableStress`. Areas within the bound are unchanged. Single
+  release runs on a loaded machine (load about 6): organic rings of 500 and 1 500 nodes imported in 0.6 and 2.1 s.
 
 - **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
   the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads

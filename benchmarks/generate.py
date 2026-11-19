@@ -855,6 +855,59 @@ def vehicle_buses(strategy=None):
     return b.graph(**({"defaultStrategy": strategy} if strategy else {}))
 
 
+def vehicle_trunk():
+    """A made-up vehicle without gateways: one CAN trunk past every ECU, and two ECUs that each head a LIN branch of their
+    own. Every edge joins an ECU to its bus. The tree grows from the ECU on the most buses."""
+    b = Builder("tb")
+    b.node("trunk-can", "Vehicle CAN 500k", "bus", shape="busLine")
+    for node_id, label in [("lin-front", "Front LIN 19.2k"), ("lin-rear", "Rear LIN 19.2k")]:
+        b.node(node_id, label, "bus", shape="busLine")
+    on_trunk = ["Engine ECU", "Brake ECU", "Steering ECU", "Instrument cluster", "Front body module", "Rear body module",
+                "Airbag ECU", "Infotainment"]
+    for label in on_trunk:
+        node_id = label.lower().replace(" ", "-")
+        b.node(node_id, label, "ecu")
+        b.edge(node_id, "trunk-can", "connects")
+    for bus, head, leaves in [("lin-front", "front-body-module", ["Wiper motor", "Headlamp left", "Headlamp right"]),
+                              ("lin-rear", "rear-body-module", ["Tailgate lock", "Rear lamp", "Trailer module"])]:
+        b.edge(head, bus, "connects")
+        for label in leaves:
+            node_id = label.lower().replace(" ", "-")
+            b.node(node_id, label, "ecu")
+            b.edge(node_id, bus, "connects")
+    return b.graph()
+
+
+def vehicle_zonal():
+    """A made-up zonal vehicle: a central compute unit on an Ethernet backbone with three zone controllers; each zone (a
+    container, so it can be collapsed and opened) holds its zone controller, a CAN bus and its actuators. The brake unit
+    sits on two zone buses (redundant), so it hangs below both."""
+    b = Builder("tb")
+    b.node("central", "Central compute", "ecu")
+    b.node("backbone", "Ethernet backbone 1G", "bus", shape="busLine")
+    b.edge("central", "backbone", "connects")
+    zones = {
+        "front": ("Zone front", ["Headlamps", "Front radar", "Wiper motor"]),
+        "left": ("Zone left", ["Door left", "Seat left", "Mirror left"]),
+        "right": ("Zone right", ["Door right", "Seat right", "Mirror right"]),
+    }
+    for zone, (label, actuators) in zones.items():
+        b.container(f"zone-{zone}", label)
+        b.node(f"zc-{zone}", f"{label} controller", "ecu", f"zone-{zone}")
+        b.edge(f"zc-{zone}", "backbone", "connects")
+        b.node(f"can-{zone}", f"{label} CAN", "bus", f"zone-{zone}", shape="busLine")
+        b.edge(f"zc-{zone}", f"can-{zone}", "connects")
+        for actuator in actuators:
+            node_id = f"{zone}-" + actuator.lower().replace(" ", "-")
+            b.node(node_id, actuator, "ecu", f"zone-{zone}")
+            b.edge(node_id, f"can-{zone}", "connects")
+    # One unit on two zone buses.
+    b.node("brake-unit", "Brake unit (redundant)", "ecu")
+    b.edge("brake-unit", "can-left", "connects")
+    b.edge("brake-unit", "can-right", "connects")
+    return b.graph()
+
+
 def can_bus():
     """Vehicle speed limiter on a CAN bus: the ECUs that publish speed, engine and position data, the ECUs that receive them,
     and the limiter's wired outputs. The CAN messages (named by their kind) form one explicit bus between the sending
@@ -947,6 +1000,8 @@ def main():
         ("can-bus", can_bus, "CAN bus (vehicle)", "Vehicle speed limiter on a CAN bus: ECUs on one shared bus line, the limiter's wired outputs as a second bus; the limiter ECU holds a layered software diagram, the engine ECU an organic one, and two ECUs share a housing.", "hand-authored", True),
         ("vehicle-buses", vehicle_buses, "Vehicle buses (bus lines)", "Physical buses of a made-up vehicle as bars (shape busLine): four buses with their ECUs and a central gateway on three of them.", "hand-authored", True),
         ("vehicle-buses-organic", lambda: vehicle_buses("organic"), "Vehicle buses, organic", "The same buses placed organically: each bar runs along its ECUs.", "hand-authored", True),
+        ("vehicle-trunk", vehicle_trunk, "Vehicle trunk bus (no gateway)", "One CAN trunk past every ECU of a made-up vehicle, without gateways; two body modules each head a LIN branch.", "hand-authored", True),
+        ("vehicle-zonal", vehicle_zonal, "Zonal vehicle (zones, redundant unit)", "A made-up zonal architecture: central compute on an Ethernet backbone, three zones (containers) with a controller, a CAN bus and actuators; a brake unit on two zone buses.", "hand-authored", True),
         ("synthetic-2k", lambda: synthetic(2000, 11), "Synthetic 2k", "Random hierarchy, 2,000 leaves, cycles, self-loops, parallel and unresolved edges.", "seeded (seed 11)", False),
         ("synthetic-20k", lambda: synthetic(20000, 12), "Synthetic 20k", "Random hierarchy, 20,000 leaves; scale probe for the view import path.", "seeded (seed 12)", False),
     ]

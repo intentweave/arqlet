@@ -245,3 +245,86 @@ fn every_operation_answers_the_view_with_its_bus_lines() {
         );
     }
 }
+
+/// Absolute top of a box in the view (boxes are relative to their parents).
+fn top_of(s: &Snapshot, id: &str) -> f64 {
+    let parent: std::collections::BTreeMap<&str, Option<&str>> = s
+        .graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let mut at = Some(id);
+    let mut y = 0.;
+    while let Some(n) = at {
+        y += s.boxes[n].y;
+        at = parent[n];
+    }
+    y
+}
+
+#[test]
+fn a_trunk_without_a_gateway_stands_on_top_with_its_branches_below() {
+    // One trunk past four nodes; two of them head a branch bus each. No node is on three buses: the middle of the network
+    // is the trunk, so it is the root.
+    let node = |id: &str, bus: bool| {
+        let mut n = json!({"id": id, "kind": if bus { "bus" } else { "ecu" }, "label": id});
+        if bus {
+            n["shape"] = json!("busLine");
+        }
+        n
+    };
+    let edge = |s: &str, t: &str| json!({"id": format!("{s}-{t}"), "kind": "connects", "source": s, "target": t});
+    let g: Graph = serde_json::from_value(json!({
+        "defaultDirection": "tb",
+        "nodes": [node("head-a", false), node("trunk", true), node("a", true), node("b", true), node("head-b", false),
+            node("x", false), node("y", false), node("leaf-a", false), node("leaf-b", false)],
+        "edges": [edge("head-a", "trunk"), edge("head-b", "trunk"), edge("x", "trunk"), edge("y", "trunk"),
+            edge("head-a", "a"), edge("leaf-a", "a"), edge("head-b", "b"), edge("leaf-b", "b")]
+    }))
+    .unwrap();
+    let s = import_graph_with(g, 100, &LayoutOptions::default()).unwrap();
+    let bar = |id: &str| s.bus_lines[id].bar.y;
+    for n in ["head-a", "head-b", "x", "y"] {
+        assert!(top_of(&s, n) > bar("trunk"), "{n} below the trunk");
+    }
+    assert!(bar("a") > top_of(&s, "head-a") && top_of(&s, "leaf-a") > bar("a"));
+    assert!(bar("b") > top_of(&s, "head-b") && top_of(&s, "leaf-b") > bar("b"));
+}
+
+#[test]
+fn zones_hang_below_their_backbone_and_a_unit_on_two_zone_buses_below_both() {
+    // A backbone with a central unit and two zone controllers; each zone (a container) holds its controller, its bus and an
+    // actuator; one unit outside is on both zone buses.
+    let node = |id: &str, parent: Option<&str>, bus: bool| {
+        let mut n = json!({"id": id, "kind": if bus { "bus" } else { "ecu" }, "label": id, "parentId": parent});
+        if bus {
+            n["shape"] = json!("busLine");
+        }
+        n
+    };
+    let edge = |s: &str, t: &str| json!({"id": format!("{s}-{t}"), "kind": "connects", "source": s, "target": t});
+    let g: Graph = serde_json::from_value(json!({
+        "defaultDirection": "tb",
+        "nodes": [node("central", None, false), node("backbone", None, true),
+            node("zone-l", None, false), node("zc-l", Some("zone-l"), false), node("can-l", Some("zone-l"), true),
+            node("act-l", Some("zone-l"), false),
+            node("zone-r", None, false), node("zc-r", Some("zone-r"), false), node("can-r", Some("zone-r"), true),
+            node("act-r", Some("zone-r"), false),
+            node("brake", None, false)],
+        "edges": [edge("central", "backbone"), edge("zc-l", "backbone"), edge("zc-r", "backbone"), edge("zc-l", "can-l"),
+            edge("act-l", "can-l"), edge("zc-r", "can-r"), edge("act-r", "can-r"), edge("brake", "can-l"), edge("brake", "can-r")]
+    }))
+    .unwrap();
+    let s = import_graph_with(g, 100, &LayoutOptions::default()).unwrap();
+    assert_eq!(s.bus_lines.len(), 3);
+    let bar = |id: &str| s.bus_lines[id].bar.y;
+    assert!(top_of(&s, "zone-l") > bar("backbone") && top_of(&s, "zone-r") > bar("backbone"));
+    assert!(
+        top_of(&s, "brake") > top_of(&s, "zone-l") && top_of(&s, "brake") > top_of(&s, "zone-r")
+    );
+    // Collapsing a zone keeps the backbone; the zone stands for its bus.
+    let closed =
+        arqlet_runtime::toggle_container(&s, s.revision, s.layout_version, "zone-l").unwrap();
+    assert!(closed.bus_lines.contains_key("backbone") && !closed.bus_lines.contains_key("can-l"));
+}
