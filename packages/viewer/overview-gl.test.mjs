@@ -107,3 +107,21 @@ test('draggable chooses what a drag moves: a cluster when the page says so', () 
   assert.deepEqual(moves, [[0, 'move'], [0, 'end']]);
   assert.equal(views.length, 0);
 });
+
+test('under the orbit a drag turns the drawing and Shift-drag pans', () => {
+  const {canvas, renderer, fire} = fakes();
+  let orbit = {yaw: 0, pitch: 0, depth: 10};
+  Object.defineProperty(renderer, 'orbit', {get: () => orbit && {...orbit}});
+  renderer.setOrbit = next => { orbit = {...orbit, ...next}; };
+  const views = [];
+  renderer.setView = v => views.push(v);
+  bindOverviewNavigation(canvas, renderer, {onNodeDrag: () => assert.fail('no node moves under the orbit')});
+  fire('pointerdown');
+  fire('pointermove', {clientX: 110, clientY: 60});
+  fire('pointerup', {clientX: 110, clientY: 60});
+  assert.ok(Math.abs(orbit.yaw - 0.6) < 1e-9 && Math.abs(orbit.pitch - 0.3) < 1e-9);
+  assert.equal(views.length, 0);
+  fire('pointerdown');
+  fire('pointermove', {clientX: 40, clientY: 10, shiftKey: true});
+  assert.equal(views.length, 1);
+});

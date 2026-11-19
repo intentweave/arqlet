@@ -27,6 +27,10 @@ export interface OverviewRenderer {
   /** Provisional: whether the galaxy style is on (glows and stars instead of discs and rings, faint lines, added light). */
   readonly galaxy: boolean;
   setGalaxy(on: boolean): void;
+  /** Provisional: the orbit (pseudo-3D): turned by `yaw` and `pitch` (radians) around the view's centre, points at depths
+   * of up to `depth` world units; null is flat. Under the orbit a drag turns the drawing and Shift-drag pans. */
+  readonly orbit: {yaw: number; pitch: number; depth: number} | null;
+  setOrbit(orbit: {yaw?: number; pitch?: number; depth?: number} | null): void;
   /** Draws clusters structured (`expanded`) or collapsed into one disc (`collapsed`, indices); omitted parts are kept.
    * With `fade` (milliseconds) the old drawing blends into the new one. */
   setState(state: {expanded?: Expanded; collapsed?: Set<number>; selected?: number; trace?: import('./overview.js').OverviewPath | null}, animation?: {fade?: number}): void;

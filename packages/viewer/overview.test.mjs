@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES, pathOf, revealPathDecisions, viewOfNodes} from './overview.js';
+import {orbitPoint, orbitDepth, overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES, pathOf, revealPathDecisions, viewOfNodes} from './overview.js';
 
 // Two clusters: c (with leaves a, b) and d (with leaf e); edges a→b, b→a (a cycle) and a→e.
 const overview = {
@@ -496,4 +496,19 @@ test('in the galaxy style a cluster is named in its middle on a tag of its colou
   // The disc style names it above its disc, without a colour.
   const plain = labelsOf(m, new Map(), view, 800, 600).find(l => l.text === 'c');
   assert.ok(plain.y < 300 && !plain.colour);
+});
+
+test('the orbit projects a point by its depth, turned around the view centre, in perspective', () => {
+  const view = {centreX: 10, centreY: 20, scale: 1};
+  // Flat: the plain offset.
+  assert.deepEqual(orbitPoint(null, view, 100, 15, 25), [5, 5, 1]);
+  // The view's centre stays at the middle whatever the turn.
+  const at = orbitPoint({yaw: 0.8, pitch: -0.4, depth: 30}, view, 100, 10, 20);
+  const z = orbitDepth(10, 20, 100) * 30;
+  assert.ok(Math.abs(at[0] - Math.sin(0.8) * z * at[2]) < 1e-9);
+  // Nearer points (negative depth after the turn) are larger, farther ones smaller.
+  const depths = [0, 25, 50, 75].map(x => orbitPoint({yaw: 0, pitch: 0, depth: 30}, view, 100, x, 20));
+  for (const [x, , f] of depths) assert.ok(f > 0.8 && f < 1.2 && Number.isFinite(x));
+  // The depth field is smooth at the scale of the clusters: two points close together lie at similar depths.
+  assert.ok(Math.abs(orbitDepth(0, 0, 100) - orbitDepth(0.5, 0.5, 100)) < 0.35);
 });
