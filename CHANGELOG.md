@@ -5,7 +5,35 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+## 0.6.0 — 2026-11-19
+
+Physical buses and large graphs. A node of shape `busLine` (CAN, LIN, FlexRay, Ethernet) becomes a bus line of the view:
+a bar past its nodes with square taps, or with `busStyle: "trunk"` a shared line from its head; bus networks read as
+trees from their gateway or their middle, stay trees when zones collapse, and traces cross them. Large graphs start
+abstract and stay responsive: a first-view budget (`levelOfDetail.nodes`/`edges`), lifted edges between containers,
+columnar scenes for sessions, a shared prepared source, and indexed projections (a 1 000 000-node import 22.5 s → 10.6 s,
+a toggle in its session 8.5 s → 2.5 s). Hosts can precompute communities and imports as library calls and leave the
+source graph out of the answers (`omitSource`). New defaults give stacked containers and loops their room and place
+organic areas with forces; an organic area above 300 children is laid out instead of refused.
+
+### Upgrading from 0.5
+
+- **The default drawing changes** where the new defaults act: `sharedBorderRanks`, `alignStacked`, `loopSpace` and
+  `organicForces` are on (see *Changed*). To keep 0.5's drawings, set the four options to `false`; they are written into
+  a snapshot only when `false`. The reference fingerprints are `fingerprints-20261119-default-0.6.0.jsonl`.
+- **The engine version is `0.6.0`**: edits of a snapshot from an earlier engine are refused, so import the graph again
+  rather than continuing a 0.5 snapshot.
+- **An organic area above 300 children is laid out** (by the scalable stress, up to 2 000) instead of refused, and the
+  snapshot records `scalableStress`.
+- **Additions to the formats**, all omitted when empty or default, so earlier documents read unchanged: the node shape
+  `busLine` (columns code 3); `Bus.taps`, `Bus.kind`, `Bus.parentId`; `Snapshot.busLines`, `Snapshot.busTaps`,
+  `Snapshot.sourceDigest`; `Scene.busLines`; the options `busStyle`, `isolatedGridFrom`, `liftEdges`,
+  `routeSearchWindow` and `levelOfDetail.nodes`/`edges`. Rust: exhaustive struct literals of `LayoutOptions`, `Bus` and
+  `Snapshot` need the new fields (or `..Default::default()`); `Snapshot.source_graph` is an `Arc<Graph>`.
+
 ### Added
+
+#### Bus lines
 
 - Node shape `busLine` (provisional): a physical bus (CAN, LIN, FlexRay, …) as a node keeps its box for the layout and is
   drawn as a bar past the nodes its edges attach (`Snapshot.busLines`), with the edges as square taps onto the bar. The
@@ -42,9 +70,42 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   edge between two members of a bus network that joins no bus (as to a collapsed zone that holds a bus) follows the tree.
   A collapsed zone now stands below its backbone instead of at the bottom.
 - An organic area above the dense bound of 300 children is placed by the scalable stress (up to 2 000) when no stress was
-  chosen, instead of being refused; the snapshot records `scalableStress`. Areas within the bound are unchanged. Single
-  release runs on a loaded machine (load about 6): organic rings of 500 and 1 500 nodes imported in 0.6 and 2.1 s.
+  chosen, instead of being refused; above 2 000 it is refused with that bound. The snapshot records `scalableStress`.
+  Areas within the bound are unchanged. Organic rings of 500, 1 000 and 2 000 nodes imported in 0.8, 1.5 and 3.4 s on a
+  heavily loaded machine ([results](benchmarks/results/organic-fallback-20261119.md)).
 
+#### Large graphs and hosts
+
+- `liftEdges` (provisional, off): an edge whose ends are not siblings is drawn between the outermost containers its ends
+  differ in, and the edges of one pair of containers as one route with their weights in both directions; edges between
+  siblings stay. synthetic-20k with `levelOfDetail: {nodes: 300}`: 1 126 instead of 7 730 drawn edges, no line–node hits
+  instead of 10 775, 33 940 crossings instead of 8.4 million, 1.6 s instead of 7.2 s
+  ([results](benchmarks/results/lift-edges-20261118.md)).
+- `levelOfDetail` takes a budget (provisional): `nodes` and `edges` bound the first view of an import, which opens
+  containers level by level while it stays within both; edges are counted as drawn (one per pair of collapsed ends). With
+  `nodes` and no `communities`, containers with more children than the budget are divided into communities, so a flat
+  graph starts collapsed too. synthetic-20k (22 819 nodes) with `{nodes: 1000, edges: 2000}`: 94 boxes and 2 000 edges in 4.2 s;
+  a flat graph of 20 000 nodes with `{nodes: 300}`: 300 boxes in 41 s (loaded machine)
+  ([results](benchmarks/results/first-view-budget-20261118.md)).
+- `routeSearchWindow` (provisional, off): a constructed layered route searches the lanes across the flow only near its
+  ends (as far across as it reaches along the flow, at least 16 tracks) and over the whole width only when it finds no
+  way there. A search over the whole width is quadratic in the boxes across the drawing (4 000 lanes in a 5 000-node
+  view). The same metrics on every dataset of the benchmark set; on synthetic-20k slightly fewer crossings and bends, and
+  half the time (5 000-node view: 47 s → 22 s). `benchmarks/eval/search-window.mjs` compares it with the default
+  ([results](benchmarks/results/route-search-window-20261118.md)).
+- `isolatedGridFrom` (provisional, unset): `isolatedGrid` only in the areas with at least this many children that no edge
+  joins to a sibling, so a container opened with hundreds of unlinked members is a grid instead of one long column while
+  every other area keeps its default layout. At 50 every dataset of the benchmark set keeps its metrics; `isolatedGrid`
+  everywhere changes five of them (line–node hits on `mixed-large`, more crossings on `workflow-dag`).
+- Precomputing for a host (provisional): `communities` (operation; `arqlet::community_groups`; npm `communityGroups`)
+  answers the groups and communities a view adds as the `groups` option takes them (node id → path of labels). Computed
+  once in a backend and given back as `groups`, the view gets the same members and labels without Louvain (the
+  containers are of kind `group`). `arqlet::import` and npm `importGraph` (with `omitSource`) run the import as a
+  library call. Tests `community_groups.rs`, `precompute.test.mjs`.
+- `omitSource` (provisional, import): the snapshot leaves the source graph out and carries its fingerprint
+  (`sourceDigest`); later requests on it bring the graph as `source`, checked against the fingerprint, and their answers
+  leave it out again (an answer whose source changed carries the new one). At 1M the import's answer is 7.3 MB instead
+  of 187 MB.
 - **Columnar scene (ADR 0019 step 4, provisional):** a resident session answers `columns` with the id tables and keeps
   the scene's numbers as columns (`f32` bounds and route points, `u32` indices); `session.columns()` in JavaScript reads
   them as views into WASM memory, as transferred copies from a worker, or builds them from the scene for a backend
@@ -59,37 +120,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   The overview page has a "typed arrays" box. Benchmark:
   `benchmarks/protocol/measure-columns.sh`.
 
-### Changed
+#### Playground and tools
 
-- `isolatedGridFrom` (provisional, unset): `isolatedGrid` only in the areas with at least this many children that no edge
-  joins to a sibling, so a container opened with hundreds of unlinked members is a grid instead of one long column while
-  every other area keeps its default layout. At 50 every dataset of the benchmark set keeps its metrics; `isolatedGrid`
-  everywhere changes five of them (line–node hits on `mixed-large`, more crossings on `workflow-dag`).
-- Precomputing for a host (provisional): `communities` (operation; `arqlet::community_groups`; npm `communityGroups`)
-  answers the groups and communities a view adds as the `groups` option takes them (node id → path of labels). Computed
-  once in a backend and given back as `groups`, the view gets the same members and labels without Louvain (the
-  containers are of kind `group`). `arqlet::import` and npm `importGraph` (with `omitSource`) run the import as a
-  library call. Tests `community_groups.rs`, `precompute.test.mjs`.
-- The import's selection, its collapsed containers and the budget walk the structured graph by index (`GraphIndex`,
-  built once): a 1 000 000-node import 16.5 s → 10.6 s, byte-identical
-  ([results](benchmarks/results/import-index-20261118.md)).
-- `omitSource` (provisional, import): the snapshot leaves the source graph out and carries its fingerprint
-  (`sourceDigest`); later requests on it bring the graph as `source`, checked against the fingerprint, and their answers
-  leave it out again (an answer whose source changed carries the new one). At 1M the import's answer is 7.3 MB instead
-  of 187 MB.
-- The import of a large graph: an abstracting import reuses the structure (communities) its selection computed, the
-  selection and `validate` walk ancestors once (linear), edge-port bindings are found by maps, a typed request field is
-  read without a copy, and an `import` is read from its text in one pass. A 1 000 000-node import: 22.5 s → 15.8 s;
-  byte-identical ([results](benchmarks/results/import-prepare-20261118.md)).
-- A view's projection walks the structured graph by index (`arqlet_model::GraphIndex`, kept with the structure;
-  `arqlet_view::project_indexed`) and copies an edge only when the view keeps it. A toggle in a session of a 1 000 000-node
-  graph: 3.9 s → 2.5 s on the same machine and load; byte-identical
-  ([results](benchmarks/results/sessions-indexed-20261118.md)).
-- Resident sessions keep the prepared source (ADR 0019 step 3): the snapshot's source graph is shared (`Arc`), and the
-  view's structure (groups, communities) is kept with the snapshot (`Snapshot.structure`, not serialized) and reused by the
-  next view of the same source and structure options; a structured view projected once is not validated again. Opening a
-  container in a session of a 1 000 000-node graph: 8.5 s → 3.8 s; byte-identical answers
-  ([results](benchmarks/results/sessions-prepared-20261118.md)).
+- Playground: **Live** (organic areas keep settling, animated): turns on force-directed behaviour and follows every change
+  with bounded `settle` calls, one animated frame each, until the engine reports convergence (at most 60 calls). Each
+  call goes through `execute()`, so it runs in the split, browser-only and backend-only modes, and a stale answer is
+  discarded as for any edit. Each frame is a preview; the converged one is repaired. An import in live mode animates
+  from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
+  equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
+- `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
+
+### Changed
 
 - **Default:** `sharedBorderRanks` and `alignStacked` are on: free space beside stacked containers. In a container across
   its parent's flow the border nodes share the first or last rank with the side nodes instead of opening one of their
@@ -117,6 +158,29 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   self-loops 4 % smaller; every other dataset and every fingerprint view unchanged (can-bus was 0.25 % larger until an
   area in a layered parent kept the stress at a tie of crossings and boxes in the way when the forces took more room)
   ([measurement](benchmarks/results/organic-forces-20261114.md)). `organicForces: false` restores the earlier placement.
+
+- The import's selection, its collapsed containers and the budget walk the structured graph by index (`GraphIndex`,
+  built once): a 1 000 000-node import 16.5 s → 10.6 s, byte-identical
+  ([results](benchmarks/results/import-index-20261118.md)).
+- The import of a large graph: an abstracting import reuses the structure (communities) its selection computed, the
+  selection and `validate` walk ancestors once (linear), edge-port bindings are found by maps, a typed request field is
+  read without a copy, and an `import` is read from its text in one pass. A 1 000 000-node import: 22.5 s → 15.8 s;
+  byte-identical ([results](benchmarks/results/import-prepare-20261118.md)).
+- A view's projection walks the structured graph by index (`arqlet_model::GraphIndex`, kept with the structure;
+  `arqlet_view::project_indexed`) and copies an edge only when the view keeps it. A toggle in a session of a 1 000 000-node
+  graph: 3.9 s → 2.5 s on the same machine and load; byte-identical
+  ([results](benchmarks/results/sessions-indexed-20261118.md)).
+- Resident sessions keep the prepared source (ADR 0019 step 3): the snapshot's source graph is shared (`Arc`), and the
+  view's structure (groups, communities) is kept with the snapshot (`Snapshot.structure`, not serialized) and reused by the
+  next view of the same source and structure options; a structured view projected once is not validated again. Opening a
+  container in a session of a 1 000 000-node graph: 8.5 s → 3.8 s; byte-identical answers
+  ([results](benchmarks/results/sessions-prepared-20261118.md)).
+- The projection of a view (`arqlet_view::project`) checked for every collapsed container that it has children by a
+  search of all nodes, and walked from every node and edge end to the root by id lookups; both are computed once now, and
+  two more searches of all nodes per id (pulled containers at import, pins) use a set. A first view of a 300 000-node
+  graph: 24 s → 6.4 s, of 1 000 000 nodes: 71 s → 23 s, opening a container there 74 s → 14 s; byte-identical output.
+  `benchmarks/scaling/series.py` measures overview, first view and opening a container from 20K to 1M nodes
+  ([results](benchmarks/results/scaling-series-20261118.md)).
 
 - With `organicForces`, `settle` takes its steps as previews of the forces (no repair in between, as the steps of a
   force-directed drag) and repairs the step that converges; the settling then counts as converged. Without a held node a
@@ -195,39 +259,6 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - The end of a drag that changes no pin repaired nothing: the engine saw unchanged options and answered without a layout,
   so conflicts the local repair of the last drag step left stood. The end of a gesture now lays out the dragged node
   again when geometry issues remain (not for a force-directed drag, which settles by its own steps).
-
-### Added
-
-- Playground: **Live** (organic areas keep settling, animated): turns on force-directed behaviour and follows every change
-  with bounded `settle` calls, one animated frame each, until the engine reports convergence (at most 60 calls). Each
-  call goes through `execute()`, so it runs in the split, browser-only and backend-only modes, and a stale answer is
-  discarded as for any edit. Each frame is a preview; the converged one is repaired. An import in live mode animates
-  from scratch: it keeps the stress placement, then the forces are switched on and the settling draws the way into their
-  equilibrium (petri-net-shapes: about 60 frames, 2.7 s in the split mode).
-- `tools/readme-examples.mjs` takes `--options`, `--out` and dataset names, for before-and-after images.
-- The projection of a view (`arqlet_view::project`) checked for every collapsed container that it has children by a
-  search of all nodes, and walked from every node and edge end to the root by id lookups; both are computed once now, and
-  two more searches of all nodes per id (pulled containers at import, pins) use a set. A first view of a 300 000-node
-  graph: 24 s → 6.4 s, of 1 000 000 nodes: 71 s → 23 s, opening a container there 74 s → 14 s; byte-identical output.
-  `benchmarks/scaling/series.py` measures overview, first view and opening a container from 20K to 1M nodes
-  ([results](benchmarks/results/scaling-series-20261118.md)).
-- `liftEdges` (provisional, off): an edge whose ends are not siblings is drawn between the outermost containers its ends
-  differ in, and the edges of one pair of containers as one route with their weights in both directions; edges between
-  siblings stay. synthetic-20k with `levelOfDetail: {nodes: 300}`: 1 126 instead of 7 730 drawn edges, no line–node hits
-  instead of 10 775, 33 940 crossings instead of 8.4 million, 1.6 s instead of 7.2 s
-  ([results](benchmarks/results/lift-edges-20261118.md)).
-- `levelOfDetail` takes a budget (provisional): `nodes` and `edges` bound the first view of an import, which opens
-  containers level by level while it stays within both; edges are counted as drawn (one per pair of collapsed ends). With
-  `nodes` and no `communities`, containers with more children than the budget are divided into communities, so a flat
-  graph starts collapsed too. synthetic-20k (22 819 nodes) with `{nodes: 1000, edges: 2000}`: 94 boxes and 2 000 edges in 4.2 s;
-  a flat graph of 20 000 nodes with `{nodes: 300}`: 300 boxes in 41 s (loaded machine)
-  ([results](benchmarks/results/first-view-budget-20261118.md)).
-- `routeSearchWindow` (provisional, off): a constructed layered route searches the lanes across the flow only near its
-  ends (as far across as it reaches along the flow, at least 16 tracks) and over the whole width only when it finds no
-  way there. A search over the whole width is quadratic in the boxes across the drawing (4 000 lanes in a 5 000-node
-  view). The same metrics on every dataset of the benchmark set; on synthetic-20k slightly fewer crossings and bends, and
-  half the time (5 000-node view: 47 s → 22 s). `benchmarks/eval/search-window.mjs` compares it with the default
-  ([results](benchmarks/results/route-search-window-20261118.md)).
 
 ## 0.5.0 — 2026-11-14
 
