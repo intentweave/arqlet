@@ -73,7 +73,7 @@ python3 apps/playground/server_test.py
 node apps/playground/ui-regression.mjs
 
 # Scene adapters, SVG viewer and React Flow mapping: fixtures, golden markup and invariants.
-node --test packages/viewer/*.test.mjs packages/engine-client/*.test.mjs packages/arqlet/*.test.mjs apps/playground/comparison.test.mjs apps/playground/aggregation.test.mjs apps/playground/import-map.test.mjs apps/playground/markup.test.mjs
+node --test packages/viewer/*.test.mjs packages/engine-client/*.test.mjs packages/arqlet/*.test.mjs apps/playground/comparison.test.mjs apps/playground/aggregation.test.mjs apps/playground/import-map.test.mjs apps/playground/markup.test.mjs apps/playground/progressive.test.mjs
 
 node --test apps/playground/scene-engine.test.mjs
 

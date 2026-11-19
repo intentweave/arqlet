@@ -269,7 +269,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
       // a collapsed one a brighter glow, a leaf a star; the colours of the clusters as in the disc style.
       const [red, green, blue] = dim(colour(i), i);
       if (children[i].length > 0 && !collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.15, o.r[i] * 1.15, [red, green, blue], 0.22 / (1 + depth[i]), 4);
-      else if (collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.3, o.r[i] * 1.3, [red, green, blue], 0.8, 4);
+      else if (collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.3, o.r[i] * 1.3, [red, green, blue], 0.45, 4);
       else pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.6, o.r[i] * 1.6, [Math.min(1, red * 1.25 + 0.1), Math.min(1, green * 1.25 + 0.1), Math.min(1, blue * 1.25 + 0.1)], 0.95, 5);
       continue;
     }
