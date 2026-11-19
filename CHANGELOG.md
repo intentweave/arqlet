@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Orbit, a pseudo-3D view of the WebGL overview (provisional, `renderer.setOrbit({yaw, pitch, depth})`): every point
+  gets a depth from a smooth field at the scale of the clusters (what lies close together, a galaxy, lies at a similar
+  depth) plus a little of its own, the drawing turns around the view's centre and is seen in perspective, so clusters lie
+  at different depths and pass each other when it turns; the same in both vertex shaders (lines stay on their stars) and
+  in JavaScript for picking and labels (`orbitDepth`, `orbitPoint`). Under the orbit a drag turns the drawing and
+  Shift-drag pans. Overview page: *3D orbit*. The layout stays two-dimensional.
 - Cosmic motion in the galaxy style (provisional): when idle, instead of breathing, every point turns a little around the
   drawing's centre by a slowly oscillating angle that differs with its distance (the galaxies seem to rotate and shear
   against each other; bounded, it never drifts), the same field for stars and line ends so lines stay on their stars,

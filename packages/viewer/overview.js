@@ -510,11 +510,17 @@ export function lensInverse(lens, x, y) {
  * their text is at least `minPixels` high. Positions in CSS pixels; at most `limit` texts, largest first, and none that
  * would overlap a larger one.
  */
-export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set(), lens = null, galaxy = false} = {}) {
+export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set(), lens = null, galaxy = false, orbit = null} = {}) {
   const o = model.overview, out = [];
   // A screen point and the lens's enlargement there (`[x, y, factor]`); sizes on screen are multiplied by the factor, so
   // that the lens also shows the texts of what it enlarges.
-  const screen = (x, y) => lensAt(lens, width / 2 + (x - view.centreX) * view.scale, height / 2 + (y - view.centreY) * view.scale);
+  // With `orbit` (pseudo-3D) through its projection; a size there grows with the perspective's enlargement.
+  const extent = o.rootRadius || 1;
+  const screen = (x, y) => {
+    const [px, py, f] = orbitPoint(orbit, view, extent, x, y);
+    const [sx, sy, g] = lensAt(lens, width / 2 + px * view.scale, height / 2 + py * view.scale);
+    return [sx, sy, g * f];
+  };
   const visible = (x, y, pad) => x > -pad && y > -pad && x < width + pad && y < height + pad;
   const owner = ownersOf(model, expanded, collapsed);
   for (let i = 0; i < model.n; i++) {
@@ -626,6 +632,35 @@ function thickSegment(out, a, b, half, [red, green, blue], alpha) {
   const nx = -dy / len * half, ny = dx / len * half;
   const quad = [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]];
   for (const k of [0, 1, 2, 0, 2, 3]) out.push(...quad[k], red, green, blue, alpha);
+}
+
+/**
+ * Provisional (orbit, pseudo-3D): the depth of a world point, from a smooth field at the scale of the clusters (what lies
+ * close together, a galaxy, lies at a similar depth) plus a little of its own (a cluster's thickness). In [-1.15, 1.15];
+ * `extent` is the drawing's radius. The renderer's shaders compute the same.
+ */
+export function orbitDepth(x, y, extent) {
+  const qx = x / Math.max(extent, 1) * 3, qy = y / Math.max(extent, 1) * 3;
+  const field = Math.sin(qx * 1.7 + 0.3) * Math.cos(qy * 1.3 - 0.7) * 0.7 + Math.sin((qx + qy) * 2.3) * 0.3;
+  const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return field + ((s - Math.floor(s)) - 0.5) * 0.3;
+}
+
+/**
+ * Provisional (orbit): where a world point is drawn, as `[x, y, factor]` relative to the view's centre in world units, with
+ * the perspective's enlargement there: turned by `orbit.yaw` (about the vertical) and `orbit.pitch` (about the
+ * horizontal) around the view's centre, its depth `orbitDepth * orbit.depth`, seen from three extents away.
+ */
+export function orbitPoint(orbit, view, extent, x, y) {
+  const rx = x - view.centreX, ry = y - view.centreY;
+  if (!orbit) return [rx, ry, 1];
+  let px = rx, py = ry, pz = orbitDepth(x, y, extent) * orbit.depth;
+  const cy = Math.cos(orbit.yaw), sy = Math.sin(orbit.yaw);
+  [px, pz] = [cy * px + sy * pz, -sy * px + cy * pz];
+  const cp = Math.cos(orbit.pitch), sp = Math.sin(orbit.pitch);
+  [py, pz] = [cp * py - sp * pz, sp * py + cp * pz];
+  const dist = Math.max(extent, 1) * 3, f = dist / Math.max(dist + pz, dist * 0.2);
+  return [px * f, py * f, f];
 }
 
 /** The bus lines of a model by node index (`busLines` of the overview), kept with the model. */

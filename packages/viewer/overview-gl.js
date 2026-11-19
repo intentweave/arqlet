@@ -6,7 +6,7 @@
 // layout of the same graph (`morph`) moves every vertex from its old to its new place in the vertex shader (two sets of
 // positions and a uniform `t`); a change of what is collapsed or structured (`setState` with `fade`) fades the old
 // drawing out under the new one.
-import {overviewBuffers, pickNode, pickExpanded, labelsOf, lensInverse, SHAPE_STRIDE, LINE_STRIDE} from './overview.js';
+import {overviewBuffers, pickNode, pickExpanded, labelsOf, lensInverse, ownersOf, orbitPoint, SHAPE_STRIDE, LINE_STRIDE} from './overview.js';
 
 // The fisheye lens of `lensAt` (overview.js) in device pixels from the canvas centre: u_lens = (x, y, radius,
 // magnification), radius 0 for none. Returns the moved point and the enlargement there.
@@ -35,6 +35,30 @@ vec2 cosmic(vec2 p) {
   return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
 }`;
 
+// Orbit (pseudo-3D): u_orbit = (yaw, pitch, depth in world units, on), u_extent the drawing's radius. A world point gets a
+// depth from a smooth field at the scale of the clusters plus a little of its own (as `orbitDepth` in overview.js), is
+// turned around the view's centre and seen in perspective from three extents away: (x, y) relative to the centre in
+// world units, and the enlargement there. Off: the plain offset, enlargement 1.
+const ORBIT = `
+uniform vec4 u_orbit; uniform float u_extent;
+float orbitDepth(vec2 w) {
+  vec2 q = w / max(u_extent, 1.0) * 3.0;
+  float field = sin(q.x * 1.7 + 0.3) * cos(q.y * 1.3 - 0.7) * 0.7 + sin((q.x + q.y) * 2.3) * 0.3;
+  return field + (fract(sin(w.x * 12.9898 + w.y * 78.233) * 43758.5453) - 0.5) * 0.3;
+}
+vec3 orbit(vec2 w) {
+  vec2 rel = w - u_centre;
+  if (u_orbit.w < 0.5) return vec3(rel, 1.0);
+  vec3 p = vec3(rel, orbitDepth(w) * u_orbit.z);
+  float cy = cos(u_orbit.x), sy = sin(u_orbit.x);
+  p = vec3(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);
+  float cp = cos(u_orbit.y), sp = sin(u_orbit.y);
+  p = vec3(p.x, cp * p.y - sp * p.z, sp * p.y + cp * p.z);
+  float dist = max(u_extent, 1.0) * 3.0;
+  float f = dist / max(dist + p.z, dist * 0.2);
+  return vec3(p.xy * f, f);
+}`;
+
 const SHAPE_VS = `
 attribute vec2 a_centre; attribute vec2 a_half; attribute vec2 a_centre2; attribute vec2 a_half2;
 attribute vec2 a_corner; attribute vec4 a_colour; attribute float a_kind;
@@ -45,13 +69,15 @@ varying vec2 v_local; varying vec4 v_colour; varying float v_kind; varying vec2 
 uniform vec3 u_breath;
 ${LENS}
 ${COSMIC}
+${ORBIT}
 void main() {
   vec2 centre = cosmic(mix(a_centre, a_centre2, u_t)), extent = mix(a_half, a_half2, u_t);
+  vec3 seen = orbit(centre);
   // A phase of its own per star, for the twinkle.
   v_seed = fract(sin(dot(mix(a_centre, a_centre2, u_t), vec2(12.9898, 78.233))) * 43758.5453);
   // At least 1.5 pixels across, so that a leaf far out stays visible as a dot.
-  vec2 pixels = max(extent * u_scale * u_ratio, vec2(0.75));
-  vec2 middle = (centre - u_centre) * u_scale * u_ratio;
+  vec2 pixels = max(extent * u_scale * u_ratio * seen.z, vec2(0.75));
+  vec2 middle = seen.xy * u_scale * u_ratio;
   // Only discs breathe; the boxes and lines of structured clusters stay with their texts.
   if (u_breath.y > 0.0 && a_kind < 1.5) pixels *= 1.0 + u_breath.y * sin(u_breath.x - 6.2831853 * length(middle) / u_breath.z);
   // Every corner goes through the lens (a disc larger than the lens keeps its outline); the edge width uses the
@@ -118,8 +144,9 @@ uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size; uniform float
 varying vec4 v_colour;
 ${LENS}
 ${COSMIC}
+${ORBIT}
 void main() {
-  vec2 clip = lens((cosmic(mix(a_position, a_position2, u_t)) - u_centre) * u_scale * u_ratio).xy / (u_size * 0.5);
+  vec2 clip = lens(orbit(cosmic(mix(a_position, a_position2, u_t))).xy * u_scale * u_ratio).xy / (u_size * 0.5);
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
   v_colour = a_colour;
 }`;
@@ -199,6 +226,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   let outlines = options.shapes ?? {};
   // Provisional: the galaxy style (`setGalaxy`): glows and stars instead of discs and rings, faint lines, light added.
   let galaxy = !!options.galaxy;
+  // Provisional: the orbit (pseudo-3D, `setOrbit`): {yaw, pitch, depth} in radians and world units, or null (flat).
+  let orbit = null;
   const data = () => overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy});
   let current = layer(data()), previous = null;
   // The running animation: a morph (`t` of the current layer, and the view) and a fade (of the previous layer).
@@ -232,6 +261,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     gl.uniform3f(gl.getUniformLocation(p, 'u_cosmic'), seconds, strength, model.overview.rootRadius || 1);
     // Wrapped, so that the fragment shader's lower precision stays fine over a long idle time.
     gl.uniform2f(gl.getUniformLocation(p, 'u_twinkle'), seconds % 2732, strength);
+    gl.uniform4f(gl.getUniformLocation(p, 'u_orbit'), orbit?.yaw ?? 0, orbit?.pitch ?? 0, orbit?.depth ?? 0, orbit ? 1 : 0);
+    gl.uniform1f(gl.getUniformLocation(p, 'u_extent'), model.overview.rootRadius || 1);
   };
   const drawPart = (l, part, mode, view, t, fade) => {
     if (!l.counts[part]) return;
@@ -289,7 +320,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     if (!show) return;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens, galaxy})) {
+    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens, galaxy, orbit})) {
       ctx.font = `${label.kind === 'cluster' ? 600 : 400} ${label.size.toFixed(1)}px system-ui, sans-serif`;
       if (label.colour) {
         // A galaxy's tag: a dark rounded box, a dot in its colour, its name.
@@ -343,6 +374,21 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     options.onView?.(renderer.view);
   };
 
+  // Picking under the orbit: the node whose projected disc holds the point, the smallest such (a star before the cloud
+  // around it); not inside structured clusters.
+  const pickOrbit = (clientX, clientY) => {
+    const rect = canvas.getBoundingClientRect(), v = renderer.view, o = model.overview, extent = o.rootRadius || 1;
+    const mx = clientX - rect.left - rect.width / 2, my = clientY - rect.top - rect.height / 2;
+    const owner = ownersOf(model, expanded, collapsed);
+    let best = -1, size = Infinity;
+    for (let i = 0; i < model.n; i++) {
+      if (owner[i] >= 0) continue;
+      const [px, py, f] = orbitPoint(orbit, v, extent, o.x[i], o.y[i]);
+      const r = o.r[i] * f * v.scale;
+      if ((px * v.scale - mx) ** 2 + (py * v.scale - my) ** 2 <= Math.max(r, 3) ** 2 && r < size) { best = i; size = r; }
+    }
+    return best >= 0 && model.chainTop ? model.chainTop[best] : best;
+  };
   const renderer = {
     view: {centreX: 0, centreY: 0, scale: 1},
     get model() { return model; },
@@ -365,6 +411,16 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     /** Provisional: draws in the galaxy style (glows, stars, faint lines, added light) or back in discs and rings. */
     get galaxy() { return galaxy; },
     setGalaxy(on) { if (galaxy !== !!on) { galaxy = !!on; renderer.setState({}); } },
+    /**
+     * Provisional: the orbit (pseudo-3D): `{yaw, pitch}` in radians turn the drawing around the view's centre, every point
+     * at a depth of up to `depth` (default half the drawing's radius) from a smooth field, so clusters lie at
+     * different depths and pass each other when it turns; null draws it flat again.
+     */
+    get orbit() { return orbit && {...orbit}; },
+    setOrbit(next) {
+      orbit = next ? {yaw: next.yaw ?? 0, pitch: Math.max(-1.3, Math.min(1.3, next.pitch ?? 0)), depth: next.depth ?? (model.overview.rootRadius || 1) / 2} : null;
+      if (!frame) frame = requestAnimationFrame(() => { frame = 0; renderer.draw(); if (morphing || fading || breath) animate(); });
+    },
     /**
      * Draws clusters structured (`expanded`, index → {scene}), collapsed into one disc (`collapsed`, indices) and marks
      * `selected` (-1: none); omitted parts are kept. With `fade` (milliseconds) the old drawing blends into the new one.
@@ -457,6 +513,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     },
     /** The deepest overview node under a CSS pixel, or -1 (inside a structured cluster: that cluster). */
     pick(clientX, clientY) {
+      if (orbit) return pickOrbit(clientX, clientY);
       const [x, y] = renderer.world(clientX, clientY);
       return pickExpanded(model, expanded, x, y)?.cluster ?? pickNode(model, x, y, collapsed);
     },
@@ -513,12 +570,13 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
   // phase)` with the world point, `move` while dragging and `end` at the release; any other drag pans. `draggable(i)`
   // (of the node under the pointer, -1 for none) chooses another node to move, or -1 to pan.
   const leafAt = e => {
-    if (!onNodeDrag) return -1;
+    // Under the orbit a drag turns the drawing; nodes are not moved.
+    if (!onNodeDrag || renderer.orbit) return -1;
     const i = renderer.pick(e.clientX, e.clientY), m = renderer.model;
     if (draggable) return draggable(i);
     return i >= 0 && m && !m.children[i].length ? i : -1;
   };
-  const down = e => { awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, moved: false, node: leafAt(e)}; canvas.setPointerCapture?.(e.pointerId); };
+  const down = e => { awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, orbit: renderer.orbit, moved: false, node: leafAt(e)}; canvas.setPointerCapture?.(e.pointerId); };
   const move = e => {
     awake();
     follow(e);
@@ -527,6 +585,11 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
     drag.moved = true;
     if (drag.node >= 0) { onNodeDrag(drag.node, ...renderer.world(e.clientX, e.clientY), 'move'); return; }
+    // Under the orbit a drag turns the drawing (about half a turn across the canvas); with Shift it pans.
+    if (drag.orbit && !e.shiftKey) {
+      renderer.setOrbit({...drag.orbit, yaw: drag.orbit.yaw + dx * 0.006, pitch: drag.orbit.pitch + dy * 0.006});
+      return;
+    }
     renderer.setView({...drag.view, centreX: drag.view.centreX - dx / drag.view.scale, centreY: drag.view.centreY - dy / drag.view.scale});
   };
   const up = e => {

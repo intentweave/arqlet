@@ -198,6 +198,10 @@ export function lensInverse(lens: OverviewLens | null, x: number, y: number): [n
 /** The deepest node whose disc holds the world point, or -1; a collapsed cluster is picked as a whole. A bus drawn as a
  * line (`busLines`) is picked by its bar where no disc is, not by its disc. */
 export function pickNode(model: OverviewModel, x: number, y: number, collapsed?: Set<number>): number;
+/** Provisional (orbit): a world point's depth in [-1.15, 1.15], from a smooth field at the scale of the clusters. */
+export function orbitDepth(x: number, y: number, extent: number): number;
+/** Provisional (orbit): a world point drawn under the orbit, `[x, y, factor]` relative to the view's centre. */
+export function orbitPoint(orbit: {yaw: number; pitch: number; depth: number} | null, view: OverviewView, extent: number, x: number, y: number): [number, number, number];
 /** Provisional: the overview's bus lines by the bus node's index. */
 export function busLinesOf(model: OverviewModel): Map<number, import('@arqlet/contracts').OverviewBusLine>;
 /** The view that shows node `i` (-1: everything) in a viewport of `width` × `height` CSS pixels. */
