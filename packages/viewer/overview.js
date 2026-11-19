@@ -281,7 +281,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     }
   }
   // The selected cluster: a bright ring on top of its disc.
-  if (selected >= 0 && owner[selected] < 0) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
+  if (selected >= 0 && owner[selected] < 0 && !lines.has(selected)) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
   // Scene geometry per structured cluster, where each of its nodes' boxes is, and the border port of each edge that
   // leaves it.
   const back = [], routes = [], arrows = [], front = [];
@@ -367,8 +367,9 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   // (or the cluster that shows it) to its foot on the line.
   const BUS = [0.44, 0.58, 0.72];
   for (const [i, l] of lines) {
+    // The selected bus's bar is white, a bus on a path amber.
     const lit = !!trace && trace.nodes.has(i);
-    const [red, green, blue] = lit ? AMBER : dim(BUS, i);
+    const [red, green, blue] = i === selected ? [1, 1, 1] : lit ? AMBER : dim(BUS, i);
     const dx = l.x2 - l.x1, dy = l.y2 - l.y1, len = Math.hypot(dx, dy) || 1, w = Math.max(o.r[i] / 3, 0.5);
     const nx = -dy / len * w, ny = dx / len * w;
     const quad = [[l.x1 + nx, l.y1 + ny], [l.x2 + nx, l.y2 + ny], [l.x2 - nx, l.y2 - ny], [l.x1 - nx, l.y1 - ny]];
@@ -514,6 +515,16 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
     if (!visible(x, y + r, r)) continue;
     out.push({text, x, y: y + 12, size: Math.min(13 + r / 60, 18), weight: r, kind: 'cluster'});
   }
+  // A bus drawn as a line carries its name above the middle of its bar, once the bar is long enough on screen.
+  for (const [i, l] of busLinesOf(model)) {
+    if (owner[i] >= 0) continue;
+    const [x1, y1, f1] = screen(l.x1, l.y1), [x2, y2] = screen(l.x2, l.y2);
+    const long = Math.hypot(x2 - x1, y2 - y1);
+    if (long < 40 * f1) continue;
+    const [x, y] = [(x1 + x2) / 2, (y1 + y2) / 2];
+    if (!visible(x, y, long)) continue;
+    out.push({text: nameOf(model, i), x, y: y - 9, size: Math.min(11 + long / 120, 14), weight: long / 2, kind: 'node'});
+  }
   for (const [i, {scene}] of expanded) {
     const place = placeScene(model, i, scene);
     const placed = new Set((scene.labels ?? []).map(l => l.id));
@@ -560,16 +571,31 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
 /** The deepest node whose disc holds the world point (`x`, `y`), or -1. Descends from the top level. */
 export function pickNode(model, x, y, collapsed = new Set()) {
   const {overview: o, children, roots} = model;
-  const inside = i => (o.x[i] - x) ** 2 + (o.y[i] - y) ** 2 <= o.r[i] ** 2;
+  // A bus drawn as a line (`busLines`) is picked by its bar (within the bar's width, at least a tenth of a leaf beyond
+  // it), not by its disc; a disc under the point comes first.
+  const lines = busLinesOf(model);
+  const onBar = i => {
+    const l = lines.get(i), dx = l.x2 - l.x1, dy = l.y2 - l.y1, len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - l.x1) * dx + (y - l.y1) * dy) / len2)) : 0;
+    const px = l.x1 + t * dx, py = l.y1 + t * dy, reach = Math.max(o.r[i] / 3, 0.5) * 1.5;
+    return (x - px) ** 2 + (y - py) ** 2 <= reach * reach;
+  };
+  const inside = i => !lines.has(i) && (o.x[i] - x) ** 2 + (o.y[i] - y) ** 2 <= o.r[i] ** 2;
   let found = -1, candidates = roots;
   for (;;) {
-    const next = candidates.find(inside);
+    const next = candidates.find(inside) ?? candidates.find(i => lines.has(i) && onBar(i));
     if (next === undefined) return found >= 0 && model.chainTop ? model.chainTop[found] : found;
     found = next;
     // A collapsed cluster is picked as a whole.
     if (collapsed.has(next)) return found;
     candidates = children[next];
   }
+}
+
+/** The bus lines of a model by node index (`busLines` of the overview), kept with the model. */
+export function busLinesOf(model) {
+  if (!model.busLines) model.busLines = new Map((model.overview.busLines ?? []).map(l => [l.node, l]));
+  return model.busLines;
 }
 
 /** The view (`centreX`, `centreY`, `scale` in pixels per unit) that shows the disc of node `i` (-1: everything). */

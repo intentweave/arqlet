@@ -413,3 +413,37 @@ test('a bus of the overview is a bar with taps instead of a disc', () => {
   const lit = overviewBuffers(m, new Map(), new Set(), -1, {trace: {nodes: new Set([0, 1]), clusters: new Set(), edges: new Set(), nodeIds: new Set(), edgeIds: new Set()}});
   assert.ok(Math.abs(lit.arrows[2] - 1) < 1e-6 && Math.abs(lit.arrows[3] - 0.78) < 1e-6);
 });
+
+test('a bus of the overview is picked by its bar, a disc on the bar first', () => {
+  const bus = {
+    schemaVersion: 1, ids: ['can', 'a', 'b'], parent: [-1, -1, -1],
+    x: [0, -10, 10], y: [20, 0, 0], r: [4, 4, 4], rootRadius: 30, edges: [1, 0, 2, 0], links: [],
+    busLines: [{node: 0, x1: -10, y1: 0, x2: 10, y2: 0, taps: [1, 2], feet: [-10, 0, 10, 0]}],
+  };
+  const m = overviewModel(bus);
+  // On the bar between the members: the bus.
+  assert.equal(pickNode(m, 0, 0.5), 0);
+  // On a member's disc where the bar runs through it: the member.
+  assert.equal(pickNode(m, -10, 0), 1);
+  // Where the bus's disc would be: nothing (it is not drawn).
+  assert.equal(pickNode(m, 0, 20), -1);
+  // Off the bar: nothing.
+  assert.equal(pickNode(m, 0, 6), -1);
+});
+
+test('a selected bus has a white bar and a bus line carries its name', () => {
+  const bus = {
+    schemaVersion: 1, ids: ['can', 'a', 'b'], labels: ['CAN 1', 'A', 'B'], parent: [-1, -1, -1],
+    x: [0, -100, 100], y: [20, 0, 0], r: [4, 4, 4], rootRadius: 130, edges: [1, 0, 2, 0], links: [],
+    busLines: [{node: 0, x1: -100, y1: 0, x2: 100, y2: 0, taps: [1, 2], feet: [-100, 0, 100, 0]}],
+  };
+  const m = overviewModel(bus);
+  const b = overviewBuffers(m, new Map(), new Set(), 0);
+  // No ring for the selection: two discs only, and the bar is white.
+  assert.equal(b.count.discs, 2 * 6);
+  assert.deepEqual([...b.arrows.slice(2, 5)], [1, 1, 1]);
+  const labels = labelsOf(m, new Map(), {centreX: 0, centreY: 0, scale: 1}, 400, 300);
+  const name = labels.find(l => l.text === 'CAN 1');
+  assert.ok(name, JSON.stringify(labels));
+  assert.equal(name.x, 200);
+});
