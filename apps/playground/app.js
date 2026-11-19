@@ -236,7 +236,7 @@ function draw(fit=false){
  $('profile-info').textContent=active?`${active.description} Indicative budget ${Math.round(active.budgetMs/1000)} s; in the browser without a time limit, interrupted only on cancel.`:defaults?'Engine defaults: no profile applied. Choose a profile to apply one.':stale?'This profile is from another version; its rules no longer apply. Custom options: no longer match a profile.':'Custom options: no longer match a profile.';
  $('refine').disabled=!!pending||!!curation||active?.refine===false;
  $('structured').disabled=!!pending||!!curation;
- {const lines=(snapshot.graph.buses??[]).filter(b=>b.taps?.length&&snapshot.busLines?.[b.id]);$('stats').textContent=`${snapshot.graph.nodes.length+lines.length}/${(snapshot.sourceGraph??snapshot.graph).nodes.length} visible nodes${lines.length?` (${lines.length} bus line${lines.length===1?'':'s'})`:''} · ${snapshot.graph.edges.length+lines.reduce((n,b)=>n+b.taps.length,0)} connections · Revision ${snapshot.revision} · Layout ${snapshot.layoutVersion??0}`;}$('save').disabled=false;$('bundle').value=snapshot.options?.bundling==='complete'?'complete':'none';
+ {const lines=(snapshot.graph.buses??[]).filter(b=>b.taps?.length&&(snapshot.busLines?.[b.id]||b.edges?.length));$('stats').textContent=`${snapshot.graph.nodes.length+lines.length}/${(snapshot.sourceGraph??snapshot.graph).nodes.length} visible nodes${lines.length?` (${lines.length} bus line${lines.length===1?'':'s'})`:''} · ${snapshot.graph.edges.length+lines.filter(b=>!b.edges?.length).reduce((n,b)=>n+b.taps.length,0)} connections · Revision ${snapshot.revision} · Layout ${snapshot.layoutVersion??0}`;}$('save').disabled=false;$('bundle').value=snapshot.options?.bundling==='complete'?'complete':'none';
  if($('measure').checked)setTimeout(measureNodes,30);
  syncCuration();
 }
@@ -1033,7 +1033,7 @@ function syncDetails(){
  if(!optionDefaults)return;
  const o=effectiveOptions();
  for(const n of [1,2,3,4])$(`cand-${n}`).checked=o.candidates.includes(n);
- $('routing-candidate').checked=!!o.routingCandidate;$('hybrid-by').value=o.hybridBy;$('bundle').value=o.bundling;
+ $('routing-candidate').checked=!!o.routingCandidate;$('hybrid-by').value=o.hybridBy;$('bundle').value=o.bundling;$('bus-style').value=o.busStyle??'bar';
  $('port-placement').value=o.portPlacement;$('routing-engine').value=o.routingEngine;
  $('placement-grid').value=o.placementGrid;$('placement-search').value=o.placementSearch;$('min-port-spacing').value=o.minPortSpacing;
  $('free-placement').checked=!!o.freePlacement;$('routing-clearance').value=o.routingClearance;$('track-spacing').value=o.trackSpacing;
@@ -1299,6 +1299,7 @@ $('measure').onchange=()=>{if($('measure').checked)measureNodes();};
 // Port placement: symmetric (evenly spaced) or optimized (towards the peers, with the minimum spacing).
 $('port-placement').onchange=()=>setOption({portPlacement:$('port-placement').value},'port distribution');
 $('bundle').onchange=()=>setOption({bundling:$('bundle').value},'Bundling');
+$('bus-style').onchange=()=>setOption({busStyle:$('bus-style').value},'Bus style');
 
 // The entity-relationship projection of a graph (ADR 0011): an entity becomes a leaf node, its rows are its title and its
 // attributes, measured in the text's font. Other graphs are returned unchanged, with no rows.

@@ -338,20 +338,59 @@ pub fn compute_counted(
 ) -> Result<(Snapshot, SearchCounters), String> {
     // Provisional (ADR 0019 view model): a node of shape `busLine` is a bus line in the view (`Bus::taps`), without its node
     // and edges; the layout sees it as a node again, and its bar and taps come back in `Snapshot::bus_lines`.
-    let projected = bus_line::project(graph);
-    let view = projected.as_ref().unwrap_or(graph);
-    let Some(expanded) = bus_line::expand(view) else {
-        return compute_counted_forced(graph, previous, dirty, options);
-    };
-    // The earlier layout as the layout left it, with the bus nodes, where its continuation finds them.
+    // A view drawn with trunks is a view with bars again; the trunks are drawn anew below when the options ask for them.
+    let projected = bus_line::project(graph).or_else(|| bus_line::untrunk(graph));
+    let mut view = projected.as_ref().unwrap_or(graph);
+    // With `busStyle: trunk` a bus with a head is a shared line from it (`bus_line::trunks`); a bus at the root of its
+    // tree keeps its bar.
+    let mut trunked = None;
+    let joined;
+    let mut trunk_roots = None;
+    let mut joining = BTreeSet::new();
+    if options.bus_style == arqlet_model::BusStyle::Trunk && projected.is_some() {
+        let kept = if options.bus_roots.is_empty() {
+            previous.map_or(&[][..], |p| p.bus_taps.roots.as_slice())
+        } else {
+            options.bus_roots.as_slice()
+        };
+        let with_nodes = bus_line::expand(view);
+        let (roots, levels) = bus_line::orient(with_nodes.as_ref().unwrap_or(graph), kept)
+            .map(|(_, _, roots, levels)| (roots, levels))
+            .unwrap_or_default();
+        if let Some(t) = bus_line::trunks(view, &levels) {
+            let (oriented, flipped) = bus_line::orient_joining(&t, &levels);
+            trunked = Some(t);
+            joined = oriented;
+            joining = flipped;
+            view = &joined;
+            trunk_roots = Some(roots);
+        }
+    }
+    // The earlier layout as the layout left it, with the bus nodes and its trunks in the layout's direction.
     let earlier = previous.map(|p| {
         let mut p = p.clone();
         bus_line::expand_snapshot(&mut p);
         p
     });
-    let (mut snapshot, stages) =
-        compute_counted_forced(&expanded, earlier.as_ref(), dirty, options)?;
-    bus_line::collapse(&mut snapshot, view);
+    let (mut snapshot, stages) = match bus_line::expand(view) {
+        Some(expanded) => {
+            let (mut snapshot, stages) =
+                compute_counted_forced(&expanded, earlier.as_ref(), dirty, options)?;
+            bus_line::collapse(&mut snapshot, view);
+            (snapshot, stages)
+        }
+        None if trunk_roots.is_some() => {
+            compute_counted_forced(view, earlier.as_ref(), dirty, options)?
+        }
+        None => return compute_counted_forced(graph, previous, dirty, options),
+    };
+    if let Some(roots) = trunk_roots {
+        if let Some(view) = trunked.as_ref().filter(|_| !joining.is_empty()) {
+            bus_line::restore(&mut snapshot, view, &joining);
+        }
+        snapshot.bus_taps.roots = roots;
+        bus_line::turn_trunks(&mut snapshot, true);
+    }
     Ok((snapshot, stages))
 }
 
@@ -360,6 +399,14 @@ pub fn compute_counted(
 /// boxes (`Snapshot::bus_lines`); applying it again changes nothing. Nothing changes without a bus.
 pub fn apply_bus_lines(snapshot: &mut Snapshot) {
     bus_line::collapse_snapshot(snapshot);
+}
+
+/// Provisional: the root of every bus network of a graph with nodes of shape `busLine` (a gateway, else the network's
+/// middle), for `LayoutOptions::bus_roots`. Empty without such a node.
+pub fn bus_roots(graph: &Graph) -> Vec<String> {
+    bus_line::orient(graph, &[])
+        .map(|(_, _, roots, _)| roots)
+        .unwrap_or_default()
 }
 
 /// Provisional: the snapshot of a view with bus lines turned back into the one of the graph the layout sees, with the bus
@@ -814,9 +861,16 @@ fn compute_mode(
         _ => options,
     };
     // Provisional: the edges of bus lines turned for the layering, so the bus network reads as a tree (`bus_line::orient`).
-    if let Some((oriented, flipped)) = bus_line::orient(graph) {
+    // The roots found on the source graph (`LayoutOptions::bus_roots`), else those of the earlier layout.
+    let kept_roots = if options.bus_roots.is_empty() {
+        previous.map_or(&[][..], |p| p.bus_taps.roots.as_slice())
+    } else {
+        options.bus_roots.as_slice()
+    };
+    if let Some((oriented, flipped, roots, _)) = bus_line::orient(graph, kept_roots) {
         let mut snapshot = compute_mode_buses(&oriented, previous, dirty, optimize, options, run)?;
         bus_line::restore(&mut snapshot, graph, &flipped);
+        snapshot.bus_taps.roots = roots;
         return Ok(snapshot);
     }
     compute_mode_buses(graph, previous, dirty, optimize, options, run)

@@ -6,4 +6,9 @@ import type { Route } from "./Route";
 /**
  * Provisional: the layout state of the taps of the bus lines (`Snapshot::bus_taps`).
  */
-export type BusTapLayout = { routes?: Array<Route>, resolvedPorts?: Array<ResolvedPort>, boundaryCrossings?: Array<BoundaryCrossing>, };
+export type BusTapLayout = { routes?: Array<Route>, resolvedPorts?: Array<ResolvedPort>, boundaryCrossings?: Array<BoundaryCrossing>,
+/**
+ * The root of every bus network of the layout (one per network), kept so that the next layout of the same networks
+ * (a toggle, an edit) grows its trees from the same roots.
+ */
+roots?: Array<string>, };

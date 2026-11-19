@@ -42,7 +42,10 @@ pub(crate) fn draw_buses(
         })
         .collect();
     // A bus line (`Bus::taps`) is drawn as a bar, not on shared routes.
-    for bus in buses.iter().filter(|b| b.taps.is_empty()) {
+    for bus in buses
+        .iter()
+        .filter(|b| b.taps.is_empty() || !b.edges.is_empty())
+    {
         let members: Vec<usize> = bus
             .edges
             .iter()

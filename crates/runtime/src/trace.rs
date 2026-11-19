@@ -180,7 +180,19 @@ pub(crate) fn on_view(
             .is_none_or(|k| drawn_kind.get(id).is_some_and(|kind| k.contains(*kind)))
     };
     let mut routes = BTreeSet::new();
+    // A tap of a bus drawn as a shared line (`busStyle: trunk`) is the drawn edge with its id.
+    let trunk_taps: BTreeSet<&str> = snapshot
+        .graph
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
+        .flat_map(|b| b.edges.iter().map(String::as_str))
+        .collect();
     for edge in path_edges {
+        if trunk_taps.contains(edge.as_str()) && drawn.contains_key(edge.as_str()) {
+            routes.insert(edge.clone());
+            continue;
+        }
         let (s, Some(t)) = ends[edge.as_str()] else {
             continue;
         };

@@ -2,6 +2,7 @@
 import type { AggregateWeight } from "./AggregateWeight";
 import type { AppearanceConfig } from "./AppearanceConfig";
 import type { Bundling } from "./Bundling";
+import type { BusStyle } from "./BusStyle";
 import type { CommunityHubs } from "./CommunityHubs";
 import type { ContainerSizing } from "./ContainerSizing";
 import type { EdgeRouting } from "./EdgeRouting";
@@ -137,6 +138,12 @@ isolatedGrid?: boolean,
  * default, omitted): as `isolatedGrid` says.
  */
 isolatedGridFrom?: number | null,
+/**
+ * Provisional: how the view draws a bus kept as a node of shape `busLine`: `bar` (the default) a bar in a rank of its
+ * own with one tap per edge; `trunk` no rank and no bar, one shared line from the bus's head (its member nearest the
+ * root of the bus tree) to every other member, drawn as an explicit bus (ADR 0005). Omitted when `bar`.
+ */
+busStyle?: BusStyle,
 /**
  * ADR 0020, S1-0 and S1-0b: a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`) is laid out
  * with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header at its
