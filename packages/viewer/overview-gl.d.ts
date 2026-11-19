@@ -11,6 +11,8 @@ export interface OverviewRendererOptions {
   background?: [number, number, number, number];
   /** The outline per node kind; kinds not named are circles. */
   shapes?: Record<string, import('./overview.js').Outline>;
+  /** Provisional: start in the galaxy style (`setGalaxy`). */
+  galaxy?: boolean;
 }
 
 export interface OverviewRenderer {
@@ -22,6 +24,9 @@ export interface OverviewRenderer {
   setExpanded(expanded: Expanded): void;
   /** The outline per node kind (inscribed in each disc); kinds not named are circles. */
   setShapes(shapes: Record<string, import('./overview.js').Outline>): void;
+  /** Provisional: whether the galaxy style is on (glows and stars instead of discs and rings, faint lines, added light). */
+  readonly galaxy: boolean;
+  setGalaxy(on: boolean): void;
   /** Draws clusters structured (`expanded`) or collapsed into one disc (`collapsed`, indices); omitted parts are kept.
    * With `fade` (milliseconds) the old drawing blends into the new one. */
   setState(state: {expanded?: Expanded; collapsed?: Set<number>; selected?: number; trace?: import('./overview.js').OverviewPath | null}, animation?: {fade?: number}): void;

@@ -59,7 +59,14 @@ float outlineDistance(vec2 p, float outline) {
 }
 void main() {
   vec4 colour;
-  if (v_kind < 1.5) {
+  if (v_kind > 3.5) {
+    // Galaxy mode: a glow (4), a soft Gaussian spot; a star (5), a bright core in its own glow.
+    float d = length(v_local);
+    if (d > 1.0) discard;
+    float glow = exp(-d * d * 4.5) * (1.0 - d);
+    float a = v_kind < 4.5 ? glow : max(1.0 - smoothstep(0.22, 0.34, d), glow * 0.55);
+    colour = vec4(v_colour.rgb, v_colour.a * a);
+  } else if (v_kind < 1.5) {
     float base = floor(v_kind + 0.05);
     float d = outlineDistance(v_local, floor((v_kind - base) * 10.0 + 0.5));
     if (d > 1.0) discard;
@@ -168,7 +175,9 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     for (const p of PARTS) { gl.deleteBuffer(l.buffers[p].a); if (l.buffers[p].b !== l.buffers[p].a) gl.deleteBuffer(l.buffers[p].b); }
   };
   let outlines = options.shapes ?? {};
-  const data = () => overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace});
+  // Provisional: the galaxy style (`setGalaxy`): glows and stars instead of discs and rings, faint lines, light added.
+  let galaxy = !!options.galaxy;
+  const data = () => overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy});
   let current = layer(data()), previous = null;
   // The running animation: a morph (`t` of the current layer, and the view) and a fade (of the previous layer).
   let morphing = null, fading = null, frame = 0;
@@ -307,6 +316,9 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     setExpanded(map) { renderer.setState({expanded: map}); },
     /** The outline per node kind (`circle`, `square`, `octagon`, `diamond`); kinds not named are circles. */
     setShapes(next) { outlines = {...next}; renderer.setState({}); },
+    /** Provisional: draws in the galaxy style (glows, stars, faint lines, added light) or back in discs and rings. */
+    get galaxy() { return galaxy; },
+    setGalaxy(on) { if (galaxy !== !!on) { galaxy = !!on; renderer.setState({}); } },
     /**
      * Draws clusters structured (`expanded`, index → {scene}), collapsed into one disc (`collapsed`, indices) and marks
      * `selected` (-1: none); omitted parts are kept. With `fade` (milliseconds) the old drawing blends into the new one.
@@ -380,7 +392,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       gl.clearColor(...(options.background ?? [0.047, 0.063, 0.094, 1]));
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      // Galaxy mode adds light: where many glows and lines meet it grows brighter.
+      gl.blendFunc(gl.SRC_ALPHA, galaxy ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
       const t = morphing ? ease(progress(morphing)) : 0;
       const f = fading ? ease(progress(fading)) : 1;
       // The old drawing fades out under the new one, which is drawn whole: what both have does not dim (a blend of two

@@ -469,3 +469,16 @@ test('a tap is orthogonal: a stub from the rim to the line, an L for a member be
   assert.deepEqual(triangles[3], [30 - half, -36, 30 + half, 0].map(v => Math.round(v * 100) / 100));
   assert.deepEqual(triangles[4], [10, -half, 30, half].map(v => Math.round(v * 100) / 100));
 });
+
+test('the galaxy style draws glows for clusters and stars for leaves, edges in their cluster colour', () => {
+  const m = overviewModel(overview);
+  const plain = overviewBuffers(m), galaxy = overviewBuffers(m, new Map(), new Set(), -1, {galaxy: true});
+  // The same number of shapes: one per node, no rings.
+  assert.equal(galaxy.count.discs, plain.count.discs);
+  const kinds = [];
+  for (let k = 0; k < galaxy.count.discs; k += 6) kinds.push(galaxy.discs[k * SHAPE_STRIDE + 10]);
+  // Clusters c and d glow (4), leaves a, b, e are stars (5).
+  assert.deepEqual([...kinds].sort(), [4, 4, 5, 5, 5]);
+  // A galaxy edge is fainter than a leg and takes its source cluster's colour also across clusters (a → e).
+  assert.equal(galaxy.count.edges, plain.count.edges);
+});

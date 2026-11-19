@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Galaxy style of the WebGL overview (provisional, `createOverviewRenderer(..., {galaxy})`, `setGalaxy`): clusters as
+  clouds of light (a Gaussian glow, fainter the deeper the cluster, so nested clouds add up towards their cores), a
+  collapsed cluster as a brighter glow, every leaf as a star (a bright core in its own glow), every edge as a faint line in
+  its source cluster's colour; light is added (additive blending), so where many edges and nodes meet the drawing grows
+  brighter. Positions are the overview's as before. Overview page: *Galaxy*.
 - Bus lines in the cluster overview (provisional): a node of shape `busLine` is a line instead of a disc
   (`Overview.busLines`, also in `positionsOnly` answers and the columns' description): horizontal or vertical, whichever
   its members in its own cluster spread more along, through their centroid, from the first to the last one's
