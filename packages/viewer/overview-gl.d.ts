@@ -75,6 +75,9 @@ export function bindOverviewNavigation(
     /** Provisional: a drag that starts on a leaf moves it (world point; `move` while dragging, `end` at the release);
      * without it every drag pans. */
     onNodeDrag?: (index: number, x: number, y: number, phase: 'move' | 'end') => void;
+    /** Provisional: which node a drag that starts over node `index` (-1: none) moves, or -1 to pan; default: the leaf
+     * itself, else pan. */
+    draggable?: (index: number) => number;
     /** A lens that follows the pointer: its radius (CSS pixels) and magnification, or null for none; asked on every move. */
     lens?: () => {radius: number; magnification: number} | null;
     /** Breathing after `after` ms (default 8000) without input; stops at the next input. Not under reduced motion. */

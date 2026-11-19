@@ -893,3 +893,44 @@ fn a_moved_node_stays_where_it_was_put_and_its_neighbours_follow() {
     .unwrap();
     assert_eq!(response["ok"], false);
 }
+
+#[test]
+fn a_moved_cluster_takes_its_children_along() {
+    // Three clusters of leaves; one cluster is moved: it stands at the target, its children keep their places relative
+    // to it, nothing overlaps.
+    let graph = hierarchical(3, 2, 4);
+    let first = overview(&graph, 1);
+    let ids: Vec<&str> = first["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let parent = |i: usize| first["parent"][i].as_i64().unwrap();
+    let cluster = ids.iter().position(|id| *id == "g1").unwrap();
+    let child = (0..ids.len())
+        .find(|&i| parent(i) == cluster as i64)
+        .unwrap();
+    let at = |o: &Value, i: usize| (o["x"][i].as_f64().unwrap(), o["y"][i].as_f64().unwrap());
+    let (cx, cy) = at(&first, cluster);
+    let target = (cx + 300., cy - 200.);
+    let start = json!({"x": first["x"], "y": first["y"], "r": first["r"], "moved": {"g1": {"x": target.0, "y": target.1}}});
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "start": start}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let moved = &response["overview"];
+    let (mx, my) = at(moved, cluster);
+    assert!(
+        (mx - target.0).abs() < 0.02 && (my - target.1).abs() < 0.02,
+        "held at the target: {mx}, {my}"
+    );
+    let before = (at(&first, child).0 - cx, at(&first, child).1 - cy);
+    let after = (at(moved, child).0 - mx, at(moved, child).1 - my);
+    assert!(
+        (before.0 - after.0).abs() < 0.05 && (before.1 - after.1).abs() < 0.05,
+        "the child moved along"
+    );
+    assert_eq!(moved["stats"]["overlaps"], 0);
+}

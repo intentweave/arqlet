@@ -196,7 +196,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   unbind?.(); renderer?.destroy();
   model = next;
   renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes});
-  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, lens: lensSettings, idle: idleSettings()});
+  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   focus = -1;
   zoomTo(-1);
   renderRules();
@@ -422,8 +422,19 @@ function select(i, event) {
 }
 
 /**
- * Dragging a node (a leaf): it follows the pointer; at the release the overview is laid out again from where everything
- * is, with the node held where it was put, so that its cluster settles around it (`start.moved`).
+ * What a drag that starts over node `i` moves: inside the selected cluster, that cluster with all it holds (click a
+ * cluster first to move it); else a leaf itself; else nothing, and the drag pans.
+ */
+function draggable(i) {
+  if (i < 0) return -1;
+  for (let k = i; k >= 0; k = model.overview.parent[k]) if (k === selected) return selected;
+  return model.children[i].length ? -1 : i;
+}
+
+/**
+ * Dragging a node (a leaf, or the selected cluster with what it holds): it follows the pointer; at the release the
+ * overview is laid out again from where everything is, with the node held where it was put, so that its cluster settles
+ * around it (`start.moved`).
  */
 let dragFrame = 0;
 async function dragNode(i, x, y, phase) {
@@ -431,7 +442,8 @@ async function dragNode(i, x, y, phase) {
     cancelAnimationFrame(dragFrame);
     dragFrame = requestAnimationFrame(() => {
       const o = model.overview, xs = Array.from(o.x), ys = Array.from(o.y);
-      xs[i] = x; ys[i] = y;
+      const dx = x - o.x[i], dy = y - o.y[i];
+      for (const k of [i, ...descendantsOf(i)]) { xs[k] += dx; ys[k] += dy; }
       renderer.morph(overviewModel({...o, x: xs, y: ys}, resolvedEdgeIds(graph)), {duration: 0});
     });
     return;
@@ -442,6 +454,13 @@ async function dragNode(i, x, y, phase) {
   if (!result.ok) { status(result.error); return; }
   show(result.overview, true);
   status(`${nameOf(model, i)} moved; its cluster settled around it`);
+}
+
+/** The indices below node `i`. */
+function descendantsOf(i) {
+  const out = [], stack = [...model.children[i]];
+  while (stack.length) { const k = stack.pop(); out.push(k); stack.push(...model.children[k]); }
+  return out;
 }
 
 /** A double-click zooms into a cluster, and opens it when it is collapsed (one level more). */
@@ -627,6 +646,6 @@ for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
   $(id).addEventListener('change', () => {
     if (!renderer) return;
     unbind?.();
-    unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, lens: lensSettings, idle: idleSettings()});
+    unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   });
 }

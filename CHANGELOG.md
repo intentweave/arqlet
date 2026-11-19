@@ -24,8 +24,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - Moving a node in the overview (provisional): `start.moved` (node id → new centre) lays the overview out from the
   previous places with each moved node held where it was put; its cluster settles around it with cool forces (d3's
   fixed positions; the others follow and make room without arranging themselves anew) and is not centred again.
-  `bindOverviewNavigation` takes `onNodeDrag(i, x, y, phase)`: a drag that starts on a leaf moves it (`move`, `end`),
-  any other drag pans. The overview page shows the node under the pointer while dragging and settles at the release.
+  A moved cluster takes what it holds along. `bindOverviewNavigation` takes `onNodeDrag(i, x, y, phase)` and
+  `draggable(i)`: by default a drag that starts on a leaf moves it (`move`, `end`), any other drag pans. The overview page
+  moves the selected cluster with all it holds when a drag starts inside it, else a leaf, and previews the move under the
+  pointer; it settles at the release.
 
 ## 0.6.0 — 2026-11-19
 

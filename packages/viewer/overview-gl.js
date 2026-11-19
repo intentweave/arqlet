@@ -421,7 +421,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
  * (`renderer.breathe(breathe)`) after `after` milliseconds (default 8000) without input, and stop at the next input; not
  * when the system asks for reduced motion. Returns a function that removes the listeners.
  */
-export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick, onNodeDrag, lens, idle} = {}) {
+export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick, onNodeDrag, draggable, lens, idle} = {}) {
   let drag = null;
   // Breathing after `idle.after` milliseconds without input; any input stops it and starts the wait again. Not when
   // the user asked the system for less motion.
@@ -451,10 +451,12 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     renderer.setView({scale, centreX: wx - (wx - v.centreX) * v.scale / scale, centreY: wy - (wy - v.centreY) * v.scale / scale});
   };
   // With `onNodeDrag`, a drag that starts on a leaf (a node without children) moves that node: `onNodeDrag(i, x, y,
-  // phase)` with the world point, `move` while dragging and `end` at the release; any other drag pans.
+  // phase)` with the world point, `move` while dragging and `end` at the release; any other drag pans. `draggable(i)`
+  // (of the node under the pointer, -1 for none) chooses another node to move, or -1 to pan.
   const leafAt = e => {
     if (!onNodeDrag) return -1;
     const i = renderer.pick(e.clientX, e.clientY), m = renderer.model;
+    if (draggable) return draggable(i);
     return i >= 0 && m && !m.children[i].length ? i : -1;
   };
   const down = e => { awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, moved: false, node: leafAt(e)}; canvas.setPointerCapture?.(e.pointerId); };
