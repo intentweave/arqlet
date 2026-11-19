@@ -2,7 +2,8 @@
 
 /**
  * Provisional: a bus of the overview drawn as a line (`Overview::bus_lines`): the bus node's index, the line from
- * (`x1`, `y1`) to (`x2`, `y2`) along the main axis of its members, and per member (`taps`, node indices) the point of the
- * line its tap meets (`feet`, x and y alternating), so a tap runs from the member's centre to its foot.
+ * (`x1`, `y1`) to (`x2`, `y2`), horizontal or vertical (whichever its members spread more along), and per member (`taps`,
+ * node indices) the point of the line its tap meets (`feet`, x and y alternating): straight across from the member, or
+ * the line's end for a member beyond it.
  */
 export type OverviewBusLine = { node: number, x1: number, y1: number, x2: number, y2: number, taps: Array<number>, feet: Array<number>, };

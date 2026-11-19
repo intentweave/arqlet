@@ -363,31 +363,38 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     const alpha = lit ? 0.95 : Math.min(0.55, 0.06 + 0.04 * Math.sqrt(count)) * (trace?.fade ? 0.3 : 1);
     edges.push(o.x[ra], o.y[ra], red, green, blue, alpha, o.x[rb], o.y[rb], red, green, blue, alpha);
   }
-  // The bus lines: a bar (two triangles across the line, as wide as a third of the bus's disc) and a tap from each member
-  // (or the cluster that shows it) to its foot on the line.
-  const BUS = [0.44, 0.58, 0.72];
+  // The bus lines as thick orthogonal connectors: the line, and from each member (or the cluster that shows it) a tap that
+  // leaves its disc at the rim (the stub), runs at a right angle to the line and, for a member beyond the line's ends,
+  // along it to the end; a square junction where it meets the line. All as triangles, so they keep their width.
+  const BUS = [0.44, 0.58, 0.72], buses = [];
   for (const [i, l] of lines) {
-    // The selected bus's bar is white, a bus on a path amber.
     const lit = !!trace && trace.nodes.has(i);
     const [red, green, blue] = i === selected ? [1, 1, 1] : lit ? AMBER : dim(BUS, i);
-    const dx = l.x2 - l.x1, dy = l.y2 - l.y1, len = Math.hypot(dx, dy) || 1, w = Math.max(o.r[i] / 3, 0.5);
-    const nx = -dy / len * w, ny = dx / len * w;
-    const quad = [[l.x1 + nx, l.y1 + ny], [l.x2 + nx, l.y2 + ny], [l.x2 - nx, l.y2 - ny], [l.x1 - nx, l.y1 - ny]];
-    for (const k of [0, 1, 2, 0, 2, 3]) arrows.push(...quad[k], red, green, blue, 1);
+    const half = Math.max(o.r[i] * 0.12, 0.25), across = l.y1 === l.y2;
+    thickSegment(buses, [l.x1, l.y1], [l.x2, l.y2], half, [red, green, blue], 1);
     l.taps.forEach((m, k) => {
       const shown = owner[m] >= 0 && collapsed.has(owner[m]) ? owner[m] : m;
-      const from = owner[m] >= 0 && !collapsed.has(owner[m]) ? boxCentre.get(o.ids[m]) ?? [o.x[owner[m]], o.y[owner[m]]] : [o.x[shown], o.y[shown]];
+      const centre = owner[m] >= 0 && !collapsed.has(owner[m]) ? boxCentre.get(o.ids[m]) ?? [o.x[owner[m]], o.y[owner[m]]] : [o.x[shown], o.y[shown]];
+      const rim = owner[m] >= 0 && !collapsed.has(owner[m]) ? 0 : o.r[shown];
+      const foot = [l.feet[2 * k], l.feet[2 * k + 1]];
+      // Where the tap meets the line's level: straight below or beside the member; the foot when the member is within
+      // the line's span, else a corner from which the tap runs along the line to its end.
+      const corner = across ? [centre[0], l.y1] : [l.x1, centre[1]];
+      const away = Math.hypot(corner[0] - centre[0], corner[1] - centre[1]);
+      const start = away > rim ? [centre[0] + (corner[0] - centre[0]) / away * rim, centre[1] + (corner[1] - centre[1]) / away * rim] : corner;
       const tapLit = lit && (trace.nodes.has(m) || trace.clusters.has(shown));
-      const [tr, tg, tb] = tapLit ? AMBER : dim(BUS, i);
-      const alpha = tapLit ? 0.95 : 0.55 * (trace?.fade ? 0.3 : 1);
-      edges.push(...from, tr, tg, tb, alpha, l.feet[2 * k], l.feet[2 * k + 1], tr, tg, tb, alpha);
+      const [tr, tg, tb] = tapLit ? AMBER : i === selected ? [1, 1, 1] : dim(BUS, i);
+      const alpha = tapLit || i === selected ? 1 : trace?.fade ? 0.35 : 0.9;
+      if (away > rim) thickSegment(buses, start, corner, half * 0.8, [tr, tg, tb], alpha);
+      if (Math.hypot(foot[0] - corner[0], foot[1] - corner[1]) > 1e-6) thickSegment(buses, corner, foot, half * 0.8, [tr, tg, tb], alpha);
+      thickSegment(buses, [foot[0] - half * 1.6, foot[1]], [foot[0] + half * 1.6, foot[1]], half * 1.6, [red, green, blue], 1);
     });
   }
   const f = a => new Float32Array(a);
   return {
-    discs: f(discs), edges: f(edges), back: f(back), routes: f(routes), arrows: f(arrows), front: f(front),
+    discs: f(discs), edges: f(edges), buses: f(buses), back: f(back), routes: f(routes), arrows: f(arrows), front: f(front),
     count: {
-      discs: discs.length / SHAPE_STRIDE, edges: edges.length / LINE_STRIDE, back: back.length / SHAPE_STRIDE,
+      discs: discs.length / SHAPE_STRIDE, edges: edges.length / LINE_STRIDE, buses: buses.length / LINE_STRIDE, back: back.length / SHAPE_STRIDE,
       routes: routes.length / LINE_STRIDE, arrows: arrows.length / LINE_STRIDE, front: front.length / SHAPE_STRIDE,
     },
   };
@@ -590,6 +597,14 @@ export function pickNode(model, x, y, collapsed = new Set()) {
     if (collapsed.has(next)) return found;
     candidates = children[next];
   }
+}
+
+// A segment from `a` to `b` as two triangles `half` wide on each side (line vertices: x, y, red, green, blue, alpha).
+function thickSegment(out, a, b, half, [red, green, blue], alpha) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len * half, ny = dx / len * half;
+  const quad = [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]];
+  for (const k of [0, 1, 2, 0, 2, 3]) out.push(...quad[k], red, green, blue, alpha);
 }
 
 /** The bus lines of a model by node index (`busLines` of the overview), kept with the model. */

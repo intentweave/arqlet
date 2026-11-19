@@ -115,7 +115,7 @@ function program(gl, vs, fs) {
   return p;
 }
 
-const PARTS = ['edges', 'discs', 'back', 'routes', 'arrows', 'front'];
+const PARTS = ['edges', 'buses', 'discs', 'back', 'routes', 'arrows', 'front'];
 const SHAPE_PARTS = new Set(['discs', 'back', 'front']);
 /** Ease in and out: a move starts and ends gently. */
 const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
@@ -224,6 +224,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   };
   const drawLayer = (l, view, t, fade) => {
     drawPart(l, 'edges', gl.LINES, view, t, fade);
+    // The bus connectors under the discs: the members sit on them.
+    drawPart(l, 'buses', gl.TRIANGLES, view, t, fade);
     drawPart(l, 'discs', gl.TRIANGLES, view, t, fade);
     drawPart(l, 'back', gl.TRIANGLES, view, t, fade);
     drawPart(l, 'routes', gl.LINES, view, t, fade);

@@ -1727,11 +1727,11 @@ mod tests {
 }
 
 /// Provisional: the line of every node of shape `busLine` (`graph.nodes[i]` is node `i`) in a laid-out overview, from the
-/// resolved `edges` (index pairs), the clusters (`parent`) and the centres `x`, `y`: the line runs along the main axis of
-/// the bus's members in its own cluster (the nodes at the other end of its edges, other buses left out) through their
-/// centroid, from the first to the last one's projection; every member taps it at its projection, clamped to the line
+/// resolved `edges` (index pairs), the clusters (`parent`) and the centres `x`, `y`: the line runs across x or across y,
+/// whichever the bus's members in its own cluster (the nodes at the other end of its edges, other buses left out) spread
+/// more along, through their centroid, from the first to the last one's projection; every member taps it at its projection, clamped to the line
 /// (a member in another cluster at the line's nearest point). A bus with fewer than two members in its cluster gets a
-/// line of `2 * half` across its own centre. Pure and deterministic (only square roots).
+/// line of `2 * half` across its own centre. Pure and deterministic (no roots or trigonometry: the line is axis-parallel).
 pub fn bus_lines(
     graph: &Graph,
     parent: &[Option<usize>],
@@ -1778,29 +1778,15 @@ pub fn bus_lines(
             let n = along.len() as f64;
             let cx = along.iter().map(|&j| x[j]).sum::<f64>() / n;
             let cy = along.iter().map(|&j| y[j]).sum::<f64>() / n;
-            // The main axis: the eigenvector of the largest eigenvalue of the members' covariance.
-            let (mut sxx, mut sxy, mut syy) = (0., 0., 0.);
+            // The axis the members spread more along: across x or across y, so that the line and every tap are
+            // orthogonal (a tap meets the line at a right angle).
+            let (mut sxx, mut syy) = (0., 0.);
             for &j in along.iter() {
                 let (u, v) = (x[j] - cx, y[j] - cy);
                 sxx += u * u;
-                sxy += u * v;
                 syy += v * v;
             }
-            let half_diff = (sxx - syy) / 2.;
-            let lambda = (sxx + syy) / 2. + (half_diff * half_diff + sxy * sxy).sqrt();
-            let (vx, vy) = if sxy.abs() > 1e-12 {
-                (sxy, lambda - sxx)
-            } else if sxx >= syy {
-                (1., 0.)
-            } else {
-                (0., 1.)
-            };
-            let len = (vx * vx + vy * vy).sqrt();
-            let (dx, dy) = if len > 1e-12 {
-                (vx / len, vy / len)
-            } else {
-                (1., 0.)
-            };
+            let (dx, dy) = if sxx >= syy { (1., 0.) } else { (0., 1.) };
             let t: Vec<f64> = along
                 .iter()
                 .map(|&j| (x[j] - cx) * dx + (y[j] - cy) * dy)

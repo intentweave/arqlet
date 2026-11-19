@@ -8,11 +8,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 ### Added
 
 - Bus lines in the cluster overview (provisional): a node of shape `busLine` is a line instead of a disc
-  (`Overview.busLines`, also in `positionsOnly` answers and the columns' description): along the main axis of its members
-  in its own cluster, through their centroid, from the first to the last one's projection; every member taps it at its
-  projection (a member in another cluster at the nearest point of the line). Only square roots, the same on every
-  platform and for any thread count. The WebGL overview draws the bar and the taps instead of the disc and the edges to
-  it, in amber on a path through the bus, white when selected; a bus is picked by its bar where no disc is
+  (`Overview.busLines`, also in `positionsOnly` answers and the columns' description): horizontal or vertical, whichever
+  its members in its own cluster spread more along, through their centroid, from the first to the last one's
+  projection; every member taps it at its projection (a member in another cluster at the line's end). No roots or
+  trigonometry, the same on every platform and for any thread count. The WebGL overview draws thick orthogonal
+  connectors instead of the disc and the edges to it: the line, from each member a stub at its rim that runs at a right
+  angle to the line (an L to the end for a member beyond it), a square junction at the line; amber on a path through the
+  bus, white when selected; a bus is picked by its bar where no disc is
   (`pickNode`, new `busLinesOf`) and named above the middle of its bar. The overview page offers *Vehicle network, bus lines* (371 nodes, 40 buses,
   made up, `benchmarks/generate.py vehicle_network`) and the two vehicle examples.
 

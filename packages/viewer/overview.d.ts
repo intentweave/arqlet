@@ -68,12 +68,14 @@ export type Expanded = Map<number, StructuredCluster>;
 export interface OverviewBuffers {
   discs: Float32Array;
   edges: Float32Array;
+  /** Bus connectors (`busLines`) as triangles, drawn under the discs. */
+  buses: Float32Array;
   back: Float32Array;
   routes: Float32Array;
   arrows: Float32Array;
   front: Float32Array;
   /** Vertices per part. */
-  count: {discs: number; edges: number; back: number; routes: number; arrows: number; front: number};
+  count: {discs: number; edges: number; buses: number; back: number; routes: number; arrows: number; front: number};
 }
 
 /** The part of a structured cluster's scene its disc shows: the cluster's own box, or the whole scene. */

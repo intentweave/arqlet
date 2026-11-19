@@ -404,14 +404,13 @@ test('a bus of the overview is a bar with taps instead of a disc', () => {
   const centres = [];
   for (let k = 0; k < b.count.discs; k += 6) centres.push([b.discs[k * SHAPE_STRIDE], b.discs[k * SHAPE_STRIDE + 1]]);
   assert.deepEqual(centres, [[-10, 0], [10, 0]]);
-  // The bar: six vertices of two triangles along the line.
-  assert.equal(b.count.arrows, 6);
-  // The taps replace the edges to the bus's centre: two lines, each from a member to its foot.
-  assert.equal(b.count.edges, 4);
-  assert.deepEqual([b.edges[0], b.edges[1], b.edges[LINE_STRIDE], b.edges[LINE_STRIDE + 1]], [-10, 0, -10, 0]);
+  // The line (two triangles) and a junction per member; the members sit on the line, so their taps have no length. No
+  // thin edges to the bus's centre.
+  assert.equal(b.count.buses, 6 + 2 * 6);
+  assert.equal(b.count.edges, 0);
   // On a path through the bus, the bar is amber.
   const lit = overviewBuffers(m, new Map(), new Set(), -1, {trace: {nodes: new Set([0, 1]), clusters: new Set(), edges: new Set(), nodeIds: new Set(), edgeIds: new Set()}});
-  assert.ok(Math.abs(lit.arrows[2] - 1) < 1e-6 && Math.abs(lit.arrows[3] - 0.78) < 1e-6);
+  assert.ok(Math.abs(lit.buses[2] - 1) < 1e-6 && Math.abs(lit.buses[3] - 0.78) < 1e-6);
 });
 
 test('a bus of the overview is picked by its bar, a disc on the bar first', () => {
@@ -441,9 +440,32 @@ test('a selected bus has a white bar and a bus line carries its name', () => {
   const b = overviewBuffers(m, new Map(), new Set(), 0);
   // No ring for the selection: two discs only, and the bar is white.
   assert.equal(b.count.discs, 2 * 6);
-  assert.deepEqual([...b.arrows.slice(2, 5)], [1, 1, 1]);
+  assert.deepEqual([...b.buses.slice(2, 5)], [1, 1, 1]);
   const labels = labelsOf(m, new Map(), {centreX: 0, centreY: 0, scale: 1}, 400, 300);
   const name = labels.find(l => l.text === 'CAN 1');
   assert.ok(name, JSON.stringify(labels));
   assert.equal(name.x, 200);
+});
+
+test('a tap is orthogonal: a stub from the rim to the line, an L for a member beyond its end', () => {
+  // A horizontal line from (-10, 0) to (10, 0); member a above its middle, member g beyond its right end.
+  const bus = {
+    schemaVersion: 1, ids: ['can', 'a', 'g'], parent: [-1, -1, -1],
+    x: [0, 0, 30], y: [30, -20, -40], r: [4, 4, 4], rootRadius: 60, edges: [1, 0, 2, 0], links: [],
+    busLines: [{node: 0, x1: -10, y1: 0, x2: 10, y2: 0, taps: [1, 2], feet: [0, 0, 10, 0]}],
+  };
+  const b = overviewBuffers(overviewModel(bus));
+  const triangles = [];
+  for (let k = 0; k < b.count.buses; k += 6) {
+    const xs = [], ys = [];
+    for (let v = 0; v < 6; v++) { xs.push(b.buses[(k + v) * LINE_STRIDE]); ys.push(b.buses[(k + v) * LINE_STRIDE + 1]); }
+    triangles.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)].map(v => Math.round(v * 100) / 100));
+  }
+  // Line; a: stub from its rim (y -16) down to the line, junction; g: down from its rim to the line's level, along to the
+  // end, junction.
+  assert.equal(triangles.length, 1 + 2 + 3);
+  const half = 4 * 0.12 * 0.8;
+  assert.deepEqual(triangles[1], [-half, -16, half, 0].map(v => Math.round(v * 100) / 100));
+  assert.deepEqual(triangles[3], [30 - half, -36, 30 + half, 0].map(v => Math.round(v * 100) / 100));
+  assert.deepEqual(triangles[4], [10, -half, 30, half].map(v => Math.round(v * 100) / 100));
 });
