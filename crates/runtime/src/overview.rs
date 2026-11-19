@@ -126,6 +126,33 @@ fn hints_of(v: &Value, h: &overview::Hierarchy) -> Result<OverviewHints, String>
             radius: r,
             // `settle: true` lets the changed containers settle again (for a host that animates the change).
             settle: start["settle"].as_bool().unwrap_or(false),
+            moved: match start.get("moved") {
+                None => BTreeMap::new(),
+                Some(moved) => {
+                    let index: BTreeMap<&str, usize> = h
+                        .ids
+                        .iter()
+                        .enumerate()
+                        .map(|(i, id)| (id.as_str(), i))
+                        .collect();
+                    moved
+                        .as_object()
+                        .ok_or("Overview start moved must be an object: node id -> {x, y}")?
+                        .iter()
+                        .map(|(id, p)| {
+                            let i = *index.get(id.as_str()).ok_or_else(|| {
+                                format!("Overview start moved an unknown node: {id}")
+                            })?;
+                            let at = |k: &str| {
+                                p[k].as_f64().filter(|v| v.is_finite()).ok_or_else(|| {
+                                    format!("Overview start moved {id} needs finite x and y")
+                                })
+                            };
+                            Ok((i, (at("x")?, at("y")?)))
+                        })
+                        .collect::<Result<_, String>>()?
+                }
+            },
         });
     }
     Ok(hints)

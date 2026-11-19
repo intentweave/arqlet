@@ -196,7 +196,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   unbind?.(); renderer?.destroy();
   model = next;
   renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes});
-  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, lens: lensSettings, idle: idleSettings()});
+  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, lens: lensSettings, idle: idleSettings()});
   focus = -1;
   zoomTo(-1);
   renderRules();
@@ -421,6 +421,29 @@ function select(i, event) {
   renderPanel();
 }
 
+/**
+ * Dragging a node (a leaf): it follows the pointer; at the release the overview is laid out again from where everything
+ * is, with the node held where it was put, so that its cluster settles around it (`start.moved`).
+ */
+let dragFrame = 0;
+async function dragNode(i, x, y, phase) {
+  if (phase === 'move') {
+    cancelAnimationFrame(dragFrame);
+    dragFrame = requestAnimationFrame(() => {
+      const o = model.overview, xs = Array.from(o.x), ys = Array.from(o.y);
+      xs[i] = x; ys[i] = y;
+      renderer.morph(overviewModel({...o, x: xs, y: ys}, resolvedEdgeIds(graph)), {duration: 0});
+    });
+    return;
+  }
+  cancelAnimationFrame(dragFrame);
+  const id = model.overview.ids[i];
+  const result = await overviewOf({start: {moved: {[id]: {x, y}}}});
+  if (!result.ok) { status(result.error); return; }
+  show(result.overview, true);
+  status(`${nameOf(model, i)} moved; its cluster settled around it`);
+}
+
 /** A double-click zooms into a cluster, and opens it when it is collapsed (one level more). */
 function zoomInto(i) {
   const cluster = clusterOf(i);
@@ -604,6 +627,6 @@ for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
   $(id).addEventListener('change', () => {
     if (!renderer) return;
     unbind?.();
-    unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, lens: lensSettings, idle: idleSettings()});
+    unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, lens: lensSettings, idle: idleSettings()});
   });
 }

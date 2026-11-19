@@ -21,6 +21,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   stand in one row on the bus's line (across x or y, whichever they spread more along, in the order they lay), the
   bus's own disc beside the row; the separation then makes room for the other children. The same for any thread count.
   Overview page: *Members of a bus in a row on its line*.
+- Moving a node in the overview (provisional): `start.moved` (node id → new centre) lays the overview out from the
+  previous places with each moved node held where it was put; its cluster settles around it with cool forces (d3's
+  fixed positions; the others follow and make room without arranging themselves anew) and is not centred again.
+  `bindOverviewNavigation` takes `onNodeDrag(i, x, y, phase)`: a drag that starts on a leaf moves it (`move`, `end`),
+  any other drag pans. The overview page shows the node under the pointer while dragging and settles at the release.
 
 ## 0.6.0 — 2026-11-19
 

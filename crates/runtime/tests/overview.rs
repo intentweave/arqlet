@@ -844,3 +844,52 @@ fn with_bus_rows_the_members_of_a_bus_stand_in_a_row_on_its_line() {
     .unwrap();
     assert_eq!(response["overview"]["x"], rows["x"]);
 }
+
+#[test]
+fn a_moved_node_stays_where_it_was_put_and_its_neighbours_follow() {
+    // A chain of twelve nodes; the end node is moved far out. It stays exactly there, its neighbour moves after it, and
+    // nothing overlaps.
+    let nodes: Vec<Value> = (0..12)
+        .map(|i| json!({"id": format!("n{i}"), "kind": "k", "label": format!("n{i}")}))
+        .collect();
+    let edges: Vec<Value> = (0..11)
+        .map(|i| json!({"id": format!("e{i}"), "kind": "k", "source": format!("n{i}"), "target": format!("n{}", i + 1)}))
+        .collect();
+    let graph = json!({"nodes": nodes, "edges": edges});
+    let first = overview(&graph, 1);
+    let at = |o: &Value, i: usize| (o["x"][i].as_f64().unwrap(), o["y"][i].as_f64().unwrap());
+    let (x0, y0) = at(&first, 0);
+    let target = (x0 + 80., y0 + 60.);
+    let start = json!({"x": first["x"], "y": first["y"], "r": first["r"], "moved": {"n0": {"x": target.0, "y": target.1}}});
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "start": start}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let moved = &response["overview"];
+    let (mx, my) = at(moved, 0);
+    assert!(
+        (mx - target.0).abs() < 0.02 && (my - target.1).abs() < 0.02,
+        "held at the target: {mx}, {my}"
+    );
+    let step = |o: &Value| {
+        let (a, b) = (at(o, 0), at(o, 1));
+        ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt()
+    };
+    // Its neighbour followed: not as far from it as it would be had nothing moved.
+    let unmoved =
+        ((target.0 - at(&first, 1).0).powi(2) + (target.1 - at(&first, 1).1).powi(2)).sqrt();
+    assert!(
+        step(moved) < unmoved * 0.8,
+        "neighbour follows: {} vs {unmoved}",
+        step(moved)
+    );
+    assert_eq!(moved["stats"]["overlaps"], 0);
+    // An unknown node is refused.
+    let bad = json!({"x": first["x"], "y": first["y"], "r": first["r"], "moved": {"nope": {"x": 0, "y": 0}}});
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "start": bad}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["ok"], false);
+}

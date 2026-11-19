@@ -72,6 +72,9 @@ export function bindOverviewNavigation(
     onClick?: (index: number, event: PointerEvent) => void;
     onHover?: (index: number, event: PointerEvent) => void;
     onDoubleClick?: (index: number, event: MouseEvent) => void;
+    /** Provisional: a drag that starts on a leaf moves it (world point; `move` while dragging, `end` at the release);
+     * without it every drag pans. */
+    onNodeDrag?: (index: number, x: number, y: number, phase: 'move' | 'end') => void;
     /** A lens that follows the pointer: its radius (CSS pixels) and magnification, or null for none; asked on every move. */
     lens?: () => {radius: number; magnification: number} | null;
     /** Breathing after `after` ms (default 8000) without input; stops at the next input. Not under reduced motion. */

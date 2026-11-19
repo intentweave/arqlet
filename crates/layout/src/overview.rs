@@ -83,10 +83,18 @@ pub struct Previous {
     /// simulation from the previous places (`SETTLE_ALPHA`) closes the gaps a shrinking child leaves, and the container
     /// is centred again. Meant for a host that animates the change; without it, moving only what must move is calmer.
     pub settle: bool,
+    /// Provisional: nodes the user moved, by index, to their new absolute centres. Each one's container settles from its
+    /// previous places with the moved node held where it was put (the first one of a container; the others are only
+    /// put), and is not centred again, so that nothing else jumps.
+    pub moved: BTreeMap<usize, (f64, f64)>,
 }
 
 /// The starting temperature of a settling simulation: the forces only settle what changed.
 const SETTLE_ALPHA: f64 = 0.3;
+
+/// The starting temperature after the user moved a node (`Previous::moved`): cooler than a settling, so that the others
+/// follow the moved one and make room without arranging themselves anew.
+const DRAG_ALPHA: f64 = 0.1;
 
 /// Two radii are the same when they differ by at most this much. A host passes back a previous response, whose numbers are
 /// rounded to hundredths, and an unchanged container measures its radius again from rounded places.
@@ -920,6 +928,37 @@ pub fn arrange(
             let changed = members
                 .iter()
                 .any(|&m| (radius[m] - previous.radius[m]).abs() > SAME_RADIUS);
+            // A child the user moved: put where it was put, held there while the others settle around it.
+            let held = members
+                .iter()
+                .enumerate()
+                .filter_map(|(j, m)| previous.moved.get(m).map(|&p| (j, p)))
+                .collect::<Vec<_>>();
+            if !held.is_empty() {
+                let mut x = x;
+                for &(j, p) in &held {
+                    x[j] = (p.0 - origin.0, p.1 - origin.1);
+                }
+                let (pin, at) = (held[0].0, x[held[0].0]);
+                simulate_held(&mut x, &r, &links, options, DRAG_ALPHA, Some(pin));
+                let overlaps = separate(&mut x, &r, options.gap);
+                // The separation may have moved the held child: the whole arrangement follows it back.
+                let (dx, dy) = (at.0 - x[pin].0, at.1 - x[pin].1);
+                for p in &mut x {
+                    p.0 += dx;
+                    p.1 += dy;
+                }
+                let reach = x
+                    .iter()
+                    .zip(&r)
+                    .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
+                    .fold(0., f64::max);
+                return Arrangement {
+                    positions: x,
+                    radius: reach + options.padding,
+                    overlaps,
+                };
+            }
             if !changed {
                 // Kept as it was: only the radius is measured again (it may have been set by a host before).
                 let reach = x
@@ -1033,6 +1072,20 @@ fn simulate(
     options: &OverviewOptions,
     start_alpha: f64,
 ) {
+    simulate_held(x, r, links, options, start_alpha, None);
+}
+
+/// `simulate` with one child (`held`) kept where it is, as d3-force's fixed positions: it pushes and pulls the others but
+/// does not move.
+fn simulate_held(
+    x: &mut [(f64, f64)],
+    r: &[f64],
+    links: &[(usize, usize, f64)],
+    options: &OverviewOptions,
+    start_alpha: f64,
+    held: Option<usize>,
+) {
+    let pin = held.map(|h| (h, x[h]));
     let k = x.len();
     let ticks = options.ticks.max(1);
     let mut degree = vec![0f64; k];
@@ -1079,6 +1132,10 @@ fn simulate(
             v[i].1 *= 1. - VELOCITY_DECAY;
             x[i].0 += v[i].0;
             x[i].1 += v[i].1;
+        }
+        if let Some((h, at)) = pin {
+            x[h] = at;
+            v[h] = (0., 0.);
         }
     }
 }
@@ -1500,6 +1557,7 @@ mod tests {
             centre: o.x.iter().copied().zip(o.y.iter().copied()).collect(),
             radius: o.radius.clone(),
             settle: false,
+            moved: BTreeMap::new(),
         }
     }
 

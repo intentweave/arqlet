@@ -421,7 +421,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
  * (`renderer.breathe(breathe)`) after `after` milliseconds (default 8000) without input, and stop at the next input; not
  * when the system asks for reduced motion. Returns a function that removes the listeners.
  */
-export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick, lens, idle} = {}) {
+export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick, onNodeDrag, lens, idle} = {}) {
   let drag = null;
   // Breathing after `idle.after` milliseconds without input; any input stops it and starts the wait again. Not when
   // the user asked the system for less motion.
@@ -450,7 +450,14 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     // Keep the world point under the pointer where it is.
     renderer.setView({scale, centreX: wx - (wx - v.centreX) * v.scale / scale, centreY: wy - (wy - v.centreY) * v.scale / scale});
   };
-  const down = e => { awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, moved: false}; canvas.setPointerCapture?.(e.pointerId); };
+  // With `onNodeDrag`, a drag that starts on a leaf (a node without children) moves that node: `onNodeDrag(i, x, y,
+  // phase)` with the world point, `move` while dragging and `end` at the release; any other drag pans.
+  const leafAt = e => {
+    if (!onNodeDrag) return -1;
+    const i = renderer.pick(e.clientX, e.clientY), m = renderer.model;
+    return i >= 0 && m && !m.children[i].length ? i : -1;
+  };
+  const down = e => { awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, moved: false, node: leafAt(e)}; canvas.setPointerCapture?.(e.pointerId); };
   const move = e => {
     awake();
     follow(e);
@@ -458,10 +465,12 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
     drag.moved = true;
+    if (drag.node >= 0) { onNodeDrag(drag.node, ...renderer.world(e.clientX, e.clientY), 'move'); return; }
     renderer.setView({...drag.view, centreX: drag.view.centreX - dx / drag.view.scale, centreY: drag.view.centreY - dy / drag.view.scale});
   };
   const up = e => {
     if (drag && !drag.moved) onClick?.(renderer.pick(e.clientX, e.clientY), e);
+    else if (drag && drag.node >= 0) onNodeDrag(drag.node, ...renderer.world(e.clientX, e.clientY), 'end');
     drag = null;
   };
   const cancel = () => { drag = null; };
