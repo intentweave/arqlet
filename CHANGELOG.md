@@ -17,6 +17,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   bus, white when selected; a bus is picked by its bar where no disc is
   (`pickNode`, new `busLinesOf`) and named above the middle of its bar. The overview page offers *Vehicle network, bus lines* (371 nodes, 40 buses,
   made up, `benchmarks/generate.py vehicle_network`) and the two vehicle examples.
+- `busRows` (provisional overview option, off): after the forces, the members of every bus line that a cluster holds
+  stand in one row on the bus's line (across x or y, whichever they spread more along, in the order they lay), the
+  bus's own disc beside the row; the separation then makes room for the other children. The same for any thread count.
+  Overview page: *Members of a bus in a row on its line*.
+- Moving a node in the overview (provisional): `start.moved` (node id → new centre) lays the overview out from the
+  previous places with each moved node held where it was put; its cluster settles around it with cool forces (d3's
+  fixed positions; the others follow and make room without arranging themselves anew) and is not centred again.
+  A moved cluster takes what it holds along. `bindOverviewNavigation` takes `onNodeDrag(i, x, y, phase)` and
+  `draggable(i)`: by default a drag that starts on a leaf moves it (`move`, `end`), any other drag pans. The overview page
+  moves the selected cluster with all it holds when a drag starts inside it, else a leaf, and previews the move under the
+  pointer; it settles at the release.
 
 ## 0.6.0 — 2026-11-19
 

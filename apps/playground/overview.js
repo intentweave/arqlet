@@ -42,12 +42,13 @@ function loadSettings() {
     for (const id of [...LAYOUT, ...ZOOM]) if (saved[id] !== undefined) $(id).value = saved[id];
     if (saved.auto !== undefined) $('auto').checked = saved.auto;
     if (saved.chains !== undefined) $('chains').checked = saved.chains;
+    if (saved.busRows !== undefined) $('bus-rows').checked = saved.busRows;
     if (saved.columns !== undefined) $('columns').checked = saved.columns;
   } catch { /* no storage: the defaults */ }
 }
 function saveSettings() {
   try {
-    const out = {auto: $('auto').checked, chains: $('chains').checked, columns: $('columns').checked};
+    const out = {auto: $('auto').checked, chains: $('chains').checked, busRows: $('bus-rows').checked, columns: $('columns').checked};
     for (const id of [...LAYOUT, ...ZOOM]) out[id] = $(id).value;
     localStorage.setItem(STORE, JSON.stringify(out));
   } catch { /* no storage */ }
@@ -130,7 +131,8 @@ function request(extra = {}) {
     charge: number('charge'), gravity: number('gravity'), communities: number('communities'),
     ...(number('satellites') > 0 ? {satellites: Math.min(1, number('satellites'))} : {}),
     ...(number('hub-links') > 0 ? {hubs: {minLinks: Math.round(number('hub-links'))}} : {}),
-    ...($('chains').checked ? {chains: true} : {})};
+    ...($('chains').checked ? {chains: true} : {}),
+    ...($('bus-rows').checked ? {busRows: true} : {})};
   const values = {threads: 4, options, intent: {decisions: Object.fromEntries(decisions)}, ...extra};
   // The level of detail travels in the config set, so that the engine checks it (a config set needs its base: without
   // one it acts in the viewer only).
@@ -194,7 +196,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   unbind?.(); renderer?.destroy();
   model = next;
   renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes});
-  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, lens: lensSettings, idle: idleSettings()});
+  unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   focus = -1;
   zoomTo(-1);
   renderRules();
@@ -419,6 +421,48 @@ function select(i, event) {
   renderPanel();
 }
 
+/**
+ * What a drag that starts over node `i` moves: inside the selected cluster, that cluster with all it holds (click a
+ * cluster first to move it); else a leaf itself; else nothing, and the drag pans.
+ */
+function draggable(i) {
+  if (i < 0) return -1;
+  for (let k = i; k >= 0; k = model.overview.parent[k]) if (k === selected) return selected;
+  return model.children[i].length ? -1 : i;
+}
+
+/**
+ * Dragging a node (a leaf, or the selected cluster with what it holds): it follows the pointer; at the release the
+ * overview is laid out again from where everything is, with the node held where it was put, so that its cluster settles
+ * around it (`start.moved`).
+ */
+let dragFrame = 0;
+async function dragNode(i, x, y, phase) {
+  if (phase === 'move') {
+    cancelAnimationFrame(dragFrame);
+    dragFrame = requestAnimationFrame(() => {
+      const o = model.overview, xs = Array.from(o.x), ys = Array.from(o.y);
+      const dx = x - o.x[i], dy = y - o.y[i];
+      for (const k of [i, ...descendantsOf(i)]) { xs[k] += dx; ys[k] += dy; }
+      renderer.morph(overviewModel({...o, x: xs, y: ys}, resolvedEdgeIds(graph)), {duration: 0});
+    });
+    return;
+  }
+  cancelAnimationFrame(dragFrame);
+  const id = model.overview.ids[i];
+  const result = await overviewOf({start: {moved: {[id]: {x, y}}}});
+  if (!result.ok) { status(result.error); return; }
+  show(result.overview, true);
+  status(`${nameOf(model, i)} moved; its cluster settled around it`);
+}
+
+/** The indices below node `i`. */
+function descendantsOf(i) {
+  const out = [], stack = [...model.children[i]];
+  while (stack.length) { const k = stack.pop(); out.push(k); stack.push(...model.children[k]); }
+  return out;
+}
+
 /** A double-click zooms into a cluster, and opens it when it is collapsed (one level more). */
 function zoomInto(i) {
   const cluster = clusterOf(i);
@@ -535,6 +579,7 @@ $('relayout').onclick = () => { saveSettings(); layOut(false); };
 $('defaults').onclick = () => {
   for (const [id, value] of Object.entries(DEFAULTS)) $(id).value = value;
   $('chains').checked = false;
+  $('bus-rows').checked = false;
   saveSettings();
   schedule();
 };
@@ -601,6 +646,6 @@ for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
   $(id).addEventListener('change', () => {
     if (!renderer) return;
     unbind?.();
-    unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, lens: lensSettings, idle: idleSettings()});
+    unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   });
 }

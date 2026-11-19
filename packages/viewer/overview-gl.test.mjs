@@ -69,3 +69,41 @@ test('no breathing without idle settings, and none under reduced motion', () => 
     mock.timers.reset();
   }
 });
+
+test('a drag that starts on a leaf moves it; on a cluster or the background it pans', () => {
+  const {canvas, renderer, fire} = fakes();
+  // Node 1 is a leaf at (10, 10); node 0 is a cluster.
+  renderer.model = {children: [[1], []]};
+  let at = 1;
+  renderer.pick = () => at;
+  const moves = [], views = [];
+  renderer.setView = v => views.push(v);
+  bindOverviewNavigation(canvas, renderer, {onNodeDrag: (i, x, y, phase) => moves.push([i, x, y, phase])});
+  fire('pointerdown');
+  fire('pointermove', {clientX: 30, clientY: 25});
+  fire('pointerup', {clientX: 40, clientY: 25});
+  assert.deepEqual(moves, [[1, 30, 25, 'move'], [1, 40, 25, 'end']]);
+  assert.equal(views.length, 0);
+  // On the cluster: a pan.
+  at = 0;
+  fire('pointerdown');
+  fire('pointermove', {clientX: 30, clientY: 25});
+  fire('pointerup', {clientX: 30, clientY: 25});
+  assert.equal(moves.length, 2);
+  assert.equal(views.length, 1);
+});
+
+test('draggable chooses what a drag moves: a cluster when the page says so', () => {
+  const {canvas, renderer, fire} = fakes();
+  renderer.model = {children: [[1], []]};
+  renderer.pick = () => 1;
+  const moves = [], views = [];
+  renderer.setView = v => views.push(v);
+  // Over the leaf 1, the page moves its cluster 0.
+  bindOverviewNavigation(canvas, renderer, {onNodeDrag: (i, x, y, phase) => moves.push([i, phase]), draggable: i => (i === 1 ? 0 : -1)});
+  fire('pointerdown');
+  fire('pointermove', {clientX: 30, clientY: 25});
+  fire('pointerup', {clientX: 30, clientY: 25});
+  assert.deepEqual(moves, [[0, 'move'], [0, 'end']]);
+  assert.equal(views.length, 0);
+});

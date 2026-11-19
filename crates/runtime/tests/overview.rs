@@ -517,6 +517,7 @@ fn every_answer_is_the_typed_overview_contract() {
             communities: Some(4),
             satellites: Some(0.5),
             chains: Some(true),
+            bus_rows: Some(true),
             ticks: Some(50),
             groups: Some([("g0/f0".to_string(), vec!["A".to_string()])].into()),
             hubs: Some(arqlet_model::CommunityHubs {
@@ -787,4 +788,149 @@ fn a_member_in_another_cluster_taps_the_bus_line_without_stretching_it() {
         5,
         "the gateway taps it too"
     );
+}
+
+#[test]
+fn with_bus_rows_the_members_of_a_bus_stand_in_a_row_on_its_line() {
+    // Eight members of one bus: without the option the forces place them around it; with it they stand in a row, and the
+    // line runs through their centres.
+    let mut nodes = vec![json!({"id": "can", "kind": "bus", "label": "CAN", "shape": "busLine"})];
+    let mut edges = Vec::new();
+    for i in 0..8 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("E{i}")}));
+        edges.push(json!({"id": format!("c{i}"), "kind": "connects", "source": format!("e{i}"), "target": "can"}));
+    }
+    let graph = json!({"nodes": nodes, "edges": edges});
+    let run = |options: Value| -> Value {
+        let response: Value = serde_json::from_str(&dispatch(
+            &json!({"op": "overview", "graph": graph, "options": options}).to_string(),
+        ))
+        .unwrap();
+        assert_eq!(response["ok"], true, "{response}");
+        response["overview"].clone()
+    };
+    let off_line = |o: &Value| -> f64 {
+        let l = &o["busLines"][0];
+        let horizontal = l["y1"] == l["y2"];
+        (1..=8)
+            .map(|j| {
+                let (x, y) = (o["x"][j].as_f64().unwrap(), o["y"][j].as_f64().unwrap());
+                if horizontal {
+                    (y - l["y1"].as_f64().unwrap()).abs()
+                } else {
+                    (x - l["x1"].as_f64().unwrap()).abs()
+                }
+            })
+            .fold(0., f64::max)
+    };
+    let free = run(json!({}));
+    let rows = run(json!({"busRows": true}));
+    assert!(
+        off_line(&free) > 1.,
+        "around the bus without the option: {}",
+        off_line(&free)
+    );
+    assert!(
+        off_line(&rows) < 0.05,
+        "in a row with it: {}",
+        off_line(&rows)
+    );
+    // No overlaps, and the same for any thread count.
+    assert_eq!(rows["stats"]["overlaps"], 0);
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "options": {"busRows": true}, "threads": 4})
+            .to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["overview"]["x"], rows["x"]);
+}
+
+#[test]
+fn a_moved_node_stays_where_it_was_put_and_its_neighbours_follow() {
+    // A chain of twelve nodes; the end node is moved far out. It stays exactly there, its neighbour moves after it, and
+    // nothing overlaps.
+    let nodes: Vec<Value> = (0..12)
+        .map(|i| json!({"id": format!("n{i}"), "kind": "k", "label": format!("n{i}")}))
+        .collect();
+    let edges: Vec<Value> = (0..11)
+        .map(|i| json!({"id": format!("e{i}"), "kind": "k", "source": format!("n{i}"), "target": format!("n{}", i + 1)}))
+        .collect();
+    let graph = json!({"nodes": nodes, "edges": edges});
+    let first = overview(&graph, 1);
+    let at = |o: &Value, i: usize| (o["x"][i].as_f64().unwrap(), o["y"][i].as_f64().unwrap());
+    let (x0, y0) = at(&first, 0);
+    let target = (x0 + 80., y0 + 60.);
+    let start = json!({"x": first["x"], "y": first["y"], "r": first["r"], "moved": {"n0": {"x": target.0, "y": target.1}}});
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "start": start}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let moved = &response["overview"];
+    let (mx, my) = at(moved, 0);
+    assert!(
+        (mx - target.0).abs() < 0.02 && (my - target.1).abs() < 0.02,
+        "held at the target: {mx}, {my}"
+    );
+    let step = |o: &Value| {
+        let (a, b) = (at(o, 0), at(o, 1));
+        ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt()
+    };
+    // Its neighbour followed: not as far from it as it would be had nothing moved.
+    let unmoved =
+        ((target.0 - at(&first, 1).0).powi(2) + (target.1 - at(&first, 1).1).powi(2)).sqrt();
+    assert!(
+        step(moved) < unmoved * 0.8,
+        "neighbour follows: {} vs {unmoved}",
+        step(moved)
+    );
+    assert_eq!(moved["stats"]["overlaps"], 0);
+    // An unknown node is refused.
+    let bad = json!({"x": first["x"], "y": first["y"], "r": first["r"], "moved": {"nope": {"x": 0, "y": 0}}});
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "start": bad}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["ok"], false);
+}
+
+#[test]
+fn a_moved_cluster_takes_its_children_along() {
+    // Three clusters of leaves; one cluster is moved: it stands at the target, its children keep their places relative
+    // to it, nothing overlaps.
+    let graph = hierarchical(3, 2, 4);
+    let first = overview(&graph, 1);
+    let ids: Vec<&str> = first["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let parent = |i: usize| first["parent"][i].as_i64().unwrap();
+    let cluster = ids.iter().position(|id| *id == "g1").unwrap();
+    let child = (0..ids.len())
+        .find(|&i| parent(i) == cluster as i64)
+        .unwrap();
+    let at = |o: &Value, i: usize| (o["x"][i].as_f64().unwrap(), o["y"][i].as_f64().unwrap());
+    let (cx, cy) = at(&first, cluster);
+    let target = (cx + 300., cy - 200.);
+    let start = json!({"x": first["x"], "y": first["y"], "r": first["r"], "moved": {"g1": {"x": target.0, "y": target.1}}});
+    let response: Value = serde_json::from_str(&dispatch(
+        &json!({"op": "overview", "graph": graph, "start": start}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let moved = &response["overview"];
+    let (mx, my) = at(moved, cluster);
+    assert!(
+        (mx - target.0).abs() < 0.02 && (my - target.1).abs() < 0.02,
+        "held at the target: {mx}, {my}"
+    );
+    let before = (at(&first, child).0 - cx, at(&first, child).1 - cy);
+    let after = (at(moved, child).0 - mx, at(moved, child).1 - my);
+    assert!(
+        (before.0 - after.0).abs() < 0.05 && (before.1 - after.1).abs() < 0.05,
+        "the child moved along"
+    );
+    assert_eq!(moved["stats"]["overlaps"], 0);
 }

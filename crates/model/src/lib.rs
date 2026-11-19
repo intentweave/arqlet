@@ -3280,6 +3280,10 @@ pub struct OverviewLayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub chains: Option<bool>,
+    /// Provisional: the members of every bus line (node shape `busLine`) in a row on its line, after the forces (false).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub bus_rows: Option<bool>,
     /// Force steps per container (1..=10000).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number"))]

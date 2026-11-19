@@ -30,6 +30,10 @@ satellites?: number,
  */
 chains?: boolean,
 /**
+ * Provisional: the members of every bus line (node shape `busLine`) in a row on its line, after the forces (false).
+ */
+busRows?: boolean,
+/**
  * Force steps per container (1..=10000).
  */
 ticks?: number,
