@@ -3019,7 +3019,28 @@ pub struct Overview {
     pub edges: Vec<u32>,
     /// Per container, the links between its children: child, child, number of edges (flat triples).
     pub links: Vec<f64>,
+    /// Provisional: every node of shape `busLine` as a line instead of a disc (a viewer draws the line and its taps, not
+    /// the node's disc). Omitted when there is none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<OverviewBusLine>>"))]
+    pub bus_lines: Vec<OverviewBusLine>,
     pub stats: OverviewStats,
+}
+
+/// Provisional: a bus of the overview drawn as a line (`Overview::bus_lines`): the bus node's index, the line from
+/// (`x1`, `y1`) to (`x2`, `y2`) along the main axis of its members, and per member (`taps`, node indices) the point of the
+/// line its tap meets (`feet`, x and y alternating), so a tap runs from the member's centre to its foot.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewBusLine {
+    pub node: u32,
+    pub x1: f64,
+    pub y1: f64,
+    pub x2: f64,
+    pub y2: f64,
+    pub taps: Vec<u32>,
+    pub feet: Vec<f64>,
 }
 
 /// Provisional: a change of the source graph of a view (`patch`): nodes and edges to add, and nodes (each with what it
@@ -3107,6 +3128,10 @@ pub struct OverviewPositions {
     pub y: Vec<f64>,
     pub r: Vec<f64>,
     pub root_radius: f64,
+    /// The bus lines move with the nodes (`Overview::bus_lines`). Omitted when there is none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<OverviewBusLine>>"))]
+    pub bus_lines: Vec<OverviewBusLine>,
     pub stats: OverviewStats,
 }
 
@@ -3121,6 +3146,7 @@ impl OverviewPositions {
             y: overview.y,
             r: overview.r,
             root_radius: overview.root_radius,
+            bus_lines: overview.bus_lines,
             stats: overview.stats,
         }
     }

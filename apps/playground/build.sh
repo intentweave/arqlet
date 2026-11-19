@@ -57,9 +57,12 @@ mkdir -p apps/playground/generated/overview
 python3 benchmarks/overview/generate.py --nodes 10000 --seed 1 --out apps/playground/generated/overview/code-10000.json
 python3 benchmarks/overview/generate.py --nodes 50000 --seed 1 --out apps/playground/generated/overview/code-50000.json
 python3 benchmarks/overview/generate.py --nodes 6000 --seed 1 --flat --out apps/playground/generated/overview/calls-flat.json
+# Physical buses as lines with taps (made up): the two vehicle examples and a larger network.
+cp apps/playground/generated/examples/vehicle-zonal.json apps/playground/generated/examples/vehicle-trunk.json apps/playground/generated/overview/
+python3 -c "import json, sys; sys.path.insert(0, 'benchmarks'); import generate; json.dump(generate.vehicle_network(40, 1), open('apps/playground/generated/overview/vehicle-network.json', 'w'))"
 # The data's config set: rules for the overview by node kind (ADR 0018, addendum).
 cp benchmarks/overview/code-index.configset.json apps/playground/generated/overview/code-index.configset.json
-printf '[{"title":"Code index, synthetic","file":"code-10000.json","nodes":10000,"configSet":"code-index.configset.json"},{"title":"Code index, synthetic","file":"code-50000.json","nodes":50000,"configSet":"code-index.configset.json"},{"title":"Flat call graph, communities","file":"calls-flat.json","nodes":5612}]\n' > apps/playground/generated/overview/index.json
+printf '[{"title":"Code index, synthetic","file":"code-10000.json","nodes":10000,"configSet":"code-index.configset.json"},{"title":"Code index, synthetic","file":"code-50000.json","nodes":50000,"configSet":"code-index.configset.json"},{"title":"Flat call graph, communities","file":"calls-flat.json","nodes":5612},{"title":"Vehicle network, bus lines","file":"vehicle-network.json","nodes":371},{"title":"Zonal vehicle, bus lines","file":"vehicle-zonal.json","nodes":21},{"title":"Vehicle trunk bus, bus lines","file":"vehicle-trunk.json","nodes":17}]\n' > apps/playground/generated/overview/index.json
 # Curation editor: TypeScript compiled to generated/editor (git-ignored), typechecked and tested below.
 pnpm --filter @arqlet/playground run build
 node apps/playground/smoke.mjs

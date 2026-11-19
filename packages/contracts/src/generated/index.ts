@@ -47,6 +47,7 @@ export * from './OptimizationReport';
 export * from './OrderHint';
 export * from './Orientation';
 export * from './Overview';
+export * from './OverviewBusLine';
 export * from './OverviewConfig';
 export * from './OverviewIntent';
 export * from './OverviewLayoutOptions';

@@ -908,6 +908,40 @@ def vehicle_zonal():
     return b.graph()
 
 
+def vehicle_network(buses=40, seed=1):
+    """A larger made-up vehicle network for the cluster overview: `buses` buses (nodes of shape `busLine`, CAN, CAN-FD, LIN
+    and FlexRay in turn) with 3 to 14 ECUs each, a gateway on every fifth bus and on the bus before it, a central gateway
+    on the gateways' buses, and every seventh ECU on a second bus too. Deterministic for a seed."""
+    import random
+    rng = random.Random(seed)
+    b = Builder("tb")
+    kinds = ["CAN", "CAN-FD", "LIN", "FlexRay"]
+    b.node("central-gateway", "Central gateway", "ecu")
+    ecu = 0
+    previous = []
+    for k in range(buses):
+        bus = f"bus-{k}"
+        b.node(bus, f"{kinds[k % len(kinds)]} {k}", "bus", shape="busLine")
+        members = []
+        for _ in range(rng.randint(3, 14)):
+            node_id = f"ecu-{ecu}"
+            b.node(node_id, f"ECU {ecu}", "ecu")
+            b.edge(node_id, bus, "connects")
+            members.append(node_id)
+            ecu += 1
+        if k % 5 == 4:
+            gateway = f"gateway-{k // 5}"
+            b.node(gateway, f"Gateway {k // 5}", "ecu")
+            b.edge(gateway, bus, "connects")
+            b.edge(gateway, f"bus-{k - 1}", "connects")
+            b.edge("central-gateway", bus, "connects")
+        for i, node_id in enumerate(previous):
+            if i % 7 == 3:
+                b.edge(node_id, bus, "connects")
+        previous = members
+    return b.graph()
+
+
 def can_bus():
     """Vehicle speed limiter on a CAN bus: the ECUs that publish speed, engine and position data, the ECUs that receive them,
     and the limiter's wired outputs. The CAN messages (named by their kind) form one explicit bus between the sending

@@ -258,8 +258,12 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const folded = i => model.chainTop && model.chainTop[i] !== i && children[i].length > 0;
   const order = [...Array(n).keys()].filter(i => owner[i] < 0 && !folded(i)).sort((a, b) =>
     (children[b].length > 0) - (children[a].length > 0) || depth[a] - depth[b] || a - b);
+  // Provisional: a bus of shape busLine that stands on its own (not inside a collapsed or structured cluster) is drawn as
+  // its line with taps (`busLines`), not as a disc; its edges are its taps.
+  const lines = new Map((o.busLines ?? []).filter(l => owner[l.node] < 0).map(l => [l.node, l]));
   const discs = [];
   for (const i of order) {
+    if (lines.has(i)) continue;
     // A collapsed cluster is one filled disc, a little darker than a leaf.
     const ring = children[i].length > 0 && !collapsed.has(i);
     const shade = ring ? 0.35 + 0.1 * Math.min(depth[i], 4) : collapsed.has(i) ? 0.72 : 1;
@@ -317,6 +321,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const bundled = new Map(), litBundles = new Set();
   for (let k = 0; k < o.edges.length / 2; k++) {
     const a = o.edges[2 * k], b = o.edges[2 * k + 1];
+    if (lines.has(a) || lines.has(b)) continue;
     if (owner[a] >= 0 && owner[a] === owner[b]) continue;
     const ra = owner[a] >= 0 && collapsed.has(owner[a]) ? owner[a] : a;
     const rb = owner[b] >= 0 && collapsed.has(owner[b]) ? owner[b] : b;
@@ -357,6 +362,25 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     const [red, green, blue] = lit ? AMBER : cluster[ra] === cluster[rb] ? colour(ra) : [0.62, 0.7, 0.82];
     const alpha = lit ? 0.95 : Math.min(0.55, 0.06 + 0.04 * Math.sqrt(count)) * (trace?.fade ? 0.3 : 1);
     edges.push(o.x[ra], o.y[ra], red, green, blue, alpha, o.x[rb], o.y[rb], red, green, blue, alpha);
+  }
+  // The bus lines: a bar (two triangles across the line, as wide as a third of the bus's disc) and a tap from each member
+  // (or the cluster that shows it) to its foot on the line.
+  const BUS = [0.44, 0.58, 0.72];
+  for (const [i, l] of lines) {
+    const lit = !!trace && trace.nodes.has(i);
+    const [red, green, blue] = lit ? AMBER : dim(BUS, i);
+    const dx = l.x2 - l.x1, dy = l.y2 - l.y1, len = Math.hypot(dx, dy) || 1, w = Math.max(o.r[i] / 3, 0.5);
+    const nx = -dy / len * w, ny = dx / len * w;
+    const quad = [[l.x1 + nx, l.y1 + ny], [l.x2 + nx, l.y2 + ny], [l.x2 - nx, l.y2 - ny], [l.x1 - nx, l.y1 - ny]];
+    for (const k of [0, 1, 2, 0, 2, 3]) arrows.push(...quad[k], red, green, blue, 1);
+    l.taps.forEach((m, k) => {
+      const shown = owner[m] >= 0 && collapsed.has(owner[m]) ? owner[m] : m;
+      const from = owner[m] >= 0 && !collapsed.has(owner[m]) ? boxCentre.get(o.ids[m]) ?? [o.x[owner[m]], o.y[owner[m]]] : [o.x[shown], o.y[shown]];
+      const tapLit = lit && (trace.nodes.has(m) || trace.clusters.has(shown));
+      const [tr, tg, tb] = tapLit ? AMBER : dim(BUS, i);
+      const alpha = tapLit ? 0.95 : 0.55 * (trace?.fade ? 0.3 : 1);
+      edges.push(...from, tr, tg, tb, alpha, l.feet[2 * k], l.feet[2 * k + 1], tr, tg, tb, alpha);
+    });
   }
   const f = a => new Float32Array(a);
   return {

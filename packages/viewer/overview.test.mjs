@@ -389,3 +389,27 @@ test('a path is mapped to the model, drawn in amber with the rest dimmed, and re
   assert.ok(view.centreX > -10 && view.centreX < 12 && view.scale > 1);
   assert.deepEqual(viewOfNodes(m, [], 200, 100), viewOf(m, -1, 200, 100));
 });
+
+test('a bus of the overview is a bar with taps instead of a disc', () => {
+  // A bus (index 0) with members a and b; the engine's line runs from (-10, 0) to (10, 0), the taps meet it below them.
+  const bus = {
+    schemaVersion: 1, ids: ['can', 'a', 'b'], parent: [-1, -1, -1],
+    x: [0, -10, 10], y: [20, 0, 0], r: [4, 4, 4], rootRadius: 30, edges: [1, 0, 2, 0], links: [],
+    busLines: [{node: 0, x1: -10, y1: 0, x2: 10, y2: 0, taps: [1, 2], feet: [-10, 0, 10, 0]}],
+  };
+  const m = overviewModel(bus);
+  const b = overviewBuffers(m);
+  // Two discs (a and b), not the bus's.
+  assert.equal(b.count.discs, 2 * 6);
+  const centres = [];
+  for (let k = 0; k < b.count.discs; k += 6) centres.push([b.discs[k * SHAPE_STRIDE], b.discs[k * SHAPE_STRIDE + 1]]);
+  assert.deepEqual(centres, [[-10, 0], [10, 0]]);
+  // The bar: six vertices of two triangles along the line.
+  assert.equal(b.count.arrows, 6);
+  // The taps replace the edges to the bus's centre: two lines, each from a member to its foot.
+  assert.equal(b.count.edges, 4);
+  assert.deepEqual([b.edges[0], b.edges[1], b.edges[LINE_STRIDE], b.edges[LINE_STRIDE + 1]], [-10, 0, -10, 0]);
+  // On a path through the bus, the bar is amber.
+  const lit = overviewBuffers(m, new Map(), new Set(), -1, {trace: {nodes: new Set([0, 1]), clusters: new Set(), edges: new Set(), nodeIds: new Set(), edgeIds: new Set()}});
+  assert.ok(Math.abs(lit.arrows[2] - 1) < 1e-6 && Math.abs(lit.arrows[3] - 0.78) < 1e-6);
+});

@@ -1725,3 +1725,110 @@ mod tests {
         assert_eq!(h.ids.len(), 150);
     }
 }
+
+/// Provisional: the line of every node of shape `busLine` (`graph.nodes[i]` is node `i`) in a laid-out overview, from the
+/// resolved `edges` (index pairs), the clusters (`parent`) and the centres `x`, `y`: the line runs along the main axis of
+/// the bus's members in its own cluster (the nodes at the other end of its edges, other buses left out) through their
+/// centroid, from the first to the last one's projection; every member taps it at its projection, clamped to the line
+/// (a member in another cluster at the line's nearest point). A bus with fewer than two members in its cluster gets a
+/// line of `2 * half` across its own centre. Pure and deterministic (only square roots).
+pub fn bus_lines(
+    graph: &Graph,
+    parent: &[Option<usize>],
+    edges: &[(usize, usize)],
+    x: &[f64],
+    y: &[f64],
+    half: f64,
+) -> Vec<arqlet_model::OverviewBusLine> {
+    let bus: Vec<bool> = graph
+        .nodes
+        .iter()
+        .map(|n| n.shape == arqlet_model::NodeShape::BusLine)
+        .collect();
+    if !bus.iter().any(|&b| b) {
+        return Vec::new();
+    }
+    let mut members: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for &(a, b) in edges {
+        let (is_a, is_b) = (
+            bus.get(a).copied().unwrap_or(false),
+            bus.get(b).copied().unwrap_or(false),
+        );
+        if is_a && !is_b {
+            members.entry(a).or_default().push(b);
+        } else if is_b && !is_a {
+            members.entry(b).or_default().push(a);
+        }
+    }
+    let mut out = Vec::new();
+    for (i, _) in bus.iter().enumerate().filter(|(_, &b)| b) {
+        let mut m = members.remove(&i).unwrap_or_default();
+        m.sort_unstable();
+        m.dedup();
+        // The line follows the members in the bus's own cluster (a member elsewhere, as a gateway or a node on two buses,
+        // would stretch it across the drawing); the others tap it at its nearest point. With fewer than two there, the
+        // line is a short one across the bus's own centre.
+        let local: Vec<usize> = m
+            .iter()
+            .copied()
+            .filter(|&j| parent.get(j) == parent.get(i))
+            .collect();
+        let along = &local;
+        let (cx, cy, dx, dy, lo, hi) = if along.len() >= 2 {
+            let n = along.len() as f64;
+            let cx = along.iter().map(|&j| x[j]).sum::<f64>() / n;
+            let cy = along.iter().map(|&j| y[j]).sum::<f64>() / n;
+            // The main axis: the eigenvector of the largest eigenvalue of the members' covariance.
+            let (mut sxx, mut sxy, mut syy) = (0., 0., 0.);
+            for &j in along.iter() {
+                let (u, v) = (x[j] - cx, y[j] - cy);
+                sxx += u * u;
+                sxy += u * v;
+                syy += v * v;
+            }
+            let half_diff = (sxx - syy) / 2.;
+            let lambda = (sxx + syy) / 2. + (half_diff * half_diff + sxy * sxy).sqrt();
+            let (vx, vy) = if sxy.abs() > 1e-12 {
+                (sxy, lambda - sxx)
+            } else if sxx >= syy {
+                (1., 0.)
+            } else {
+                (0., 1.)
+            };
+            let len = (vx * vx + vy * vy).sqrt();
+            let (dx, dy) = if len > 1e-12 {
+                (vx / len, vy / len)
+            } else {
+                (1., 0.)
+            };
+            let t: Vec<f64> = along
+                .iter()
+                .map(|&j| (x[j] - cx) * dx + (y[j] - cy) * dy)
+                .collect();
+            let lo = t.iter().copied().fold(f64::INFINITY, f64::min);
+            let hi = t.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            if hi - lo > 1e-9 {
+                (cx, cy, dx, dy, lo, hi)
+            } else {
+                (cx, cy, dx, dy, -half, half)
+            }
+        } else {
+            (x[i], y[i], 1., 0., -half, half)
+        };
+        let mut feet = Vec::with_capacity(m.len() * 2);
+        for &j in &m {
+            let t = ((x[j] - cx) * dx + (y[j] - cy) * dy).clamp(lo, hi);
+            feet.extend([cx + t * dx, cy + t * dy]);
+        }
+        out.push(arqlet_model::OverviewBusLine {
+            node: i as u32,
+            x1: cx + lo * dx,
+            y1: cy + lo * dy,
+            x2: cx + hi * dx,
+            y2: cy + hi * dy,
+            taps: m.iter().map(|&j| j as u32).collect(),
+            feet,
+        });
+    }
+    out
+}
