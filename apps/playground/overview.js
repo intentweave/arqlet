@@ -437,23 +437,60 @@ function draggable(i) {
  * around it (`start.moved`).
  */
 let dragFrame = 0;
+// Live while dragging: the latest pointer place not yet sent, whether a request is out, and the gesture's number (an
+// answer of an earlier gesture, or one that arrives after the release, is dropped).
+let dragAt = null, dragBusy = false, dragGesture = 0, dragging = false;
 async function dragNode(i, x, y, phase) {
   if (phase === 'move') {
-    cancelAnimationFrame(dragFrame);
-    dragFrame = requestAnimationFrame(() => {
-      const o = model.overview, xs = Array.from(o.x), ys = Array.from(o.y);
-      const dx = x - o.x[i], dy = y - o.y[i];
-      for (const k of [i, ...descendantsOf(i)]) { xs[k] += dx; ys[k] += dy; }
-      renderer.morph(overviewModel({...o, x: xs, y: ys}, resolvedEdgeIds(graph)), {duration: 0});
-    });
+    if (!dragging) { dragging = true; dragGesture++; }
+    dragAt = {i, x, y};
+    preview();
+    if ($('live-drag').checked) follow(dragGesture);
     return;
   }
+  dragging = false;
+  dragAt = null;
   cancelAnimationFrame(dragFrame);
   const id = model.overview.ids[i];
   const result = await overviewOf({start: {moved: {[id]: {x, y}}}});
   if (!result.ok) { status(result.error); return; }
   show(result.overview, true);
   status(`${nameOf(model, i)} moved; its cluster settled around it`);
+}
+
+/** Draws the dragged node (with what it holds) under the pointer on the latest positions, at the next frame. */
+function preview() {
+  cancelAnimationFrame(dragFrame);
+  dragFrame = requestAnimationFrame(() => {
+    if (!dragAt) return;
+    const {i, x, y} = dragAt, o = model.overview, xs = Array.from(o.x), ys = Array.from(o.y);
+    const dx = x - o.x[i], dy = y - o.y[i];
+    for (const k of [i, ...descendantsOf(i)]) { xs[k] += dx; ys[k] += dy; }
+    renderer.morph(overviewModel({...o, x: xs, y: ys}, resolvedEdgeIds(graph)), {duration: 0});
+  });
+}
+
+/**
+ * The neighbours follow while dragging: one request at a time, each with the latest pointer place; its answer becomes
+ * the model (the next request settles on from there), and the dragged node is drawn under the pointer again.
+ */
+async function follow(gesture) {
+  if (dragBusy) return;
+  dragBusy = true;
+  try {
+    while (dragging && gesture === dragGesture && dragAt) {
+      const {i, x, y} = dragAt, id = model.overview.ids[i];
+      const result = await overviewOf({start: {moved: {[id]: {x, y}}}});
+      if (!dragging || gesture !== dragGesture) break;
+      if (!result.ok) { status(result.error); break; }
+      model = overviewModel(result.overview, resolvedEdgeIds(graph));
+      preview();
+      // The pointer did not move since: nothing more to send until it does.
+      if (dragAt && dragAt.x === x && dragAt.y === y) break;
+    }
+  } finally {
+    dragBusy = false;
+  }
 }
 
 /** The indices below node `i`. */

@@ -288,7 +288,7 @@ fn lay_out(
     options: &OverviewOptions,
     threads: usize,
 ) -> Result<Overview, String> {
-    let hints = hints_of(v, h)?;
+    let mut hints = hints_of(v, h)?;
     // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
     let rows_wanted = options.rows.contains_key(&usize::MAX);
     let mut options = options.clone();
@@ -321,6 +321,7 @@ fn lay_out(
             overview::arrange(&h, container, &radius, &options, hints.start.as_ref())
         });
         arrangements.extend(level.iter().copied().zip(done));
+        overview::carry_shifts(&mut hints, level, &arrangements);
     }
     let o = overview::assemble(&h, &arrangements, &options, &hints);
     let parent: Vec<i64> = h

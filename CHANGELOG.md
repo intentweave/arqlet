@@ -28,6 +28,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `draggable(i)`: by default a drag that starts on a leaf moves it (`move`, `end`), any other drag pans. The overview page
   moves the selected cluster with all it holds when a drag starts inside it, else a leaf, and previews the move under the
   pointer; it settles at the release.
+- Neighbours follow while dragging in the overview (provisional): the overview page sends the latest pointer place
+  while dragging, one request at a time, and draws each answer (the next one settles on from there), so the cluster gives
+  way during the gesture; *Neighbours follow while dragging* turns it off. A cluster whose child was moved (or that holds
+  one) is centred on its children again and its parent moves it as far (`Arrangement::shift`), so the moved node keeps
+  its place while a node dragged out of its cluster no longer inflates the cluster's disc around its old centre.
 
 ## 0.6.0 — 2026-11-19
 

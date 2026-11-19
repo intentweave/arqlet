@@ -89,6 +89,64 @@ pub struct Previous {
     pub moved: BTreeMap<usize, (f64, f64)>,
 }
 
+/// An arrangement after a move (`Previous::moved`): the whole arrangement follows the anchor back to where it was (the
+/// separation may have pushed it), and with `recentre` the container is centred on its children again and reports how
+/// far its centre moved (`shift`), which its parent adds, so that the anchor keeps its absolute place.
+fn anchored(
+    mut x: Vec<(f64, f64)>,
+    r: &[f64],
+    options: &OverviewOptions,
+    overlaps: usize,
+    (anchor, at): (usize, (f64, f64)),
+    recentre: bool,
+) -> Arrangement {
+    let (dx, dy) = (at.0 - x[anchor].0, at.1 - x[anchor].1);
+    for p in &mut x {
+        p.0 += dx;
+        p.1 += dy;
+    }
+    let (cx, cy) = if recentre {
+        enclosing_centre(&x, r)
+    } else {
+        (0., 0.)
+    };
+    for p in &mut x {
+        p.0 -= cx;
+        p.1 -= cy;
+    }
+    let reach = x
+        .iter()
+        .zip(r)
+        .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
+        .fold(0., f64::max);
+    Arrangement {
+        positions: x,
+        radius: reach + options.padding,
+        overlaps,
+        shift: (cx, cy),
+    }
+}
+
+/// After a level is arranged: a container centred again on its children (`Arrangement::shift`) stands that much further
+/// from its previous place, which its parent's arrangement starts from.
+pub fn carry_shifts(
+    hints: &mut OverviewHints,
+    level: &[Container],
+    arrangements: &BTreeMap<Container, Arrangement>,
+) {
+    let Some(start) = hints.start.as_mut() else {
+        return;
+    };
+    for container in level {
+        if let (Container::Node(n), Some(a)) = (container, arrangements.get(container)) {
+            if a.shift != (0., 0.) {
+                start.centre[*n].0 += a.shift.0;
+                start.centre[*n].1 += a.shift.1;
+            }
+        }
+    }
+}
+
 /// The starting temperature of a settling simulation: the forces only settle what changed.
 const SETTLE_ALPHA: f64 = 0.3;
 
@@ -798,6 +856,9 @@ pub struct Arrangement {
     pub radius: f64,
     /// Pairs of children whose discs (with the gap) still overlap after the final separation. Normally 0.
     pub overlaps: usize,
+    /// How far the container's centre moves from its previous place (with `Previous::moved`: the container is centred on
+    /// its children again, and its parent places it this much further, so a held child stays where it was put).
+    pub shift: (f64, f64),
 }
 
 /// The share of the velocity lost per tick (d3-force: 0.4). The model follows d3-force; no code is copied.
@@ -896,6 +957,7 @@ pub fn arrange(
             positions: Vec::new(),
             radius: options.node_radius,
             overlaps: 0,
+            shift: (0., 0.),
         };
     }
     if k == 1 {
@@ -903,6 +965,7 @@ pub fn arrange(
             positions: vec![(0., 0.)],
             radius: r[0] + if options.chains { 0. } else { options.padding },
             overlaps: 0,
+            shift: (0., 0.),
         };
     }
     let links: Vec<(usize, usize, f64)> = h
@@ -934,6 +997,23 @@ pub fn arrange(
                 .enumerate()
                 .filter_map(|(j, m)| previous.moved.get(m).map(|&p| (j, p)))
                 .collect::<Vec<_>>();
+            // A child that holds a moved node (its ancestor): it keeps the place its own arrangement gave it, so that
+            // the moved node stays where it was put.
+            let carrier = held.is_empty().then(|| {
+                members.iter().position(|&m| {
+                    previous.moved.keys().any(|&n| {
+                        let mut at = h.parent[n];
+                        while let Some(p) = at {
+                            if p == m {
+                                return true;
+                            }
+                            at = h.parent[p];
+                        }
+                        false
+                    })
+                })
+            });
+            let recentre = container != Container::Root;
             if !held.is_empty() {
                 let mut x = x;
                 for &(j, p) in &held {
@@ -942,22 +1022,18 @@ pub fn arrange(
                 let (pin, at) = (held[0].0, x[held[0].0]);
                 simulate_held(&mut x, &r, &links, options, DRAG_ALPHA, Some(pin));
                 let overlaps = separate(&mut x, &r, options.gap);
-                // The separation may have moved the held child: the whole arrangement follows it back.
-                let (dx, dy) = (at.0 - x[pin].0, at.1 - x[pin].1);
-                for p in &mut x {
-                    p.0 += dx;
-                    p.1 += dy;
-                }
-                let reach = x
-                    .iter()
-                    .zip(&r)
-                    .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
-                    .fold(0., f64::max);
-                return Arrangement {
-                    positions: x,
-                    radius: reach + options.padding,
-                    overlaps,
+                return anchored(x, &r, options, overlaps, (pin, at), recentre);
+            }
+            if let Some(Some(j)) = carrier {
+                // The others make room for the carrier, which keeps its place.
+                let at = x[j];
+                let mut x = x;
+                let overlaps = if changed {
+                    make_room(&mut x, &r, options.gap)
+                } else {
+                    0
                 };
+                return anchored(x, &r, options, overlaps, (j, at), recentre);
             }
             if !changed {
                 // Kept as it was: only the radius is measured again (it may have been set by a host before).
@@ -970,6 +1046,7 @@ pub fn arrange(
                     positions: x,
                     radius: reach + options.padding,
                     overlaps: 0,
+                    shift: (0., 0.),
                 };
             }
             if previous.settle {
@@ -989,6 +1066,7 @@ pub fn arrange(
                     positions: x,
                     radius: reach + options.padding,
                     overlaps,
+                    shift: (0., 0.),
                 };
             }
         }
@@ -1015,6 +1093,7 @@ pub fn arrange(
         positions: x,
         radius: reach + options.padding,
         overlaps,
+        shift: (0., 0.),
     }
 }
 
@@ -1349,13 +1428,16 @@ pub fn overview(
     let h = with_communities(hierarchy(graph), options.communities)
         .unwrap_or_else(|_| hierarchy(graph));
     let mut arrangements = BTreeMap::new();
+    let mut hints = hints.clone();
     for level in levels(&h) {
-        let radius = radii(&h, &arrangements, options, hints);
-        for container in level {
+        let radius = radii(&h, &arrangements, options, &hints);
+        for &container in &level {
             let start = hints.start.as_ref();
             arrangements.insert(container, arrange(&h, container, &radius, options, start));
         }
+        carry_shifts(&mut hints, &level, &arrangements);
     }
+    let hints = &hints;
     let result = assemble(&h, &arrangements, options, hints);
     (h, result)
 }
