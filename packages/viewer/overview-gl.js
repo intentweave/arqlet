@@ -261,8 +261,26 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     if (!show) return;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens})) {
+    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens, galaxy})) {
       ctx.font = `${label.kind === 'cluster' ? 600 : 400} ${label.size.toFixed(1)}px system-ui, sans-serif`;
+      if (label.colour) {
+        // A galaxy's tag: a dark rounded box, a dot in its colour, its name.
+        const width = ctx.measureText(label.text).width, dot = label.size * 0.36, pad = label.size * 0.55;
+        const w = width + dot * 2 + pad * 3, h = label.size * 1.8, left = label.x - w / 2, top = label.y - h / 2;
+        ctx.beginPath();
+        ctx.roundRect?.(left, top, w, h, h * 0.3) ?? ctx.rect(left, top, w, h);
+        ctx.fillStyle = 'rgba(16,20,28,0.82)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(left + pad + dot, label.y, dot, 0, 2 * Math.PI);
+        ctx.fillStyle = `rgb(${label.colour.map(v => Math.round(v * 255)).join(',')})`;
+        ctx.fill();
+        ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(236,241,247,0.95)';
+        ctx.fillText(label.text, left + pad * 2 + dot * 2, label.y);
+        ctx.textAlign = 'center';
+        continue;
+      }
       ctx.fillStyle = label.kind === 'cluster' ? 'rgba(223,231,239,0.85)' : 'rgba(223,231,239,0.95)';
       ctx.fillText(label.text, label.x, label.y);
     }

@@ -509,7 +509,7 @@ export function lensInverse(lens, x, y) {
  * their text is at least `minPixels` high. Positions in CSS pixels; at most `limit` texts, largest first, and none that
  * would overlap a larger one.
  */
-export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set(), lens = null} = {}) {
+export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set(), lens = null, galaxy = false} = {}) {
   const o = model.overview, out = [];
   // A screen point and the lens's enlargement there (`[x, y, factor]`); sizes on screen are multiplied by the factor, so
   // that the lens also shows the texts of what it enlarges.
@@ -528,6 +528,15 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
       continue;
     }
     if (r < 36) continue;
+    if (galaxy) {
+      // A galaxy carries its name in its middle, with its colour (drawn as a dot on a dark tag). A single root around
+      // everything is the sky, not a galaxy: its name would sit on the one in the middle.
+      if (model.roots.length === 1 && i === model.roots[0]) continue;
+      if (!visible(cx, cy, r)) continue;
+      const ordinal = model.tops.indexOf(model.cluster[i]);
+      out.push({text, x: cx, y: cy, size: Math.min(12 + r / 80, 15), weight: r, kind: 'cluster', colour: clusterColour(ordinal)});
+      continue;
+    }
     const [x, y] = screen(o.x[i], o.y[i] - o.r[i]);
     if (!visible(x, y + r, r)) continue;
     out.push({text, x, y: y + 12, size: Math.min(13 + r / 60, 18), weight: r, kind: 'cluster'});
@@ -576,7 +585,8 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
   const placed = [], kept = [];
   for (const label of out) {
     if (kept.length >= limit) break;
-    const w = label.text.length * label.size * 0.55 + 4, h = label.size + 2;
+    // A galaxy's tag also holds its dot and margins.
+    const w = label.text.length * label.size * 0.55 + (label.colour ? label.size * 2.6 : 4), h = label.size * (label.colour ? 1.9 : 1) + 2;
     const box = [label.x - w / 2, label.y - h / 2, label.x + w / 2, label.y + h / 2];
     if (placed.some(b => box[0] < b[2] && b[0] < box[2] && box[1] < b[3] && b[1] < box[3])) continue;
     placed.push(box);

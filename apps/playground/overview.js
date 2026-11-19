@@ -687,4 +687,16 @@ for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
   });
 }
 
-$('galaxy').onchange = () => { renderer?.setGalaxy($('galaxy').checked); };
+// The galaxy style with looser forces: less gravity, more repulsion and a wider gap let the clusters fray out into clouds
+// instead of round discs. Fields the user changed are left alone; turning the style off gives the defaults back.
+const GALAXY_FORCES = {gravity: 0.05, charge: 0.1, gap: 3};
+$('galaxy').onchange = () => {
+  const on = $('galaxy').checked;
+  renderer?.setGalaxy(on);
+  let changed = false;
+  for (const [id, value] of Object.entries(GALAXY_FORCES)) {
+    const [from, to] = on ? [DEFAULTS[id], value] : [value, DEFAULTS[id]];
+    if (Number($(id).value) === from) { $(id).value = to; changed = true; }
+  }
+  if (changed && graph) { saveSettings(); layOut(false); }
+};

@@ -482,3 +482,18 @@ test('the galaxy style draws glows for clusters and stars for leaves, edges in t
   // A galaxy edge is fainter than a leg and takes its source cluster's colour also across clusters (a → e).
   assert.equal(galaxy.count.edges, plain.count.edges);
 });
+
+test('in the galaxy style a cluster is named in its middle on a tag of its colour', () => {
+  const m = overviewModel(overview);
+  const view = {centreX: 0, centreY: 0, scale: 10};
+  const labels = labelsOf(m, new Map(), view, 800, 600, {galaxy: true});
+  const c = labels.find(l => l.text === 'c');
+  assert.ok(c, JSON.stringify(labels));
+  // The middle of c's disc on the screen, and a colour.
+  assert.equal(c.x, 400 + (-20) * 10);
+  assert.equal(c.y, 300);
+  assert.equal(c.colour.length, 3);
+  // The disc style names it above its disc, without a colour.
+  const plain = labelsOf(m, new Map(), view, 800, 600).find(l => l.text === 'c');
+  assert.ok(plain.y < 300 && !plain.colour);
+});
