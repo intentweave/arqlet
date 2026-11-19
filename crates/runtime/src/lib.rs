@@ -917,6 +917,32 @@ fn view_options(
     if abstracts(&options) {
         options.aggregate_weights = weights.clone();
     }
+    // Provisional: the bus trees grow from the roots of the whole graph, each shown by the visible node that holds it.
+    if view
+        .nodes
+        .iter()
+        .any(|n| n.shape == arqlet_model::NodeShape::BusLine)
+    {
+        let parent: BTreeMap<&str, Option<&str>> = view
+            .nodes
+            .iter()
+            .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+            .collect();
+        options.bus_roots = arqlet_layout::bus_roots(view)
+            .into_iter()
+            .map(|root| {
+                let mut shown = root.clone();
+                let mut at = parent.get(root.as_str()).copied().flatten();
+                while let Some(p) = at {
+                    if collapsed.contains(p) {
+                        shown = p.to_string();
+                    }
+                    at = parent.get(p).copied().flatten();
+                }
+                shown
+            })
+            .collect();
+    }
     options
 }
 /// Change only view state. Hidden nodes and original edge endpoints remain canonical.

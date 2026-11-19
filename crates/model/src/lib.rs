@@ -1952,6 +1952,17 @@ pub struct LayoutOptions {
     #[serde(skip)]
     #[cfg_attr(feature = "ts", ts(skip))]
     pub isolated_grid_areas: BTreeSet<String>,
+    /// Provisional: the roots of the bus networks (`busLine` nodes), found on the source graph and shown by the visible
+    /// node that holds each, so that every view of the graph grows its bus trees from the same roots whatever is
+    /// collapsed. Set by the runtime for a view; never written or read.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub bus_roots: Vec<String>,
+    /// Provisional: how the view draws a bus kept as a node of shape `busLine`: `bar` (the default) a bar in a rank of its
+    /// own with one tap per edge; `trunk` no rank and no bar, one shared line from the bus's head (its member nearest the
+    /// root of the bus tree) to every other member, drawn as an explicit bus (ADR 0005). Omitted when `bar`.
+    #[serde(default, skip_serializing_if = "BusStyle::is_bar")]
+    pub bus_style: BusStyle,
     /// ADR 0020, S1-0 and S1-0b: a graph whose areas all flow right to left (`rl`) or bottom to top (`bt`) is laid out
     /// with the positive flow, where single pass runs, and mirrored area by area (a container keeps its header at its
     /// top); logical edge direction is kept. Not for graphs with pins, label places, explicit ports or buses. On by default
@@ -2306,6 +2317,10 @@ pub struct BusTapLayout {
     pub resolved_ports: Vec<ResolvedPort>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub boundary_crossings: Vec<BoundaryCrossing>,
+    /// The root of every bus network of the layout (one per network), kept so that the next layout of the same networks
+    /// (a toggle, an edit) grows its trees from the same roots.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roots: Vec<String>,
 }
 
 impl BusTapLayout {
@@ -2313,6 +2328,7 @@ impl BusTapLayout {
         self.routes.is_empty()
             && self.resolved_ports.is_empty()
             && self.boundary_crossings.is_empty()
+            && self.roots.is_empty()
     }
 }
 
@@ -2355,6 +2371,8 @@ impl Default for LayoutOptions {
             isolated_grid: false,
             isolated_grid_from: None,
             isolated_grid_areas: BTreeSet::new(),
+            bus_roots: Vec::new(),
+            bus_style: BusStyle::Bar,
             single_pass_reversed: true,
             straight_detours: true,
             region_ports: true,
@@ -2501,6 +2519,22 @@ pub enum EdgeRouting {
     #[default]
     Orthogonal,
     Straight,
+}
+
+/// Provisional: how a bus kept as a node of shape `busLine` is drawn (`LayoutOptions::bus_style`).
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum BusStyle {
+    #[default]
+    Bar,
+    Trunk,
+}
+
+impl BusStyle {
+    pub fn is_bar(&self) -> bool {
+        *self == BusStyle::Bar
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]

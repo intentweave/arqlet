@@ -364,14 +364,19 @@ const EXACT_MIDDLE_MAX: usize = 2000;
 /// The root of one bus network (`network`: its members; `far`: the member a search from its first member reached last): the
 /// node on the most buses when it is on three or more (a gateway; the earliest in the graph on a tie), else the middle of the
 /// network, which may be a bus (a trunk without gateways, the backbone of zones): the member whose farthest member is
-/// nearest, or above `EXACT_MIDDLE_MAX` members the middle of a longest path found by a second search from `far`.
+/// nearest, or above `EXACT_MIDDLE_MAX` members the middle of a longest path found by a second search from `far`. A root
+/// `kept` from an earlier layout of the network wins while it is still a member.
 fn root_of<'a>(
     network: &BTreeMap<&'a str, usize>,
     far: &'a str,
     buses: &BTreeSet<&str>,
     adjacent: &BTreeMap<&'a str, BTreeSet<&'a str>>,
     order: &BTreeMap<&str, usize>,
+    kept: &[String],
 ) -> &'a str {
+    if let Some((root, _)) = kept.iter().find_map(|k| network.get_key_value(k.as_str())) {
+        return root;
+    }
     let gateway = network
         .keys()
         .copied()
@@ -441,7 +446,15 @@ fn bfs<'a>(
     (level, parent, last)
 }
 
-pub(crate) fn orient(graph: &Graph) -> Option<(Graph, BTreeSet<String>)> {
+/// `orient`'s answer: the graph with the turned edges, their ids, the root of every network, and every member's level.
+pub(crate) type Oriented = (
+    Graph,
+    BTreeSet<String>,
+    Vec<String>,
+    BTreeMap<String, usize>,
+);
+
+pub(crate) fn orient(graph: &Graph, kept: &[String]) -> Option<Oriented> {
     let buses: BTreeSet<&str> = graph
         .nodes
         .iter()
@@ -479,16 +492,40 @@ pub(crate) fn orient(graph: &Graph) -> Option<(Graph, BTreeSet<String>)> {
     if bus_edges.is_empty() {
         return None;
     }
+    // An edge between two members of a bus network that joins no bus follows the tree too: a collapsed container that
+    // holds a bus stands for it, and the edges to that bus end at the container.
+    let members: BTreeSet<&str> = adjacent.keys().copied().collect();
+    let joining: Vec<(usize, &str, &str)> = graph
+        .edges
+        .iter()
+        .enumerate()
+        .filter_map(|(k, e)| {
+            let (s, t) = (e.source.as_str(), e.target.as_deref()?);
+            (s != t
+                && !buses.contains(s)
+                && !buses.contains(t)
+                && members.contains(s)
+                && members.contains(t))
+            .then_some((k, s, t))
+        })
+        .collect();
+    for (k, s, t) in joining {
+        adjacent.entry(s).or_default().insert(t);
+        adjacent.entry(t).or_default().insert(s);
+        bus_edges.push(k);
+    }
     // Breadth-first levels from one root per network (`root_of`).
     let mut starts: Vec<&str> = adjacent.keys().copied().collect();
     starts.sort_by_key(|id| order[id]);
     let mut level: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut roots = Vec::new();
     for start in starts {
         if level.contains_key(start) {
             continue;
         }
         let (network, _, far) = bfs(start, &adjacent, &order);
-        let root = root_of(&network, far, &buses, &adjacent, &order);
+        let root = root_of(&network, far, &buses, &adjacent, &order, kept);
+        roots.push(root.to_string());
         level.extend(bfs(root, &adjacent, &order).0);
     }
     let mut oriented = graph.clone();
@@ -501,15 +538,13 @@ pub(crate) fn orient(graph: &Graph) -> Option<(Graph, BTreeSet<String>)> {
             flipped.insert(e.id.clone());
         }
     }
-    if flipped.is_empty() {
-        return None;
-    }
     for binding in &mut oriented.edge_ports {
         if flipped.contains(&binding.edge_id) {
             std::mem::swap(&mut binding.source_port, &mut binding.target_port);
         }
     }
-    Some((oriented, flipped))
+    let levels = level.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
+    Some((oriented, flipped, roots, levels))
 }
 
 /// The snapshot of a layout of `orient`'s graph, given back on `graph`: the turned edges' routes run in their own direction
@@ -595,13 +630,23 @@ pub(crate) fn project(graph: &Graph) -> Option<Graph> {
 /// The graph the layout sees for a view with bus lines: every bus line as a node of shape `busLine` again, with one edge per
 /// tap, after the other nodes and edges. `None` when the view has no bus line.
 pub(crate) fn expand(view: &Graph) -> Option<Graph> {
-    if !view.buses.iter().any(|b| !b.taps.is_empty()) {
+    if !view
+        .buses
+        .iter()
+        .any(|b| !b.taps.is_empty() && b.edges.is_empty())
+    {
         return None;
     }
     let present: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
     let mut graph = view.clone();
-    graph.buses.retain(|b| b.taps.is_empty());
-    for bus in view.buses.iter().filter(|b| !b.taps.is_empty()) {
+    graph
+        .buses
+        .retain(|b| b.taps.is_empty() || !b.edges.is_empty());
+    for bus in view
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && b.edges.is_empty())
+    {
         graph.nodes.push(Node {
             id: bus.id.clone(),
             kind: bus.kind.clone().unwrap_or_else(|| "bus".into()),
@@ -642,7 +687,11 @@ pub(crate) fn collapse(snapshot: &mut Snapshot, view: &Graph) {
         &snapshot.boxes,
         &snapshot.area_orientations,
     );
-    let line_buses: Vec<&Bus> = view.buses.iter().filter(|b| !b.taps.is_empty()).collect();
+    let line_buses: Vec<&Bus> = view
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && b.edges.is_empty())
+        .collect();
     let taps: BTreeSet<&str> = line_buses
         .iter()
         .flat_map(|b| b.taps.iter().map(|t| t.edge.as_str()))
@@ -681,7 +730,12 @@ pub(crate) fn redraw(snapshot: &mut Snapshot) {
         return;
     };
     let mut boxes = snapshot.boxes.clone();
-    for bus in snapshot.graph.buses.iter().filter(|b| !b.taps.is_empty()) {
+    for bus in snapshot
+        .graph
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && b.edges.is_empty())
+    {
         if let Some(r) = snapshot.bus_boxes.get(&bus.id) {
             boxes.insert(bus.id.clone(), r.clone());
         }
@@ -694,15 +748,22 @@ pub(crate) fn redraw(snapshot: &mut Snapshot) {
 /// operation that continues a layout works on this; `collapse_snapshot` gives the view back. Nothing changes (and `false`)
 /// without a bus line.
 pub(crate) fn expand_snapshot(snapshot: &mut Snapshot) -> bool {
+    turn_trunks(snapshot, false);
     let Some(graph) = expand(&snapshot.graph) else {
         return false;
     };
-    for bus in snapshot.graph.buses.iter().filter(|b| !b.taps.is_empty()) {
+    for bus in snapshot
+        .graph
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && b.edges.is_empty())
+    {
         if let Some(r) = snapshot.bus_boxes.remove(&bus.id) {
             snapshot.boxes.insert(bus.id.clone(), r);
         }
     }
     let kept = std::mem::take(&mut snapshot.bus_taps);
+    snapshot.bus_taps.roots = kept.roots;
     snapshot.routes.extend(kept.routes);
     snapshot.resolved_ports.extend(kept.resolved_ports);
     snapshot.boundary_crossings.extend(kept.boundary_crossings);
@@ -719,4 +780,199 @@ pub(crate) fn collapse_snapshot(snapshot: &mut Snapshot) {
         Some(view) => collapse(snapshot, &view),
         None => redraw(snapshot),
     }
+    turn_trunks(snapshot, true);
+}
+
+/// Provisional (`busStyle: trunk`): the view of a graph with bus lines drawn as shared lines. Every bus line (`Bus::taps`)
+/// with a member above it in its bus tree (`levels` from `orient`) gets that member as its head (the nearest to the root,
+/// then the one on the most buses, then the earliest in the graph) and one edge from the head to every other member, with the
+/// id and kind of that member's tap; the bus lists those edges (an explicit bus, ADR 0005), so the layout gives it no rank
+/// and draws one trunk with branches. A bus at the root of its tree keeps its bar. The taps keep the edges' own
+/// direction. `None` when no bus gets a head.
+pub(crate) fn trunks(view: &Graph, levels: &BTreeMap<String, usize>) -> Option<Graph> {
+    if !view
+        .buses
+        .iter()
+        .any(|b| !b.taps.is_empty() && b.edges.is_empty())
+    {
+        return None;
+    }
+    let present: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
+    let order: BTreeMap<&str, usize> = view
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+    let mut on_buses: BTreeMap<&str, usize> = BTreeMap::new();
+    for bus in &view.buses {
+        for tap in &bus.taps {
+            *on_buses.entry(tap.node.as_str()).or_default() += 1;
+        }
+    }
+    let mut graph = view.clone();
+    for bus in graph
+        .buses
+        .iter_mut()
+        .filter(|b| !b.taps.is_empty() && b.edges.is_empty())
+    {
+        let members: Vec<&BusTap> = bus
+            .taps
+            .iter()
+            .filter(|t| present.contains(t.node.as_str()))
+            .collect();
+        // The head: the member above the bus in its tree (the nearest to the root, then the one on the most buses, then
+        // the earliest). A bus at the root of its tree has none and keeps its bar.
+        let own = levels.get(&bus.id).copied().unwrap_or(0);
+        let head = members
+            .iter()
+            .filter(|t| levels.get(&t.node).is_some_and(|&l| l < own))
+            .min_by_key(|t| {
+                (
+                    levels[&t.node],
+                    std::cmp::Reverse(on_buses.get(t.node.as_str()).copied().unwrap_or(0)),
+                    order[t.node.as_str()],
+                )
+            })
+            .map(|t| t.node.clone());
+        let Some(head) = head else { continue };
+        for tap in members.iter().filter(|t| t.node != head) {
+            view_edge(&mut graph.edges, tap, &head);
+            bus.edges.push(tap.edge.clone());
+        }
+    }
+    Some(graph)
+}
+
+fn view_edge(edges: &mut Vec<Edge>, tap: &BusTap, head: &str) {
+    edges.push(Edge {
+        id: tap.edge.clone(),
+        kind: tap.kind.clone(),
+        source: head.to_string(),
+        target: Some(tap.node.clone()),
+        weight: None,
+    });
+}
+
+/// Provisional (`busStyle: trunk`): turns the edges of trunk buses between the layout's direction (from the head to the
+/// member, so the tree grows down) and their own (`logical`: a tap from the member to the bus runs from the member to the
+/// head), with their routes, ports and port bindings. Applying it in one direction twice changes nothing.
+pub(crate) fn turn_trunks(snapshot: &mut Snapshot, logical: bool) {
+    let mut turned: BTreeSet<String> = BTreeSet::new();
+    let index: BTreeMap<&str, usize> = snapshot
+        .graph
+        .edges
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.id.as_str(), i))
+        .collect();
+    let mut flip = Vec::new();
+    for bus in snapshot
+        .graph
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
+    {
+        for tap in bus.taps.iter().filter(|t| t.to_bus) {
+            let Some(&i) = index.get(tap.edge.as_str()) else {
+                continue;
+            };
+            let e = &snapshot.graph.edges[i];
+            // In the layout's direction the member is the target; in its own, the source.
+            let at_member = if logical {
+                e.target.as_deref() == Some(tap.node.as_str())
+            } else {
+                e.source == tap.node
+            };
+            if at_member {
+                flip.push(i);
+            }
+        }
+    }
+    for i in flip {
+        let e = &mut snapshot.graph.edges[i];
+        let target = e.target.take().expect("a trunk edge has a target");
+        e.target = Some(std::mem::replace(&mut e.source, target));
+        turned.insert(e.id.clone());
+    }
+    if turned.is_empty() {
+        return;
+    }
+    for route in &mut snapshot.routes {
+        if turned.contains(&route.id) {
+            route.points.reverse();
+        }
+    }
+    for port in &mut snapshot.resolved_ports {
+        if turned.contains(&port.edge_id) {
+            port.endpoint = if port.endpoint == "source" {
+                "target".into()
+            } else {
+                "source".into()
+            };
+        }
+    }
+    for binding in &mut snapshot.graph.edge_ports {
+        if turned.contains(&binding.edge_id) {
+            std::mem::swap(&mut binding.source_port, &mut binding.target_port);
+        }
+    }
+}
+
+/// Provisional: a view whose bus lines are drawn as trunks (`trunks`) turned back into one with bars: the trunks' edges
+/// leave, the taps stay. `None` without a trunk.
+pub(crate) fn untrunk(view: &Graph) -> Option<Graph> {
+    let edges: BTreeSet<&str> = view
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
+        .flat_map(|b| b.edges.iter().map(String::as_str))
+        .collect();
+    if edges.is_empty() {
+        return None;
+    }
+    let mut graph = view.clone();
+    graph.edges.retain(|e| !edges.contains(e.id.as_str()));
+    graph
+        .edge_ports
+        .retain(|b| !edges.contains(b.edge_id.as_str()));
+    for bus in graph.buses.iter_mut().filter(|b| !b.taps.is_empty()) {
+        bus.edges.clear();
+    }
+    Some(graph)
+}
+
+/// Provisional (`busStyle: trunk`): the edges of a trunk view that are neither a trunk's nor a bar's tap but join two
+/// members of a bus tree (as to a collapsed zone that holds a bus), turned so they point down the tree (`levels`), with
+/// their ids; `restore` gives their direction back after the layout.
+pub(crate) fn orient_joining(
+    view: &Graph,
+    levels: &BTreeMap<String, usize>,
+) -> (Graph, BTreeSet<String>) {
+    let trunk: BTreeSet<&str> = view
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty())
+        .flat_map(|b| b.edges.iter().map(String::as_str))
+        .collect();
+    let mut graph = view.clone();
+    let mut flipped = BTreeSet::new();
+    for e in graph.edges.iter_mut() {
+        let Some(t) = e.target.clone() else { continue };
+        if trunk.contains(e.id.as_str()) || e.source == t {
+            continue;
+        }
+        if let (Some(a), Some(b)) = (levels.get(&e.source), levels.get(&t)) {
+            if a > b {
+                e.target = Some(std::mem::replace(&mut e.source, t));
+                flipped.insert(e.id.clone());
+            }
+        }
+    }
+    for binding in &mut graph.edge_ports {
+        if flipped.contains(&binding.edge_id) {
+            std::mem::swap(&mut binding.source_port, &mut binding.target_port);
+        }
+    }
+    (graph, flipped)
 }

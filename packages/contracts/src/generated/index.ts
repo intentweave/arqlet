@@ -8,6 +8,7 @@ export * from './BoundaryCrossing';
 export * from './Bundling';
 export * from './Bus';
 export * from './BusLine';
+export * from './BusStyle';
 export * from './BusTap';
 export * from './BusTapLayout';
 export * from './CommunityHubs';

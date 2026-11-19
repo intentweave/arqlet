@@ -32,6 +32,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   network (the member whose farthest member is nearest; above 2 000 members the middle of a longest path), which may be a
   bus. A trunk without gateways stands on top with its branches below; zones hang below their backbone, and a unit on two
   zone buses below both. Examples *Vehicle trunk bus (no gateway)* and *Zonal vehicle (zones, redundant unit)* (made up).
+- `busStyle: "trunk"` (provisional option, default `bar`): a bus kept as a `busLine` node is drawn without a bar and
+  without a rank of its own, as one shared line from its head (the member nearest the root of its bus tree) to every
+  other member, an explicit bus (ADR 0005) with junction dots. Each line carries its tap's id and runs in the tap's own
+  direction; refinement, toggles and traces keep it; switching back to `bar` restores the bars. A bus at the root of
+  its tree (a trunk without gateways, a backbone) has no head and keeps its bar. Playground: Routing → *Buses*.
+- Bus trees keep their roots whatever is collapsed: the roots are found on the whole graph and each is shown by the
+  visible node that holds it (`LayoutOptions::bus_roots`, internal; `Snapshot.busTaps.roots` for continuations), and an
+  edge between two members of a bus network that joins no bus (as to a collapsed zone that holds a bus) follows the tree.
+  A collapsed zone now stands below its backbone instead of at the bottom.
 - An organic area above the dense bound of 300 children is placed by the scalable stress (up to 2 000) when no stress was
   chosen, instead of being refused; the snapshot records `scalableStress`. Areas within the bound are unchanged. Single
   release runs on a loaded machine (load about 6): organic rings of 500 and 1 500 nodes imported in 0.6 and 2.1 s.

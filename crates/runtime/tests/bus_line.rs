@@ -323,8 +323,204 @@ fn zones_hang_below_their_backbone_and_a_unit_on_two_zone_buses_below_both() {
     assert!(
         top_of(&s, "brake") > top_of(&s, "zone-l") && top_of(&s, "brake") > top_of(&s, "zone-r")
     );
+    // As trunks: the backbone, at the root of the tree, keeps its bar; each zone bus is a line from its controller.
+    let trunks = import_graph_with(
+        s.source_graph.as_deref().unwrap().clone(),
+        100,
+        &serde_json::from_value(json!({"busStyle": "trunk"})).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(trunks.bus_lines.keys().collect::<Vec<_>>(), ["backbone"]);
+    let zone_bus = trunks.graph.buses.iter().find(|b| b.id == "can-l").unwrap();
+    assert!(!zone_bus.edges.is_empty());
+    assert!(trunks
+        .graph
+        .edges
+        .iter()
+        .filter(|e| zone_bus.edges.contains(&e.id))
+        .all(|e| e.source == "zc-l" || e.target.as_deref() == Some("zc-l")));
+    let shut =
+        arqlet_runtime::toggle_container(&trunks, trunks.revision, trunks.layout_version, "zone-l")
+            .unwrap();
+    assert!(top_of(&shut, "zone-l") > shut.bus_lines["backbone"].bar.y);
+    assert!(top_of(&shut, "brake") > top_of(&shut, "zone-l"));
     // Collapsing a zone keeps the backbone; the zone stands for its bus.
     let closed =
         arqlet_runtime::toggle_container(&s, s.revision, s.layout_version, "zone-l").unwrap();
     assert!(closed.bus_lines.contains_key("backbone") && !closed.bus_lines.contains_key("can-l"));
+    // The collapsed zone stands for its bus: below the backbone, and the unit on its bus below it.
+    let backbone = closed.bus_lines["backbone"].bar.y;
+    assert!(
+        top_of(&closed, "zone-l") > backbone,
+        "zone below the backbone"
+    );
+    assert!(
+        top_of(&closed, "brake") > top_of(&closed, "zone-l"),
+        "unit below the collapsed zone"
+    );
+}
+
+#[test]
+fn a_trunk_bus_is_a_shared_line_from_its_head_without_a_rank() {
+    // A gateway on a bus with three nodes, drawn as a trunk: no bar, no bus box; one edge from the gateway to each node
+    // with the tap's id, in the tap's own direction; the bus lists them.
+    let node = |id: &str, bus: bool| {
+        let mut n = json!({"id": id, "kind": if bus { "bus" } else { "ecu" }, "label": id});
+        if bus {
+            n["shape"] = json!("busLine");
+        }
+        n
+    };
+    let edge = |s: &str, t: &str| json!({"id": format!("{s}-{t}"), "kind": "connects", "source": s, "target": t});
+    let g: Graph = serde_json::from_value(json!({
+        "defaultDirection": "tb",
+        "nodes": [node("gw", false), node("can", true), node("a", false), node("b", false), node("c", false),
+            node("lin", true), node("d", false)],
+        "edges": [edge("gw", "can"), edge("a", "can"), edge("b", "can"), edge("can", "c"), edge("gw", "lin"), edge("d", "lin")]
+    }))
+    .unwrap();
+    let options: LayoutOptions = serde_json::from_value(json!({"busStyle": "trunk"})).unwrap();
+    let s = import_graph_with(g, 100, &options).unwrap();
+    assert!(s.bus_lines.is_empty() && s.bus_boxes.is_empty());
+    let bus = s.graph.buses.iter().find(|b| b.id == "can").unwrap();
+    let mut members = bus.edges.clone();
+    members.sort();
+    assert_eq!(members, ["a-can", "b-can", "can-c"]);
+    let ends = |id: &str| {
+        let e = s.graph.edges.iter().find(|e| e.id == id).unwrap();
+        (e.source.clone(), e.target.clone().unwrap())
+    };
+    // Own direction: a → bus is a → head; bus → c is head → c.
+    assert_eq!(ends("a-can"), ("a".to_string(), "gw".to_string()));
+    assert_eq!(ends("can-c"), ("gw".to_string(), "c".to_string()));
+    // The head above its members, all members in one rank (no rank for the bus).
+    let top = |id: &str| s.boxes[id].y;
+    assert!(
+        top("a") > top("gw")
+            && top("a") == top("b")
+            && top("b") == top("c")
+            && top("d") == top("a")
+    );
+    // The route of a member's tap runs in its own direction: it starts at the member.
+    let route = s.routes.iter().find(|r| r.id == "a-can").unwrap();
+    let first = route.points.first().unwrap();
+    assert!(inside(first, &s.boxes["a"]), "{:?}", route.points);
+    // Refinement keeps it.
+    let run = |v: serde_json::Value| -> serde_json::Value {
+        serde_json::from_str(&arqlet_runtime::dispatch(&v.to_string())).unwrap()
+    };
+    let refined = run(
+        json!({"op": "refine", "threads": 1, "snapshot": s, "expectedRevision": s.revision,
+        "expectedLayoutVersion": s.layout_version}),
+    );
+    assert_eq!(refined["ok"], true, "{refined}");
+    let r: Snapshot = serde_json::from_value(refined["snapshot"].clone()).unwrap();
+    let e = r.graph.edges.iter().find(|e| e.id == "a-can").unwrap();
+    assert_eq!((e.source.as_str(), e.target.as_deref()), ("a", Some("gw")));
+    // A trace from a to c runs over the trunk's two edges.
+    let answer =
+        arqlet_runtime::trace::trace_answer_on(&s, &json!({"from": "a", "to": "c"})).unwrap();
+    assert_eq!(answer.visible.routes, ["a-can", "can-c"]);
+}
+
+#[test]
+fn the_bus_style_switches_both_ways() {
+    let run = |v: serde_json::Value| -> serde_json::Value {
+        serde_json::from_str(&arqlet_runtime::dispatch(&v.to_string())).unwrap()
+    };
+    let configure = |s: &serde_json::Value, style: &str| {
+        let answer = run(
+            json!({"op": "configure", "snapshot": s, "options": {"busStyle": style},
+            "expectedRevision": s["revision"], "expectedLayoutVersion": s["layoutVersion"]}),
+        );
+        assert_eq!(answer["ok"], true, "{answer}");
+        serde_json::from_value::<Snapshot>(answer["snapshot"].clone()).unwrap()
+    };
+    // A single bus is the root of its tree: it keeps its bar as a trunk too.
+    let alone = import_graph_with(graph(3, None), 100, &LayoutOptions::default()).unwrap();
+    let alone = configure(&serde_json::to_value(&alone).unwrap(), "trunk");
+    check(&alone, 3);
+    // A gateway on two buses heads both.
+    let mut g = graph(3, None);
+    let more: Graph = serde_json::from_value(json!({
+        "nodes": [{"id": "gw", "kind": "ecu", "label": "gw"}, {"id": "lin", "kind": "bus", "label": "LIN", "shape": "busLine"},
+            {"id": "leaf", "kind": "ecu", "label": "leaf"}],
+        "edges": [{"id": "gw-can", "kind": "connects", "source": "gw", "target": "can"},
+            {"id": "gw-lin", "kind": "connects", "source": "gw", "target": "lin"},
+            {"id": "leaf-lin", "kind": "connects", "source": "leaf", "target": "lin"}]
+    }))
+    .unwrap();
+    g.nodes.extend(more.nodes);
+    g.edges.extend(more.edges);
+    let bar = import_graph_with(g, 100, &LayoutOptions::default()).unwrap();
+    assert_eq!(bar.bus_lines.len(), 2);
+    let trunk = configure(&serde_json::to_value(&bar).unwrap(), "trunk");
+    assert!(
+        trunk.bus_lines.is_empty(),
+        "{:?}",
+        trunk.bus_lines.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        trunk.graph.edges.len(),
+        5,
+        "one edge from the head to each other member"
+    );
+    let back = configure(&serde_json::to_value(&trunk).unwrap(), "bar");
+    assert_eq!(back.bus_lines.len(), 2);
+    assert!(back.graph.edges.is_empty());
+}
+
+#[test]
+fn a_refined_trunk_view_with_a_collapsed_zone_keeps_its_tree() {
+    // The zones of the zonal test graph as trunks, one zone collapsed, then refined: the tree stands as before.
+    let node = |id: &str, parent: Option<&str>, bus: bool| {
+        let mut n = json!({"id": id, "kind": if bus { "bus" } else { "ecu" }, "label": id, "parentId": parent});
+        if bus {
+            n["shape"] = json!("busLine");
+        }
+        n
+    };
+    let edge = |s: &str, t: &str| json!({"id": format!("{s}-{t}"), "kind": "connects", "source": s, "target": t});
+    let g: Graph = serde_json::from_value(json!({
+        "defaultDirection": "tb",
+        "nodes": [node("central", None, false), node("backbone", None, true),
+            node("zone-l", None, false), node("zc-l", Some("zone-l"), false), node("can-l", Some("zone-l"), true),
+            node("act-l", Some("zone-l"), false),
+            node("zone-r", None, false), node("zc-r", Some("zone-r"), false), node("can-r", Some("zone-r"), true),
+            node("act-r", Some("zone-r"), false),
+            node("brake", None, false)],
+        "edges": [edge("central", "backbone"), edge("zc-l", "backbone"), edge("zc-r", "backbone"), edge("zc-l", "can-l"),
+            edge("act-l", "can-l"), edge("zc-r", "can-r"), edge("act-r", "can-r"), edge("brake", "can-l"), edge("brake", "can-r")]
+    }))
+    .unwrap();
+    let s = import_graph_with(
+        g,
+        100,
+        &serde_json::from_value(json!({"busStyle": "trunk"})).unwrap(),
+    )
+    .unwrap();
+    let shut =
+        arqlet_runtime::toggle_container(&s, s.revision, s.layout_version, "zone-l").unwrap();
+    let run = |v: serde_json::Value| -> serde_json::Value {
+        serde_json::from_str(&arqlet_runtime::dispatch(&v.to_string())).unwrap()
+    };
+    let refined = run(
+        json!({"op": "refine", "threads": 1, "snapshot": shut, "expectedRevision": shut.revision,
+        "expectedLayoutVersion": shut.layout_version}),
+    );
+    assert_eq!(refined["ok"], true, "{refined}");
+    let r: Snapshot = serde_json::from_value(refined["snapshot"].clone()).unwrap();
+    assert!(top_of(&r, "zone-l") > r.bus_lines["backbone"].bar.y);
+    assert!(top_of(&r, "brake") > top_of(&r, "zone-l"));
+    // The joining edge keeps its own direction.
+    let e = r
+        .graph
+        .edges
+        .iter()
+        .find(|e| e.id == "brake-can-l")
+        .unwrap();
+    assert_eq!(
+        (e.source.as_str(), e.target.as_deref()),
+        ("brake", Some("zone-l"))
+    );
 }
