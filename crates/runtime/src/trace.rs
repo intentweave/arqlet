@@ -188,7 +188,13 @@ pub(crate) fn on_view(
         .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
         .flat_map(|b| b.edges.iter().map(String::as_str))
         .collect();
+    // A reference to a hub (`hubRefs`) is drawn as a stub with the edge's id.
+    let hub_refs: BTreeSet<&str> = snapshot.hub_refs.iter().map(|r| r.edge.as_str()).collect();
     for edge in path_edges {
+        if hub_refs.contains(edge.as_str()) {
+            routes.insert(edge.clone());
+            continue;
+        }
         if trunk_taps.contains(edge.as_str()) && drawn.contains_key(edge.as_str()) {
             routes.insert(edge.clone());
             continue;

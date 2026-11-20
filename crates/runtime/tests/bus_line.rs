@@ -524,3 +524,51 @@ fn a_refined_trunk_view_with_a_collapsed_zone_keeps_its_tree() {
         ("brake", Some("zone-l"))
     );
 }
+
+#[test]
+fn hub_refs_take_the_edges_of_hubs_out_of_the_layout_and_draw_them_as_stubs() {
+    // A hub with six edges and a chain a → b: with `hubRefs: 5` the hub's edges are references, the chain stays routed.
+    let mut nodes = vec![
+        json!({"id": "hub", "kind": "ecu", "label": "Gateway"}),
+        json!({"id": "a", "kind": "ecu", "label": "a"}),
+        json!({"id": "b", "kind": "ecu", "label": "b"}),
+    ];
+    let mut edges = vec![json!({"id": "ab", "kind": "k", "source": "a", "target": "b"})];
+    for i in 0..6 {
+        nodes.push(json!({"id": format!("n{i}"), "kind": "ecu", "label": format!("n{i}")}));
+        let (s, t) = if i % 2 == 0 {
+            (format!("n{i}"), "hub".to_string())
+        } else {
+            ("hub".to_string(), format!("n{i}"))
+        };
+        edges.push(json!({"id": format!("h{i}"), "kind": "k", "source": s, "target": t}));
+    }
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": edges})).unwrap();
+    let options: LayoutOptions = serde_json::from_value(json!({"hubRefs": 5})).unwrap();
+    let s = import_graph_with(g.clone(), 100, &options).unwrap();
+    assert_eq!(s.hub_refs.len(), 6);
+    assert!(s.hub_refs.iter().all(|r| r.hub == "hub" && r.node != "hub"));
+    assert!(s.hub_refs.iter().any(|r| r.outgoing) && s.hub_refs.iter().any(|r| !r.outgoing));
+    assert_eq!(
+        s.routes.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
+        ["ab"]
+    );
+    // The source graph keeps every edge.
+    assert_eq!(s.source_graph.as_deref().unwrap().edges.len(), 7);
+    // The scene draws a stub per reference, beside its node, named after the hub.
+    let scene = arqlet_scene::build_scene(&s).unwrap();
+    assert_eq!(scene.hub_refs.len(), 6);
+    let r0 = scene.hub_refs.iter().find(|r| r.edge == "h0").unwrap();
+    assert_eq!(r0.text, "Gateway");
+    let n0 = &s.boxes["n0"];
+    assert_eq!(r0.points[0].x, n0.x + n0.width, "out of its right side");
+    // Without the option nothing changes.
+    let plain = import_graph_with(g, 100, &LayoutOptions::default()).unwrap();
+    assert!(plain.hub_refs.is_empty() && plain.routes.len() == 7);
+    // A trace through the hub marks the stubs.
+    let answer =
+        arqlet_runtime::trace::trace_answer_on(&s, &json!({"from": "n0", "to": "n1"})).unwrap();
+    let mut routes = answer.visible.routes.clone();
+    routes.sort();
+    assert_eq!(routes, ["h0", "h1"]);
+}

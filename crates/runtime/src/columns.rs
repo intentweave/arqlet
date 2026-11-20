@@ -192,6 +192,8 @@ pub struct SceneColumns {
     pub buses: Vec<Vec<String>>,
     /// Provisional: the bus lines, as the scene has them (few, so kept as they are).
     pub bus_lines: Vec<arqlet_scene::SceneBusLine>,
+    /// Provisional: the hub references, as the scene has them.
+    pub hub_refs: Vec<arqlet_scene::SceneHubRef>,
 }
 
 impl SceneColumns {
@@ -342,6 +344,7 @@ impl SceneColumns {
         c.show_ports = scene.show_ports;
         c.buses = scene.buses.clone();
         c.bus_lines = scene.bus_lines.clone();
+        c.hub_refs = scene.hub_refs.clone();
         c
     }
 
@@ -427,6 +430,7 @@ impl SceneColumns {
             "conflictReasons": self.conflict_reasons,
             "buses": self.buses,
             "busLines": self.bus_lines,
+            "hubRefs": self.hub_refs,
             "bounds": self.bounds,
             "showPorts": self.show_ports,
             "columns": columns,
@@ -686,6 +690,7 @@ mod tests {
             buses: vec![vec!["e0".into(), "e2".into()]],
             junctions: vec![Point { x: 5., y: 6.5 }],
             bus_lines: Vec::new(),
+            hub_refs: Vec::new(),
             bounds: rect(-30., -30., 260., 160.),
         }
     }

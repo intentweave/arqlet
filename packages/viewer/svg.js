@@ -167,6 +167,16 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
    const node={id:bus.id,label:bus.label,kind:bus.kind,shape:'busLine'};g.onclick=e=>choose(node,e);g.onkeydown=e=>{if(e.key==='Enter')choose(node,e);};
    g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);g.onpointerleave=()=>shape.setAttribute('stroke',bus.id===selected?'#90e4c3':'#4c6682');
    svg.append(g);}
+  // Provisional (hubRefs): an edge of a hub drawn as a stub at its other end with the hub's name, as a wiring diagram
+  // refers to another sheet; the stub answers to the edge's id as a route does (selection, trace).
+  for(const ref of scene.hubRefs??[]){
+   const line=element('polyline',{'data-route-id':ref.edge,points:ref.points.map(p=>`${p.x},${p.y}`).join(' '),fill:'none',stroke:'#73bba7','stroke-width':1.6,'stroke-opacity':active?.2:.85,'marker-end':`url(#${markerId})`,'pointer-events':'none'});
+   line.append(element('title',{},`${ref.edge}: ${ref.outgoing?`${ref.node} → ${ref.text}`:`${ref.text} → ${ref.node}`}`));
+   svg.append(line);
+   const r=ref.label;
+   svg.append(element('rect',{...r,rx:3,fill:'#142133',stroke:'#3b5068','stroke-width':0.8,'pointer-events':'none'}));
+   svg.append(element('text',{x:r.x+4,y:r.y+r.height/2,'dominant-baseline':'middle',fill:'#9fc3e6','font-size':10.5,'pointer-events':'none'},(ref.outgoing?'→ ':'← ')+ref.text.slice(0,32)));
+  }
   // Junctions of explicit buses: where the bus's lines branch (ADR 0005).
   for(const j of scene.junctions??[])svg.append(element('circle',{cx:j.x,cy:j.y,r:3.5,fill:'#73bba7',stroke:'#142133','stroke-width':1,'pointer-events':'none',class:'lw-junction'}));
   // The rings and the controls of the containers are drawn above the routes, so a route crossing a container's border does
