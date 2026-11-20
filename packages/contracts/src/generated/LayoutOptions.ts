@@ -334,7 +334,9 @@ levelOfDetail?: LevelOfDetail | null,
  * Provisional: an edge between nodes in different containers is drawn between the outermost containers its ends
  * differ in, and those of one pair of containers as one route with their weights (as between collapsed containers);
  * edges between siblings stay as they are. A view of many open groups with dense traffic between them draws one route
- * per pair of groups instead of one per edge. Off by default (omitted).
+ * per pair of groups instead of one per edge. `None` (the default, omitted): on in views that start abstract (with
+ * `levelOfDetail` or `communities`, where member edges between opened containers otherwise make the drawing grow to a
+ * million units), off elsewhere; `true` or `false` sets it.
  */
 liftEdges?: boolean,
 /**

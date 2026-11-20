@@ -15,6 +15,10 @@ label?: string,
  * Provisional: a bus line, the view of a node of shape `busLine` (ADR 0019 view model): the source graph keeps the bus
  * as a node with its edges; the view leaves the node and those edges out and keeps them here, one tap per edge, drawn
  * as a bar past the nodes they attach (`Snapshot::bus_lines`). Omitted when empty (a bus of shared edges).
+ *
+ * Also an input (buses as data): a bus given with `taps` and no node of its own is drawn the same way, and `trace`,
+ * `neighbourhood` and `filter` treat it as a shared medium as they do a `busLine` node (`id` names the bus; the taps'
+ * `edge` ids must not collide with the graph's edges).
  */
 taps?: Array<BusTap>,
 /**

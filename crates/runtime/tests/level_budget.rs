@@ -20,8 +20,10 @@ fn grouped() -> Graph {
         .unwrap()
 }
 
+/// The first view's budget; edges as they are (not lifted, as they are by default with `levelOfDetail`), so that the tests
+/// see each edge's ends.
 fn options(level: serde_json::Value) -> LayoutOptions {
-    serde_json::from_value(json!({"levelOfDetail": level})).unwrap()
+    serde_json::from_value(json!({"levelOfDetail": level, "liftEdges": false})).unwrap()
 }
 
 fn units(snapshot: &arqlet_model::Snapshot) -> usize {
@@ -167,4 +169,39 @@ fn a_budget_counts_lifted_edges() {
     let snapshot = import_graph_with(grouped(), 100, &lifted).unwrap();
     assert_eq!(snapshot.collapsed_ids, ["g2", "g3"]);
     assert_eq!(snapshot.graph.edges.len(), 16);
+}
+
+#[test]
+fn lift_edges_is_on_by_default_in_views_that_start_abstract() {
+    // With `levelOfDetail` (or communities) and no `liftEdges`, edges between opened groups are lifted; `false` turns it
+    // off; without an abstract start nothing is lifted.
+    let opts = |v: serde_json::Value| -> LayoutOptions { serde_json::from_value(v).unwrap() };
+    assert!(opts(json!({"levelOfDetail": {"depth": 0}})).lifts_edges());
+    assert!(opts(json!({"communities": 30})).lifts_edges());
+    assert!(!opts(json!({"levelOfDetail": {"depth": 0}, "liftEdges": false})).lifts_edges());
+    assert!(!opts(json!({})).lifts_edges());
+    assert!(opts(json!({"liftEdges": true})).lifts_edges());
+    let lifted = import_graph_with(
+        grouped(),
+        100,
+        &opts(json!({"levelOfDetail": {"nodes": 100}})),
+    )
+    .unwrap();
+    let plain = import_graph_with(
+        grouped(),
+        100,
+        &opts(json!({"levelOfDetail": {"nodes": 100}, "liftEdges": false})),
+    )
+    .unwrap();
+    // The edge between two open groups ends at the groups when lifted, at its leaves when not.
+    let ends = |s: &arqlet_model::Snapshot| {
+        let x0 = s.graph.edges.iter().find(|e| e.id == "x0").unwrap();
+        (x0.source.clone(), x0.target.clone().unwrap())
+    };
+    assert_eq!(ends(&lifted), ("g0".to_string(), "g1".to_string()));
+    assert_eq!(ends(&plain), ("n0-0".to_string(), "n1-0".to_string()));
+    // The default is not written into the snapshot.
+    assert!(!serde_json::to_string(&lifted.options)
+        .unwrap()
+        .contains("liftEdges"));
 }

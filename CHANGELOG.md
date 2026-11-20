@@ -5,8 +5,20 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- **Default:** `liftEdges` is on in views that start abstract (`levelOfDetail` or `communities` set, `liftEdges`
+  unset): edges between opened containers are drawn between the outermost containers they differ in, one route per
+  pair. On a private catalog with `levelOfDetail: {depth: 0}` opening the largest container takes 0.47 s instead of
+  2.10 s and the scene is 12 110 × 36 310 instead of 24 528 × 111 082 (single runs, loaded machine). `liftEdges: false`
+  keeps the earlier drawing; views without an abstract start are unchanged (15 fingerprint views identical).
+  `LayoutOptions::lift_edges` is an `Option<bool>` now; `lifts_edges()` gives the effective value.
+
 ### Added
 
+- Buses as data (provisional): a bus given in `Graph.buses` with `taps` and no node of its own, as a host holds bus
+  membership, is crossed by `trace` and `neighbourhood` as a shared medium (as a `busLine` node is), and `filter` hides
+  it by its id or hides a member's tap (`arqlet_layout::with_bus_nodes`). Documented on `Bus::taps` as an input.
 - Paging through `+N more` (provisional): `reveal` with `more: {container, count}` shows the next `count` children of a
   container shown in part, in the graph's order; on the last page the container is whole again, without its rest. The
   playground shows the next 12 on a click on a `+N more` box (Shift: all at once, as before).
