@@ -5,8 +5,20 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- **Default:** `liftEdges` is on in views that start abstract (`levelOfDetail` or `communities` set, `liftEdges`
+  unset): edges between opened containers are drawn between the outermost containers they differ in, one route per
+  pair. On a private catalog with `levelOfDetail: {depth: 0}` opening the largest container takes 0.47 s instead of
+  2.10 s and the scene is 12 110 × 36 310 instead of 24 528 × 111 082 (single runs, loaded machine). `liftEdges: false`
+  keeps the earlier drawing; views without an abstract start are unchanged (15 fingerprint views identical).
+  `LayoutOptions::lift_edges` is an `Option<bool>` now; `lifts_edges()` gives the effective value.
+
 ### Added
 
+- Buses as data (provisional): a bus given in `Graph.buses` with `taps` and no node of its own, as a host holds bus
+  membership, is crossed by `trace` and `neighbourhood` as a shared medium (as a `busLine` node is), and `filter` hides
+  it by its id or hides a member's tap (`arqlet_layout::with_bus_nodes`). Documented on `Bus::taps` as an input.
 - `hubRefs` (provisional layout option, unset): an edge of a node with at least this many edges in the view is not laid
   out or routed but drawn as a short stub at its other end, named after the hub (out of the right side for an edge to
   the hub, into the left for one from it), as a wiring diagram refers to another sheet (`Snapshot.hubRefs`, scene

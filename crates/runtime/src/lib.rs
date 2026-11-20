@@ -250,7 +250,7 @@ fn derives_groups(options: &LayoutOptions) -> bool {
 /// Whether the view abstracts (provisional): with derived groups or an initial collapse, the edges between collapsed
 /// containers are drawn by one route per pair with their weights (`merge_aggregated_pairs`).
 pub(crate) fn abstracts(options: &LayoutOptions) -> bool {
-    derives_groups(options) || options.level_of_detail.is_some() || options.lift_edges
+    derives_groups(options) || options.level_of_detail.is_some() || options.lifts_edges()
 }
 
 /// Whether the projection draws the edges a collapsed container aggregates once per pair: with a node budget, and when
@@ -298,7 +298,7 @@ fn initially_collapsed_indexed(
             &named,
             level.nodes.unwrap_or(usize::MAX),
             level.edges.unwrap_or(usize::MAX),
-            options.lift_edges,
+            options.lifts_edges(),
         ),
         _ => named,
     }
@@ -325,7 +325,7 @@ fn merge_view(
     options: &LayoutOptions,
 ) -> (Graph, BTreeMap<String, AggregateWeight>) {
     if abstracts(options) {
-        let projected = if options.lift_edges {
+        let projected = if options.lifts_edges() {
             arqlet_view::lift_edges(projected)
         } else {
             projected

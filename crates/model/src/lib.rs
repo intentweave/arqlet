@@ -1656,6 +1656,13 @@ pub const ISOLATED_GRID_ROOT: &str = "\u{1}root";
 impl LayoutOptions {
     /// Whether the unconnected children of the area of `parent` (`None`: the top level) are spread as a grid
     /// (`isolatedGrid`, or `isolatedGridFrom` for this area).
+    /// Whether edges are lifted to their outermost differing containers (`lift_edges`): as set, else in views that start
+    /// abstract (`levelOfDetail`, `communities`).
+    pub fn lifts_edges(&self) -> bool {
+        self.lift_edges
+            .unwrap_or(self.level_of_detail.is_some() || self.communities > 0)
+    }
+
     pub fn isolated_grid_in(&self, parent: Option<&str>) -> bool {
         self.isolated_grid
             || (!self.isolated_grid_areas.is_empty()
@@ -2145,9 +2152,12 @@ pub struct LayoutOptions {
     /// Provisional: an edge between nodes in different containers is drawn between the outermost containers its ends
     /// differ in, and those of one pair of containers as one route with their weights (as between collapsed containers);
     /// edges between siblings stay as they are. A view of many open groups with dense traffic between them draws one route
-    /// per pair of groups instead of one per edge. Off by default (omitted).
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub lift_edges: bool,
+    /// per pair of groups instead of one per edge. `None` (the default, omitted): on in views that start abstract (with
+    /// `levelOfDetail` or `communities`, where member edges between opened containers otherwise make the drawing grow to a
+    /// million units), off elsewhere; `true` or `false` sets it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub lift_edges: Option<bool>,
     /// Provisional (view state, set by `filter`): what the view hides, keeping the place of the rest. Omitted when empty.
     #[serde(default, skip_serializing_if = "Hidden::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Hidden>"))]
@@ -2287,6 +2297,10 @@ pub struct Bus {
     /// Provisional: a bus line, the view of a node of shape `busLine` (ADR 0019 view model): the source graph keeps the bus
     /// as a node with its edges; the view leaves the node and those edges out and keeps them here, one tap per edge, drawn
     /// as a bar past the nodes they attach (`Snapshot::bus_lines`). Omitted when empty (a bus of shared edges).
+    ///
+    /// Also an input (buses as data): a bus given with `taps` and no node of its own is drawn the same way, and `trace`,
+    /// `neighbourhood` and `filter` treat it as a shared medium as they do a `busLine` node (`id` names the bus; the taps'
+    /// `edge` ids must not collide with the graph's edges).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<BusTap>>"))]
     pub taps: Vec<BusTap>,
@@ -2433,7 +2447,7 @@ impl Default for LayoutOptions {
             communities: 0,
             groups: BTreeMap::new(),
             level_of_detail: None,
-            lift_edges: false,
+            lift_edges: None,
             hidden: Hidden::default(),
             community_hubs: CommunityHubs::default(),
             renamed_initial_collapse: (),
