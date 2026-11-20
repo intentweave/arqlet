@@ -507,6 +507,13 @@ pub fn apply_bus_lines(snapshot: &mut Snapshot) {
     bus_line::collapse_snapshot(snapshot);
 }
 
+/// Provisional (buses as data): a graph whose buses are given as members (`Bus::taps`, no node of their own) with every
+/// such bus as a node of shape `busLine` and one edge per tap, as the layout sees it, so that queries on the graph
+/// (`trace`, `neighbourhood`) cross a bus as a shared medium. `None` without such a bus.
+pub fn with_bus_nodes(graph: &Graph) -> Option<Graph> {
+    bus_line::expand(graph)
+}
+
 /// Provisional: the root of every bus network of a graph with nodes of shape `busLine` (a gateway, else the network's
 /// middle), for `LayoutOptions::bus_roots`. Empty without such a node.
 pub fn bus_roots(graph: &Graph) -> Vec<String> {

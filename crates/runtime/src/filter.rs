@@ -26,7 +26,19 @@ pub fn filter_view(
     let mut shown_all = snapshot.options.clone();
     shown_all.hidden = Hidden::default();
     let view = crate::structured(canonical, &shown_all)?;
-    let known: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
+    // A bus given as data (`Bus::taps`) can be hidden by its id too.
+    let known: BTreeSet<&str> = view
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .chain(
+            canonical
+                .buses
+                .iter()
+                .filter(|b| !b.taps.is_empty())
+                .map(|b| b.id.as_str()),
+        )
+        .collect();
     if let Some(id) = hidden.nodes.iter().find(|id| !known.contains(id.as_str())) {
         return Err(format!("Unknown node: {id}"));
     }
@@ -115,6 +127,40 @@ fn hide(snapshot: &Snapshot, scene: &mut Scene) -> Result<(), String> {
             *n = n.saturating_add(edge.count());
         }
     }
+    // Bus lines: a hidden bus goes with its taps; a tap goes with a hidden member or a hidden edge kind.
+    let bus_kinds: BTreeMap<&str, (&str, BTreeMap<&str, &str>)> = snapshot
+        .graph
+        .buses
+        .iter()
+        .map(|b| {
+            (
+                b.id.as_str(),
+                (
+                    b.kind.as_deref().unwrap_or("bus"),
+                    b.taps
+                        .iter()
+                        .map(|t| (t.edge.as_str(), t.kind.as_str()))
+                        .collect(),
+                ),
+            )
+        })
+        .collect();
+    scene.bus_lines.retain_mut(|line| {
+        let (kind, tap_kinds) = bus_kinds
+            .get(line.id.as_str())
+            .cloned()
+            .unwrap_or(("bus", BTreeMap::new()));
+        if named.contains(line.id.as_str()) || kinds.contains(kind) {
+            return false;
+        }
+        line.taps.retain(|t| {
+            !is_hidden(&t.node)
+                && !tap_kinds
+                    .get(t.edge.as_str())
+                    .is_some_and(|k| edge_kinds.contains(k))
+        });
+        true
+    });
     let collapsed: BTreeSet<&str> = snapshot.collapsed_ids.iter().map(String::as_str).collect();
     let mut dropped: BTreeSet<String> = BTreeSet::new();
     scene.routes.retain_mut(|route| {
