@@ -1,0 +1,3 @@
+{"nodes":10000,"edges":15205,"roughGraphNodes":105,"roughEdges":210,"cut":1,"roughNodes":105,"wholeNodes":10227,"rough":[0.604946041,0.007450542,0.007568584],"whole":[0.30682825,0.331650125,0.347530084]}
+{"nodes":50000,"edges":75856,"roughGraphNodes":349,"roughEdges":698,"cut":1,"roughNodes":349,"wholeNodes":51088,"rough":[0.014744125,0.023289334,0.015756083],"whole":[1.766884542,2.664558167,197.387635041]}
+{"nodes":100000,"edges":151865,"roughGraphNodes":519,"roughEdges":1038,"cut":1,"roughNodes":519,"wholeNodes":102252,"rough":[0.019188625,0.027469041,0.019436709],"whole":[2.676484417,2.9346635,2.639058875]}

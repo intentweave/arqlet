@@ -29,7 +29,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - Overview built in steps (provisional, overview page, *Rough overview first, then bloom*): for a graph with a
   containment hierarchy larger than 600 nodes, a rough overview of its top levels is laid out first (at most 600 nodes; a
   cut container stands for what it holds with a radius for its leaves, and only the strongest lifted edges, two per node)
-  and shown at once (0.1 s for the synthetic 50 000-node code index, whose whole overview takes 3.8 s in the browser);
+  and shown at once (natively a few hundredths of a second for the synthetic code indexes of 10 000 to 100 000 nodes,
+  whose whole overview takes 0.3 to 2.7 s on a heavily loaded machine, see
+  [results](benchmarks/results/overview-progressive-20261120.md));
   when the whole overview is done, every node starts at its rough ancestor's place and moves to its own, so the clusters
   bloom out of the rough picture. `apps/playground/progressive.js` (`coarseGraph`, `bloomStart`), tested.
 - Galaxy style of the WebGL overview (provisional, `createOverviewRenderer(..., {galaxy})`, `setGalaxy`): clusters as
