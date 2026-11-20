@@ -13,6 +13,11 @@ export interface OverviewRendererOptions {
   shapes?: Record<string, import('./overview.js').Outline>;
   /** Provisional: start in the galaxy style (`setGalaxy`). */
   galaxy?: boolean;
+  /** Provisional: the names of nodes (`setNames`) and their details. */
+  names?: boolean;
+  details?: boolean;
+  /** Dim the edges by how many overlap on a pixel (default true). */
+  edgeDimming?: boolean;
 }
 
 export interface OverviewRenderer {
@@ -31,6 +36,9 @@ export interface OverviewRenderer {
    * of up to `depth` world units; null is flat. Under the orbit a drag turns the drawing and Shift-drag pans. */
   readonly orbit: {yaw: number; pitch: number; depth: number} | null;
   setOrbit(orbit: {yaw?: number; pitch?: number; depth?: number} | null): void;
+  /** Provisional: name every node whose disc is 6 pixels across or more (`nodes`), with its kind and links (`details`). */
+  readonly names: {nodes: boolean; details: boolean};
+  setNames(names: {nodes?: boolean; details?: boolean}): void;
   /** Draws clusters structured (`expanded`) or collapsed into one disc (`collapsed`, indices); omitted parts are kept.
    * With `fade` (milliseconds) the old drawing blends into the new one. */
   setState(state: {expanded?: Expanded; collapsed?: Set<number>; selected?: number; trace?: import('./overview.js').OverviewPath | null}, animation?: {fade?: number}): void;

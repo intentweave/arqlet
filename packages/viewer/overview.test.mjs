@@ -512,3 +512,20 @@ test('the orbit projects a point by its depth, turned around the view centre, in
   // The depth field is smooth at the scale of the clusters: two points close together lie at similar depths.
   assert.ok(Math.abs(orbitDepth(0, 0, 100) - orbitDepth(0.5, 0.5, 100)) < 0.35);
 });
+
+test('with names, a node large enough on the screen is named beside it, with details its kind and links', () => {
+  const m = overviewModel({...overview, kinds: ['dir', 'fn'], kind: [0, 1, 1, 0, 1], labels: ['c', 'alpha', 'beta', 'd', 'eps']});
+  const small = labelsOf(m, new Map(), {centreX: 0, centreY: 0, scale: 1}, 800, 600, {names: true});
+  assert.ok(!small.some(l => l.text === 'alpha'), 'a leaf of 4 units at scale 1 is too small');
+  const near = {centreX: 0, centreY: 0, scale: 3};
+  const named = labelsOf(m, new Map(), near, 800, 600, {names: true});
+  const alpha = named.find(l => l.text === 'alpha');
+  assert.ok(alpha, JSON.stringify(named.map(l => l.text)));
+  // Beside the disc, on its right.
+  assert.ok(alpha.x > 400 + (-24) * 3 + 4 * 3);
+  const detailed = labelsOf(m, new Map(), near, 800, 600, {names: true, details: true});
+  // a has the edges a→b, b→a and a→e: three links.
+  assert.ok(detailed.some(l => l.text === 'alpha · fn · 3 links'), JSON.stringify(detailed.map(l => l.text)));
+  // Without names only the clusters as before.
+  assert.ok(!labelsOf(m, new Map(), near, 800, 600).some(l => l.text === 'alpha'));
+});

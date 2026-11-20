@@ -212,6 +212,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes, galaxy: $('galaxy').checked});
   unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   if ($('orbit').checked) renderer.setOrbit({yaw: 0.35, pitch: 0.25});
+  renderer.setNames({nodes: $('node-names').checked, details: $('node-details').checked});
   focus = -1;
   zoomTo(-1);
   renderRules();
@@ -749,3 +750,6 @@ $('galaxy').onchange = () => {
 
 // Provisional: the orbit (pseudo-3D). A slight tilt to start with, so that the depth shows at once.
 $('orbit').onchange = () => { renderer?.setOrbit($('orbit').checked ? {yaw: 0.35, pitch: 0.25} : null); };
+
+// Provisional: names of nodes when they are large enough on the screen, optionally with their kind and links.
+$('node-names').onchange = $('node-details').onchange = () => renderer?.setNames({nodes: $('node-names').checked, details: $('node-details').checked});
