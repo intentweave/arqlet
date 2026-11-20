@@ -5,6 +5,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Fixed (first-view budget)
+
+- `levelOfDetail.nodes` counts the boxes as drawn: an opened container stays a box (its frame) and adds its children;
+  before, it was counted as replaced by them, so every opened container added one box over the budget (a private
+  catalog: `nodes: 300` gave 573 boxes with 273 containers opened, now 300; `nodes: 100` gave 139, now 100). A first
+  view that cannot keep its budget (the top level alone is larger, or its edges are) says so in `layoutDiagnostics`
+  ("First view: N boxes, M over the node budget of B: …"). The older `initial_collapse` (import `limit`) is unchanged.
+
 ### Added (bus lines)
 
 - `busStyle: "lines"` (provisional): every bus as shared lines with junctions, never a bar; a bus with no member above

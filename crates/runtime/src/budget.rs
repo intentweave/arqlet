@@ -183,7 +183,8 @@ pub fn level_budget_collapse_indexed(
         if fixed.contains(&c) {
             continue;
         }
-        let after = visible - 1 + children[c].len();
+        // An opened container stays a box (its frame) and adds its children.
+        let after = visible + children[c].len();
         if after > nodes {
             continue;
         }
@@ -426,13 +427,19 @@ mod tests {
                 .collect::<BTreeSet<String>>()
         };
         let none = BTreeSet::new();
-        // Nodes as `initial_collapse`; the result names every container left closed, inner ones too.
+        // The result names every container left closed, inner ones too. Boxes are counted as drawn: an opened container
+        // stays a box (its frame) and adds its children. Budget 5: A opens (2 + 3 = 5); B (5 + 3) and A1 (5 + 2) do not fit.
         assert_eq!(
             level_budget_collapse(&g, &none, 2, usize::MAX, false),
             set(&["A", "B", "A1"])
         );
         assert_eq!(
             level_budget_collapse(&g, &none, 5, usize::MAX, false),
+            set(&["A1", "B"])
+        );
+        // Budget 7: A1 fits too (5 + 2 = 7).
+        assert_eq!(
+            level_budget_collapse(&g, &none, 7, usize::MAX, false),
             set(&["B"])
         );
         assert!(level_budget_collapse(&g, &none, 100, usize::MAX, false).is_empty());
