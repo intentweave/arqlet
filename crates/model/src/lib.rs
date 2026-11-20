@@ -2711,6 +2711,14 @@ pub struct Intent {
     /// The orders the user chose by a drag.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub order_hints: BTreeMap<String, OrderHint>,
+    /// Provisional: the containers shown in part (`LayoutOptions::partial`, set by `reveal`), so that a step back undoes a
+    /// reveal or a page of `+N more`. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(
+        feature = "ts",
+        ts(optional, as = "Option<BTreeMap<String, Vec<String>>>")
+    )]
+    pub partial: BTreeMap<String, Vec<String>>,
 }
 
 /// The authored size of one axis of a container (ADR 0010). Absent means content: the extent follows the children,

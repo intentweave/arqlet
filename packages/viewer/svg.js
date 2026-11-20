@@ -73,13 +73,13 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
   const g=element('g',{class:'lw-control',role:'button',tabindex:0,'aria-label':label,...attrs});
   g.append(element('rect',{x,y,width:size,height:size,rx:size/4,fill:'transparent'}),element('title',{},label));
   g.onpointerdown=e=>{e.stopPropagation();down?.(e);};
-  g.onclick=e=>{e.stopPropagation();action();};
-  g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();action();}};
+  g.onclick=e=>{e.stopPropagation();action(e);};
+  g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();action(e);}};
   return g;
  };
  const toggleControl=(n,x,y,size)=>{
   const open=!collapsed.has(n.id);
-  const c=control(x,y,size,`${open?'Collapse':'Expand'} ${n.label}`,()=>onToggle(n.id),{'data-toggle-id':n.id});
+  const c=control(x,y,size,`${open?'Collapse':'Expand'} ${n.label}`,e=>onToggle(n.id,e),{'data-toggle-id':n.id});
   const at=(u,v)=>`${x+u*size},${y+v*size}`;
   c.append(element('polygon',{points:open?[at(.25,.38),at(.75,.38),at(.5,.7)].join(' '):[at(.38,.25),at(.7,.5),at(.38,.75)].join(' '),fill:'#c4d6e8','pointer-events':'none'}));
   return c;

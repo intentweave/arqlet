@@ -29,4 +29,9 @@ labelPositions: { [key in string]: Point },
 /**
  * The orders the user chose by a drag.
  */
-orderHints?: { [key in string]: OrderHint }, };
+orderHints?: { [key in string]: OrderHint },
+/**
+ * Provisional: the containers shown in part (`LayoutOptions::partial`, set by `reveal`), so that a step back undoes a
+ * reveal or a page of `+N more`. Omitted when empty.
+ */
+partial?: { [key in string]: Array<string> }, };
