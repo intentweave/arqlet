@@ -444,7 +444,12 @@ fn compute_counted_buses(
     let joined;
     let mut trunk_roots = None;
     let mut joining = BTreeSet::new();
-    if options.bus_style == arqlet_model::BusStyle::Trunk && projected.is_some() {
+    // Bus lines given as `busLine` nodes or as data (`Bus::taps`), drawn as lines with `trunk` or `lines`.
+    let has_bus_lines = view
+        .buses
+        .iter()
+        .any(|b| !b.taps.is_empty() && b.edges.is_empty());
+    if options.bus_style != arqlet_model::BusStyle::Bar && has_bus_lines {
         let kept = if options.bus_roots.is_empty() {
             previous.map_or(&[][..], |p| p.bus_taps.roots.as_slice())
         } else {
@@ -454,7 +459,11 @@ fn compute_counted_buses(
         let (roots, levels) = bus_line::orient(with_nodes.as_ref().unwrap_or(graph), kept)
             .map(|(_, _, roots, levels)| (roots, levels))
             .unwrap_or_default();
-        if let Some(t) = bus_line::trunks(view, &levels) {
+        if let Some(t) = bus_line::trunks(
+            view,
+            &levels,
+            options.bus_style == arqlet_model::BusStyle::Lines,
+        ) {
             let (oriented, flipped) = bus_line::orient_joining(&t, &levels);
             trunked = Some(t);
             joined = oriented;

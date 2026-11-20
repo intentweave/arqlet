@@ -5,6 +5,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added (bus lines)
+
+- `busStyle: "lines"` (provisional): every bus as shared lines with junctions, never a bar; a bus with no member above
+  it in its bus tree (a root bus, a backbone) takes the member on the most buses as its head. `trunk` and `lines` now
+  also draw buses given as data (`Bus::taps` without a node). Playground: Routing → *Buses*.
+- A tap at a member hidden in a collapsed container attaches to that container, once per bus and container (the view
+  projection remaps the taps; a bus inside a collapsed container is hidden with it). Before, such buses fell back to a
+  bar (57 of 107 on a private bus view with collapsed satellites); now none does in `trunk` or `lines`, with bus nodes
+  or with taps-only input.
 ### Changed
 
 - **Default:** `liftEdges` is on in views that start abstract (`levelOfDetail` or `communities` set, `liftEdges`

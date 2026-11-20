@@ -3,4 +3,4 @@
 /**
  * Provisional: how a bus kept as a node of shape `busLine` is drawn (`LayoutOptions::bus_style`).
  */
-export type BusStyle = "bar" | "trunk";
+export type BusStyle = "bar" | "trunk" | "lines";

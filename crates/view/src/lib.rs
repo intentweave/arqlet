@@ -91,6 +91,24 @@ pub fn project_indexed(
             Some(edge)
         })
         .collect();
+    // Provisional (bus lines): a tap at a hidden node attaches to the node that shows it (a collapsed container), once
+    // per bus and shown node; a bus's own container, when collapsed, shows the bus as part of it (its taps stay).
+    graph.buses.retain(|b| {
+        b.taps.is_empty()
+            || b.parent_id
+                .as_deref()
+                .is_none_or(|p| index.node.get(p).is_some_and(|&i| shown[i] == i))
+    });
+    for bus in graph.buses.iter_mut().filter(|b| !b.taps.is_empty()) {
+        let mut seen = std::collections::BTreeSet::new();
+        bus.taps.retain_mut(|tap| {
+            let Some(&i) = index.node.get(tap.node.as_str()) else {
+                return false;
+            };
+            tap.node = id(shown[i]);
+            seen.insert(tap.node.clone())
+        });
+    }
     graph.ports = source
         .ports
         .iter()

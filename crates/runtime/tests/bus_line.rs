@@ -574,6 +574,70 @@ fn hub_refs_take_the_edges_of_hubs_out_of_the_layout_and_draw_them_as_stubs() {
 }
 
 #[test]
+fn bus_style_lines_never_draws_a_bar() {
+    // A single bus is the root of its tree: `trunk` keeps its bar, `lines` draws it as a line from a member.
+    let options = |style: &str| -> LayoutOptions {
+        serde_json::from_value(json!({"busStyle": style})).unwrap()
+    };
+    let trunk = import_graph_with(graph(3, None), 100, &options("trunk")).unwrap();
+    assert!(trunk.bus_lines.contains_key("can"));
+    let lines = import_graph_with(graph(3, None), 100, &options("lines")).unwrap();
+    assert!(lines.bus_lines.is_empty(), "no bar");
+    let bus = lines.graph.buses.iter().find(|b| b.id == "can").unwrap();
+    assert_eq!(
+        bus.edges.len(),
+        3,
+        "a line from the head to each other member"
+    );
+}
+
+#[test]
+fn a_tap_at_a_collapsed_member_attaches_to_its_container() {
+    // Members in two containers; one container collapsed: its members' taps end at the container, once.
+    let mut nodes = vec![
+        json!({"id": "can", "kind": "bus", "label": "CAN", "shape": "busLine"}),
+        json!({"id": "left", "kind": "zone", "label": "left"}),
+        json!({"id": "right", "kind": "zone", "label": "right"}),
+    ];
+    let mut edges = Vec::new();
+    for (i, zone) in [(0, "left"), (1, "left"), (2, "right"), (3, "right")] {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("e{i}"), "parentId": zone}));
+        edges.push(json!({"id": format!("t{i}"), "kind": "connects", "source": format!("e{i}"), "target": "can"}));
+    }
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": edges})).unwrap();
+    let open = import_graph_with(g, 100, &LayoutOptions::default()).unwrap();
+    let closed =
+        arqlet_runtime::toggle_container(&open, open.revision, open.layout_version, "left")
+            .unwrap();
+    let bus = closed.graph.buses.iter().find(|b| b.id == "can").unwrap();
+    let mut nodes: Vec<&str> = bus.taps.iter().map(|t| t.node.as_str()).collect();
+    nodes.sort();
+    assert_eq!(nodes, ["e2", "e3", "left"]);
+    assert!(closed.bus_lines.contains_key("can"));
+}
+
+#[test]
+fn a_bus_given_as_data_is_drawn_as_lines_too() {
+    // No bus node, only `taps`: `lines` draws it as a line (no bar), `bar` as a bar.
+    let mut nodes = Vec::new();
+    let mut taps = Vec::new();
+    for i in 0..4 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("e{i}")}));
+        taps.push(json!({"edge": format!("t{i}"), "node": format!("e{i}"), "toBus": true, "kind": "connects"}));
+    }
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": [],
+        "buses": [{"id": "can", "edges": [], "label": "CAN", "kind": "bus", "taps": taps}]}))
+    .unwrap();
+    let style =
+        |s: &str| -> LayoutOptions { serde_json::from_value(json!({"busStyle": s})).unwrap() };
+    let bar = import_graph_with(g.clone(), 100, &style("bar")).unwrap();
+    assert!(bar.bus_lines.contains_key("can"));
+    let lines = import_graph_with(g, 100, &style("lines")).unwrap();
+    assert!(lines.bus_lines.is_empty());
+    assert_eq!(lines.graph.buses[0].edges.len(), 3);
+}
+
+#[test]
 fn a_bus_given_as_data_is_crossed_by_trace_and_neighbourhood() {
     // No bus node: the bus is given as members (`Graph.buses` with `taps`), as a host holds bus membership.
     let mut nodes = vec![json!({"id": "gw", "kind": "ecu", "label": "gw"})];
