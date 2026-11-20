@@ -31,6 +31,7 @@ pub fn intent_of(snapshot: &Snapshot) -> Intent {
         edge_ports: graph.edge_ports.clone(),
         label_positions: options.label_positions.clone(),
         order_hints: options.order_hints.clone(),
+        partial: options.partial.clone(),
     }
 }
 
@@ -52,12 +53,25 @@ pub fn restore_intent(
         .unwrap_or(&snapshot.graph)
         .clone();
     let known: BTreeSet<&str> = source.nodes.iter().map(|n| n.id.as_str()).collect();
+    // A rest (`rest:<container>`) stands for a container shown in part.
+    let collapsed: Vec<String> = intent
+        .collapsed_ids
+        .iter()
+        .map(|id| {
+            id.strip_prefix(arqlet_layout::communities::REST_PREFIX)
+                .filter(|c| intent.partial.contains_key(*c))
+                .map(str::to_string)
+                .unwrap_or_else(|| id.clone())
+        })
+        .collect();
     let unknown = intent
         .pins
         .keys()
         .chain(intent.container_sizing.keys())
         .chain(intent.node_sizes.keys())
-        .chain(intent.collapsed_ids.iter())
+        .chain(collapsed.iter())
+        .chain(intent.partial.keys())
+        .chain(intent.partial.values().flatten())
         .chain(intent.shapes.keys())
         .chain(intent.container_directions.keys())
         .chain(intent.container_strategies.keys())
@@ -84,6 +98,7 @@ pub fn restore_intent(
     options.node_sizes = intent.node_sizes.clone();
     options.label_positions = intent.label_positions.clone();
     options.order_hints = intent.order_hints.clone();
+    options.partial = intent.partial.clone();
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
     validate_pins(&source, &options.pins)?;

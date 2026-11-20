@@ -3,6 +3,12 @@
 /**
  * Provisional: the children that `communities` leaves out of Louvain, so that one hub does not pull a whole container
  * into one community: those with at least `min_links` links in their container (by edge weight, as Louvain counts them)
- * and those named in `nodes`. A hub stays a direct child of its container. Ids the graph lacks are ignored.
+ * those among the share `top` of a container's linked children with the most links (by weight; `0.01`: the top 1 %, at
+ * least one; ties by the children's order), and those named in `nodes`. A hub stays a direct child of its container.
+ * Ids the graph lacks are ignored.
  */
-export type CommunityHubs = { minLinks?: number, nodes?: Array<string>, };
+export type CommunityHubs = { minLinks?: number,
+/**
+ * Provisional: a relative threshold, a share in (0, 1] of a container's linked children.
+ */
+top?: number, nodes?: Array<string>, };

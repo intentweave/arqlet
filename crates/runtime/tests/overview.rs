@@ -522,6 +522,7 @@ fn every_answer_is_the_typed_overview_contract() {
             groups: Some([("g0/f0".to_string(), vec!["A".to_string()])].into()),
             hubs: Some(arqlet_model::CommunityHubs {
                 min_links: Some(10),
+                top: None,
                 nodes: vec!["g1".into()],
             }),
         }),
