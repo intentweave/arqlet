@@ -228,7 +228,30 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   let galaxy = !!options.galaxy;
   // Provisional: the orbit (pseudo-3D, `setOrbit`): {yaw, pitch, depth} in radians and world units, or null (flat).
   let orbit = null;
-  const data = () => overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy});
+  // Provisional: names of nodes when they are large enough on the screen, and their details (`setNames`).
+  let names = {nodes: !!options.names, details: !!options.details};
+  // The edges' total length in world units, measured whenever the buffers are built (for the adaptive dimming).
+  let edgeLength = 0;
+  const data = () => {
+    const d = overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy});
+    let sum = 0;
+    for (let k = 0; k + 1 < d.count.edges; k += 2) {
+      const a = k * LINE_STRIDE, b = (k + 1) * LINE_STRIDE;
+      sum += Math.hypot(d.edges[b] - d.edges[a], d.edges[b + 1] - d.edges[a + 1]);
+    }
+    edgeLength = sum;
+    return d;
+  };
+  // Adaptive dimming (`options.edgeDimming`, on): how many edge lines lie over a pixel on average in what is visible (the
+  // edges' length on the screen, of the part the canvas shows, over its area); the more, the fainter each line, so that
+  // where thousands overlap they do not add up to a white tangle. Zoomed out the drawing is dimmed, zoomed in the lines
+  // come back.
+  const edgeDim = view => {
+    if (options.edgeDimming === false) return 1;
+    const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1, extent = 2 * (model.overview.rootRadius || 1) * view.scale;
+    const coverage = edgeLength * view.scale / Math.max(w * h, extent * extent);
+    return 1 / Math.sqrt(1 + coverage / 1.5);
+  };
   let current = layer(data()), previous = null;
   // The running animation: a morph (`t` of the current layer, and the view) and a fade (of the previous layer).
   let morphing = null, fading = null, frame = 0;
@@ -283,7 +306,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     } else {
       gl.useProgram(lines);
       uniforms(lines, view, t, fade);
-      gl.uniform1f(gl.getUniformLocation(lines, 'u_alpha'), part === 'edges' ? options.edgeAlpha ?? 1 : 1);
+      gl.uniform1f(gl.getUniformLocation(lines, 'u_alpha'), part === 'edges' ? (options.edgeAlpha ?? 1) * edgeDim(view) : 1);
       attribute(lines, 'a_position', a, LINE_STRIDE, 2, 0);
       attribute(lines, 'a_colour', a, LINE_STRIDE, 4, 2);
       attribute(lines, 'a_position2', b, LINE_STRIDE, 2, 0);
@@ -320,7 +343,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     if (!show) return;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens, galaxy, orbit})) {
+    for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens, galaxy, orbit, names: names.nodes, details: names.details})) {
       ctx.font = `${label.kind === 'cluster' ? 600 : 400} ${label.size.toFixed(1)}px system-ui, sans-serif`;
       if (label.colour) {
         // A galaxy's tag: a dark rounded box, a dot in its colour, its name.
@@ -417,6 +440,9 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
      * different depths and pass each other when it turns; null draws it flat again.
      */
     get orbit() { return orbit && {...orbit}; },
+    /** Provisional: name every node whose disc is 6 pixels across or more (`nodes`), with its kind and links (`details`). */
+    get names() { return {...names}; },
+    setNames(next) { names = {nodes: !!next?.nodes, details: !!next?.details}; renderer.draw(); },
     setOrbit(next) {
       orbit = next ? {yaw: next.yaw ?? 0, pitch: Math.max(-1.3, Math.min(1.3, next.pitch ?? 0)), depth: next.depth ?? (model.overview.rootRadius || 1) / 2} : null;
       if (!frame) frame = requestAnimationFrame(() => { frame = 0; renderer.draw(); if (morphing || fading || breath) animate(); });

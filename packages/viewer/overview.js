@@ -510,7 +510,7 @@ export function lensInverse(lens, x, y) {
  * their text is at least `minPixels` high. Positions in CSS pixels; at most `limit` texts, largest first, and none that
  * would overlap a larger one.
  */
-export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set(), lens = null, galaxy = false, orbit = null} = {}) {
+export function labelsOf(model, expanded, view, width, height, {minPixels = 7, limit = 300, collapsed = new Set(), lens = null, galaxy = false, orbit = null, names = false, details = false} = {}) {
   const o = model.overview, out = [];
   // A screen point and the lens's enlargement there (`[x, y, factor]`); sizes on screen are multiplied by the factor, so
   // that the lens also shows the texts of what it enlarges.
@@ -557,6 +557,22 @@ export function labelsOf(model, expanded, view, width, height, {minPixels = 7, l
     const [x, y] = [(x1 + x2) / 2, (y1 + y2) / 2];
     if (!visible(x, y, long)) continue;
     out.push({text: nameOf(model, i), x, y: y - 9, size: Math.min(11 + long / 120, 14), weight: long / 2, kind: 'node'});
+  }
+  // Provisional (`names`): a node's name beside it once its disc is 6 pixels across or more on the screen (zoomed in, or
+  // near in the orbit); with `details` also its kind and how many edges it has.
+  if (names) {
+    const degree = degreesOf(model);
+    for (let i = 0; i < model.n; i++) {
+      if (model.children[i].length || owner[i] >= 0) continue;
+      const [cx, cy, factor] = screen(o.x[i], o.y[i]);
+      const r = o.r[i] * view.scale * factor;
+      if (r < 6 || !visible(cx, cy, r)) continue;
+      const kind = o.kinds && o.kind ? o.kinds[o.kind[i]] : null;
+      const text = nameOf(model, i) + (details ? [kind, degree[i] ? `${degree[i]} link${degree[i] === 1 ? '' : 's'}` : null].filter(Boolean).map(s => ` · ${s}`).join('') : '');
+      const size = Math.min(9 + r / 3, 13);
+      // Beside the disc on its right (the text is centred on `x`).
+      out.push({text, x: cx + r + 4 + text.length * size * 0.275, y: cy, size, weight: r, kind: 'node'});
+    }
   }
   for (const [i, {scene}] of expanded) {
     const place = placeScene(model, i, scene);
@@ -661,6 +677,16 @@ export function orbitPoint(orbit, view, extent, x, y) {
   [py, pz] = [cp * py - sp * pz, sp * py + cp * pz];
   const dist = Math.max(extent, 1) * 3, f = dist / Math.max(dist + pz, dist * 0.2);
   return [px * f, py * f, f];
+}
+
+/** How many edges every node has (either end), kept with the model. */
+export function degreesOf(model) {
+  if (!model.degree) {
+    const d = new Int32Array(model.n), e = model.overview.edges;
+    for (let k = 0; k < e.length; k++) d[e[k]]++;
+    model.degree = d;
+  }
+  return model.degree;
 }
 
 /** The bus lines of a model by node index (`busLines` of the overview), kept with the model. */

@@ -174,15 +174,19 @@ export interface OverviewLabel {
   size: number;
   weight: number;
   kind: string;
+  /** Provisional: a galaxy's tag colour (RGB in 0..1). */
+  colour?: [number, number, number];
 }
-/** Texts to write over a view: cluster names and the labels of structured clusters, in CSS pixels. */
+/** Texts to write over a view: cluster names and the labels of structured clusters, in CSS pixels; with `names` also the
+ * names of nodes large enough on the screen (6 pixels across), with `details` their kind and links. */
 export function labelsOf(
   model: OverviewModel,
   expanded: Expanded,
   view: OverviewView,
   width: number,
   height: number,
-  options?: {minPixels?: number; limit?: number; collapsed?: Set<number>; lens?: OverviewLens | null},
+  options?: {minPixels?: number; limit?: number; collapsed?: Set<number>; lens?: OverviewLens | null; galaxy?: boolean;
+    orbit?: {yaw: number; pitch: number; depth: number} | null; names?: boolean; details?: boolean},
 ): OverviewLabel[];
 /** A fisheye lens in CSS pixels of the canvas: centre, radius and the enlargement in its middle (> 1). */
 export interface OverviewLens {
@@ -202,6 +206,8 @@ export function pickNode(model: OverviewModel, x: number, y: number, collapsed?:
 export function orbitDepth(x: number, y: number, extent: number): number;
 /** Provisional (orbit): a world point drawn under the orbit, `[x, y, factor]` relative to the view's centre. */
 export function orbitPoint(orbit: {yaw: number; pitch: number; depth: number} | null, view: OverviewView, extent: number, x: number, y: number): [number, number, number];
+/** How many edges every node has (either end). */
+export function degreesOf(model: OverviewModel): Int32Array;
 /** Provisional: the overview's bus lines by the bus node's index. */
 export function busLinesOf(model: OverviewModel): Map<number, import('@arqlet/contracts').OverviewBusLine>;
 /** The view that shows node `i` (-1: everything) in a viewport of `width` × `height` CSS pixels. */

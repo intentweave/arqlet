@@ -7,6 +7,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Adaptive edge dimming in the WebGL overview (`edgeDimming`, on): the renderer estimates how many edge lines lie over a
+  pixel on average in what is visible (their length on the screen over the area) and makes each line fainter the more
+  there are, so thousands of overlapping lines no longer add up to a white tangle in the galaxy style; zoomed in, they
+  come back.
+- Names of nodes when zoomed in (provisional, `labelsOf` options `names`, `details`; `renderer.setNames`): every node
+  whose disc is 6 pixels across or more on the screen (zoomed in, or near in the orbit) is named beside it; with details
+  also its kind and how many edges it has (`degreesOf`). Overview page: *Names of nodes when zoomed in* (on), *… with
+  kind and links*.
 - Orbit, a pseudo-3D view of the WebGL overview (provisional, `renderer.setOrbit({yaw, pitch, depth})`): every point
   gets a depth from a smooth field at the scale of the clusters (what lies close together, a galaxy, lies at a similar
   depth) plus a little of its own, the drawing turns around the view's centre and is seen in perspective, so clusters lie
