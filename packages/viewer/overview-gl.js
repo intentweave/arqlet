@@ -589,7 +589,9 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     const [wx, wy] = renderer.world(e.clientX, e.clientY);
     const v = renderer.view, factor = Math.exp(-e.deltaY * 0.0015);
     const scale = Math.min(Math.max(v.scale * factor, 1e-4), 1e4);
-    // Keep the world point under the pointer where it is.
+    // Keep the world point under the pointer where it is; under the orbit the flat point is not the one shown there, so the
+    // zoom keeps the view's centre (what the orbit turns around).
+    if (renderer.orbit) { renderer.setView({...v, scale}); return; }
     renderer.setView({scale, centreX: wx - (wx - v.centreX) * v.scale / scale, centreY: wy - (wy - v.centreY) * v.scale / scale});
   };
   // With `onNodeDrag`, a drag that starts on a leaf (a node without children) moves that node: `onNodeDrag(i, x, y,
