@@ -444,6 +444,8 @@ fn compute_counted_buses(
     let joined;
     let mut trunk_roots = None;
     let mut joining = BTreeSet::new();
+    let mut organic_heads = BTreeMap::new();
+    let mut organic_roots = None;
     // Bus lines given as `busLine` nodes or as data (`Bus::taps`), drawn as lines with `trunk` or `lines`.
     let has_bus_lines = view
         .buses
@@ -459,11 +461,20 @@ fn compute_counted_buses(
         let (roots, levels) = bus_line::orient(with_nodes.as_ref().unwrap_or(graph), kept)
             .map(|(_, _, roots, levels)| (roots, levels))
             .unwrap_or_default();
-        if let Some(t) = bus_line::trunks(
-            view,
-            &levels,
-            options.bus_style == arqlet_model::BusStyle::Lines,
-        ) {
+        // A bus in an area that is not layered is laid out as a bar and turned into lines afterwards
+        // (`bus_line::bars_to_lines`): the bar keeps clear of the boxes, and the lines follow it orthogonally.
+        let layered = |b: &arqlet_model::Bus| {
+            matches!(
+                view.area_mode(b.parent_id.as_deref()),
+                Ok(arqlet_model::Mode::Orientation(_))
+            )
+        };
+        let always = options.bus_style == arqlet_model::BusStyle::Lines;
+        organic_heads = bus_line::heads(view, &levels, always, &|b| !layered(b));
+        if !organic_heads.is_empty() {
+            organic_roots = Some(roots.clone());
+        }
+        if let Some(t) = bus_line::trunks(view, &levels, always, &|b| !layered(b)) {
             let (oriented, flipped) = bus_line::orient_joining(&t, &levels);
             trunked = Some(t);
             joined = oriented;
@@ -496,6 +507,12 @@ fn compute_counted_buses(
         }
         snapshot.bus_taps.roots = roots;
         bus_line::turn_trunks(&mut snapshot, true);
+    }
+    if !organic_heads.is_empty() {
+        bus_line::bars_to_lines(&mut snapshot, &organic_heads);
+        if let Some(roots) = organic_roots {
+            snapshot.bus_taps.roots = roots;
+        }
     }
     Ok((snapshot, stages))
 }
