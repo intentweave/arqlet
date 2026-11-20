@@ -14,6 +14,14 @@ use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
 /// One request to the engine. Serializes to the JSON that `dispatch` reads; [`Request::from_json`] reads it back.
+/// Provisional (paging, `reveal` with `more`): the next `count` children of `container` from its rest.
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RevealMore {
+    pub container: String,
+    pub count: usize,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 #[non_exhaustive]
@@ -88,6 +96,9 @@ pub enum Request {
         node_ids: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         partial: Option<bool>,
+        /// Provisional (paging): instead of `node_ids`, the next `count` children of a container shown in part.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        more: Option<RevealMore>,
     },
     /// Apply an options patch.
     Configure {
@@ -672,12 +683,26 @@ impl Request {
                     })?
                 },
             },
-            "reveal" => Request::Reveal {
-                on,
-                node_ids: serde_json::from_value(v["nodeIds"].clone())
-                    .map_err(|_| "Missing nodeIds")?,
-                partial: v["partial"].as_bool(),
-            },
+            "reveal" => {
+                let more: Option<RevealMore> = match v.get("more") {
+                    None => None,
+                    Some(m) => Some(
+                        serde_json::from_value(m.clone())
+                            .map_err(|_| "reveal more needs {container, count}")?,
+                    ),
+                };
+                Request::Reveal {
+                    on,
+                    node_ids: if more.is_some() && v.get("nodeIds").is_none() {
+                        Vec::new()
+                    } else {
+                        serde_json::from_value(v["nodeIds"].clone())
+                            .map_err(|_| "Missing nodeIds")?
+                    },
+                    partial: v["partial"].as_bool(),
+                    more,
+                }
+            }
             "configure" => Request::Configure {
                 on,
                 options: v["options"].clone(),
@@ -863,8 +888,20 @@ fn handle_request(request: Request) -> Response {
         )),
         Request::Reveal {
             on,
+            more: Some(more),
+            ..
+        } => snapshot(reveal_more(
+            &on.snapshot,
+            on.expected_revision,
+            on.expected_layout_version,
+            &more.container,
+            more.count,
+        )),
+        Request::Reveal {
+            on,
             node_ids,
             partial,
+            more: None,
         } => snapshot(reveal_nodes(
             &on.snapshot,
             on.expected_revision,

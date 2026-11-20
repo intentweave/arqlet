@@ -332,12 +332,14 @@ pub fn with_communities(h: Hierarchy, threshold: usize) -> Result<Hierarchy, Str
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Hubs {
     pub min_links: Option<f64>,
+    /// A share of a container's linked children: those with the most links (ties by order), at least one.
+    pub top: Option<f64>,
     pub nodes: std::collections::BTreeSet<String>,
 }
 
 impl Hubs {
     pub fn is_empty(&self) -> bool {
-        self.min_links.is_none() && self.nodes.is_empty()
+        self.min_links.is_none() && self.top.is_none() && self.nodes.is_empty()
     }
 }
 
@@ -385,6 +387,18 @@ pub fn with_communities_except(
             for (k, &m) in members.iter().enumerate() {
                 hub[k] = hubs.nodes.contains(&h.ids[m])
                     || hubs.min_links.is_some_and(|min| strength[k] >= min);
+            }
+            // The share `top` of the linked children with the most links (ties by their order here).
+            if let Some(share) = hubs.top.filter(|s| *s > 0.) {
+                let mut linked: Vec<usize> =
+                    (0..members.len()).filter(|&k| strength[k] > 0.).collect();
+                linked.sort_by(|&a, &b| strength[b].total_cmp(&strength[a]).then(a.cmp(&b)));
+                let take = ((linked.len() as f64 * share.min(1.)).ceil() as usize)
+                    .max(1)
+                    .min(linked.len());
+                for &k in &linked[..take] {
+                    hub[k] = true;
+                }
             }
         }
         let links: Vec<(usize, usize, f64)> = all_links

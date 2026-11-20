@@ -238,6 +238,7 @@ pub fn community_groups(
 pub(crate) fn hubs_of(hubs: &arqlet_model::CommunityHubs) -> arqlet_layout::overview::Hubs {
     arqlet_layout::overview::Hubs {
         min_links: hubs.min_links.map(f64::from),
+        top: hubs.top,
         nodes: hubs.nodes.iter().cloned().collect(),
     }
 }
@@ -1178,6 +1179,43 @@ pub fn reveal_nodes(
         opened = options.partial.keys().cloned().collect();
     }
     relayout_collapsed(snapshot, &options, collapsed, &opened)
+}
+
+/// Provisional (paging): the next `count` children of a container shown in part (`LayoutOptions::partial`), in the order
+/// of the graph, that its rest (`+N more`) still holds; revealed as `reveal` with `partial` does. Unknown or whole
+/// containers are refused; a rest that is empty after it goes.
+pub fn reveal_more(
+    snapshot: &Snapshot,
+    expected: u64,
+    layout: u64,
+    container: &str,
+    count: usize,
+) -> Result<Snapshot, String> {
+    let Some(shown) = snapshot.options.partial.get(container) else {
+        return Err(format!("{container} is not shown in part"));
+    };
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let mut base_options = snapshot.options.clone();
+    base_options.partial.clear();
+    let base = structured(canonical, &base_options)?;
+    let next: Vec<String> = base
+        .nodes
+        .iter()
+        .filter(|n| n.parent_id.as_deref() == Some(container) && !shown.contains(&n.id))
+        .take(count.max(1))
+        .map(|n| n.id.clone())
+        .collect();
+    if next.is_empty() {
+        return Ok(snapshot.clone());
+    }
+    // The last page: the container is shown whole again, without its rest.
+    let all = base
+        .nodes
+        .iter()
+        .filter(|n| n.parent_id.as_deref() == Some(container))
+        .count();
+    let last = shown.len() + next.len() >= all;
+    reveal_nodes(snapshot, expected, layout, &next, !last)
 }
 
 pub fn set_direction(

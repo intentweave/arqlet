@@ -19,6 +19,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - Buses as data (provisional): a bus given in `Graph.buses` with `taps` and no node of its own, as a host holds bus
   membership, is crossed by `trace` and `neighbourhood` as a shared medium (as a `busLine` node is), and `filter` hides
   it by its id or hides a member's tap (`arqlet_layout::with_bus_nodes`). Documented on `Bus::taps` as an input.
+- Paging through `+N more` (provisional): `reveal` with `more: {container, count}` shows the next `count` children of a
+  container shown in part, in the graph's order; on the last page the container is whole again, without its rest. The
+  playground shows the next 12 on a click on a `+N more` box (Shift: all at once, as before).
+- A step back over a reveal: the remembered state (`intent`) keeps the containers shown in part (`partial`), and
+  `restore` takes them and their rests (`rest:<container>`), so undo returns to the page before; before, a restore
+  after a partial reveal was refused ("unknown node").
+- `communityHubs.top` (provisional, also the overview's `hubs.top`): a relative hub threshold, a share of a container's
+  linked children with the most links (`0.01`: the top 1 %, at least one; ties by the children's order), beside the
+  absolute `minLinks`. On a private catalog (373 top-level containers, `communities: 40`) `minLinks: 60` left no
+  community at all, `top: 0.01` 9 communities (the largest 102 members instead of 148 without hubs).
 - `hubRefs` (provisional layout option, unset): an edge of a node with at least this many edges in the view is not laid
   out or routed but drawn as a short stub at its other end, named after the hub (out of the right side for an edge to
   the hub, into the left for one from it), as a wiring diagram refers to another sheet (`Snapshot.hubRefs`, scene

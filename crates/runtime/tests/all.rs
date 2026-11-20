@@ -78,6 +78,8 @@ mod overlaps;
 mod overview;
 #[path = "pack_components.rs"]
 mod pack_components;
+#[path = "paging.rs"]
+mod paging;
 #[path = "parallel_straight.rs"]
 mod parallel_straight;
 #[path = "petri_shapes.rs"]

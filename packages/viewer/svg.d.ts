@@ -16,7 +16,8 @@ export interface RenderSvgOptions {
   sized?: Map<string, string[]>;
   onSelect?: (nodeId: string, event: Event) => void;
   onSelectRoute?: (routeId: string) => void;
-  onToggle?: (nodeId: string) => void;
+  /** Collapse or expand; the click or key event is passed along (for example Shift on a `+N more` box). */
+  onToggle?: (nodeId: string, event?: Event) => void;
   onPin?: (nodeId: string, pin: boolean) => void;
   onReset?: (nodeId: string, axis: string) => void;
   onNodeDragStart?: (node: SceneNode, event: PointerEvent, detail?: {fromPin: boolean}) => void;

@@ -154,9 +154,17 @@ async function applyLayoutSetting(field,value){
  if(!result.ok){layoutError={target:nodeId,field,reason:result.error};treeSignature=null;draw();}
 }
 // Expanding or collapsing a container is an engine operation: the view changes when the accepted result arrives.
-function toggleContainer(id){
+// Provisional (paging): a `+N more` box (`rest:<container>`) shows the next page of its container's children; Shift shows
+// them all at once (the rest dissolves, as before).
+const PAGE=12;
+function toggleContainer(id,event){
  if(curation){status('Curation is active: end it to collapse or expand containers.');return;}
  if(!id||!snapshot||pending)return;
+ if(id.startsWith('rest:')&&!event?.shiftKey){
+  const container=id.slice(5);
+  edit({op:'reveal',snapshot,more:{container,count:PAGE}},{busy:`Next ${PAGE} …`,anchor:container,remember:`Next ${PAGE} of ${container}`});
+  return;
+ }
  // The opened or closed container stays where it is on screen; the rest of the view moves around it.
  edit({op:'toggle',snapshot,nodeId:id},{busy:'Recomputing view …',anchor:id,remember:'Collapse or expand'});
 }
