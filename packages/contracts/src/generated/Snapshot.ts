@@ -7,6 +7,7 @@ import type { EditReport } from "./EditReport";
 import type { GeometryIssue } from "./GeometryIssue";
 import type { Gesture } from "./Gesture";
 import type { Graph } from "./Graph";
+import type { HubRef } from "./HubRef";
 import type { LayoutOptions } from "./LayoutOptions";
 import type { LayoutStrategy } from "./LayoutStrategy";
 import type { OptimizationReport } from "./OptimizationReport";
@@ -78,6 +79,11 @@ busLines?: { [key in string]: BusLine },
  * Omitted when empty.
  */
 busTaps?: BusTapLayout,
+/**
+ * Provisional (`hubRefs`): the edges of the view that were not laid out because one end is a hub, each drawn as a stub
+ * at its other end (`node`) named after the hub. Omitted when empty.
+ */
+hubRefs?: Array<HubRef>,
 /**
  * The move gesture in progress or the last one finished, for sequence checks. Omitted when there was none.
  */

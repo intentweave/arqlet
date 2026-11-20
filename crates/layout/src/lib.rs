@@ -336,6 +336,103 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Provisional (`hubRefs`): the edges of hubs are taken out of the layout and kept as references to draw as stubs.
+    if let Some((view, refs)) = hub_refs(graph, options.hub_refs) {
+        // Room between the ranks for the stubs and their names: out of a node on its right, into one on its left (as the
+        // scene draws them: an 18-unit stub, the name at about 6.5 units a character, at most 32, and margins).
+        let labels: BTreeMap<&str, &str> = view
+            .nodes
+            .iter()
+            .map(|n| (n.id.as_str(), n.label.as_str()))
+            .collect();
+        let room = |outgoing: bool| {
+            refs.iter()
+                .filter(|r| r.outgoing == outgoing)
+                .map(|r| {
+                    let name = labels
+                        .get(r.hub.as_str())
+                        .copied()
+                        .unwrap_or(r.hub.as_str());
+                    18. + 3. + name.chars().count().min(32) as f64 * 6.5 + 8. + 6.
+                })
+                .fold(0., f64::max)
+        };
+        let mut spaced = options.clone();
+        spaced.hub_ref_room = room(true) + room(false);
+        let (mut snapshot, stages) = compute_counted_buses(&view, previous, dirty, &spaced)?;
+        snapshot.hub_refs = refs;
+        return Ok((snapshot, stages));
+    }
+    // Without references no room for them, also when an earlier layout with the option left some in the options.
+    if options.hub_ref_room != 0. {
+        let mut plain = options.clone();
+        plain.hub_ref_room = 0.;
+        return compute_counted_buses(graph, previous, dirty, &plain);
+    }
+    compute_counted_buses(graph, previous, dirty, options)
+}
+
+/// Provisional (`hubRefs`): the view without the edges of its hubs (nodes with at least `min` edges between two distinct
+/// visible nodes), and those edges as references, each at its end that is not a hub (the source when both are). `None`
+/// without the option or without a hub.
+fn hub_refs(graph: &Graph, min: Option<usize>) -> Option<(Graph, Vec<arqlet_model::HubRef>)> {
+    let min = min.filter(|&m| m >= 1)?;
+    let present: BTreeSet<&str> = graph.nodes.iter().map(|n| n.id.as_str()).collect();
+    let mut degree: BTreeMap<&str, usize> = BTreeMap::new();
+    for e in &graph.edges {
+        let Some(t) = e.target.as_deref() else {
+            continue;
+        };
+        if e.source == t || !present.contains(e.source.as_str()) || !present.contains(t) {
+            continue;
+        }
+        *degree.entry(e.source.as_str()).or_default() += 1;
+        *degree.entry(t).or_default() += 1;
+    }
+    let hub = |id: &str| degree.get(id).is_some_and(|&d| d >= min);
+    let mut refs = Vec::new();
+    let mut taken: BTreeSet<String> = BTreeSet::new();
+    for e in &graph.edges {
+        let Some(t) = e.target.as_deref() else {
+            continue;
+        };
+        if e.source == t || !present.contains(e.source.as_str()) || !present.contains(t) {
+            continue;
+        }
+        let (node, hub_id, outgoing) = if hub(t) {
+            (e.source.clone(), t.to_string(), true)
+        } else if hub(&e.source) {
+            (t.to_string(), e.source.clone(), false)
+        } else {
+            continue;
+        };
+        refs.push(arqlet_model::HubRef {
+            edge: e.id.clone(),
+            kind: e.kind.clone(),
+            node,
+            hub: hub_id,
+            outgoing,
+        });
+        taken.insert(e.id.clone());
+    }
+    if refs.is_empty() {
+        return None;
+    }
+    let mut view = graph.clone();
+    view.edges.retain(|e| !taken.contains(&e.id));
+    view.edge_ports.retain(|b| !taken.contains(&b.edge_id));
+    for bus in &mut view.buses {
+        bus.edges.retain(|e| !taken.contains(e));
+    }
+    Some((view, refs))
+}
+
+fn compute_counted_buses(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
     // Provisional (ADR 0019 view model): a node of shape `busLine` is a bus line in the view (`Bus::taps`), without its node
     // and edges; the layout sees it as a node again, and its bar and taps come back in `Snapshot::bus_lines`.
     // A view drawn with trunks is a view with bars again; the trunks are drawn anew below when the options ask for them.
@@ -1957,7 +2054,8 @@ fn realize_channel_widths(
             .fold(f64::MAX, f64::min);
         // What the construction found missing in this channel (`channel_key`), on top of the tracks counted here.
         let reported = gaps.get(&channel_key(area, k)).copied().unwrap_or(0.);
-        let need = tracks[k] as f64 * track + 2. * margin + reported;
+        // With `hubRefs` a channel also holds the references' stubs and names (`hub_ref_room`).
+        let need = (tracks[k] as f64 * track + 2. * margin + reported).max(options.hub_ref_room);
         // Experimental (`channelsByDemand`): a channel also narrows to what its tracks need, at least the margin on both
         // sides and a track (as a border rank keeps), instead of keeping the layer gap. The order and the places across the
         // flow were chosen before, on the layer gap, so the lanes stay as planned.
@@ -5447,6 +5545,7 @@ fn placed_snapshot(
         bus_boxes: BTreeMap::new(),
         bus_lines: BTreeMap::new(),
         bus_taps: Default::default(),
+        hub_refs: Vec::new(),
         gesture: None,
         layered_plans: plans
             .iter()
@@ -6205,7 +6304,7 @@ fn place(
             .fold((0., 0.), |(w, h), s: &(f64, f64)| (w + s.0, h + s.1));
         let (w, h) = (w / children.len() as f64, h / children.len() as f64);
         let (along, across) = if vertical { (h, w) } else { (w, h) };
-        let along = along + options.layer_spacing.unwrap_or(64.);
+        let along = along + options.layer_spacing.unwrap_or(64.) + options.hub_ref_room;
         let across = across + options.node_spacing.unwrap_or(24.);
         if along > 0. && across > 0. {
             across / along
@@ -7076,6 +7175,7 @@ fn place(
         );
         let primary_gap = snap(
             (base(options.layer_spacing, 64.)
+                + options.hub_ref_room
                 + 2. * if vertical { label_height } else { label_width })
             .max(clearance_gap),
             grid,
