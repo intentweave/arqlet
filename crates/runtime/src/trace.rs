@@ -44,7 +44,8 @@ pub fn trace_answer_on(snapshot: &Snapshot, v: &Value) -> Result<TraceAnswer, St
         Some(other) => return Err(format!("Unknown trace mode: {other}")),
     };
     let kinds = edge_kinds_of(v, "Trace")?;
-    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let navigable = navigable(snapshot);
+    let canonical = navigable.as_ref();
     let path = trace_along(canonical, from, to, mode, |e| {
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;
@@ -95,13 +96,25 @@ pub(crate) fn edge_kinds_of(v: &Value, what: &str) -> Result<Option<BTreeSet<Str
 /// those boxes through the drawn edges (for fading).
 pub(crate) type OnView = (Vec<String>, BTreeSet<String>, BTreeMap<String, usize>);
 
+/// Provisional (buses as data): the snapshot's source graph, with its buses given as members (`Bus::taps`) as nodes of
+/// shape `busLine` and their edges (`arqlet_layout::with_bus_nodes`), so that a path or a neighbourhood crosses them as
+/// it crosses a `busLine` node.
+pub(crate) fn navigable(snapshot: &Snapshot) -> std::borrow::Cow<'_, arqlet_model::Graph> {
+    let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    match arqlet_layout::with_bus_nodes(source) {
+        Some(graph) => std::borrow::Cow::Owned(graph),
+        None => std::borrow::Cow::Borrowed(source),
+    }
+}
+
 pub(crate) fn on_view(
     snapshot: &Snapshot,
     path_nodes: &[String],
     path_edges: &[String],
     kinds: &Option<BTreeSet<String>>,
 ) -> Result<OnView, String> {
-    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let navigable = navigable(snapshot);
+    let canonical = navigable.as_ref();
     // The visible node of every node of the view: itself, or the outermost collapsed container above it.
     let view = structured(canonical, &snapshot.options)?;
     let parent: BTreeMap<&str, Option<&str>> = view
@@ -318,7 +331,8 @@ pub fn neighbourhood_answer_on(
         }
     };
     let kinds = edge_kinds_of(v, "Neighbourhood")?;
-    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let navigable = navigable(snapshot);
+    let canonical = navigable.as_ref();
     let found = neighbourhood(canonical, &starts, hops, reach, |e| {
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;

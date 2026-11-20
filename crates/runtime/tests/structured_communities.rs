@@ -55,7 +55,8 @@ fn change(snapshot: &Value, request: Value) -> Value {
 
 fn import() -> Value {
     ok(call(
-        json!({"op": "import", "graph": flat(), "limit": 100, "options": {"communities": 30}}),
+        // Edges as they are (not lifted, as they are by default with communities): the tests follow single edges.
+        json!({"op": "import", "graph": flat(), "limit": 100, "options": {"communities": 30, "liftEdges": false}}),
     ))
 }
 

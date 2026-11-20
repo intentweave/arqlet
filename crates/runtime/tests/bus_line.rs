@@ -636,3 +636,53 @@ fn a_bus_given_as_data_is_drawn_as_lines_too() {
     assert!(lines.bus_lines.is_empty());
     assert_eq!(lines.graph.buses[0].edges.len(), 3);
 }
+
+#[test]
+fn a_bus_given_as_data_is_crossed_by_trace_and_neighbourhood() {
+    // No bus node: the bus is given as members (`Graph.buses` with `taps`), as a host holds bus membership.
+    let mut nodes = vec![json!({"id": "gw", "kind": "ecu", "label": "gw"})];
+    let mut taps = vec![json!({"edge": "t-gw", "node": "gw", "toBus": true, "kind": "connects"})];
+    for i in 0..4 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("e{i}")}));
+        taps.push(json!({"edge": format!("t{i}"), "node": format!("e{i}"), "toBus": true, "kind": "connects"}));
+    }
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": [],
+        "buses": [{"id": "can", "edges": [], "label": "CAN", "kind": "bus", "taps": taps}]}))
+    .unwrap();
+    let s = import_graph_with(g, 100, &LayoutOptions::default()).unwrap();
+    assert!(s.bus_lines.contains_key("can"), "drawn as a bar");
+    // A path from one member to another runs over the bus.
+    let path =
+        arqlet_runtime::trace::trace_answer_on(&s, &json!({"from": "e0", "to": "e3"})).unwrap();
+    assert_eq!(path.length, Some(2));
+    assert_eq!(path.nodes.iter().filter(|n| *n == "can").count(), 1);
+    let mut routes = path.visible.routes.clone();
+    routes.sort();
+    assert_eq!(routes, ["t0", "t3"]);
+    // The gateway's neighbourhood within two hops: the bus and every member.
+    let around =
+        arqlet_runtime::trace::neighbourhood_answer_on(&s, &json!({"nodeId": "gw", "hops": 2}))
+            .unwrap();
+    assert_eq!(around.nodes.len(), 6, "{:?}", around.nodes);
+    // A filter hides the bus by its id, or a member with its tap.
+    let run = |v: serde_json::Value| -> serde_json::Value {
+        serde_json::from_str(&arqlet_runtime::dispatch(&v.to_string())).unwrap()
+    };
+    let snapshot = serde_json::to_value(&s).unwrap();
+    let filtered = |hidden: serde_json::Value| {
+        let answer = run(json!({"op": "filter", "snapshot": snapshot, "hide": hidden,
+            "expectedRevision": s.revision, "expectedLayoutVersion": s.layout_version}));
+        assert_eq!(answer["ok"], true, "{answer}");
+        let scene = run(json!({"op": "scene", "snapshot": answer["snapshot"]}));
+        scene["scene"]["busLines"].clone()
+    };
+    let gone = filtered(json!({"nodes": ["can"]}));
+    assert!(gone.as_array().map_or(true, |a| a.is_empty()), "{gone}");
+    assert_eq!(
+        filtered(json!({"nodes": ["e2"]}))[0]["taps"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+}

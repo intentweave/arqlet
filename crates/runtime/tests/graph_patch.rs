@@ -60,7 +60,7 @@ fn boxes(s: &Value) -> serde_json::Map<String, Value> {
 #[test]
 fn opening_a_package_and_loading_its_member_edges_keeps_the_view() {
     let first = ok(call(
-        json!({"op": "import", "graph": packages(), "limit": 100, "options": {"levelOfDetail": {"depth": 0}}}),
+        json!({"op": "import", "graph": packages(), "limit": 100, "options": {"levelOfDetail": {"depth": 0}, "liftEdges": false}}),
     ));
     assert_eq!(first["collapsedIds"].as_array().unwrap().len(), 10);
     let opened = ok(edit(&first, json!({"op": "toggle", "nodeId": "p0"})));
@@ -105,7 +105,7 @@ fn opening_a_package_and_loading_its_member_edges_keeps_the_view() {
     edges.retain(|e| e["id"] != "agg:p0-p1" && e["id"] != "agg:p0-p3");
     edges.extend(member_edges(0));
     let fresh = ok(call(
-        json!({"op": "import", "graph": graph, "limit": 100, "options": {"levelOfDetail": {"depth": 0}}}),
+        json!({"op": "import", "graph": graph, "limit": 100, "options": {"levelOfDetail": {"depth": 0}, "liftEdges": false}}),
     ));
     let fresh = ok(edit(&fresh, json!({"op": "toggle", "nodeId": "p0"})));
     assert_eq!(
