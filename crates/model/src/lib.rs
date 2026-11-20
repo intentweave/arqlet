@@ -2565,6 +2565,9 @@ pub enum BusStyle {
     #[default]
     Bar,
     Trunk,
+    /// As `Trunk`, but never a bar: a bus with no member above it in its bus tree takes the member on the most buses (the
+    /// earliest in the graph on a tie) as its head.
+    Lines,
 }
 
 impl BusStyle {

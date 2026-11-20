@@ -619,7 +619,13 @@ pub(crate) fn project(graph: &Graph) -> Option<Graph> {
             id: node.id.clone(),
             edges: Vec::new(),
             label: Some(node.label.clone()),
-            taps: taps.remove(node.id.as_str()).unwrap_or_default(),
+            // One tap per attached node (edges of collapsed members end at their container, several at one).
+            taps: {
+                let mut seen = BTreeSet::new();
+                let mut list = taps.remove(node.id.as_str()).unwrap_or_default();
+                list.retain(|t| seen.insert(t.node.clone()));
+                list
+            },
             kind: Some(node.kind.clone()),
             parent_id: node.parent_id.clone(),
         });
@@ -789,7 +795,11 @@ pub(crate) fn collapse_snapshot(snapshot: &mut Snapshot) {
 /// id and kind of that member's tap; the bus lists those edges (an explicit bus, ADR 0005), so the layout gives it no rank
 /// and draws one trunk with branches. A bus at the root of its tree keeps its bar. The taps keep the edges' own
 /// direction. `None` when no bus gets a head.
-pub(crate) fn trunks(view: &Graph, levels: &BTreeMap<String, usize>) -> Option<Graph> {
+pub(crate) fn trunks(
+    view: &Graph,
+    levels: &BTreeMap<String, usize>,
+    always: bool,
+) -> Option<Graph> {
     if !view
         .buses
         .iter()
@@ -834,7 +844,25 @@ pub(crate) fn trunks(view: &Graph, levels: &BTreeMap<String, usize>) -> Option<G
                     order[t.node.as_str()],
                 )
             })
-            .map(|t| t.node.clone());
+            .map(|t| t.node.clone())
+            // `always` (`busStyle: lines`): without a member above, the member on the most buses, then the earliest.
+            .or_else(|| {
+                always
+                    .then(|| {
+                        members
+                            .iter()
+                            .min_by_key(|t| {
+                                (
+                                    std::cmp::Reverse(
+                                        on_buses.get(t.node.as_str()).copied().unwrap_or(0),
+                                    ),
+                                    order[t.node.as_str()],
+                                )
+                            })
+                            .map(|t| t.node.clone())
+                    })
+                    .flatten()
+            });
         let Some(head) = head else { continue };
         for tap in members.iter().filter(|t| t.node != head) {
             view_edge(&mut graph.edges, tap, &head);
