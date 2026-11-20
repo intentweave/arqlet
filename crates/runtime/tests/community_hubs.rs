@@ -62,7 +62,11 @@ fn a_hub_left_out_of_louvain_stays_alone_and_names_no_community() {
         plain.iter().any(|(label, n)| label == "≈ hub" && *n > 20),
         "{plain:?}"
     );
-    for hubs in [json!({"nodes": ["h"]}), json!({"minLinks": 100})] {
+    for hubs in [
+        json!({"nodes": ["h"]}),
+        json!({"minLinks": 100}),
+        json!({"top": 0.004}),
+    ] {
         let (o, clusters) = overview_clusters(json!({"communities": 120, "hubs": hubs}));
         let hub = o["ids"]
             .as_array()

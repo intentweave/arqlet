@@ -238,6 +238,7 @@ pub fn community_groups(
 pub(crate) fn hubs_of(hubs: &arqlet_model::CommunityHubs) -> arqlet_layout::overview::Hubs {
     arqlet_layout::overview::Hubs {
         min_links: hubs.min_links.map(f64::from),
+        top: hubs.top,
         nodes: hubs.nodes.iter().cloned().collect(),
     }
 }

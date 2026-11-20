@@ -1810,14 +1810,20 @@ impl Hidden {
 
 /// Provisional: the children that `communities` leaves out of Louvain, so that one hub does not pull a whole container
 /// into one community: those with at least `min_links` links in their container (by edge weight, as Louvain counts them)
-/// and those named in `nodes`. A hub stays a direct child of its container. Ids the graph lacks are ignored.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// those among the share `top` of a container's linked children with the most links (by weight; `0.01`: the top 1 %, at
+/// least one; ties by the children's order), and those named in `nodes`. A hub stays a direct child of its container.
+/// Ids the graph lacks are ignored.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct CommunityHubs {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
     pub min_links: Option<u32>,
+    /// Provisional: a relative threshold, a share in (0, 1] of a container's linked children.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub top: Option<f64>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
     pub nodes: Vec<String>,
@@ -1825,7 +1831,7 @@ pub struct CommunityHubs {
 
 impl CommunityHubs {
     pub fn is_empty(&self) -> bool {
-        self.min_links.is_none() && self.nodes.is_empty()
+        self.min_links.is_none() && self.top.is_none() && self.nodes.is_empty()
     }
 }
 

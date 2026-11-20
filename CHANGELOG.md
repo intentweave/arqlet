@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `communityHubs.top` (provisional, also the overview's `hubs.top`): a relative hub threshold, a share of a container's
+  linked children with the most links (`0.01`: the top 1 %, at least one; ties by the children's order), beside the
+  absolute `minLinks`. On a private catalog (373 top-level containers, `communities: 40`) `minLinks: 60` left no
+  community at all, `top: 0.01` 9 communities (the largest 102 members instead of 148 without hubs).
 - Adaptive edge dimming in the WebGL overview (`edgeDimming`, on): the renderer estimates how many edge lines lie over a
   pixel on average in what is visible (their length on the screen over the area) and makes each line fainter the more
   there are, so thousands of overlapping lines no longer add up to a white tangle in the galaxy style; zoomed in, they
