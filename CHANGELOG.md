@@ -17,6 +17,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   linked children with the most links (`0.01`: the top 1 %, at least one; ties by the children's order), beside the
   absolute `minLinks`. On a private catalog (373 top-level containers, `communities: 40`) `minLinks: 60` left no
   community at all, `top: 0.01` 9 communities (the largest 102 members instead of 148 without hubs).
+- `hubRefs` (provisional layout option, unset): an edge of a node with at least this many edges in the view is not laid
+  out or routed but drawn as a short stub at its other end, named after the hub (out of the right side for an edge to
+  the hub, into the left for one from it), as a wiring diagram refers to another sheet (`Snapshot.hubRefs`, scene
+  `hubRefs`; the SVG viewer draws them, a trace marks them). The channels between ranks keep room for the stubs and
+  names. On a flat view of 373 nodes and 1 338 edges with a few hubs of 100 to 270 edges (a private evaluation graph):
+  layout 372 ms → 71 ms with `hubRefs: 80` (763 references) and 24 ms with 20, extent 9 270 × 32 169 → 3 988 × 21 692
+  and 1 556 × 20 122, no line through a node either way (single runs, heavily loaded machine). Not yet: grouping the
+  stubs of one node, a hub's own side of the references.
 - Adaptive edge dimming in the WebGL overview (`edgeDimming`, on): the renderer estimates how many edge lines lie over a
   pixel on average in what is visible (their length on the screen over the area) and makes each line fainter the more
   there are, so thousands of overlapping lines no longer add up to a white tangle in the galaxy style; zoomed in, they

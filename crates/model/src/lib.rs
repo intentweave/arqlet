@@ -641,6 +641,10 @@ pub struct Snapshot {
     /// Omitted when empty.
     #[serde(default, skip_serializing_if = "BusTapLayout::is_empty")]
     pub bus_taps: BusTapLayout,
+    /// Provisional (`hubRefs`): the edges of the view that were not laid out because one end is a hub, each drawn as a stub
+    /// at its other end (`node`) named after the hub. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hub_refs: Vec<HubRef>,
     /// The move gesture in progress or the last one finished, for sequence checks. Omitted when there was none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gesture: Option<Gesture>,
@@ -1953,6 +1957,17 @@ pub struct LayoutOptions {
     /// default, omitted): as `isolatedGrid` says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub isolated_grid_from: Option<usize>,
+    /// Provisional (hub references): an edge of a node with at least this many edges in the view is not laid out or routed;
+    /// it is drawn as a short stub at its other end, named after the hub (`Snapshot::hub_refs`), as a wiring diagram refers
+    /// to another sheet. `None` (the default, omitted): every edge is routed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub hub_refs: Option<usize>,
+    /// Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
+    /// (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    #[cfg_attr(feature = "ts", ts(as = "Option<f64>", optional))]
+    pub hub_ref_room: f64,
     /// The areas `isolatedGridFrom` gives the grid (`ISOLATED_GRID_ROOT` for the top level), computed by the layout at its
     /// start. Never written or read.
     #[serde(skip)]
@@ -2338,6 +2353,19 @@ impl BusTapLayout {
     }
 }
 
+/// Provisional: an edge drawn as a reference to a hub (`Snapshot::hub_refs`): the edge, its kind, the node it is drawn at,
+/// the hub, and whether it runs from the node to the hub (`outgoing`) or from the hub to the node.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HubRef {
+    pub edge: String,
+    pub kind: String,
+    pub node: String,
+    pub hub: String,
+    pub outgoing: bool,
+}
+
 /// Where a node stands in its rank, chosen by the user (`LayoutOptions::order_hints`).
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2376,6 +2404,8 @@ impl Default for LayoutOptions {
             align_stacked: true,
             isolated_grid: false,
             isolated_grid_from: None,
+            hub_refs: None,
+            hub_ref_room: 0.,
             isolated_grid_areas: BTreeSet::new(),
             bus_roots: Vec::new(),
             bus_style: BusStyle::Bar,

@@ -40,6 +40,9 @@ pub struct Scene {
     /// its taps, one per edge of the bus, in the edge's direction. Omitted when there is none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bus_lines: Vec<SceneBusLine>,
+    /// Provisional (`hubRefs`): edges of hubs drawn as stubs at their other end, named after the hub. Omitted when none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hub_refs: Vec<SceneHubRef>,
     /// Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
     pub bounds: Rect,
 }
@@ -54,6 +57,22 @@ pub struct SceneBusLine {
     pub kind: String,
     pub bounds: Rect,
     pub taps: Vec<SceneTap>,
+}
+
+/// Provisional: an edge drawn as a reference to a hub (`Scene::hub_refs`): a short stub at `node` (out of its right side for
+/// an edge to the hub, into its left side for one from it), in the edge's direction, and the hub's name (`text`) in
+/// `label` beside the stub's free end.
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SceneHubRef {
+    pub edge: String,
+    pub node: String,
+    pub hub: String,
+    pub outgoing: bool,
+    pub text: String,
+    pub points: Vec<Point>,
+    pub label: Rect,
 }
 
 /// Provisional: one tap of a bus line: the edge it stands for, the node it attaches, and its points.
@@ -421,6 +440,10 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     for line in &bus_lines {
         include(&line.bounds);
     }
+    let hub_refs = hub_refs_of(snapshot, &positions);
+    for r in &hub_refs {
+        include(&r.label);
+    }
     for label in &labels {
         include(&label.bounds);
     }
@@ -490,6 +513,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             .collect(),
         junctions,
         bus_lines,
+        hub_refs,
         bounds: Rect {
             x: left - 30.,
             y: top - 30.,
@@ -500,6 +524,72 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
 }
 
 /// Absolute rectangle of a node, computed once per node. Cycles and invalid rectangles are errors.
+/// The stubs of `Snapshot::hub_refs` at their nodes' boxes: per node, the references to hubs out of its right side and
+/// those from hubs into its left side, spread evenly along the side in the order of the references.
+fn hub_refs_of(snapshot: &Snapshot, positions: &BTreeMap<&str, Rect>) -> Vec<SceneHubRef> {
+    const STUB: f64 = 18.;
+    let labels: BTreeMap<&str, &str> = snapshot
+        .graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.label.as_str()))
+        .collect();
+    let mut count: BTreeMap<(&str, bool), usize> = BTreeMap::new();
+    for r in &snapshot.hub_refs {
+        *count.entry((r.node.as_str(), r.outgoing)).or_default() += 1;
+    }
+    let mut seen: BTreeMap<(&str, bool), usize> = BTreeMap::new();
+    let mut out = Vec::new();
+    for r in &snapshot.hub_refs {
+        let Some(b) = positions.get(r.node.as_str()) else {
+            continue;
+        };
+        let key = (r.node.as_str(), r.outgoing);
+        let k = *seen.entry(key).and_modify(|k| *k += 1).or_insert(0);
+        let n = count[&key];
+        let y = b.y + b.height * (k + 1) as f64 / (n + 1) as f64;
+        let text = labels
+            .get(r.hub.as_str())
+            .copied()
+            .unwrap_or(r.hub.as_str())
+            .to_string();
+        let width = text.chars().count().min(32) as f64 * 6.5 + 8.;
+        let (points, label) = if r.outgoing {
+            let (x0, x1) = (b.x + b.width, b.x + b.width + STUB);
+            (
+                vec![Point { x: x0, y }, Point { x: x1, y }],
+                Rect {
+                    x: x1 + 3.,
+                    y: y - 7.,
+                    width,
+                    height: 14.,
+                },
+            )
+        } else {
+            let (x0, x1) = (b.x - STUB, b.x);
+            (
+                vec![Point { x: x0, y }, Point { x: x1, y }],
+                Rect {
+                    x: x0 - 3. - width,
+                    y: y - 7.,
+                    width,
+                    height: 14.,
+                },
+            )
+        };
+        out.push(SceneHubRef {
+            edge: r.edge.clone(),
+            node: r.node.clone(),
+            hub: r.hub.clone(),
+            outgoing: r.outgoing,
+            text,
+            points,
+            label,
+        });
+    }
+    out
+}
+
 fn absolute<'a>(
     id: &'a str,
     by_id: &BTreeMap<&'a str, &'a Node>,

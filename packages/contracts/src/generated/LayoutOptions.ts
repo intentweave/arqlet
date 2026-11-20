@@ -139,6 +139,17 @@ isolatedGrid?: boolean,
  */
 isolatedGridFrom?: number | null,
 /**
+ * Provisional (hub references): an edge of a node with at least this many edges in the view is not laid out or routed;
+ * it is drawn as a short stub at its other end, named after the hub (`Snapshot::hub_refs`), as a wiring diagram refers
+ * to another sheet. `None` (the default, omitted): every edge is routed.
+ */
+hubRefs?: number,
+/**
+ * Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
+ * (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
+ */
+hubRefRoom?: number,
+/**
  * Provisional: how the view draws a bus kept as a node of shape `busLine`: `bar` (the default) a bar in a rank of its
  * own with one tap per edge; `trunk` no rank and no bar, one shared line from the bus's head (its member nearest the
  * root of the bus tree) to every other member, drawn as an explicit bus (ADR 0005). Omitted when `bar`.
