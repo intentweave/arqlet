@@ -5,6 +5,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Fixed (bus lines)
+
+- Bars and taps keep clear of the boxes: a bar that would lie over a box that is neither a bus, a member nor a container
+  around it moves to the nearest free lane; a tap that would pass another box (another member of its bus too) takes
+  another place along the stretch it shares with the bar, bends around it (an L or a Z), or follows a short orthogonal
+  search on a grid of the nearby boxes' edges. In an area that is not layered, `busStyle: trunk`/`lines` lays a bus out
+  as a bar and turns it into shared lines along the bar's middle (no diagonal lines any more). Issues found on the taps'
+  hidden layout routes, which are never drawn, are dropped. On a private bus view (392 nodes, 107 buses): layered bars
+  over foreign boxes 123 → 0, taps through boxes 12 → 0; organic taps through boxes 277 → 0, organic lines 31 diagonal
+  and 68 through boxes → 0 and 3; with collapsed satellites organic taps 1 598 → 22. Default output unchanged.
+
 ### Added (bus lines)
 
 - `busStyle: "lines"` (provisional): every bus as shared lines with junctions, never a bar; a bus with no member above
