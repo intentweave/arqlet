@@ -1,0 +1,33 @@
+{
+  "defaultDirection": "lr",
+  "nodes": [
+    { "id": "a", "kind": "module", "label": "A", "parentId": null },
+    { "id": "b", "kind": "module", "label": "B", "parentId": null },
+    { "id": "c", "kind": "module", "label": "C", "parentId": null },
+    { "id": "d", "kind": "module", "label": "D", "parentId": null },
+    { "id": "e", "kind": "module", "label": "E", "parentId": null },
+    { "id": "f", "kind": "module", "label": "F", "parentId": null }
+  ],
+  "edges": [
+    { "id": "ab", "kind": "uses", "source": "a", "target": "b" },
+    { "id": "bc", "kind": "uses", "source": "b", "target": "c" },
+    { "id": "cd", "kind": "uses", "source": "c", "target": "d" },
+    { "id": "de", "kind": "uses", "source": "d", "target": "e" },
+    { "id": "ef", "kind": "uses", "source": "e", "target": "f" },
+    { "id": "fa", "kind": "uses", "source": "f", "target": "a" }
+  ],
+  "memberships": {
+    "dimensions": [
+      {
+        "id": "concern",
+        "label": "Concern",
+        "groups": [
+          { "id": "g1", "label": "Parsing", "members": ["a", "b", "c"] },
+          { "id": "g2", "label": "Analysis", "members": ["c", "d", "e"] },
+          { "id": "g3", "label": "Reporting", "members": ["e", "f", "a"] }
+        ]
+      }
+    ]
+  },
+  "membershipViews": { "concern": "overlay" }
+}
