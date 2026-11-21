@@ -211,6 +211,16 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
      * `direction`: `out`, `in` or `both` (default); `edgeKinds`: follow only edges of these kinds.
      */
     /**
+     * Provisional (search, read only): the nodes of the source graph whose label or id contains `query` (ignoring case),
+     * best first, with the containers above each and the box that shows it (also inside collapsed groups); at most
+     * `limit` (default 20), only `nodeKinds` if given; `total` counts them all.
+     */
+    async find(query, {limit, nodeKinds} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'find', snapshot, query, ...(limit !== undefined ? {limit} : {}), ...(nodeKinds ? {nodeKinds} : {})});
+    },
+
+    /**
      * Provisional (view details, read only): what the engine knows about a node (`{nodeId}`) or an edge (`{edgeId}`, a
      * drawn line or an edge of the source graph): the containers above a node and the box that shows it, what a collapsed
      * box holds, the edges a line stands for in either direction (at most `limit` ids each, counts complete).

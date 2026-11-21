@@ -3324,6 +3324,31 @@ pub struct LineDetails {
     pub opposite_count: usize,
 }
 
+/// Provisional (search): the answer of `find` (besides `ok`): the nodes of the source graph whose label or id contains the
+/// query (ignoring case), best first: an exact match, then a prefix, then a word start, then anywhere; equal ones by label
+/// and id. At most `limit` matches; `total` counts them all.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FindAnswer {
+    pub matches: Vec<FindMatch>,
+    pub total: usize,
+}
+
+/// Provisional: a node `find` found, with the containers above it (outermost first) and the visible box that shows it
+/// (itself, the collapsed container it is in, or null when the view hides it), so that a host can `reveal` it.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FindMatch {
+    pub id: String,
+    pub label: String,
+    pub kind: String,
+    pub parents: Vec<String>,
+    #[cfg_attr(feature = "ts", ts(type = "string | null"))]
+    pub shown_as: Option<String>,
+}
+
 /// Provisional: the answer of `neighbourhood` (besides `ok`): the nodes within some hops of nodes, the edges they were
 /// reached by, each node's hops, and what of them the view shows (as for `trace`).
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

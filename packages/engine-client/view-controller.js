@@ -38,6 +38,24 @@ export function sceneDiff(before, after) {
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
+ * A bookmark as text for a URL (base64url of its JSON, UTF-8), and back. `decodeBookmark` throws on text that is not one.
+ */
+export function encodeBookmark(bookmark) {
+  const bytes = new TextEncoder().encode(JSON.stringify(bookmark));
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export function decodeBookmark(text) {
+  const base64 = text.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
+  const bookmark = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, c => c.charCodeAt(0))));
+  if (bookmark?.version !== 1 || typeof bookmark.intent !== 'object') throw Error('Not a view bookmark.');
+  return bookmark;
+}
+
+/**
  * Creates a view controller on `session` (from `createSession`). `page` is how many children `showRest` reveals at a
  * time; `historyLimit` how many steps back are kept; with `scenes: false` the state carries no scene and no diff (a host
  * that draws from the snapshot itself saves the engine call); `detailLimit` caps the edge ids of a line's details.
@@ -45,7 +63,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function createViewController(session, {page = 12, historyLimit = 50, scenes = true, detailLimit} = {}) {
   let state = Object.freeze({
     snapshot: null, scene: null, diff: null, busy: false, error: null,
-    highlight: null, selection: null, details: null, hover: null, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
+    highlight: null, selection: null, details: null, hover: null, search: null, focus: null, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
   });
   const listeners = new Set();
   const publish = patch => {
@@ -82,6 +100,12 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     });
     queue = result.catch(() => {});
     return result;
+  };
+
+  // The fingerprint of the graph (`digest`), for bookmarks; null when the engine does not answer it.
+  const digest = async () => {
+    const answer = await session.apply({op: 'digest'});
+    return answer.ok ? answer.digest ?? null : null;
   };
 
   const intent = async () => {
@@ -189,7 +213,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           return result;
         }
         state = Object.freeze({...state, scene: null, highlight: null, selection: null, details: null, hover: null,
-          hide: {}, steps: 0});
+          search: null, focus: null, hide: {}, steps: 0});
         await settle({}, current);
         return result;
       }, {fresh: true});
@@ -277,6 +301,96 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     },
 
     /**
+     * Finds nodes by label or id (see `session.find`), also those the view hides; the answer is also `state.search`
+     * until `clearSearch`. Read only.
+     */
+    find(query, init) {
+      return enqueue(async current => {
+        const answer = await session.find(query, init);
+        if (!current()) return {ok: false, cancelled: true};
+        if (!answer.ok) {
+          publish({error: answer.error ?? 'Nothing found.'});
+          return answer;
+        }
+        publish({search: {query, answer}, error: null});
+        return answer;
+      });
+    },
+
+    /** Clears the search. */
+    clearSearch() { if (state.search) publish({search: null}); },
+
+    /**
+     * Brings node `nodeId` into view: opens the groups that hide it (a step for `back`; not with `reveal: false`, and only
+     * as far as needed unless `partial: false`), selects it (`state.details`), and sets `state.focus` to
+     * `{nodeId, bounds, serial}`: the bounds of the box that shows it, for the host's camera to center or fit (`serial`
+     * counts focus requests, so the same node can be focused again). `bounds` is null when the view hides it anyway (a
+     * filter).
+     */
+    async focus(nodeId, {reveal = true, partial} = {}) {
+      let answer = await controller.select({nodeId});
+      if (!answer.ok) return answer;
+      if (reveal && answer.node.shownAs !== nodeId) {
+        const shown = await change(`Show ${nodeId}`,
+          () => session.reveal([nodeId], partial === undefined ? undefined : {partial}));
+        if (!shown.ok) return shown;
+        answer = state.details ?? answer;
+      }
+      const node = answer.node;
+      publish({focus: {nodeId, bounds: node.bounds ?? null, shownAs: node.shownAs ?? null, serial: (state.focus?.serial ?? 0) + 1}});
+      return {ok: true, focus: state.focus};
+    },
+
+    /**
+     * The view as a value to keep or share: the decisions (the engine's intent: open groups, pages, filter, options), the
+     * highlight and the selection, and the digest of the graph it belongs to. `encodeBookmark` makes it text for a URL.
+     */
+    bookmark() {
+      return enqueue(async () => {
+        if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        const h = state.highlight;
+        const highlight = h ? {kind: h.kind, ...(h.kind === 'trace' ? {from: h.from, to: h.to} : {nodeId: h.nodeId}),
+          ...(h.init ? {init: h.init} : {})} : null;
+        const bookmark = {version: 1, digest: await digest(), intent: await intent(),
+          ...(highlight ? {highlight} : {}), ...(state.selection ? {selection: state.selection} : {})};
+        return {ok: true, bookmark};
+      });
+    },
+
+    /**
+     * Opens a bookmark on the current graph (a step for `back`): its decisions, highlight and selection. A bookmark of
+     * another graph (another digest) is refused unless `force`.
+     */
+    openBookmark(bookmark, {force = false} = {}) {
+      return enqueue(async current => {
+        if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        if (bookmark?.version !== 1 || typeof bookmark.intent !== 'object') return {ok: false, error: 'Not a view bookmark.'};
+        const now = bookmark.digest && !force ? await digest() : null;
+        if (now && bookmark.digest !== now) {
+          const error = 'The bookmark belongs to another graph.';
+          publish({error});
+          return {ok: false, error};
+        }
+        const before = await intent();
+        const result = await session.apply({op: 'restore', intent: bookmark.intent});
+        if (!current()) return {ok: false, cancelled: true};
+        if (!result.ok) {
+          publish({error: result.error ?? 'The engine refused the bookmark.'});
+          return result;
+        }
+        const after = await intent();
+        if (!same(before, after)) {
+          back.push({label: 'Open bookmark', before, after});
+          if (back.length > historyLimit) back.shift();
+          forward = [];
+        }
+        state = Object.freeze({...state, highlight: bookmark.highlight ?? null, selection: bookmark.selection ?? null});
+        await settle({hide: bookmark.intent.hidden ?? {}}, current);
+        return result;
+      });
+    },
+
+    /**
      * What the pointer is over (`{nodeId}`, `{edgeId}` or `null`), for a renderer's hover state (a tooltip from the
      * scene's label, a lighter outline); no engine call. A tooltip with the engine's facts asks `select` or
      * `session.details` itself.
@@ -317,7 +431,8 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         if (forget) {
           back = [];
           forward = [];
-          state = Object.freeze({...state, highlight: null, selection: null, details: null, hover: null, hide: {}});
+          state = Object.freeze({...state, highlight: null, selection: null, details: null, hover: null, search: null,
+            focus: null, hide: {}});
         } else if (before) {
           const after = await intent();
           if (!same(before, after)) {

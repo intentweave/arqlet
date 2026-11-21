@@ -23,6 +23,8 @@ export * from './EdgeDetails';
 export * from './EdgePorts';
 export * from './EdgeRouting';
 export * from './EditReport';
+export * from './FindAnswer';
+export * from './FindMatch';
 export * from './GeometryIssue';
 export * from './Gesture';
 export * from './Graph';

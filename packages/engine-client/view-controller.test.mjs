@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, existsSync} from 'node:fs';
 import {createSession} from './session.js';
-import {createViewController, sceneDiff} from './view-controller.js';
+import {createViewController, sceneDiff, encodeBookmark, decodeBookmark} from './view-controller.js';
 import {createEngine} from './wasm-client.js';
 
 const shipped = new URL('./arqlet.wasm', import.meta.url);
@@ -141,3 +141,55 @@ test('a host hands over its own snapshots; follow-ups merge into one step', {ski
   await view.adopt(start, {forget: true});
   assert.equal(view.getState().canForward, false);
 });
+
+for (const resident of [false, true]) {
+  test(`search, focus and bookmarks (resident ${resident})`, {skip: !engine || (resident && !engine.openSession)}, async () => {
+    const view = createViewController(createSession(engine, {resident}), {page: 10});
+    await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+    // Search: hidden children are found, shown by their box.
+    const found = await view.find('C1');
+    assert.equal(found.ok, true, JSON.stringify(found));
+    assert.equal(found.total, 10);
+    assert.equal(found.matches[0].id, 'c10');
+    assert.equal(found.matches[0].shownAs, 'box');
+    assert.equal(view.getState().search.query, 'C1');
+    view.clearSearch();
+    assert.equal(view.getState().search, null);
+    // Focus: opens what hides the node (one step back), selects it, names the bounds for the camera.
+    const focused = await view.focus('c12');
+    assert.equal(focused.ok, true, JSON.stringify(focused));
+    let s = view.getState();
+    assert.equal(s.focus.nodeId, 'c12');
+    assert.equal(s.focus.shownAs, 'c12');
+    assert.ok(s.focus.bounds.width > 0);
+    assert.equal(s.details.node.id, 'c12');
+    assert.equal(s.backLabel, 'Show c12');
+    await view.focus('c12');
+    assert.equal(view.getState().focus.serial, s.focus.serial + 1, 'the same node again');
+    // A bookmark: the view with a filter and a path, as URL text and back.
+    await view.filter({nodeKinds: ['odd']});
+    await view.trace('src', 'out');
+    const {bookmark} = await view.bookmark();
+    const text = encodeBookmark(bookmark);
+    assert.match(text, /^[A-Za-z0-9_-]+$/);
+    assert.deepEqual(decodeBookmark(text), bookmark);
+    assert.throws(() => decodeBookmark('bm90IGEgYm9va21hcms'));
+    const shown = view.getState().scene.nodes.map(n => n.id).sort();
+    // Elsewhere, then the bookmark again: the same view, the filter and the path back, one step for `back`.
+    await view.back();
+    await view.back();
+    view.clearHighlight();
+    assert.equal((await view.openBookmark(decodeBookmark(text))).ok, true);
+    s = view.getState();
+    assert.deepEqual(s.scene.nodes.map(n => n.id).sort(), shown);
+    assert.deepEqual(s.hide, {nodeKinds: ['odd']});
+    assert.equal(s.highlight.kind, 'trace');
+    assert.ok(s.highlight.answer, 'the path asked again');
+    assert.equal(s.backLabel, 'Open bookmark');
+    // Another graph's bookmark is refused unless forced.
+    const other = {...bookmark, digest: 'another-graph'};
+    assert.match(bookmark.digest, /\S/, 'the graph is named');
+    assert.equal((await view.openBookmark(other)).ok, false);
+    assert.equal((await view.openBookmark(other, {force: true})).ok, true);
+  });
+}

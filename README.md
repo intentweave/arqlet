@@ -248,6 +248,23 @@ const {route} = await session.details({edgeId: 'e7'});       // route.edges, rou
 
 In the playground: select a node or an edge; the line *Engine:* below the edge details.
 
+### Search, focus and bookmarks
+
+`find` searches the whole graph by name or id, also inside collapsed groups, and names
+the box that shows each match. The view controller's `focus` opens what hides a node
+(one undo step), selects it and hands the host the bounds to center the camera on.
+`bookmark` keeps the view (open groups, pages, filter, highlight, selection) as a value,
+`encodeBookmark` turns it into URL text, and `openBookmark` opens it again; a bookmark of
+another graph is refused (the engine's `digest`).
+
+```js
+const {matches} = await session.find('parser', {limit: 10}); // best first: exact, prefix, word start, anywhere
+await view.focus(matches[0].id);                              // state.focus = {nodeId, bounds, shownAs, serial}
+location.hash = `view=${encodeBookmark((await view.bookmark()).bookmark)}`;
+```
+
+In the playground: *Find* in the section *Path*, and *Link to this view*.
+
 ### Filter
 
 `filter` hides nodes by kind or id (each with what it holds) and edges by kind, without
