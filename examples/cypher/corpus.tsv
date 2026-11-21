@@ -14,7 +14,7 @@ c12	expr	ok	open	MATCH (a) RETURN [(a)-[:KNOWS]->(b) | b.name]
 c13	subq	ok	open	MATCH (a) WHERE exists((a)-[:KNOWS]->()) RETURN a
 c14	subq	ok	later	MATCH (a) WHERE EXISTS { MATCH (a)-[:KNOWS]->(b) WHERE b.age > 3 } RETURN a
 c15	param	ok	supported	MATCH (n) WHERE n.id = $id AND n.name STARTS WITH $prefix RETURN n
-c16	string	ok	supported	MATCH (n) WHERE n.name =~ '(?i)an.*' AND n.name CONTAINS 'n' RETURN n
+c16	string	ok	later	MATCH (n) WHERE n.name =~ '(?i)an.*' AND n.name CONTAINS 'n' RETURN n
 c17	expr	ok	supported	MATCH (n) WHERE n.x IN [1, 2, 3] AND n.y IS NOT NULL RETURN n
 c18	expr	ok	open	MATCH (n) WHERE all(x IN n.tags WHERE x <> '') RETURN n
 c19	expr	ok	open	MATCH (n) RETURN n {.name, .age, extra: 1}

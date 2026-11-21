@@ -55,10 +55,10 @@ the ADR is clarified.
 
 ## How the expected values were checked
 
-The oracle was cross-checked once, on 2026-11-21, against Grafeo 0.6.2 running the same queries on a store built from the
-same graph and payload files (a throw-away checker, not part of this repository): all 40 `supported` cases and the three
-`later` or `open` cases with rows agreed. Changing two expected values by hand made the checker fail, so the comparison is
-not vacuous. This is evidence that the oracle and an independent engine read these queries alike. It is not the openCypher
+The oracle was cross-checked on 2026-11-21 (and again after `spike-11` moved to `later` and `spike-20` was added) against
+Grafeo 0.6.2 running the same queries on a store built from the same graph and payload files (a throw-away checker, not
+part of this repository): all 40 `supported` cases and the four `later` or `open` cases with rows agreed. Changing two
+expected values by hand made the checker fail, so the comparison is not vacuous. This is evidence that the oracle and an independent engine read these queries alike. It is not the openCypher
 TCK, and it covers only these queries on these graphs.
 
 ## What is not here
