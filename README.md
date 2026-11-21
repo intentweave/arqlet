@@ -409,6 +409,7 @@ Node, file system or network dependencies; only `serde` and `serde_json`.
 ## Documentation
 
 - [Specification and implementation status](docs/specification.md)
+- [Integration guide](docs/integration-guide.md): interfaces, deployment modes, precompute and hand-over, refinement offers
 - [Architecture](docs/architecture.md) and [decisions (ADRs)](docs/adr/)
 - [Roadmap](docs/roadmap.md)
 - [Configuration](docs/configuration.md) and [config sets](docs/config-sets.md)
