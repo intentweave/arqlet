@@ -30,6 +30,9 @@ export function sceneOfColumns(c) {
     if (c.nodeShape[i]) n.shape = SHAPES[c.nodeShape[i]];
     Object.assign(n, {bounds: rect(c.nodeBounds, i), container: !!(flags & 1), aggregate: !!(flags & 2), collapsed: !!(flags & 4), invalid: !!(flags & 8)});
     if (rowsOf.has(i)) n.rows = rowsOf.get(i);
+    // Provisional counts (absent in columns of an older engine).
+    if (c.nodeChildCount && c.nodeChildCount[i] !== NONE) n.childCount = c.nodeChildCount[i];
+    if (c.nodeHiddenCount && c.nodeHiddenCount[i] !== NONE) n.hiddenCount = c.nodeHiddenCount[i];
     return n;
   });
   const routes = c.routeIds.map((id, i) => {

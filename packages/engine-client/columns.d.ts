@@ -22,6 +22,9 @@ export interface SceneColumns {
   nodeKind: Uint32Array;
   /** Values of `SHAPES`. */
   nodeShape: Uint32Array;
+  /** Provisional: each node's `childCount` and `hiddenCount`, `NONE` when absent. */
+  nodeChildCount: Uint32Array;
+  nodeHiddenCount: Uint32Array;
 
   /** Route ids by route index. */
   routeIds: string[];

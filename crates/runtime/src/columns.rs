@@ -124,6 +124,9 @@ pub struct SceneColumns {
     pub node_kinds: Vec<String>,
     pub node_kind: Vec<u32>,
     pub node_shape: Vec<u32>,
+    /// Provisional: each node's `SceneNode::child_count` and `hidden_count`, `NONE` when absent.
+    pub node_child_count: Vec<u32>,
+    pub node_hidden_count: Vec<u32>,
     /// Route ids by route index.
     pub route_ids: Vec<String>,
     /// Node indices of each route's ends, `NONE` when the end is not a node of the scene.
@@ -222,6 +225,9 @@ impl SceneColumns {
                 arqlet_model::NodeShape::Circle => SHAPE_CIRCLE,
                 arqlet_model::NodeShape::BusLine => SHAPE_BUS_LINE,
             });
+            let count = |v: Option<usize>| v.map_or(NONE, |v| u32::try_from(v).unwrap_or(NONE - 1));
+            c.node_child_count.push(count(n.child_count));
+            c.node_hidden_count.push(count(n.hidden_count));
             let b = &n.bounds;
             c.node_bounds
                 .extend([b.x as f32, b.y as f32, b.width as f32, b.height as f32]);
@@ -397,6 +403,8 @@ impl SceneColumns {
             ),
             ("conflictRoutes", Column::U32(&self.conflict_routes)),
             ("junctions", Column::F32(&self.junctions)),
+            ("nodeChildCount", Column::U32(&self.node_child_count)),
+            ("nodeHiddenCount", Column::U32(&self.node_hidden_count)),
         ]
     }
 

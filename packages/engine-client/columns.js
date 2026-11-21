@@ -56,12 +56,16 @@ export function columnsOfScene(scene) {
   const nodeFlags = new Uint32Array(nodes.length);
   const nodeKind = new Uint32Array(nodes.length);
   const nodeShape = new Uint32Array(nodes.length);
+  const nodeChildCount = new Uint32Array(nodes.length);
+  const nodeHiddenCount = new Uint32Array(nodes.length);
   const nodeKinds = table();
   nodes.forEach((n, i) => {
     nodeParent[i] = n.parentId == null ? NONE : at(n.parentId);
     nodeFlags[i] = (n.container ? 1 : 0) | (n.aggregate ? 2 : 0) | (n.collapsed ? 4 : 0) | (n.invalid ? 8 : 0);
     nodeKind[i] = nodeKinds.id(n.kind);
     nodeShape[i] = SHAPES[n.shape] ?? 0;
+    nodeChildCount[i] = n.childCount ?? NONE;
+    nodeHiddenCount[i] = n.hiddenCount ?? NONE;
   });
 
   const routeSource = new Uint32Array(routes.length);
@@ -137,7 +141,7 @@ export function columnsOfScene(scene) {
     buses: scene.buses ?? [],
     bounds: b ? [b.x, b.y, b.width, b.height] : [0, 0, 0, 0],
     showPorts: Boolean(scene.showPorts),
-    nodeBounds, nodeParent, nodeFlags, nodeKind, nodeShape,
+    nodeBounds, nodeParent, nodeFlags, nodeKind, nodeShape, nodeChildCount, nodeHiddenCount,
     routeSource, routeTarget, routeWeight, routeFlags, routeOffsets, routePoints,
     routeKind, routeBackWeight, routeMemberOffsets: Uint32Array.from(routeMemberOffsets), routeMembers: Uint32Array.from(routeMembers),
     portNode, portEdge, portFlags, portSide, portPosition: points(ports, p => p.position),
