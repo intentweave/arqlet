@@ -1,0 +1,14 @@
+# Measurement of the copies and indexes a shared read of the canonical graph would avoid (ADR 0021).
+# A standalone crate, not a workspace member: the CI does not build it.
+[package]
+name = "copy-cost"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+arqlet-model = { path = "../../crates/model" }
+arqlet-view = { path = "../../crates/view" }
+serde_json = "1"
+
+[workspace]
