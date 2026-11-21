@@ -877,6 +877,7 @@
      "x": 24,
      "y": 127
     },
+    "childCount": 5,
     "collapsed": false,
     "container": true,
     "handles": [],
@@ -913,6 +914,7 @@
      "x": 520,
      "y": 48
     },
+    "childCount": 2,
     "collapsed": false,
     "container": true,
     "handles": [],
@@ -949,6 +951,7 @@
      "x": 24,
      "y": 513
     },
+    "childCount": 3,
     "collapsed": false,
     "container": true,
     "handles": [],
@@ -985,6 +988,7 @@
      "x": 1244,
      "y": 96
     },
+    "childCount": 10,
     "collapsed": false,
     "container": true,
     "handles": [],
@@ -1022,6 +1026,7 @@
      "x": 544,
      "y": 450
     },
+    "childCount": 3,
     "collapsed": false,
     "container": true,
     "handles": [],
