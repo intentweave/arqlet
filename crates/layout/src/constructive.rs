@@ -2247,23 +2247,26 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
                 0
             }
     };
-    // cost[i][j]: `i` placed before `j`.
-    let cost: Vec<Vec<i64>> = (0..n)
-        .map(|i| {
-            (0..n)
-                .map(|j| {
-                    if i == j {
-                        0
-                    } else {
-                        first(changes[i], changes[j])
-                    }
-                })
-                .collect()
-        })
-        .collect();
+    // cost(i, j): `i` placed before `j` (0 for i = j). Kept as the difference swap[i][j] = cost(j, i) - cost(i, j), row by
+    // row (what moving `i` past `j` changes), and the row sums ahead[i] = sum over j of cost(i, j) (`i` before all): a
+    // channel of a dense graph holds thousands of changes, and these are read along rows.
+    let mut swap = vec![0i32; n * n];
+    let mut ahead = vec![0i64; n];
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let (ij, ji) = (first(changes[i], changes[j]), first(changes[j], changes[i]));
+            ahead[i] += ij;
+            ahead[j] += ji;
+            // Each cost is at most 2 + CONFLICT, so the difference fits an i32.
+            swap[i * n + j] = (ji - ij) as i32;
+            swap[j * n + i] = (ij - ji) as i32;
+        }
+    }
+    let row = |i: usize| &swap[i * n..(i + 1) * n];
     let mut left: Vec<usize> = corridor_order(changes);
+    // balance(i) = sum over j of cost(i, j) - cost(j, i) = -(sum of row i of `swap`).
     let mut balances: Vec<i64> = (0..n)
-        .map(|i| (0..n).map(|j| cost[i][j] - cost[j][i]).sum())
+        .map(|i| -row(i).iter().map(|&d| i64::from(d)).sum::<i64>())
         .collect();
     let mut order = Vec::with_capacity(n);
     while !left.is_empty() {
@@ -2275,11 +2278,15 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
         }
         let removed = left.remove(best);
         order.push(removed);
+        // cost(i, removed) - cost(removed, i) = swap[removed][i].
+        let gone = row(removed);
         for &i in &left {
-            balances[i] -= cost[i][removed] - cost[removed][i];
+            balances[i] -= i64::from(gone[i]);
         }
     }
-    // Sifting: each change, taken out, goes to the place where it costs least against the others.
+    // Sifting: each change, taken out, goes to the place where it costs least against the others. The cost of `i` at place
+    // p among the others starts at ahead[i] (before all) and changes by swap[i][j] past each; its cost where it stands is
+    // that sum at its own place, so one pass finds both.
     let mut improved = true;
     let mut rounds = 0;
     while improved && rounds < 8 {
@@ -2287,23 +2294,28 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
         rounds += 1;
         for i in 0..n {
             let at = order.iter().position(|&x| x == i).expect("in the order");
-            let mut rest = order.clone();
-            rest.remove(at);
-            // Cost of `i` at place p: before rest[p..], after rest[..p].
-            let mut c: i64 = rest.iter().map(|&j| cost[i][j]).sum();
+            let past = row(i);
+            let mut c: i64 = ahead[i];
             let (mut best, mut best_place) = (c, 0);
-            for (p, &j) in rest.iter().enumerate() {
-                c += cost[j][i] - cost[i][j];
+            let mut now = if at == 0 { c } else { 0 };
+            let mut p = 0;
+            for (k, &j) in order.iter().enumerate() {
+                if k == at {
+                    continue;
+                }
+                c += i64::from(past[j]);
+                p += 1;
                 if c < best {
                     best = c;
-                    best_place = p + 1;
+                    best_place = p;
+                }
+                if p == at {
+                    now = c;
                 }
             }
-            let now: i64 = rest[..at].iter().map(|&j| cost[j][i]).sum::<i64>()
-                + rest[at..].iter().map(|&j| cost[i][j]).sum::<i64>();
             if best < now {
-                rest.insert(best_place, i);
-                order = rest;
+                order.remove(at);
+                order.insert(best_place, i);
                 improved = true;
             }
         }
