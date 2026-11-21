@@ -26,6 +26,13 @@ Not published: `arqlet-wasm` (its output ships in `@arqlet/engine-client`), `arq
    `README.md` (status line and the `arqlet = "x.y"` dependency) and the packaging row of `docs/specification.md`.
 4. Run the checks in `CLAUDE.md` and `sh apps/playground/build.sh examples/fixtures/small.json`.
 
+## Minimum Rust version
+
+The workspace declares `rust-version` once (`Cargo.toml`), and every crate inherits it. It follows what the dependencies
+need and stays well behind stable, so that toolchains pinned by companies, distributions and CI images keep working;
+raise it when a dependency or a language feature needs it, not to follow stable. The CI job `msrv` checks the workspace
+and the WASM adapter with exactly that version. A change of edition is a separate decision.
+
 ## Dry run
 
 ```sh

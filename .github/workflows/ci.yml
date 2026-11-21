@@ -31,5 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup toolchain install 1.94.0 --profile minimal
+      - run: rustup toolchain install 1.94.0 --profile minimal --target wasm32-unknown-unknown
       - run: cargo +1.94.0 check --workspace --locked
+      # The browser adapter is built for WASM; check it with the minimum version too.
+      - run: cargo +1.94.0 check -p arqlet-wasm --target wasm32-unknown-unknown --locked
