@@ -1188,7 +1188,9 @@ fn fix_areas_with_ports(
 /// (benchmarks/results/single-pass-auto-20261107.md). An area that chooses its direction is left to the attempt: its sense and
 /// axis are known only after its placement.
 fn single_pass_cannot_run(graph: &Graph, options: &LayoutOptions) -> Option<String> {
-    if !graph.routing_orthogonal_only() && !options.single_pass_mixed {
+    if !graph.routing_laid_out_orthogonally(options.single_pass_polyline)
+        && !options.single_pass_mixed
+    {
         return Some("Routing completion requires the legacy router and unbundled default orthogonal routing".into());
     }
     let containers: BTreeSet<&str> = graph

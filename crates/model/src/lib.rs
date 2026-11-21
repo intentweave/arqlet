@@ -1204,6 +1204,17 @@ pub enum RoutingConstraint {
     Allowed(Vec<RoutingStyle>),
 }
 
+impl RoutingStyle {
+    /// Whether the layout routes the style orthogonally: the orthogonal styles, and the polyline styles, which the scene
+    /// pulls taut from the orthogonal route.
+    pub fn laid_out_orthogonally(&self) -> bool {
+        matches!(
+            self,
+            Self::Orthogonal | Self::RoundedOrthogonal | Self::Polyline | Self::RoundedPolyline
+        )
+    }
+}
+
 impl RoutingConstraint {
     /// Whether the constraint admits `style`: a fixed style admits only itself, auto every style, a list its members.
     pub fn admits(&self, style: RoutingStyle) -> bool {
@@ -1500,6 +1511,23 @@ impl StrategyConstraint {
 impl Graph {
     /// Whether every area draws its edges on their orthogonal routes, plain or with rounded corners
     /// (`RoutingConstraint::orthogonal_only`); no routing declared is orthogonal.
+    /// Whether every routing constraint lays its edges out orthogonally: orthogonal styles, and with `polyline` also the
+    /// polyline styles (the layout routes them orthogonally, the scene pulls them taut).
+    pub fn routing_laid_out_orthogonally(&self, polyline: bool) -> bool {
+        let fits = |c: &RoutingConstraint| {
+            c.orthogonal_only()
+                || (polyline
+                    && match c {
+                        RoutingConstraint::Fixed(s) => s.laid_out_orthogonally(),
+                        RoutingConstraint::Auto => false,
+                        RoutingConstraint::Allowed(list) => {
+                            !list.is_empty() && list.iter().all(RoutingStyle::laid_out_orthogonally)
+                        }
+                    })
+        };
+        self.default_routing.as_ref().is_none_or(fits) && self.container_routing.values().all(fits)
+    }
+
     pub fn routing_orthogonal_only(&self) -> bool {
         self.default_routing
             .as_ref()
@@ -2277,6 +2305,11 @@ pub struct LayoutOptions {
     /// single pass, as before.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub single_pass_mixed: bool,
+    /// Polyline routing (`polyline`, `roundedPolyline`) in single pass: the layout routes such edges orthogonally, as it
+    /// always did, and the scene pulls them taut; before, a graph with polyline routing fell back to the pipeline before
+    /// single pass. On by default since 0.7.0; written as `false` when turned off (then such graphs fall back as before).
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub single_pass_polyline: bool,
     /// The clearance routes keep from nodes, their own nodes included beyond the stub at their port. It is a hard
     /// constraint (ADR 0005): the default is `DEFAULT_REQUIRED_CLEARANCE`, so it always applies. An explicit `null` is
     /// the opt-out: proximity is then a weighted quality term with the fixed `HUG_MARGIN` (docs/adr/0002-quality-model.md).
@@ -2497,6 +2530,7 @@ impl Default for LayoutOptions {
             port_sides: false,
             route_search_window: false,
             single_pass_mixed: false,
+            single_pass_polyline: true,
             required_clearance: default_required_clearance(),
             incremental_clearance_widening: false,
             routing_corridors: false,

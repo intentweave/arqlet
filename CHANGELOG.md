@@ -5,6 +5,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed (default)
+
+- **Polyline routing in single pass** (`singlePassPolyline`, on by default; `false` restores the fallback): `polyline` and
+  `roundedPolyline` are laid out orthogonally and pulled taut by the scene, as before, but a graph with them no longer
+  falls back to the pipeline before single pass. On 36 benchmark datasets with polyline routing: crossings −16 %, bends
+  −2 %, time −29 %, no route through a node; workflow-dag gets its orthogonal single-pass drawing (crossings 136 → 553).
+  `elkLayout` with `POLYLINE` on an anonymized 500-node graph with long edges: 1 778 → 509 ms (request 28). Orthogonal
+  output unchanged. Measurements: `benchmarks/results/polyline-single-pass-20261121.md`.
+
 ### Added (experimental)
 
 - `sharedTracks: "target"` (provisional, off by default; request 27): in the last channel before a node, the edges into
