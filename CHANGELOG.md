@@ -7,6 +7,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `reveal` takes the id of a bus given as data (`Graph.buses` with `taps` and no node): it opens the containers above
+  the bus (`parentId`), so its line is drawn; with `partial` the bus's own container opens in part, its taps at the rest.
+  Before, such an id was refused as an unknown node.
 - A look into a collapsed container (provisional): the read-only operation `peek` (`nodeId`, optional `limit`, default
   50) lays out the container's contents on their own as a small scene (the containers inside collapsed, at most `limit`
   direct children in the source order, the rest counted) and counts per child the edges that cross the container's
