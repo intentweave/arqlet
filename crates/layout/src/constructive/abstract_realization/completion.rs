@@ -253,10 +253,17 @@ fn run_impl(
                     .count();
                 let edges = selected.as_ref().map_or(0, |p| p.edges.len());
                 if cyclic > 16.max(edges / 100) {
+                    // The placement already made room for shared tracks: the whole layout is computed again without them
+                    // (`compute_counted`, on this diagnostic); this pass only completes the drawing it has.
                     session.shared_off = true;
                     let again = run_impl(snapshot, method, session, stop);
                     session.shared_off = false;
-                    return again;
+                    return again.map(|mut done| {
+                        done.drawing
+                            .layout_diagnostics
+                            .push(crate::SHARED_TRACKS_FALLBACK.into());
+                        done
+                    });
                 }
             }
             search.construction.add(&trial.work);
