@@ -2337,6 +2337,51 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
     order
 }
 
+/// Provisional (`LayoutOptions::shared_tracks`): the track slots of a channel's changes when the changes of one group share
+/// a track. A group stands as one change spanning all of its members, placed where its first member stands in `order`;
+/// every member takes the group's slot. A change without a group stands alone.
+pub(crate) fn shared_track_slots<'g>(
+    spans: &[(f64, f64)],
+    order: &[usize],
+    track: f64,
+    group: impl Fn(usize) -> Option<&'g str>,
+) -> (Vec<usize>, usize) {
+    let mut unit_of: Vec<usize> = vec![usize::MAX; spans.len()];
+    let mut units: Vec<(f64, f64)> = Vec::new();
+    let mut by_group: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut unit_order = Vec::new();
+    for &k in order {
+        let (lo, hi) = (spans[k].0.min(spans[k].1), spans[k].0.max(spans[k].1));
+        let unit = match group(k) {
+            Some(g) => *by_group.entry(g).or_insert_with(|| {
+                units.push((lo, hi));
+                unit_order.push(units.len() - 1);
+                units.len() - 1
+            }),
+            None => {
+                units.push((lo, hi));
+                unit_order.push(units.len() - 1);
+                units.len() - 1
+            }
+        };
+        let u = &mut units[unit];
+        u.0 = u.0.min(lo);
+        u.1 = u.1.max(hi);
+        unit_of[k] = unit;
+    }
+    let (unit_slots, count) = track_slots(&units, &unit_order, track);
+    let slots = (0..spans.len())
+        .map(|k| {
+            if unit_of[k] == usize::MAX {
+                0
+            } else {
+                unit_slots[unit_of[k]]
+            }
+        })
+        .collect();
+    (slots, count)
+}
+
 /// The track slot of every lane change of one channel, in the channel's order (`order`, positions into `changes`): changes
 /// whose spans across the flow overlap (with a track of clearance) keep the order on separate tracks; changes that do not
 /// overlap may share a track. A change takes the slot after the highest slot of the overlapping changes before it in the

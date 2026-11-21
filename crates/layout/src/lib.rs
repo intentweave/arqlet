@@ -337,6 +337,11 @@ pub fn compute(
 
 /// `compute` that also returns the stage work of the first layout (placement, routing, and so on), so that a caller can
 /// report where the time of an import goes. The snapshot is the same as `compute` returns.
+/// Provisional (`LayoutOptions::shared_tracks`): the diagnostic of a layout computed without shared tracks because they
+/// made the lane orders cyclic for many edges.
+pub const SHARED_TRACKS_FALLBACK: &str =
+    "sharedTracks: shared tracks made the lane orders of many edges cyclic; laid out without them";
+
 pub fn compute_counted(
     graph: &Graph,
     previous: Option<&Snapshot>,
@@ -344,7 +349,28 @@ pub fn compute_counted(
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
     let started = stage_timer_start();
-    let result = compute_counted_unclocked(graph, previous, dirty, options);
+    let mut result = compute_counted_unclocked(graph, previous, dirty, options);
+    // Provisional (`sharedTracks`): shared tracks made the lane orders cyclic for many edges; the placement had already made
+    // room for them, so the whole layout is computed again without them (the options keep the request, the diagnostic says
+    // what happened).
+    if options.shared_tracks.is_some()
+        && result.as_ref().is_ok_and(|(s, _)| {
+            s.layout_diagnostics
+                .iter()
+                .any(|d| d == SHARED_TRACKS_FALLBACK)
+        })
+    {
+        let plain = LayoutOptions {
+            shared_tracks: None,
+            ..options.clone()
+        };
+        result =
+            compute_counted_unclocked(graph, previous, dirty, &plain).map(|(mut s, stages)| {
+                s.options.shared_tracks = options.shared_tracks;
+                s.layout_diagnostics.push(SHARED_TRACKS_FALLBACK.into());
+                (s, stages)
+            });
+    }
     // Provisional (phase timings): the time of this layout and its phases, for a host that installed a clock.
     if let Ok((_, stages)) = &result {
         let ms = |nanos: u64| nanos as f64 / 1e6;
@@ -2009,6 +2035,7 @@ fn channel_tracks_by_edges(
     border_lanes: &BTreeMap<(String, String), f64>,
     vertical: bool,
     track: f64,
+    shared: bool,
 ) -> Vec<usize> {
     // This demand uses the cross-axis lane domains only. Main-axis coordinates
     // are still provisional when placement calls it; moving ranks afterwards
@@ -2039,6 +2066,9 @@ fn channel_tracks_by_edges(
         })
     };
     let mut spans: Vec<Vec<(f64, f64)>> = vec![Vec::new(); level_list.len()];
+    // Provisional (`sharedTracks: target`): the group of each span, the element the link ends at, for the spans of the
+    // last channel before it (as the realization shares them); `None` elsewhere or without the option.
+    let mut groups: Vec<Vec<Option<&str>>> = vec![Vec::new(); level_list.len()];
     for ((a, b), dummies) in chains {
         let Some(edges) = link_edges.get(&(a.clone(), b.clone())) else {
             continue;
@@ -2070,6 +2100,7 @@ fn channel_tracks_by_edges(
                 };
                 if (x - y).abs() > 0.5 {
                     spans[k].push((x, y));
+                    groups[k].push((shared && w[1] == b).then_some(b.as_str()));
                 }
             }
         }
@@ -2077,9 +2108,14 @@ fn channel_tracks_by_edges(
     spans
         .iter()
         .take(level_list.len().saturating_sub(1))
-        .map(|spans| {
+        .zip(&groups)
+        .map(|(spans, groups)| {
             let order = constructive::dependent_order(spans, track);
-            constructive::track_slots(spans, &order, track).1
+            if groups.iter().any(Option::is_some) {
+                constructive::shared_track_slots(spans, &order, track, |k| groups[k]).1
+            } else {
+                constructive::track_slots(spans, &order, track).1
+            }
         })
         .collect()
 }
@@ -2212,6 +2248,7 @@ mod physical_channel_capacity_tests {
             &BTreeMap::new(),
             false,
             6.,
+            false,
         );
         assert_eq!(tracks, vec![2]);
 
@@ -2232,6 +2269,7 @@ mod physical_channel_capacity_tests {
                 &BTreeMap::new(),
                 false,
                 6.,
+                false,
             ),
             tracks
         );
@@ -7669,6 +7707,7 @@ fn place(
                                 &counted(&lanes),
                                 vertical,
                                 options.track_spacing,
+                                options.shared_tracks.is_some(),
                             ),
                             across: placement_geometry::project(&placed, vertical),
                             extent: cross_extent.max(reach + cross_gap),
@@ -7748,6 +7787,7 @@ fn place(
                             &counted(lanes),
                             vertical,
                             options.track_spacing,
+                            options.shared_tracks.is_some(),
                         )
                     });
                     physical_track_counts.clone_from(&tracks);
