@@ -119,31 +119,10 @@ fn quality_order(mut channel: abstract_routing::Channel) -> abstract_routing::Ch
         }
     }
     let mut position = vec![0; n];
-    channel.tracks = 0;
     for (at, &i) in channel.order.iter().enumerate() {
         position[i] = at;
-        let a = &channel.assignments[i];
-        let (lo, hi) = if a.from < a.to {
-            (&a.from, &a.to)
-        } else {
-            (&a.to, &a.from)
-        };
-        let slot = channel.order[..at]
-            .iter()
-            .filter_map(|&j| {
-                let b = &channel.assignments[j];
-                let (l, h) = if b.from < b.to {
-                    (&b.from, &b.to)
-                } else {
-                    (&b.to, &b.from)
-                };
-                (lo <= h && l <= hi).then_some(b.slot + 1)
-            })
-            .max()
-            .unwrap_or(0);
-        channel.assignments[i].slot = slot;
-        channel.tracks = channel.tracks.max(slot + 1);
     }
+    channel.tracks = abstract_routing::slots_in_order(&mut channel.assignments, &channel.order);
     channel.broken_dependencies = channel
         .dependencies
         .iter()

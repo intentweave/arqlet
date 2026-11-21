@@ -29,3 +29,16 @@ values bit for bit and the failed edges.
 For comparison (same machine, same inputs, `benchmarks/eval` with `@openedges/elk-layout` 0.12.1, the explorer's options
 but `nodePlacement.strategy: BRANDES_KOEPF`): elk-rs takes about 318 ms on "dense" and 120 ms on "deep". With the
 explorer's `NETWORK_SIMPLEX` placement it takes about 740 ms on "dense" and 2.9–4.2 s on "deep".
+
+## Follow-up: indexes and slots (same day, same machine and inputs)
+
+- A channel's assignment of an edge, a route's edge and a box's parent are found by an index built once instead of a
+  scan with string comparisons.
+- The slots of a channel's assignments (`abstract_routing::channel`, `planning::quality_order`) come from a range query
+  over the lanes (`range_tree`) instead of a scan over the earlier assignments.
+
+Medians of 5, binaries alternately: dense default 597 → 585 ms (indexes), then 600 → 578 ms (slots; the two runs were
+measured apart, under load). The other inputs within 1–3 ms. Output byte-identical (86 cases, 15 fingerprint views).
+What remains on "dense" is quadratic in the edges of a channel by design: the pairwise dependencies of
+`abstract_routing::channel`, the sifting of `dependent_order`, and the 11.5 million candidate pairs of the
+longitudinal sweep in `reserve_once`.
