@@ -7,6 +7,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- View details (provisional): the read-only operation `details` (`nodeId` or `edgeId`, optional `limit`) answers what
+  the engine knows about a node or an edge and a host cannot see in the scene: the containers above a node, the box
+  that shows it (itself, the collapsed container it is in, or none) with its absolute bounds, what a box holds
+  (children, all nodes inside), its edges in and out; for a drawn line its visible ends, length, bends, bundle, and the
+  edges of the source graph it stands for in its own direction and in the other (at most `limit` ids each, counts
+  complete); for an edge of the source graph the line that carries it. Typed (`DetailsAnswer`), in sessions and in
+  the typed protocol. `session.details(target)`; in the view controller `select(target)` keeps `state.details` up to
+  date after every change, and `hover(target)` holds what the pointer is over (no engine call). Domain attributes stay
+  with the host. The playground shows the details of the selected node or edge.
 - A headless view controller in `@arqlet/engine-client` (provisional, request 31): `createViewController(session)` keeps
   what a user does between two scenes in one frozen state object (`scene`, `diff`, `busy`, `error`, `highlight`,
   `hide`, `canBack`, `canForward`) with `subscribe`, so a React binding is `useSyncExternalStore(view.subscribe,

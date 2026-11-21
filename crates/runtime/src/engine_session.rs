@@ -135,6 +135,7 @@ impl EngineSession {
             }
             Some("trace") => crate::trace::trace_on(self.current()?, v),
             Some("neighbourhood") => crate::trace::neighbourhood_on(self.current()?, v),
+            Some("details") => crate::details::details_on(self.current()?, v),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))
             }

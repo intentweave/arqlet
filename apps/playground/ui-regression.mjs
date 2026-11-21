@@ -135,6 +135,15 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
  await get('undo').onclick();await settle();
  assert.equal(closed(),was);
  console.log('Undo and redo passed: through the view controller.');
+ // Details: a selected node shows the engine's facts (the box that shows it, the groups above it).
+ const leaf=runInNewContext(`snapshot.graph.nodes.find(n=>n.parentId===${JSON.stringify(box)}&&!snapshot.graph.nodes.some(c=>c.parentId===n.id))?.id`,context);
+ if(leaf){
+  await runInNewContext(`viewController.select({nodeId:${JSON.stringify(leaf)}})`,context);await settle();
+  assert.match(get('details').textContent,new RegExp(`^Engine: .*in .*${box.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}`),get('details').textContent);
+  await runInNewContext('viewController.select(null)',context);
+  assert.equal(get('details').textContent,'');
+  console.log('Details passed: the engine names the groups above a selected node.');
+ }
 }
 
 // Browser-only: import, edits and refinement stay in the WASM workers; the backend is never called.

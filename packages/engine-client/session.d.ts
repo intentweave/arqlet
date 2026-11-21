@@ -1,4 +1,4 @@
-import type {Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
+import type {DetailsAnswer, Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
 import type {SceneColumns} from './columns.js';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
@@ -36,6 +36,9 @@ export interface SessionResult {
   /** `expand`/`collapse`: the container was in that state already; no engine call was made. */
   unchanged?: boolean;
 }
+
+/** What `details` asks about: a node, or an edge (a drawn line or an edge of the source graph). */
+export type DetailTarget = {nodeId: string; edgeId?: never} | {edgeId: string; nodeId?: never};
 
 /** The answer of a read-only request (`trace`, `neighbourhood`): its fields beside `ok: true`, or the error. */
 export type ReadAnswer<T> = ({ok: true} & T) | {ok: false; error: string};
@@ -85,6 +88,11 @@ export interface Session {
     nodeId: string | string[],
     init?: {hops?: number; direction?: 'out' | 'in' | 'both'; edgeKinds?: string[]},
   ): Promise<ReadAnswer<NeighbourhoodAnswer>>;
+  /**
+   * Provisional (read only): what the engine knows about a node or an edge (a drawn line or an edge of the source graph):
+   * the containers above a node and the box that shows it, what a collapsed box holds, the edges a line stands for.
+   */
+  details(target: DetailTarget, init?: {limit?: number}): Promise<ReadAnswer<DetailsAnswer>>;
   /**
    * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
    * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from

@@ -77,6 +77,8 @@ await view.import(graph, {options: {levelOfDetail: {depth: 0}}});
 await view.open('group-1');                       // close, toggle, reveal(nodes)
 await view.showRest('group-1');                   // the next page of its `+N more` box
 await view.trace('a', 'z');                       // kept as state.highlight while the view changes; clearHighlight()
+await view.select({edgeId: 'e7'});                // state.details: the edges this line stands for, kept up to date
+view.hover({nodeId: 'a'});                        // state.hover, for a tooltip (no engine call)
 await view.filter({nodeKinds: ['test']});
 await view.back();                                // forward(); cancel() drops steps not started yet
 ```

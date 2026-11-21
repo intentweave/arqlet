@@ -234,6 +234,20 @@ await session.reveal(path.nodes);                            // only as far as n
 In the playground: section *Path* (from, to, *Trace*, *Reveal path*, *Fade others*,
 *Show a node*).
 
+### Details
+
+`details` (read only) tells what the engine knows about a node or an edge and the scene
+does not show: the groups above a node, the box that shows it when it is inside a
+collapsed group, what a box holds, and for a drawn line the edges of the graph it stands
+for in each direction. Domain attributes stay with the host, which looks them up by id.
+
+```js
+const {node} = await session.details({nodeId: 'a'});         // node.parents, node.shownAs, node.bounds, node.children
+const {route} = await session.details({edgeId: 'e7'});       // route.edges, route.edgeCount, route.opposite
+```
+
+In the playground: select a node or an edge; the line *Engine:* below the edge details.
+
 ### Filter
 
 `filter` hides nodes by kind or id (each with what it holds) and edges by kind, without

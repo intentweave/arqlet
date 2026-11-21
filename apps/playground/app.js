@@ -177,7 +177,33 @@ function toggleContainer(id,event){
 // took; the stack starts empty when another graph is loaded or the graph changes.
 const layoutSession=createLayoutSession(request=>execute('edit',request),{resident:false});
 const viewController=createViewController(layoutSession,{page:PAGE,scenes:false});
-viewController.subscribe(()=>syncHistoryButtons());
+viewController.subscribe(()=>{syncHistoryButtons();showDetails();});
+// What the engine knows about the selected node or edge (`state.details`, kept up to date by the controller): the groups
+// above a node and the box that shows it, what a box holds, the edges a line stands for.
+let shownDetails;
+// Selects for the details; a refused request is shown in their place.
+const selectDetails=target=>viewController.select(target).then(r=>{if(!r.ok&&!r.cancelled)$('details').textContent=`Details: ${r.error}`;return r;});
+function showDetails(){
+ const d=viewController.getState().details;
+ if(d===shownDetails)return;
+ shownDetails=d;
+ const box=$('details');
+ if(!d){box.textContent='';return;}
+ const parts=[];
+ if(d.node){
+  const n=d.node;
+  parts.push(`${n.label} (${n.kind})`,n.parents.length?`in ${n.parents.join(' › ')}`:'top level');
+  if(n.shownAs!==n.id)parts.push(n.shownAs?`shown by ${n.shownAs}`:'hidden in this view');
+  if(n.children)parts.push(`${n.children} children, ${n.descendants} inside${n.collapsed?' (collapsed)':''}`);
+  parts.push(`${n.incoming} in, ${n.outgoing} out`);
+ }
+ if(d.route){
+  const r=d.route,list=(ids,count)=>ids.join(', ')+(count>ids.length?` … (${count})`:'');
+  parts.push(`line ${r.source} → ${r.target} stands for ${r.edgeCount} edge${r.edgeCount===1?'':'s'}${r.edgeCount?`: ${list(r.edges,r.edgeCount)}`:''}`);
+  if(r.oppositeCount)parts.push(`${r.oppositeCount} back: ${list(r.opposite,r.oppositeCount)}`);
+ } else if(d.edge)parts.push(`edge ${d.edge.source} → ${d.edge.target} is not drawn in this view`);
+ box.textContent=`Engine: ${parts.join(' · ')}`;
+}
 // Hands a snapshot the page made to the controller (with `remember`, the change is an undo entry).
 const adopt=(next,options)=>viewController.adopt(next,options).then(r=>{if(!r.ok&&!r.cancelled)status(`View: ${r.error}`);return r;});
 // Undo or redo: the engine restores the remembered decisions in one step. A refused restore keeps the entry.
@@ -206,7 +232,7 @@ function draw(fit=false){
  if(selectionKey!==key||!scene.routes.some(r=>r.id===selectedRoute)){selectedRoute=null;selectionKey=null;}
  selection.prune({nodes:new Set(scene.nodes.map(n=>n.id)),routes:new Set(scene.routes.map(r=>r.id))});
  renderSvg($('graph'),shown,{document,trace:traceView(),onPortDragStart:(port,e)=>startPortDrag(port,e),onLabelDragStart:(label,e)=>startLabelDrag(label,e),onNodeDragStart:(n,e,opts)=>startDrag(n,e,opts),onToggle:toggleContainer,onPin:(id,on)=>{if(performance.now()<pinClickGuard)return;setPin(id,on);},onReset:resetSize,onResize:startResize,sized:sizedAxes(),selected,selectedRoute,scale,pinned:new Set(Object.keys(effectiveOptions().pins)),onSelect:(id,event)=>{if(suppressClick){suppressClick=false;return;}if(event?.ctrlKey||event?.metaKey)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=(scene.nodes.find(n=>n.id===id)??scene.busLines?.find(b=>b.id===id))?.label??id;draw();},
-  onSelectRoute:id=>{selectedRoute=selectedRoute===id?null:id;selection.selectRoute(selectedRoute);selectionKey=selectedRoute?key:null;draw();}});
+  onSelectRoute:id=>{selectedRoute=selectedRoute===id?null:id;selection.selectRoute(selectedRoute);selectionKey=selectedRoute?key:null;selectDetails(selectedRoute?{edgeId:selectedRoute}:null);draw();}});
  renderTreeView(scene);
   if(curation){markPending();bindCurationGestures($('graph'),curation,scene,{changed:()=>draw(),status,growContainers:()=>true,selectedNodes:()=>selection.nodes});}
  renderInspector();
@@ -672,7 +698,7 @@ function onDragEnd(event){
 }
 // Selects a node of the view: the same selection as a click on the drawing, and the same one the containment tree uses.
 function selectNode(id,add=false){viewSelected=false;
- if(add)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=snapshot.graph.nodes.find(n=>n.id===id)?.label??id;draw();
+ if(add)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=snapshot.graph.nodes.find(n=>n.id===id)?.label??id;selectDetails({nodeId:id});draw();
 }
 // Pointer capture on the drawing sends the moves and the release to it, also outside the node. Escape cancels a move.
 // Ctrl/Cmd+Z undoes the last container size change, unless a text field has the focus.

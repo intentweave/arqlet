@@ -8,6 +8,7 @@ pub mod columns;
 pub mod components;
 pub mod containers;
 pub mod coordinator;
+pub mod details;
 pub mod engine_session;
 pub mod execution;
 pub mod filter;
@@ -4198,6 +4199,9 @@ pub(crate) fn dispatch_legacy(input: &str) -> String {
         }
         if v["op"].as_str() == Some("neighbourhood") {
             return trace::neighbourhood_response(&v).to_string();
+        }
+        if v["op"].as_str() == Some("details") {
+            return details::details_response(&v).to_string();
         }
         if v["op"].as_str() == Some("componentRefine") {
             return component_response(&v);

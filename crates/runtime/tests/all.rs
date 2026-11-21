@@ -22,6 +22,8 @@ mod curation_labels;
 mod curation_locks;
 #[path = "curation_reroute.rs"]
 mod curation_reroute;
+#[path = "details.rs"]
+mod details;
 #[path = "directed_repair.rs"]
 mod directed_repair;
 #[path = "directions_first.rs"]
