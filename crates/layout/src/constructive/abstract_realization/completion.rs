@@ -465,16 +465,18 @@ fn run_impl(
     }
     // Keep canonical graph and local node coordinates distinct from scene boxes.
     let mut drawing = snapshot.clone();
+    // Each node's parent, the first node of an id as a scan finds it.
+    let mut parent_of: BTreeMap<&str, Option<&String>> = BTreeMap::new();
+    for n in &snapshot.graph.nodes {
+        parent_of
+            .entry(n.id.as_str())
+            .or_insert(n.parent_id.as_ref());
+    }
     drawing.boxes = grown
         .boxes
         .iter()
         .map(|(id, r)| {
-            let parent = snapshot
-                .graph
-                .nodes
-                .iter()
-                .find(|n| n.id == *id)
-                .and_then(|n| n.parent_id.as_ref());
+            let parent = parent_of.get(id.as_str()).copied().flatten();
             let mut local = r.clone();
             if let Some(parent) = parent {
                 local.x -= grown.boxes[parent].x;
@@ -614,8 +616,13 @@ fn corner_loops(
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
         .collect();
     let preferred = 20. + self_loop_clearance;
+    // Each route's edge, the first of an id as a scan finds it.
+    let mut edge_of: BTreeMap<&str, &arqlet_model::Edge> = BTreeMap::new();
+    for e in &graph.edges {
+        edge_of.entry(e.id.as_str()).or_insert(e);
+    }
     for route in &mut seeds {
-        let Some(edge) = graph.edges.iter().find(|e| e.id == route.id) else {
+        let Some(&edge) = edge_of.get(route.id.as_str()) else {
             continue;
         };
         if edge.target.as_deref() != Some(edge.source.as_str()) {

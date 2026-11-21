@@ -376,6 +376,29 @@ impl<'a> Overlaps<'a> {
     }
 }
 
+/// A channel's assignments by edge, built once per channel when first asked (a channel of a dense graph holds thousands,
+/// and every section of every edge asks): the first assignment of an edge, as a scan finds it.
+pub(super) type Assigned<'c> = BTreeMap<(&'c str, usize), BTreeMap<&'c str, f64>>;
+
+/// The coordinate of `edge`'s first assignment in channel `c`, from `assigned` (filled on first use).
+pub(super) fn assigned_in<'c>(
+    assigned: &mut Assigned<'c>,
+    c: &'c Channel,
+    edge: &str,
+) -> Option<f64> {
+    assigned
+        .entry((c.area.as_str(), c.rank))
+        .or_insert_with(|| {
+            let mut by_edge = BTreeMap::new();
+            for a in &c.assignments {
+                by_edge.entry(a.0.as_str()).or_insert(a.2);
+            }
+            by_edge
+        })
+        .get(edge)
+        .copied()
+}
+
 fn compact(
     bends: &[Bend],
     constraints: &BTreeMap<(usize, usize), f64>,
@@ -635,6 +658,7 @@ fn reserve_once(
         channel_of.entry((c.area.as_str(), c.rank)).or_insert(c);
     }
     let leads = lead_segments(trials);
+    let mut assigned = Assigned::new();
     for edge in &plan.edges {
         // Growth demand (`narrow`) includes the edges whose channel is too narrow before it grows.
         let Some(trial) = trials.get(&edge.edge).filter(|t| match &t.failure {
@@ -680,8 +704,8 @@ fn reserve_once(
             }
             let preferred = channel_of
                 .get(&(s.area.as_str(), s.channel))
-                .and_then(|c| c.assignments.iter().find(|a| a.0 == edge.edge))
-                .map_or(far / 2. + near / 2., |a| a.2);
+                .and_then(|c| assigned_in(&mut assigned, c, &edge.edge))
+                .unwrap_or(far / 2. + near / 2.);
             if ![origin, bounds.0, bounds.1, preferred]
                 .iter()
                 .all(|v| v.is_finite())
