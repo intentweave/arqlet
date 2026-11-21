@@ -79,6 +79,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   or with taps-only input.
 ### Changed
 
+- **Default:** in views that start abstract (`levelOfDetail` or `communities` set), an area with at least 50 children
+  without an edge to a sibling lays them out as a grid (`isolatedGridFrom` unset now means 50 there; `0` turns it off).
+  Opening a container of 574 unlinked children inside a community gave one column of 230 × 44 820, now a grid of
+  2 960 × 7 968 (an anonymized 41k tree); on a private catalog, opening the largest container gives 12 110 × 36 310
+  instead of 8 030 × 74 958 at the same time (0.48 s). Views without an abstract start are unchanged (15 fingerprint
+  views identical). `LayoutOptions::isolated_grid_threshold()` gives the effective value.
 - **Default:** `liftEdges` is on in views that start abstract (`levelOfDetail` or `communities` set, `liftEdges`
   unset): edges between opened containers are drawn between the outermost containers they differ in, one route per
   pair. On a private catalog with `levelOfDetail: {depth: 0}` opening the largest container takes 0.47 s instead of
