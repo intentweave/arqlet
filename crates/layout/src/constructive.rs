@@ -2856,46 +2856,35 @@ fn search_on_counted(
         } else {
             Vec::new()
         };
-        for i in 0..m {
-            if arrive[k][i] == inf {
-                continue;
-            }
+        // The lane changes inside corridor k. The cost of a change from lane i to lane j is
+        // arrive[i] + |ys[j] - ys[i]| + BEND + CROSS * (crossings strictly between them on the column), and the crossings
+        // split into a count up to lane i and one up to lane j, so the cheapest lane i below (or above) every lane j is a
+        // running minimum over a sweep, restarted where a piece is blocked: linear in the lanes instead of quadratic. The
+        // chosen change is costed again by the exact sum, and ties go as in a scan over i in ascending order (the lane's own
+        // arrival first, then the lowest i). Lanes closer than 2 EPS, where the split count could differ from the exact one,
+        // keep the scan (`change_lanes_scan`).
+        if !piece.is_empty() {
             let column = &column_crossings[k];
-            for step in [-1isize, 1] {
-                // The crossings strictly between lane i and the scanned lane, as `between` counts them on the column: the
-                // bound at lane i stays, the other moves outwards with the scan, so its partition point only moves one way.
-                let (mut first, mut last) = if step > 0 {
-                    (column.partition_point(|&c| c <= ys[i] + EPS), 0)
-                } else {
-                    (column.len(), column.partition_point(|&c| c < ys[i] - EPS))
-                };
-                let mut j = i as isize + step;
-                while j >= 0 && (j as usize) < m {
-                    let lane = j as usize;
-                    let previous = (j - step) as usize;
-                    if !piece[lane.min(previous)] {
-                        break;
-                    }
-                    if step > 0 {
-                        while last < column.len() && column[last] < ys[lane] - EPS {
-                            last += 1;
-                        }
-                    } else {
-                        while first > 0 && column[first - 1] > ys[lane] + EPS {
-                            first -= 1;
-                        }
-                    }
-                    let cost = arrive[k][i]
-                        + (ys[lane] - ys[i]).abs()
-                        + BEND
-                        + last.saturating_sub(first) as f64 * CROSS;
-                    work.transitions += 1;
-                    if cost < depart[k][lane] {
-                        depart[k][lane] = cost;
-                        entered[k][lane] = i;
-                    }
-                    j += step;
-                }
+            if ys.windows(2).all(|w| w[1] - w[0] >= 2. * EPS) {
+                change_lanes_sweep(
+                    &arrive[k],
+                    &ys,
+                    &piece,
+                    column,
+                    &mut depart[k],
+                    &mut entered[k],
+                    work,
+                );
+            } else {
+                change_lanes_scan(
+                    &arrive[k],
+                    &ys,
+                    &piece,
+                    column,
+                    &mut depart[k],
+                    &mut entered[k],
+                    work,
+                );
             }
         }
         if k + 1 < n {
@@ -2931,6 +2920,156 @@ fn search_on_counted(
     }
     corners.reverse();
     Some(corners)
+}
+
+/// The lane changes of one corridor by scanning outwards from every reached lane (quadratic in the lanes): the reference
+/// for `change_lanes_sweep`, and its fallback where lanes lie closer than 2 EPS.
+#[allow(clippy::too_many_arguments)]
+fn change_lanes_scan(
+    arrive: &[f64],
+    ys: &[f64],
+    piece: &[bool],
+    column: &[f64],
+    depart: &mut [f64],
+    entered: &mut [usize],
+    work: &mut ConstructionCounters,
+) {
+    let m = ys.len();
+    let inf = f64::INFINITY;
+    for i in 0..m {
+        if arrive[i] == inf {
+            continue;
+        }
+        for step in [-1isize, 1] {
+            // The crossings strictly between lane i and the scanned lane, as `between` counts them on the column: the
+            // bound at lane i stays, the other moves outwards with the scan, so its partition point only moves one way.
+            let (mut first, mut last) = if step > 0 {
+                (column.partition_point(|&c| c <= ys[i] + EPS), 0)
+            } else {
+                (column.len(), column.partition_point(|&c| c < ys[i] - EPS))
+            };
+            let mut j = i as isize + step;
+            while j >= 0 && (j as usize) < m {
+                let lane = j as usize;
+                let previous = (j - step) as usize;
+                if !piece[lane.min(previous)] {
+                    break;
+                }
+                if step > 0 {
+                    while last < column.len() && column[last] < ys[lane] - EPS {
+                        last += 1;
+                    }
+                } else {
+                    while first > 0 && column[first - 1] > ys[lane] + EPS {
+                        first -= 1;
+                    }
+                }
+                let cost = arrive[i]
+                    + (ys[lane] - ys[i]).abs()
+                    + BEND
+                    + last.saturating_sub(first) as f64 * CROSS;
+                work.transitions += 1;
+                if cost < depart[lane] {
+                    depart[lane] = cost;
+                    entered[lane] = i;
+                }
+                j += step;
+            }
+        }
+    }
+}
+
+/// The lane changes of one corridor as `change_lanes_scan` finds them, in two sweeps (linear in the lanes).
+#[allow(clippy::too_many_arguments)]
+fn change_lanes_sweep(
+    arrive: &[f64],
+    ys: &[f64],
+    piece: &[bool],
+    column: &[f64],
+    depart: &mut [f64],
+    entered: &mut [usize],
+    work: &mut ConstructionCounters,
+) {
+    let m = ys.len();
+    let inf = f64::INFINITY;
+    // Crossings at most EPS above a lane (`low`), and those below a lane by more than EPS (`high`): the crossings strictly
+    // between lanes i < j are high[j] - low[i].
+    let low: Vec<usize> = ys
+        .iter()
+        .map(|&y| column.partition_point(|&c| c <= y + EPS))
+        .collect();
+    let high: Vec<usize> = ys
+        .iter()
+        .map(|&y| column.partition_point(|&c| c < y - EPS))
+        .collect();
+    let exact = |i: usize, j: usize| {
+        let (lo, hi) = if i < j { (i, j) } else { (j, i) };
+        arrive[i] + (ys[j] - ys[i]).abs() + BEND + high[hi].saturating_sub(low[lo]) as f64 * CROSS
+    };
+    // The keys only split the exact sum, so their rounding can differ from it near a tie (costs reach 10^8 with crossings):
+    // every lane whose key lies within a relative 1e-9 of the least stays a candidate, and the exact sum decides among them.
+    let near = |a: f64, b: f64| (a - b).abs() <= 1e-9 * a.abs().max(b.abs()).max(1.);
+    let push = |set: &mut Vec<(f64, usize)>, key: f64, i: usize| {
+        let best = set.iter().map(|c| c.0).fold(f64::INFINITY, f64::min);
+        if set.is_empty() || (key < best && !near(key, best)) {
+            set.clear();
+            set.push((key, i));
+        } else if key < best || near(key, best) {
+            set.push((key, i));
+            let best = best.min(key);
+            set.retain(|c| c.0 <= best || near(c.0, best));
+        }
+    };
+    // The candidate of `set` with the least exact cost to lane j, the lowest lane on a tie.
+    let pick = |set: &[(f64, usize)], j: usize| {
+        let mut lanes: Vec<usize> = set.iter().map(|c| c.1).collect();
+        lanes.sort_unstable();
+        let mut best: Option<(f64, usize)> = None;
+        for i in lanes {
+            let cost = exact(i, j);
+            if best.is_none_or(|(b, _)| cost < b) {
+                best = Some((cost, i));
+            }
+        }
+        best
+    };
+    let mut from_below: Vec<Option<(f64, usize)>> = vec![None; m];
+    let mut set: Vec<(f64, usize)> = Vec::new();
+    for j in 0..m {
+        if j > 0 {
+            if !piece[j - 1] {
+                set.clear();
+            }
+            from_below[j] = pick(&set, j);
+        }
+        if arrive[j] < inf {
+            push(&mut set, arrive[j] - ys[j] - CROSS * low[j] as f64, j);
+        }
+    }
+    let mut from_above: Vec<Option<(f64, usize)>> = vec![None; m];
+    let mut set: Vec<(f64, usize)> = Vec::new();
+    for j in (0..m).rev() {
+        if j + 1 < m {
+            if !piece[j] {
+                set.clear();
+            }
+            from_above[j] = pick(&set, j);
+        }
+        if arrive[j] < inf {
+            push(&mut set, arrive[j] + ys[j] + CROSS * high[j] as f64, j);
+        }
+    }
+    // As the scan: the lane's own arrival first, then every lane below, then every lane above, each taken only when cheaper.
+    for j in 0..m {
+        for candidate in [from_below[j], from_above[j]].into_iter().flatten() {
+            work.transitions += 1;
+            let (cost, i) = candidate;
+            if cost < depart[j] {
+                depart[j] = cost;
+                entered[j] = i;
+            }
+        }
+    }
 }
 
 /// The extent of a box across the flow: its y range for a left-to-right flow, its x range for a top-to-bottom flow.
@@ -4249,5 +4388,85 @@ mod lead_tests {
         );
         assert!(lead.is_empty());
         assert_eq!(at, Point { x: 180., y: 120. });
+    }
+}
+
+#[cfg(test)]
+mod lane_change_tests {
+    use super::*;
+
+    /// A small deterministic generator (no dependency): the same cases on every platform.
+    struct Lcg(u64);
+    impl Lcg {
+        fn next(&mut self) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            self.0 >> 33
+        }
+        fn below(&mut self, n: u64) -> u64 {
+            self.next() % n
+        }
+    }
+
+    #[test]
+    fn the_sweep_finds_the_lane_changes_the_scan_finds() {
+        let mut rng = Lcg(7);
+        for case in 0..4000 {
+            let m = 2 + rng.below(40) as usize;
+            // Lanes on a coarse grid (so that costs tie often), now and then fractional.
+            let mut y = 0.;
+            let ys: Vec<f64> = (0..m)
+                .map(|_| {
+                    y += if rng.below(5) == 0 {
+                        0.37 + rng.below(3) as f64
+                    } else {
+                        (1 + rng.below(4)) as f64 * 8.
+                    };
+                    y
+                })
+                .collect();
+            let arrive: Vec<f64> = (0..m)
+                .map(|_| match rng.below(4) {
+                    0 => f64::INFINITY,
+                    1 => (rng.below(6) as f64) * CROSS + rng.below(50) as f64 * 8.,
+                    _ => 1000. + rng.below(40) as f64 * 8.,
+                })
+                .collect();
+            let piece: Vec<bool> = (0..m - 1).map(|_| rng.below(7) != 0).collect();
+            // Crossings on the column: on lanes, between them, and many at large costs.
+            let mut column: Vec<f64> = (0..rng.below(30))
+                .map(|_| {
+                    let l = rng.below(m as u64) as usize;
+                    match rng.below(3) {
+                        0 => ys[l],
+                        1 => ys[l] + 1.5,
+                        _ => ys[l] - 0.25,
+                    }
+                })
+                .collect();
+            column.sort_by(f64::total_cmp);
+            let start = |a: &[f64]| {
+                let depart: Vec<f64> = a.to_vec();
+                let entered: Vec<usize> = a
+                    .iter()
+                    .enumerate()
+                    .map(|(j, v)| if v.is_finite() { j } else { usize::MAX })
+                    .collect();
+                (depart, entered)
+            };
+            let (mut d1, mut e1) = start(&arrive);
+            let (mut d2, mut e2) = start(&arrive);
+            let mut work = ConstructionCounters::default();
+            change_lanes_scan(&arrive, &ys, &piece, &column, &mut d1, &mut e1, &mut work);
+            change_lanes_sweep(&arrive, &ys, &piece, &column, &mut d2, &mut e2, &mut work);
+            assert_eq!(e1, e2, "case {case}: lanes entered");
+            assert_eq!(
+                d1.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                d2.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                "case {case}: costs"
+            );
+        }
     }
 }

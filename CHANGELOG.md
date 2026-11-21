@@ -5,6 +5,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Performance
+
+- The constructive search finds the lane changes of a corridor in two sweeps instead of a scan from every lane (linear
+  instead of quadratic in the lanes); the output is byte-identical. On an anonymized 500-node graph with long edges and
+  `POLYLINE` routing the layout takes 1 883 ms instead of 3 505 ms (routing 1 520 instead of 3 143 ms); the default
+  single pass does not use this search and is unchanged. Measurements: `benchmarks/results/lane-sweep-20261121.md`.
+
 ### Added (phase timings)
 
 - `timings: true` on any request (provisional) adds `timings` to the answer, in ms: `total`, `layout` (every layout in
