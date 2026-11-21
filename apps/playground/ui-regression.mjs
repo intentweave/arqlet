@@ -268,6 +268,35 @@ if(exampleIndex.some(e=>e.name==='petri-net-shapes')){
   console.log(`Live mode passed: the import animated from the stress and converged in ${settledIn} settle calls, no refinement.`);
 }else console.log('Live mode skipped: the petri-net-shapes example is not built.');
 
+// Memberships across the hierarchy (ADR 0022, first slice): the checkbox is disabled for a graph that declares none, and
+// on the membership example it draws a hull per group of every dimension without moving the drawing.
+get('mode').value='split';get('mode').onchange();await flush();
+get('example').value='default';get('example').onchange();await flush();
+assert.equal(get('membership-hulls').disabled,true,'a graph without memberships has nothing to show');
+if(exampleIndex.some(e=>e.name==='memberships')){
+  get('example').value='memberships';get('example').onchange();await flush();
+  assert.equal(get('membership-hulls').disabled,false,'the example declares three dimensions');
+  assert.equal(get('membership-hulls').checked,false,'the overlay is off by default');
+  const plain=sceneOf(engine,latest);
+  assert.equal((plain.membershipHulls??[]).length,0,'nothing is drawn until the option is set');
+  const boxesBefore=JSON.stringify(plain.nodes.map(n=>n.bounds));
+  const routesBefore=JSON.stringify(plain.routes.map(r=>r.points));
+
+  get('membership-hulls').checked=true;get('membership-hulls').onchange();await flush();
+  assert.deepEqual(Object.keys(latest.options.membershipViews??{}),['layer','team','zone'],'every declared dimension is shown');
+  const drawn=sceneOf(engine,latest);
+  assert.equal(drawn.membershipHulls.length,9,'three dimensions of three groups each');
+  assert.equal(drawn.membershipReport.length,3);
+  assert.ok(drawn.membershipReport.every(r=>r.applied&&r.drawn===3),'every dimension is applied and complete');
+  assert.equal(JSON.stringify(drawn.nodes.map(n=>n.bounds)),boxesBefore,'a hull may not move a node');
+  assert.equal(JSON.stringify(drawn.routes.map(r=>r.points)),routesBefore,'a hull is invisible to the router');
+
+  get('membership-hulls').checked=false;get('membership-hulls').onchange();await flush();
+  assert.equal((sceneOf(engine,latest).membershipHulls??[]).length,0,'unticking removes them again');
+  get('example').value='default';get('example').onchange();await flush();
+  console.log('Membership hulls passed: 9 hulls over 3 dimensions, boxes and routes unchanged.');
+}else console.log('Membership hulls skipped: the memberships example is not built.');
+
 // Options: preset and bundling go through `configure`; the page reflects bundling from the snapshot.
 get('mode').value='split';get('mode').onchange();await flush();
 // Presets: applying one names the snapshot with its configId; a custom change clears the name.

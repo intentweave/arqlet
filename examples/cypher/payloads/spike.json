@@ -1,0 +1,12 @@
+{
+  "nodes": {
+    "ann": { "name": "Ann", "age": 30 },
+    "bob": { "name": "Bob", "age": 25 },
+    "cid": { "name": "Cid", "age": 40 },
+    "dee": { "name": "Dee", "age": 17 }
+  },
+  "edges": {
+    "e1": { "since": 2019 },
+    "e2": { "since": 2020 }
+  }
+}

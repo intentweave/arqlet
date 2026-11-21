@@ -111,6 +111,7 @@ pub fn refine_by_fixed_boundary(
         ports: vec![],
         edge_ports: vec![],
         buses: Vec::new(),
+        memberships: Default::default(),
     };
     let no_dirty = BTreeSet::new();
     let laid = arqlet_layout::compute(&interior, None, &no_dirty, options)?;
@@ -186,6 +187,7 @@ pub fn refine_by_fixed_boundary(
         ports: vec![],
         edge_ports: vec![],
         buses: Vec::new(),
+        memberships: Default::default(),
     };
     let mut outer_options = options.clone();
     outer_options

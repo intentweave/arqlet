@@ -306,6 +306,7 @@ mod graph_tests {
             ports: vec![],
             edge_ports: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let summary = analyse_graph(&graph);
         let c = summary

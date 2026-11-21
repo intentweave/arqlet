@@ -22,6 +22,12 @@ JavaScript with state kept in the engine, a columnar data path with optional
 shared memory) is proposed in [ADR 0019](adr/0019-engine-interface.md), step by
 step and measured first.
 
+How backend and browser share a large graph is proposed in
+[ADR 0023](adr/0023-primary-store-replicas-and-change-stream.md): one primary
+store, replicas that hold a subset (structure, and content per property key),
+a change stream with revisions instead of requested views, and queries placed
+where the data is (steps R1 to R6).
+
 ## 4. Additional geometry
 
 Grid placement, rounded routes, explicit bundling, straight routes and free curves.

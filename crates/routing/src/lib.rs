@@ -2241,6 +2241,7 @@ mod tests {
                 ports: vec![],
                 edge_ports: vec![],
                 buses: Vec::new(),
+                memberships: Default::default(),
             };
             assert!(shares_segment(&routes[0], &routes[1]));
             let result = improve(&graph, &BTreeMap::new(), &routes);
@@ -2294,6 +2295,7 @@ mod tests {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rect = |y: f64| Rect {
             x: 0.,
@@ -2369,6 +2371,7 @@ mod tests {
                 })
                 .collect(),
             buses: Vec::new(),
+            memberships: Default::default(),
         }
     }
 
@@ -2487,6 +2490,7 @@ mod tests {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rect = |x: f64, y: f64, width: f64, height: f64| Rect {
             x,
@@ -2570,6 +2574,7 @@ mod tests {
             ports: vec![],
             edge_ports: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let close = |list: &[Route]| {
             let mut n = 0;
@@ -2643,6 +2648,7 @@ mod tests {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rects = BTreeMap::from([
             (
@@ -2784,6 +2790,7 @@ mod channel_tests {
             nodes,
             edges,
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let ends: Vec<ChannelEnd> = (0..2)
             .map(|i| ChannelEnd {
@@ -2912,6 +2919,7 @@ mod contour_acceptance {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rects = BTreeMap::from([
             (
@@ -3067,6 +3075,7 @@ mod contour_acceptance {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rects = BTreeMap::from([
             (
@@ -3198,6 +3207,7 @@ mod contour_acceptance {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let mut rects = BTreeMap::from([
             (
@@ -3299,6 +3309,7 @@ mod search_corner_tests {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rects = BTreeMap::from([
             (

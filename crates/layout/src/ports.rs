@@ -1669,6 +1669,7 @@ mod tests {
                 weight: None,
             }],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let s = crate::compute(&g, None, &Default::default(), &LayoutOptions::default()).unwrap();
         let port = s.resolved_ports.iter().find(|p| p.id == "out").unwrap();

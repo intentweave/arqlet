@@ -10208,6 +10208,7 @@ mod pin_tests {
             ports: vec![],
             edge_ports: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         }
     }
 
@@ -10419,6 +10420,7 @@ mod pin_diagnostic_tests {
             ports: vec![],
             edge_ports: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let mut options = LayoutOptions::default();
         options.pins.insert("gone".into(), Point { x: 1., y: 1. });

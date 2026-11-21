@@ -20,6 +20,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - `reveal` takes the id of a bus given as data (`Graph.buses` with `taps` and no node): it opens the containers above
   the bus (`parentId`), so its line is drawn; with `partial` the bus's own container opens in part, its taps at the rest.
   Before, such an id was refused as an unknown node.
+- Memberships across the hierarchy, first slice (provisional, ADR 0022): `Graph.memberships` (dimensions of groups,
+  besides the containment) and `LayoutOptions.membershipViews`; a dimension shown as `overlay` is drawn as a padded
+  convex hull behind the nodes (`Scene.membershipHulls`, with the boxes it encloses and the foreign leaf boxes inside
+  it), with a typed report per dimension (`Scene.membershipReport`). Nothing moves: boxes and routes are identical with
+  and without hulls. Refused: duplicate dimension or group ids, an unknown or cyclic `parent`, `groups` together with a
+  `hierarchy` view; unknown member ids are ignored and counted. `hierarchy` and `lanes` are accepted and reported as not
+  yet applied. SVG viewer and playground (*Membership hulls*, demo *Memberships*).
 - A look into a collapsed container (provisional): the read-only operation `peek` (`nodeId`, optional `limit`, default
   50) lays out the container's contents on their own as a small scene (the containers inside collapsed, at most `limit`
   direct children in the source order, the rest counted) and counts per child the edges that cross the container's
@@ -76,6 +83,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - The playground runs its view through the view controller: every change, the undo stack (now also covering the
   three modes through `execute`), drags and refinement results handed over with `adopt`.
 - The remembered state (`intent`) keeps the filter (`hidden`), so a step back undoes a filter.
+- The minimum supported Rust version is 1.94 (was 1.88). The rule: the minimum follows what the dependencies need and
+  stays well behind stable, so that toolchains pinned by companies, distributions and CI images keep working (1.94, not
+  1.100: nothing needs 1.95 to 1.100; the parser planned for the Cypher query layer, ADR 0021, needs 1.94). A CI job
+  (`msrv`) checks the workspace, and the WASM adapter for `wasm32-unknown-unknown`, with that exact version. Edition
+  2021 is unchanged; a change of edition is a separate decision. Crates published earlier keep the version they
+  declared.
 
 ## 0.7.0 — 2026-11-21
 

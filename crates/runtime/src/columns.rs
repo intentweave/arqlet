@@ -705,6 +705,8 @@ mod tests {
             junctions: vec![Point { x: 5., y: 6.5 }],
             bus_lines: Vec::new(),
             hub_refs: Vec::new(),
+            membership_hulls: Vec::new(),
+            membership_report: Vec::new(),
             bounds: rect(-30., -30., 260., 160.),
         }
     }
