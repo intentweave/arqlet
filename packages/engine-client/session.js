@@ -152,8 +152,23 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
      * Any change still under way is dropped.
      */
     import(graph, {limit = Math.min(graph.nodes.length, MAX_VIEW_LIMIT), options} = {}) {
+      // A new view does not wait for the changes still under way: they resolve as stale.
       generation++;
+      queue = Promise.resolve();
       return enqueue(() => call({op: 'import', graph, limit, ...(options ? {options} : {})}));
+    },
+
+    /**
+     * Provisional: continues from `snapshot` (a host made it: a drag, a refinement, a document it loaded), after the changes
+     * queued before; with a resident session the engine takes it over (`load`).
+     */
+    load(snapshot, {reset = false} = {}) {
+      // With `reset` (another view) it does not wait for the changes still under way: they resolve as stale.
+      if (reset) {
+        generation++;
+        queue = Promise.resolve();
+      }
+      return enqueue(() => (resident ? call({op: 'load', snapshot}) : {ok: true, snapshot}));
     },
 
     /** Drops the snapshot; changes still under way resolve as stale. */

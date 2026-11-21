@@ -35,6 +35,9 @@ export interface ViewState {
   readonly hide: Hidden;
   readonly canBack: boolean;
   readonly canForward: boolean;
+  /** The names of the steps `back` and `forward` would undo and redo (such as `Open group-1`), or null. */
+  readonly backLabel: string | null;
+  readonly forwardLabel: string | null;
   /** How many steps changed the scene since the import. */
   readonly steps: number;
 }
@@ -68,11 +71,21 @@ export interface ViewController {
   back(): Promise<ViewResult>;
   forward(): Promise<ViewResult>;
   /** Any other change of the protocol, remembered for `back` under `label`. */
-  apply(request: Omit<EngineRequest, 'snapshot' | 'expectedRevision' | 'expectedLayoutVersion'> & {op: string}, label?: string): Promise<ViewResult>;
+  apply(
+    request: Omit<EngineRequest, 'snapshot' | 'expectedRevision' | 'expectedLayoutVersion'> & {op: string},
+    label?: string,
+    /** `merge`: a follow-up of the last change, remembered in its entry. */
+    options?: {remember?: boolean; merge?: boolean},
+  ): Promise<ViewResult>;
+  /**
+   * Continues from a snapshot the host made; with `forget` the history and the highlight start empty, with `remember` (a
+   * label) the change from the previous snapshot is remembered for `back`.
+   */
+  adopt(snapshot: Snapshot, options?: {forget?: boolean; remember?: string | null}): Promise<ViewResult>;
   /** Drops the steps queued and not started; a step under way finishes. */
   cancel(): void;
 }
 
-export function createViewController(session: Session, options?: {page?: number; historyLimit?: number}): ViewController;
+export function createViewController(session: Session, options?: {page?: number; historyLimit?: number; scenes?: boolean}): ViewController;
 
 export function sceneDiff(before: Scene | null, after: Scene | null): SceneDiff;

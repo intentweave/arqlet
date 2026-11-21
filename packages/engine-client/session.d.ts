@@ -54,6 +54,11 @@ export interface Session {
    */
   import(graph: Graph, init?: {limit?: number; options?: Record<string, unknown>}): Promise<SessionResult>;
   /** Drops the snapshot; changes still under way resolve as stale. */
+  /**
+   * Provisional: continues from `snapshot` (made by the host), after the changes queued before; with `reset` (another
+   * view) at once, the changes still under way resolving as stale.
+   */
+  load(snapshot: Snapshot, options?: {reset?: boolean}): Promise<SessionResult>;
   reset(): void;
   /** Whether container `id` is collapsed in the current snapshot. */
   isCollapsed(id: string): boolean;

@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import {createEngine} from '@arqlet/engine-client/wasm-client.js';
 import {acceptPublication,refinementFits} from './revisions.js';
 import {Session} from './session.js';
-import {History} from './history.js';
+import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
+import {createViewController} from '@arqlet/engine-client/view-controller.js';
 import {GeometryReports} from './geometry.js';
 import {containmentRows} from '../../packages/containment-tree/model.js';
 import {settingsOf,rootSettingsOf} from '../../packages/containment-tree/settings.js';
@@ -53,16 +54,18 @@ const autoSinglePass=async mode=>{
 };
 get('auto').checked=true;get('name').value='Test node';get('mode').value='split';get('example').value='default';
 const timers=new Map();let tid=0,backendCalls=0,latest=null;const backendOps=[];
+// The requests that change something (the view controller also reads the scene and the remembered decisions).
+const changeOps=()=>backendOps.filter(op=>op!=='scene'&&op!=='intent');
 let holdReplies=false;const heldReplies=[];
 class Worker{
  postMessage({requestId,request}){const response=engine(request);if(response.ok&&response.snapshot)latest=response.snapshot;const deliver=()=>this.onmessage({data:{requestId,...response}});if(holdReplies)heldReplies.push(deliver);else queueMicrotask(deliver);}
 }
-const context={GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,acceptPublication,Session,History,console,AbortController,Blob,URL,queueMicrotask,performance,
+const context={GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,acceptPublication,Session,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
  setTimeout:fn=>{timers.set(++tid,fn);return tid;},clearTimeout:id=>timers.delete(id),
  fetch:async(url,options)=>{
    if(url.includes('snapshot.json')){latest=structuredClone(initial);return {ok:true,json:async()=>structuredClone(initial)};}
    if(url.includes('graph.json'))return {ok:true,json:async()=>structuredClone(graph)};
-   if(url==='/api/op'){const request=JSON.parse(options.body);backendOps.push(request.op);if(request.op==='refine')backendCalls++;const result=engine(request);if(result.ok)latest=result.snapshot;return {ok:result.ok,json:async()=>result};}
+   if(url==='/api/op'){const request=JSON.parse(options.body);backendOps.push(request.op);if(request.op==='refine')backendCalls++;const result=engine(request);if(result.ok&&result.snapshot)latest=result.snapshot;return {ok:result.ok,json:async()=>result};}
    if(url==='./generated/examples/index.json')return {ok:true,json:async()=>structuredClone(exampleIndex)};
    if(url==='./generated/arqlet.wasm')return {ok:true,arrayBuffer:async()=>readFileSync(new URL('./generated/arqlet.wasm',import.meta.url))};
    if(url==='./generated/presets/index.json')return {ok:true,json:async()=>structuredClone(presetIndex)};
@@ -115,6 +118,25 @@ assert.match(get('structure-summary').textContent,/Chosen:/);
 await autoSinglePass('split');
 console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and inherited override with real WASM.');
 
+// Undo and redo run through the view controller (@arqlet/engine-client): a remembered toggle, undone and redone by the
+// buttons; the engine restores the decisions.
+{
+ const box=runInNewContext("snapshot.graph.nodes.find(n=>snapshot.graph.nodes.some(c=>c.parentId===n.id)).id",context);
+ const closed=()=>runInNewContext(`snapshot.collapsedIds.includes(${JSON.stringify(box)})`,context);
+ const was=closed();
+ const r=await runInNewContext(`edit({op:'toggle',nodeId:${JSON.stringify(box)}},{busy:'Toggling …',remember:'Toggle'})`,context);await settle();
+ assert.equal(r.ok,true,JSON.stringify(r));assert.equal(closed(),!was,'the toggle applies');
+ assert.equal(get('undo').disabled,false,'the toggle is remembered');
+ await get('undo').onclick();await settle();
+ assert.equal(closed(),was,'undo restores the container');
+ assert.equal(get('redo').disabled,false);
+ await get('redo').onclick();await settle();
+ assert.equal(closed(),!was,'redo applies it again');
+ await get('undo').onclick();await settle();
+ assert.equal(closed(),was);
+ console.log('Undo and redo passed: through the view controller.');
+}
+
 // Browser-only: import, edits and refinement stay in the WASM workers; the backend is never called.
 const splitOps=backendOps.length,splitRefines=backendCalls;
 get('mode').value='browser';get('mode').onchange();await flush();
@@ -151,7 +173,9 @@ const backendStart=backendOps.length;
 get('options-json').value='{"routingClearance": 12}';get('apply-options').click();await settle();
 assert.equal(latest.options.routingClearance,12,'the edit reaches the view through the backend lane');
 await flush();
-assert.deepEqual(backendOps.slice(backendStart,backendStart+2),['configure','refine']);
+// The view controller also reads the scene and the remembered decisions (`scene`, `intent`); the changes are the edit,
+// then the refinement.
+assert.deepEqual(backendOps.slice(backendStart).filter(op=>op!=='scene'&&op!=='intent').slice(0,2),['configure','refine']);
 assert.ok(backendOps.slice(backendStart).includes('refine'),'backend mode must send refinement to /api/op');
 await autoSinglePass('backend');
 console.log('Backend-only mode passed: edits and refinement run through /api/op.');
@@ -159,7 +183,7 @@ console.log('Backend-only mode passed: edits and refinement run through /api/op.
 // Examples: any demo graph loads through the mode's import lane; the default graph stays native in split mode.
 assert.ok(exampleIndex.some(e=>e.name==='state-tcp'),'state-tcp example must be offered');
 get('example').value='state-tcp';get('example').onchange();await flush();
-assert.equal(latest.graph.nodes.length,11);assert.equal(backendOps.at(-1),'import','backend mode imports examples at /api/op');
+assert.equal(latest.graph.nodes.length,11);assert.equal(changeOps().at(-1),'import','backend mode imports examples at /api/op');
 get('mode').value='split';get('mode').onchange();await flush();
 const beforeSplitExample=backendOps.length;
 get('example').value='state-tcp';get('example').onchange();await flush();

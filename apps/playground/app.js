@@ -8,7 +8,8 @@ import {acceptPublication,refinementFits} from './revisions.js';
 import {Session} from './session.js';
 import {MoveGesture,releaseOnDrop} from './drag.js';
 import {trackGesture} from './gesture.js';
-import {History} from './history.js';
+import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
+import {createViewController} from '@arqlet/engine-client/view-controller.js';
 import {placementOnBorder,positionOnBorder} from './port-drag.js';
 import {nearResizeCorner,resizedLeaf} from './resize.js';
 import {GeometryReports,labelSize} from './geometry.js';
@@ -169,28 +170,25 @@ function toggleContainer(id,event){
  edit({op:'toggle',snapshot,nodeId:id},{busy:'Recomputing view …',anchor:id,remember:'Collapse or expand'});
 }
 // Sets one container's size (ADR 0010): `entry` is the container's new `containerSizing` entry, or null to follow content.
-// The user's decisions are values of the engine (operations `intent` and `restore`), kept as an undo stack (history.js). One
-// action is one entry, however many engine steps it took. Cleared when another graph is loaded or the graph changes.
-const history=new History(50);
-let historyQueue=Promise.resolve();
-const intentOf=async snap=>{const data=await execute('edit',{op:'intent',snapshot:snap});if(!data.ok)throw Error(data.error);return data.intent;};
-// Records the action from the snapshot `before` to the snapshot `after`; recordings run one after the other.
-function recordHistory(label,before,after,options){
- historyQueue=historyQueue.then(async()=>{try{history.record({label,before:await intentOf(before),after:await intentOf(after)},options);}catch(e){status(`History: ${e.message}`);}syncHistoryButtons();});
- return historyQueue;
-}
+// The view runs through a view controller over a layout session (`@arqlet/engine-client`), as a host would use it: every
+// change, page and filter, the undo stack of the user's decisions (the engine's `intent` and `restore`) and the snapshots
+// the page makes itself (a drag, a refinement, a loaded document), which it hands over with `adopt`. The session sends its
+// requests through `execute`, so all three modes keep working. One action is one entry, however many engine steps it
+// took; the stack starts empty when another graph is loaded or the graph changes.
+const layoutSession=createLayoutSession(request=>execute('edit',request),{resident:false});
+const viewController=createViewController(layoutSession,{page:PAGE,scenes:false});
+viewController.subscribe(()=>syncHistoryButtons());
+// Hands a snapshot the page made to the controller (with `remember`, the change is an undo entry).
+const adopt=(next,options)=>viewController.adopt(next,options).then(r=>{if(!r.ok&&!r.cancelled)status(`View: ${r.error}`);return r;});
 // Undo or redo: the engine restores the remembered decisions in one step. A refused restore keeps the entry.
 async function stepHistory(direction){
  if(!snapshot||pending||drag||resize||containerResize)return;
- await historyQueue;
- const entry=direction<0?history.peekUndo():history.peekRedo();
- if(!entry)return;
  const verb=direction<0?'Undoing':'Redoing';
- const result=await edit({op:'restore',snapshot,intent:direction<0?entry.before:entry.after},{busy:`${verb} ${entry.label} …`,fit:true});
+ const label=direction<0?viewController.getState().backLabel:viewController.getState().forwardLabel;
+ const result=await edit({op:'restore'},{busy:`${verb} ${label??''} …`,fit:true,via:()=>direction<0?viewController.back():viewController.forward()});
  if(!result.ok)return;
- if(direction<0)history.commitUndo();else history.commitRedo();
  syncHistoryButtons();
- status(`${direction<0?'Undone':'Redone'}: ${entry.label}`);
+ status(`${direction<0?'Undone':'Redone'}${label?`: ${label}`:''}`);
 }
 const undo=()=>stepHistory(-1),redo=()=>stepHistory(1);
 function applyContainerSizing(id,entry){
@@ -330,23 +328,28 @@ function animate(before,{fade=true}={}){
 }
 // `anchor` (a node id): after the change the view scrolls so that this node's box is where it was on screen, instead of
 // fitting the whole drawing again.
-async function edit(request,{busy,fit=false,chained=false,remember=null,anchor=null}={}){
+async function edit(request,{busy,fit=false,chained=false,remember=null,anchor=null,via=null}={}){
  if(curation)return {ok:false,error:'Curation is active: the view is not recomputed.'};
  if(drag?.gesture?.active)return {ok:false,error:'A move is running: finish it or cancel it first.'};
  if(!snapshot||pending)return {ok:false,error:'An operation is already running.'};
  cancelRefinement();
  const base={epoch,revision:snapshot.revision,layout:snapshot.layoutVersion??0};
- const baseSnapshot=snapshot;
  let places=null;try{places=placesOnScreen();}catch{}
  const before=anchor?drawnPosition(anchor):null;
  pending=base;$('add').disabled=true;draw();status(busy);
  let data;
- try{data=await execute('edit',{...request,expectedRevision:base.revision,expectedLayoutVersion:base.layout});}
+ // Through the view controller: the session adds the snapshot and the expected versions; a decision is remembered as one
+ // undo entry (`remember`; a follow-up of the last action with `merge`). `via` runs a step of the controller instead
+ // (undo, redo).
+ const {snapshot:_sent,expectedRevision:_r,expectedLayoutVersion:_l,...change}=request;
+ const label=remember?(typeof remember==='string'?remember:remember.label):request.op;
+ try{data=await(via?via():viewController.apply(change,label,{remember:!!remember&&request.op!=='add',merge:!!remember?.merge}));}
  catch(e){data={ok:false,error:e.message};}
+ if(data.ok&&!data.snapshot)data={...data,snapshot:viewController.getState().snapshot};
  if(epoch!==base.epoch||pending!==base)return {ok:false,error:'The view was reset in the meantime.'};
  pending=null;$('add').disabled=!selected;
  if(!data.ok){status(data.error);draw();return {ok:false,error:data.error};}
- if(snapshot.revision!==base.revision||(snapshot.layoutVersion??0)!==base.layout||data.snapshot.baseRevision!==base.revision){status('Stale result discarded.');return {ok:false,error:'Stale result discarded.'};}
+ if(snapshot.revision!==base.revision||(snapshot.layoutVersion??0)!==base.layout){status('Stale result discarded.');return {ok:false,error:'Stale result discarded.'};}
  snapshot=data.snapshot;status(`Computed locally · ${snapshot.recomputedContainers.length} container regions updated`);
  const after=before?drawnPosition(anchor):null;
  if(after){autoFit=false;draw(false);const c=$('canvas');c.scrollLeft+=after.x-before.x;c.scrollTop+=after.y-before.y;}
@@ -356,9 +359,8 @@ async function edit(request,{busy,fit=false,chained=false,remember=null,anchor=n
  if(!chained&&!$('live').checked)scheduleRefinement();
  // Live mode: a change other than a settle step is followed by settling (after this edit has returned).
  if(!chained&&request.op!=='settle'&&$('live').checked)setTimeout(live,0);
- // A new node changes the graph itself: what was remembered no longer describes it. A decision is remembered as one entry.
- if(request.op==='add')history.clear();
- else if(remember)recordHistory(typeof remember==='string'?remember:remember.label,baseSnapshot,snapshot,{merge:!!remember.merge});
+ // A new node changes the graph itself: what was remembered no longer describes it.
+ if(request.op==='add')adopt(snapshot,{forget:true});
  return {ok:true,snapshot};
 }
 // Dragging a leaf. A movement of more than 4 units starts a move gesture; below that, the pointer is a plain click.
@@ -583,7 +585,7 @@ function onDragMove(event){
   drag.gesture=new MoveGesture({
    send:request=>execute('edit',request),
    base:snapshot,
-   onSnapshot:(next,info)=>{if(epoch!==startedEpoch)return;snapshot=next;if(!info.dragging){dropNote=moveOnlyNote(next);const grown=drag&&!drag.cancelled?grownSizing(next,drag.ancestors):null;const settleAfter=!!(drag&&!drag.cancelled&&next.options?.forceDirected);if(drag&&!drag.cancelled&&drag.baseSnapshot)recordHistory(`Move ${drag.node}`,drag.baseSnapshot,next);dragPreview=null;drag=null;suppressClick=true;cancelRefinement();scheduleRefinement();if(grown){edit({op:'configure',snapshot,options:{containerSizing:grown}},{busy:'Keeping the grown container size …',fit:true,remember:{label:'Grow container',merge:true}});}else if(settleAfter)setTimeout(settle,0);}draw();},
+   onSnapshot:(next,info)=>{if(epoch!==startedEpoch)return;snapshot=next;if(!info.dragging){dropNote=moveOnlyNote(next);const grown=drag&&!drag.cancelled?grownSizing(next,drag.ancestors):null;const settleAfter=!!(drag&&!drag.cancelled&&next.options?.forceDirected);adopt(next,{remember:drag&&!drag.cancelled&&drag.baseSnapshot?`Move ${drag.node}`:null});dragPreview=null;drag=null;suppressClick=true;cancelRefinement();scheduleRefinement();if(grown){edit({op:'configure',snapshot,options:{containerSizing:grown}},{busy:'Keeping the grown container size …',fit:true,remember:{label:'Grow container',merge:true}});}else if(settleAfter)setTimeout(settle,0);}draw();},
    onStats:stats=>{
     status(`Move: ${stats.sent} sent · ${stats.coalesced} coalesced · ${stats.applied} applied · ${stats.discarded} discarded${stats.error?` · ${stats.error}`:''}${dropNote}`);
     // A refused step ends the gesture: the node returns to the engine's position, and the next drag may start.
@@ -800,10 +802,9 @@ $('profile').onchange=async()=>{
  else{status(result.error);draw();}
 };
 async function reset(){
- history.clear();
  tracker?.end('modelchange');
  const token=++loadToken;epoch++;cancelRefinement();curation=null;pending=null;selected=null;treeSignature=null;userSizes.clear();geometry.clear();selection.clear();$('add').disabled=true;
- try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);if(liveFromScratch())return;scheduleRefinement();}
+ try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;await adopt(snapshot,{forget:true});status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);if(liveFromScratch())return;scheduleRefinement();}
  catch(e){if(token===loadToken)status(e.message);}
 }
 $('reset').onclick=reset;
@@ -907,8 +908,9 @@ $('curate').onclick=async()=>{
 };
 // The buttons follow what is being edited: the legacy draft has its own stack, the direct view uses the engine's decisions.
 function syncHistoryButtons(){
- $('undo').disabled=curation?!curation.canUndo:(!history.canUndo||!!pending);
- $('redo').disabled=curation?!curation.canRedo:(!history.canRedo||!!pending);
+ const viewState=viewController.getState();
+ $('undo').disabled=curation?!curation.canUndo:(!viewState.canBack||!!pending);
+ $('redo').disabled=curation?!curation.canRedo:(!viewState.canForward||!!pending);
 }
 $('undo').onclick=()=>{if(curation){if(curation.undo()){status('Undone.');draw();}}else undo();};
 $('redo').onclick=()=>{if(curation){if(curation.redo()){status('Redone.');draw();}}else redo();};
@@ -974,13 +976,13 @@ $('load-ref').onchange=async()=>{
  try{
   const loaded=await CurationSession.load(runReference,await readFileText(file));
   const parts=Object.entries(curatedParts(loaded.document)).filter(([,count])=>count>0);
-  cancelRefinement();selected=null;selection.clear();history.clear();
+  cancelRefinement();selected=null;selection.clear();
   if(parts.length){
    // The direct view cannot show these parts, so the reference opens as a legacy draft, where they are kept and editable.
-   curation=loaded;snapshot=loaded.document.baseline;
+   curation=loaded;snapshot=loaded.document.baseline;adopt(snapshot,{forget:true});
    status(`Reference "${loaded.document.referenceId}" opened as a legacy draft: it holds ${parts.map(([name,count])=>`${count} ${name}`).join(', ')}.`);
   } else {
-   curation=null;snapshot=loaded.document.baseline;
+   curation=null;snapshot=loaded.document.baseline;adopt(snapshot,{forget:true});
    status(`Reference "${loaded.document.referenceId}" opened.`);
   }
   draw(true);
@@ -1207,7 +1209,7 @@ async function refine(){
  const show=()=>{
    const next=session.takePending();
    if(!next)return;
-   snapshot=next.snapshot;
+   snapshot=next.snapshot;adopt(snapshot);
    if(firstShownMs===null)firstShownMs=Math.round(performance.now()-started);
    draw();
    const shownAt=Date.now(),meta=next.meta??{};
@@ -1232,7 +1234,7 @@ async function refine(){
    // The final result replaces whatever was shown or pending; the job is complete.
    session.finish(job.id);
    if(!refinementFits({revision:job.revision,layoutVersion:job.layoutVersion},data.snapshot,job,epoch,!!pending)){noteDiscarded();$('backend').textContent='Stale refinement discarded.';return;}
-   snapshot=data.snapshot;draw();const q=snapshot.optimization;const timing=firstShownMs===null?'':` First improvement shown after ${firstShownMs} ms.`;$('backend').textContent=q?`${q.stopReason?STOP_TEXT[q.stopReason]+' ':''}${q.candidatesEvaluated} layouts checked · ${q.strategy==='keep-existing'?'existing layout kept':'new layout adopted'}. Edges through nodes: ${q.before.edgeNodeHits} → ${q.after.edgeNodeHits}. Crossing edge pairs: ${q.before.routedCrossings} → ${q.after.routedCrossings}. Shared lines (pairs): ${q.before.sharedRoutePairs} → ${q.after.sharedRoutePairs}. Edge length: ${Math.round(q.before.routeLength)} → ${Math.round(q.after.routeLength)}.${timing}`:'Refinement complete.';
+   snapshot=data.snapshot;adopt(snapshot);draw();const q=snapshot.optimization;const timing=firstShownMs===null?'':` First improvement shown after ${firstShownMs} ms.`;$('backend').textContent=q?`${q.stopReason?STOP_TEXT[q.stopReason]+' ':''}${q.candidatesEvaluated} layouts checked · ${q.strategy==='keep-existing'?'existing layout kept':'new layout adopted'}. Edges through nodes: ${q.before.edgeNodeHits} → ${q.after.edgeNodeHits}. Crossing edge pairs: ${q.before.routedCrossings} → ${q.after.routedCrossings}. Shared lines (pairs): ${q.before.sharedRoutePairs} → ${q.after.sharedRoutePairs}. Edge length: ${Math.round(q.before.routeLength)} → ${Math.round(q.after.routeLength)}.${timing}`:'Refinement complete.';
  }catch(e){clearTimeout(showTimer);session.fail(job.id);if(e.name!=='AbortError'&&refinement===controller)$('backend').textContent=`Refinement: ${e.message}. Local editing stays available.`;}
  finally{if(refinement===controller)refinement=null;}
 }
@@ -1257,7 +1259,7 @@ async function structuredRefine(){
    if(!refinementFits({revision:snapshot.revision,layoutVersion:snapshot.layoutVersion??0},data.snapshot,{...base,epoch:startedEpoch},startedEpoch,!!pending)){
      noteDiscarded();$('backend').textContent='Stale result discarded: the view changed in the meantime.';return;
    }
-   snapshot=data.snapshot;draw();
+   snapshot=data.snapshot;adopt(snapshot);draw();
    showApproach(data);
    $('backend').textContent=`Approach: ${approachLabels[data.route]??data.route}.`;
  }catch(e){
