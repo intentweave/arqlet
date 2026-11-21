@@ -7153,8 +7153,8 @@ mod tests {
                 &std::fs::read_to_string(dir.join(format!("{name}.scene.json"))).unwrap(),
             )
             .unwrap();
-            let actual =
-                serde_json::to_value(arqlet_scene::build_scene(&snapshot).unwrap()).unwrap();
+            // The scene as the engine answers it (with the runtime's child counts).
+            let actual = serde_json::to_value(filter::scene_of(&snapshot).unwrap()).unwrap();
             // JavaScript writes 318, Rust writes 318.0: compare numbers as floats.
             assert_eq!(
                 as_floats(actual),
