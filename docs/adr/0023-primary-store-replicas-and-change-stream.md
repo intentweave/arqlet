@@ -46,16 +46,23 @@ store. Where a query runs is decided per query.
 
 ### 1. Two parts, each with its own revision
 
-- **Structure**: nodes, edges, kinds, containment, buses, memberships (ADR 0022). Layout, query, filter, trace and
-  details read it. It is read in place (ADR 0021 measurement); interned dense ids and columns follow ADR 0019 §4 when a
-  measurement asks for them.
+- **Structure**: nodes, edges, kinds, containment, buses, memberships (ADR 0022), as the canonical source graph declares
+  them, **without** what the engine derives from them (the synthetic bus nodes and edges that `navigable` adds for
+  `trace`, `details` and `find`, communities, groups). Primary and replica therefore agree on what a node set is; each
+  side derives the rest itself (item 4). Layout, query, filter, trace and details read it. It is read in place (ADR 0021
+  measurement); interned dense ids and columns follow ADR 0019 §4 when a measurement asks for them.
 - **Content**: properties per node and per edge (a payload: null, boolean, `i64`, `f64`, string, list, map). Only query,
   `details`, `find` and later search read it; **layout never does**, and the canonical graph's serialized form does not
   change. Content is optional, loaded per property key, and kept beside the structure, keyed by node or edge id (by
-  interned index once those exist). An id the structure does not have is ignored and counted, as for `groups` and
-  memberships.
+  interned index once those exist).
 
-Each part carries a revision (`structureRevision`, `contentRevision`); a result names the revisions it read.
+**Ids the structure does not have** (a membership member, a content key) are **kept and counted**, never refused and
+never dropped: they take effect when a later change adds the node or edge, as ADR 0022 already says for memberships. One
+rule for memberships and content, so that replaying the change log on an old snapshot gives the same state as the
+primary's.
+
+Each part carries a revision (`structureRevision`, `contentRevision`), derived from the one sequence of the change stream
+(item 3); a result names the revisions it read.
 
 ### 2. One primary, replicas with a subset
 
@@ -70,10 +77,16 @@ Each part carries a revision (`structureRevision`, `contentRevision`); a result 
 
 - **Initial sync:** a snapshot of what the replica asks for (structure, optionally content keys). JSON first; the
   columnar binary frame of ADR 0019 §4 (Arrow IPC as first candidate) when a measurement asks for it.
-- **Changes:** typed and numbered, each with the revision it applies to: for the structure the operations of today's
-  `patch` (add or remove nodes and edges, with what a removed node holds), for the content set and unset of properties.
-  The primary keeps a bounded change log; `changesSince(revision)` answers the changes or tells the replica to resync
-  with a new snapshot when it has fallen out of the log.
+- **Changes:** typed and numbered in **one sequence** for structure and content, each with the sequence number it
+  applies to: for the structure the operations of today's `patch` (add or remove nodes and edges, with what a removed
+  node holds), for the content set and unset of properties. A change is a **group** applied atomically: a node added with
+  its properties, or removed together with its content, is one group with one number, never two half-states. The
+  primary keeps a bounded change log; `changesSince(sequence)` answers the groups or tells the replica to resync with a
+  new snapshot when it has fallen out of the log.
+- **Versions:** the stream has a protocol version of its own (ADR 0019 plans `protocolVersion` for responses; it is not
+  built yet), and every snapshot names its `engineVersion` as today. A replica whose engine differs from the primary's
+  does not continue a layout bit-identically by assumption: it takes a new snapshot or refuses, never computes on
+  silently.
 - **Upstream:** a replica sends a change as an intent with its base revision. The primary applies it or refuses it as
   stale (as `expectedRevision` does today) and publishes the confirmed change to every replica, including the sender. A
   replica never applies its own intent as confirmed before the primary has; an optimistic preview is the host's display
@@ -124,13 +137,29 @@ On this rule, a backend can precompute and the browser can start drawing before 
 
 The plan IR of ADR 0021 tells, before execution, which property keys and which part of the structure a query reads.
 
-- If the local store **covers** it (structure complete for the query, every key loaded, revisions current), it runs
+**What covers means.** A pattern reads every edge of its kinds, so a query on a structure that is only partly there can
+give a different answer without any sign of it: the same class of failure as a parser dropping a clause. Therefore:
+
+- A partial replica holds only **closed subsets**: a container subtree together with every edge incident to it, its
+  boundary known (which edges leave it, to where). A query runs locally only if it can be shown to stay inside a closed
+  subset (all its patterns anchored in it, no unbounded expansion leaving it); `ViewMap` needs the same closure, since it
+  walks ancestors and edges.
+- **Dynamic reads** count as "every key": `RETURN n`, `keys(n)`, `properties(n)` and `n[$key]`. Such a query runs at the
+  primary, or the replica loads every key first.
+- Every answer says whether it is `complete` or `partial`; when in doubt the query runs at the primary.
+- **The same budget in both places:** the work budget and row limit of ADR 0021 (item 11) are part of the query, so a
+  local and a primary run stop at the same step. A stop is an answer (`stopped after N steps`), not a silent retry at the
+  other place.
+
+- If the local store **covers** it in this sense (and every key is loaded, the revisions are current), it runs
   **locally**: at once, also offline.
 - Otherwise it runs at the **primary**, with the same executor (native instead of WASM).
 - Either way the answer has the same form: ids, the revisions read, and, mapped locally, the visible parts of the current
   view (`ViewMap`, as `trace`, `details` and `find` answer them). A result for revisions the view has moved past is
   discarded, as refinement results are (#82).
-- A test runs every query of the fixture corpus both ways and asserts identical answers (on top of `platform-parity`).
+- A test runs every query of the fixture corpus both ways and asserts identical answers (on top of `platform-parity`):
+  the cases of `examples/cypher/cases.jsonl` (#81), executable ones with expected rows and the ones that must be
+  refused.
 - A host may force a place (`local`, `primary`); the default is the rule above.
 
 ### 7. The three deployment modes
@@ -161,14 +190,16 @@ Each step is useful on its own, behind an option or a new operation, and measure
 - **R2 — a change log in the session.** `patch` and `payload` produce numbered changes; `changesSince(revision)` answers
   them or asks for a resync; the log is bounded by count and bytes. *Exit:* replaying the log on the old snapshot equals
   the new snapshot, byte for byte, over seeded sequences; stale intents refused.
-- **R3 — a replica in `@arqlet/engine-client`.** `createReplica(primary)` loads a snapshot of what it asks for and keeps
+- **R3 — a replica in `@arqlet/engine-client`**, started only when a measurement of R1 and R2 (or a host's need) shows
+  that whole snapshots and bounded views are not enough; until then a query runs in one process. `createReplica(primary)` loads a snapshot of what it asks for and keeps
   it current from the stream (pull first; a push channel is the host's transport choice). The playground's split mode
   uses it against `/api/session`. *Exit:* the replica equals the primary after every change in the UI tests; a replica
   that falls out of the log resyncs.
 - **R4 — the query executor** (ADR 0021 M1 to M4) over structure and content through the store seam.
 - **R5 — placement.** Local when covered, else the primary; the same answer both ways for the whole fixture corpus.
 - **R6 — columns, interned ids and a binary frame** (ADR 0019 §4) when the measurements of R1 to R3 ask for them.
-- **H1 — scene first, engine on demand** (item 5), independent of R1 to R5: the backend sends the scene and the lean
+- **H1 — scene first, engine on demand** (item 5), independent of R1 to R5 (it may move into an ADR of its own; neither
+  blocks the other): the backend sends the scene and the lean
   layout state; the playground's split mode renders before the WASM engine has loaded and starts it at the first local
   change. *Exit:* the first local change gives the same snapshot as with the full snapshot sent up front (byte for byte);
   an offer that arrives after a local change is discarded and counted; time to first render recorded both ways.
@@ -176,7 +207,17 @@ Each step is useful on its own, behind an option or a new operation, and measure
 ## Measurements before defaults
 
 Written down before the first run, recorded in `benchmarks/results/` with machine, build and revision, as the rules
-require:
+require. Each question has a correctness check, and its gate is fixed before the first run (open until then):
+
+| Question | Measured | Correctness check |
+|---|---|---|
+| Edit cost | applying one change against the size of the snapshot's graph | the result is identical to today's |
+| Projection refresh | recompute against incremental, per function | equal byte for byte over seeded change sequences |
+| Boundary crossing | serialize, transfer and parse; copy against transfer; worker against process; size and apply time of a change | the receiver sees identical content |
+| Consistency | stale changes refused, sequence and revisions increase, the same output for any thread count and on every platform | equal `platform-parity` digests |
+| Staleness window | from an accepted change until every replica is at the new sequence | as above |
+
+Also measured:
 
 - memory of a session per node, without and with content (per property key);
 - size and apply time of a change against a whole snapshot, for typical edits;
