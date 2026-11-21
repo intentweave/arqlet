@@ -610,7 +610,10 @@ fn input_plans(snapshot: &Snapshot) -> Result<LayeredPlans, String> {
     if snapshot.options.routing_engine != RoutingEngine::Legacy
         || snapshot.options.bundling != Bundling::None
         || !snapshot.straight_edges.is_empty()
-        || (!snapshot.graph.routing_orthogonal_only() && !snapshot.options.single_pass_mixed)
+        || (!snapshot
+            .graph
+            .routing_laid_out_orthogonally(snapshot.options.single_pass_polyline)
+            && !snapshot.options.single_pass_mixed)
     {
         return Err("Routing completion requires the legacy router and unbundled default orthogonal routing".into());
     }

@@ -10,9 +10,9 @@ Arqlet is an incremental graph-layout engine in Rust. It lays out nested graphs
 with ports, routes their edges and keeps the layout up to date as the graph
 changes. The same engine runs natively and in the browser via WebAssembly.
 
-> **Status: prototype (engine `0.6.0`).** Arqlet works end to end and is
+> **Status: prototype (engine `0.7.0`).** Arqlet works end to end and is
 > tested, but every API, the JSON protocol and the snapshot format are
-> provisional and may change in any release. Version 0.6.0 is on
+> provisional and may change in any release. Version 0.7.0 is on
 > [crates.io](https://crates.io/crates/arqlet) and [npm](https://www.npmjs.com/package/arqlet). Large graphs (100K+ nodes) are a goal, not a measured result.
 
 Arqlet was developed under the working name Layerweave. Measurement records in
@@ -69,7 +69,10 @@ Drawn by Arqlet with the default options and painted by the SVG viewer of `@arql
   collapsed groups; only the groups on the way opened, the rest faded.
 - **Cluster overview (prototype):** the whole graph as nested discs, laid out per
   container and drawn with WebGL, with a fisheye lens; a click switches a small cluster
-  in place to a layered layout, and its neighbours make room
+  in place to a layered layout, and its neighbours make room. Nodes can be dragged (the
+  neighbours follow with the forces), bus lines are drawn as thick lines with stubs, and
+  the renderer offers a galaxy style, a pseudo-3D orbit, adaptive edge dimming and names
+  when zoomed in; a large graph can appear rough first and then bloom
   ([ADR 0018](docs/adr/0018-cluster-overview.md), `apps/playground/overview.html`).
 
 Not yet: full crossing minimization, guaranteed obstacle-free routes in every
@@ -98,7 +101,7 @@ depend on the Git repository instead):
 
 ```toml
 [dependencies]
-arqlet = "0.6"
+arqlet = "0.7"
 ```
 
 ```rust
@@ -298,6 +301,35 @@ const {overview} = await run({op: 'overview', graph, options: {satellites: 0.6, 
   configSet: {...base, overview: {levelOfDetail: {depth: 0}}}});
 const renderer = createOverviewRenderer(canvas, overviewModel(overview), {shapes: {service: 'square', package: 'octagon'}});
 ```
+
+Nodes can be moved: the overview lays itself out again from the moved node's new centre,
+the other nodes of its cluster settle around it, and a cluster that a node leaves closes up
+(the overview page sends the pointer while dragging, so neighbours follow live):
+
+```js
+const answer = await overview.layOut({start: {moved: {[id]: {x, y}}}});
+renderer.morph(overviewModel(answer.overview));
+```
+
+A node of shape `busLine` (a CAN, LIN or Ethernet bus) is drawn as a thick line with a
+stub to each member instead of a disc, and picking hits the line; with the option
+`busRows` the members of a bus line up along it.
+
+The renderer has a few looks of its own (all provisional):
+
+```js
+renderer.setGalaxy(true);                          // glows and stars, faint lines, light that adds up
+renderer.setOrbit({yaw: 0.4, pitch: 0.25, depth: 400});   // pseudo-3D: a drag turns it, Shift-drag pans
+renderer.setNames({nodes: true, details: true});   // names (with kind and links) once a disc is 6 px across
+// createOverviewRenderer(canvas, model, {edgeDimming: true}) (the default) dims edges by how many
+// overlap on a pixel, so a dense mesh does not turn into a white tangle.
+```
+
+In the galaxy style, when nobody touches the view, the galaxies seem to rotate and shear
+against each other (instead of breathing; bounded, nothing drifts away), and the stars
+twinkle. For a graph that takes a while, the overview page shows a rough
+overview first (the coarse clusters with their strongest links) and lets the full one
+bloom out of it (`apps/playground/progressive.js`).
 
 See the [package README](packages/arqlet/README.md) and `apps/playground/overview.html`.
 

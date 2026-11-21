@@ -446,6 +446,12 @@ routeSearchWindow?: boolean,
  */
 singlePassMixed?: boolean,
 /**
+ * Polyline routing (`polyline`, `roundedPolyline`) in single pass: the layout routes such edges orthogonally, as it
+ * always did, and the scene pulls them taut; before, a graph with polyline routing fell back to the pipeline before
+ * single pass. On by default since 0.7.0; written as `false` when turned off (then such graphs fall back as before).
+ */
+singlePassPolyline?: boolean,
+/**
  * The clearance routes keep from nodes, their own nodes included beyond the stub at their port. It is a hard
  * constraint (ADR 0005): the default is `DEFAULT_REQUIRED_CLEARANCE`, so it always applies. An explicit `null` is
  * the opt-out: proximity is then a weighted quality term with the fixed `HUG_MARGIN` (docs/adr/0002-quality-model.md).
