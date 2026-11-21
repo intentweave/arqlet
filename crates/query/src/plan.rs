@@ -43,6 +43,9 @@ pub enum Op {
     },
     /// A relationship of a pattern: from the node in `from`, one row per edge that fits.
     Expand(Expand),
+    /// `OPTIONAL MATCH`: runs the operations on every row; a row for which they give nothing stays once, with what they
+    /// would have bound left null.
+    Optional(Vec<Op>),
     /// `WHERE`: keeps the rows for which the expression is true (not false, not null).
     Filter(Expr),
     /// `UNWIND`: one row per element of the list.
@@ -59,6 +62,8 @@ pub enum Op {
         keys: Vec<(Expr, Slot)>,
         aggregates: Vec<Aggregate>,
     },
+    /// `RETURN DISTINCT`: keeps the first row of each distinct combination of the values in these slots.
+    Distinct(Vec<Slot>),
     /// `ORDER BY`: a stable sort.
     Sort(Vec<SortKey>),
     /// `SKIP`.
@@ -85,6 +90,9 @@ pub struct Expand {
     pub to_label: Option<String>,
     pub to_props: Vec<(String, Expr)>,
     pub distinct_from: Vec<Slot>,
+    /// `None` for one hop. `Some((min, max))` for `*min..max` (`max` `None` is unbounded, capped by the limits): `rel`
+    /// then holds the list of the edges of the path, and no edge is used twice within a path.
+    pub hops: Option<(u32, Option<u32>)>,
 }
 
 /// One key of an `ORDER BY`.

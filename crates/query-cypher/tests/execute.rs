@@ -11,7 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// How many of the supported cases pass today. Raised by every stage that makes more of them pass.
-const MIN_PASSING: usize = 37;
+const MIN_PASSING: usize = 40;
 
 fn fixture(path: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

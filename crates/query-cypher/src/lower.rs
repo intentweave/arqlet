@@ -35,6 +35,7 @@ pub fn lower(query: &str) -> Result<Plan, QueryError> {
         bound: BTreeSet::new(),
         ops: Vec::new(),
         aliases: BTreeMap::new(),
+        distinct_return: false,
     };
     for part in &hir.parts {
         lowering.aliases.clear();
@@ -43,6 +44,10 @@ pub fn lower(query: &str) -> Result<Plan, QueryError> {
         }
     }
     let columns = lowering.columns(&tree)?;
+    if lowering.distinct_return {
+        let slots = columns.iter().map(|c| c.slot).collect();
+        lowering.ops.push(Op::Distinct(slots));
+    }
     Ok(Plan {
         slots: lowering.next_slot,
         ops: lowering.ops,
@@ -59,6 +64,8 @@ struct Lowering<'a> {
     ops: Vec<Op>,
     /// The aliases of the current part's projections: name to slot, for the columns.
     aliases: BTreeMap<String, usize>,
+    /// `RETURN DISTINCT`: the HIR keeps the flag on the Return operation, not on the projection.
+    distinct_return: bool,
 }
 
 /// The label and the `{key: value}` constraints of a node pattern.
@@ -84,7 +91,26 @@ impl Lowering<'_> {
                 }
                 Ok(())
             }
-            Operation::OptionalMatch(_) => Err(not_yet("OPTIONAL MATCH", "stage M4")),
+            Operation::OptionalMatch(m) => {
+                if !m.pattern.path_bindings.is_empty() {
+                    return Err(QueryError::unsupported(
+                        "a path variable is undecided (ADR 0021, open)",
+                    ));
+                }
+                // Its operations run as a sub-plan per row; its WHERE belongs to it, not to the rows around it.
+                let outer = std::mem::take(&mut self.ops);
+                let result = self.pattern(&m.pattern).and_then(|()| {
+                    for predicate in &m.predicates {
+                        let e = self.expr(*predicate)?;
+                        self.ops.push(Op::Filter(e));
+                    }
+                    Ok(())
+                });
+                let inner = std::mem::replace(&mut self.ops, outer);
+                result?;
+                self.ops.push(Op::Optional(inner));
+                Ok(())
+            }
             Operation::Filter(f) => {
                 let e = self.expr(f.predicate)?;
                 self.ops.push(Op::Filter(e));
@@ -167,11 +193,7 @@ impl Lowering<'_> {
                 Ok(())
             }
             Operation::Return(r) => {
-                if r.distinct {
-                    return Err(QueryError::unsupported(
-                        "DISTINCT on the RETURN operation is not lowered; decypher puts it on the projection",
-                    ));
-                }
+                self.distinct_return = r.distinct;
                 Ok(())
             }
             Operation::Union(_) => Err(not_yet("UNION", "stage M4")),
@@ -257,9 +279,11 @@ impl Lowering<'_> {
                     "a relationship type expression is undecided (ADR 0021, open)",
                 ));
             }
-            if !matches!(rel.length, RelationshipLength::Single) {
-                return Err(not_yet("a variable-length relationship", "stage M4"));
-            }
+            let hops = match rel.length {
+                RelationshipLength::Single => None,
+                // decypher gives `None` for a bound that was not written: `*` and `*..3` start at 1 (checked).
+                RelationshipLength::Variable { min, max } => Some((min.unwrap_or(1), max)),
+            };
             let (l, r) = (rel.left, rel.right);
             // Expand from the end that is bound; if neither is, scan the left one first.
             let from_left = if self.bound.contains(&node_slots[l]) {
@@ -313,6 +337,7 @@ impl Lowering<'_> {
                 to_label,
                 to_props,
                 distinct_from: rel_slots.clone(),
+                hops,
             }));
             touched[to] = true;
             self.bound.insert(node_slots[to]);

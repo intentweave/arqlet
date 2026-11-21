@@ -9,7 +9,7 @@
 //! order; `collect` keeps input order; a result that would be `NaN` is an error until its rules are decided in the
 //! fixtures. Mixed-type ordering and the comparison of an integer with a float beyond 2^53 are provisional.
 
-use crate::plan::{AggFunc, Aggregate, BinOp, CmpOp, Column, Expr, Op, Plan, SortKey};
+use crate::plan::{AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Op, Plan, SortKey};
 use crate::store::GraphStore;
 use crate::value::{EdgeId, NodeId, Value};
 use crate::QueryError;
@@ -24,6 +24,8 @@ pub struct Limits {
     pub max_steps: u64,
     /// The most rows any operation may hold.
     pub max_rows: usize,
+    /// The most edges a path of an unbounded `*` may have; a longer one is a limit error (provisional).
+    pub max_hops: u32,
 }
 
 impl Default for Limits {
@@ -31,6 +33,7 @@ impl Default for Limits {
         Limits {
             max_steps: 20_000_000,
             max_rows: 2_000_000,
+            max_hops: 64,
         }
     }
 }
@@ -143,38 +146,45 @@ impl Run<'_> {
                     let Value::Node(from) = &row[x.from] else {
                         continue;
                     };
-                    for found in self.store.edges_of(*from, x.direction) {
-                        self.tick(1)?;
-                        if !x.types.is_empty()
-                            && !x
-                                .types
-                                .iter()
-                                .any(|t| t == self.store.edge_type(found.edge))
-                        {
-                            continue;
+                    match x.hops {
+                        None => {
+                            for found in self.store.edges_of(*from, x.direction) {
+                                self.tick(1)?;
+                                if !self.edge_fits(x, found.edge, row, &[])? {
+                                    continue;
+                                }
+                                let path = [found.edge];
+                                self.arrive(x, row, found.other, &path, false, &mut out)?;
+                            }
                         }
-                        // A relationship is used once within the pattern of one MATCH.
-                        if x.distinct_from
-                            .iter()
-                            .any(|s| row[*s] == Value::Edge(found.edge))
-                        {
-                            continue;
+                        Some((min, max)) => {
+                            let max = max.map(u64::from);
+                            self.walk(
+                                x,
+                                row,
+                                *from,
+                                &mut Vec::new(),
+                                u64::from(min),
+                                max,
+                                &mut out,
+                            )?;
                         }
-                        if !self.edge_matches(found.edge, &x.props, row)? {
-                            continue;
-                        }
-                        if x.to_bound && row[x.to] != Value::Node(found.other) {
-                            continue;
-                        }
-                        if !self.node_matches(found.other, &x.to_label, &x.to_props, row)? {
-                            continue;
-                        }
-                        let mut next = row.clone();
-                        next[x.rel] = Value::Edge(found.edge);
-                        if !x.to_bound {
-                            next[x.to] = Value::Node(found.other);
-                        }
-                        out.push(next);
+                    }
+                }
+                Ok(out)
+            }
+            Op::Optional(inner) => {
+                let mut out = Vec::new();
+                for row in rows {
+                    let mut found = vec![row.clone()];
+                    for op in inner {
+                        found = self.apply(op, found)?;
+                    }
+                    if found.is_empty() {
+                        // Nothing matched: the row stays once, and what the pattern would have bound stays null.
+                        out.push(row);
+                    } else {
+                        out.extend(found);
                     }
                 }
                 Ok(out)
@@ -231,6 +241,17 @@ impl Run<'_> {
                 }
                 Ok(out)
             }
+            Op::Distinct(slots) => {
+                let mut seen = HashSet::new();
+                let mut out = Vec::new();
+                for row in rows {
+                    self.tick(1)?;
+                    if seen.insert(group_key(slots.iter().map(|s| &row[*s]))) {
+                        out.push(row);
+                    }
+                }
+                Ok(out)
+            }
             Op::Aggregate { keys, aggregates } => self.aggregate(keys, aggregates, rows),
             Op::Sort(sort_keys) => self.sort(sort_keys, rows),
             Op::Skip(expr) => {
@@ -278,6 +299,93 @@ impl Run<'_> {
             }
         }
         Ok(true)
+    }
+
+    /// Whether an edge may be taken by a step: its type, the edges already used in this pattern or path, its properties.
+    fn edge_fits(
+        &self,
+        x: &Expand,
+        edge: EdgeId,
+        row: &Row,
+        path: &[EdgeId],
+    ) -> Result<bool, QueryError> {
+        if !x.types.is_empty() && !x.types.iter().any(|t| t == self.store.edge_type(edge)) {
+            return Ok(false);
+        }
+        // A relationship is used once within the pattern of one MATCH, and once within a path.
+        if path.contains(&edge) || x.distinct_from.iter().any(|s| uses_edge(&row[*s], edge)) {
+            return Ok(false);
+        }
+        self.edge_matches(edge, &x.props, row)
+    }
+
+    /// The step arrived at `node` over `path`: emits a row when the node fits the far end of the pattern.
+    fn arrive(
+        &self,
+        x: &Expand,
+        row: &Row,
+        node: NodeId,
+        path: &[EdgeId],
+        as_list: bool,
+        out: &mut Vec<Row>,
+    ) -> Result<(), QueryError> {
+        if x.to_bound && row[x.to] != Value::Node(node) {
+            return Ok(());
+        }
+        if !self.node_matches(node, &x.to_label, &x.to_props, row)? {
+            return Ok(());
+        }
+        let mut next = row.clone();
+        next[x.rel] = if as_list {
+            Value::List(path.iter().map(|e| Value::Edge(*e)).collect())
+        } else {
+            Value::Edge(path[0])
+        };
+        if !x.to_bound {
+            next[x.to] = Value::Node(node);
+        }
+        out.push(next);
+        Ok(())
+    }
+
+    /// A variable-length step: depth-first over paths that use no edge twice, in the order of the store. A path of `min`
+    /// to `max` edges ends at a row. Unbounded (`*`) goes as deep as `Limits::max_hops`; a path that could go on beyond
+    /// it stops the query with a limit error instead of being cut off silently.
+    #[allow(clippy::too_many_arguments)]
+    fn walk(
+        &mut self,
+        x: &Expand,
+        row: &Row,
+        node: NodeId,
+        path: &mut Vec<EdgeId>,
+        min: u64,
+        max: Option<u64>,
+        out: &mut Vec<Row>,
+    ) -> Result<(), QueryError> {
+        let depth = path.len() as u64;
+        if depth >= min {
+            self.tick(1)?;
+            self.arrive(x, row, node, path, true, out)?;
+        }
+        if max == Some(depth) {
+            return Ok(());
+        }
+        let cap = u64::from(self.limits.max_hops);
+        for found in self.store.edges_of(node, x.direction) {
+            self.tick(1)?;
+            if !self.edge_fits(x, found.edge, row, path)? {
+                continue;
+            }
+            if max.is_none() && depth >= cap {
+                return Err(QueryError::limit(format!(
+                    "stopped: a path of an unbounded `*` is longer than {cap} edges (the hop limit)"
+                )));
+            }
+            path.push(found.edge);
+            self.walk(x, row, found.other, path, min, max, out)?;
+            path.pop();
+        }
+        Ok(())
     }
 
     fn edge_matches(
@@ -538,6 +646,15 @@ impl Run<'_> {
                 arithmetic(op, l, r)
             }
         }
+    }
+}
+
+/// Whether a slot's value is the edge, or a path (list) holding it.
+fn uses_edge(v: &Value, edge: EdgeId) -> bool {
+    match v {
+        Value::Edge(e) => *e == edge,
+        Value::List(items) => items.iter().any(|i| uses_edge(i, edge)),
+        _ => false,
     }
 }
 
@@ -916,7 +1033,7 @@ impl Acc {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plan::{Aggregate, Expand};
+    use crate::plan::Aggregate;
     use crate::store::{Direction, EdgeRef};
     use crate::value::EdgeId;
 
@@ -1327,6 +1444,7 @@ mod tests {
         let tight = Limits {
             max_steps: 5,
             max_rows: 1_000,
+            ..Limits::default()
         };
         let e = execute(&plan, &Tiny, &BTreeMap::new(), tight).unwrap_err();
         assert_eq!(e.class, crate::ErrorClass::Limit);
@@ -1334,6 +1452,7 @@ mod tests {
         let rows = Limits {
             max_steps: 1_000,
             max_rows: 4,
+            ..Limits::default()
         };
         assert_eq!(
             execute(&plan, &Tiny, &BTreeMap::new(), rows)
@@ -1379,6 +1498,7 @@ mod tests {
             to_label: None,
             to_props: vec![],
             distinct_from: vec![],
+            hops: None,
         }
     }
 
@@ -1508,6 +1628,86 @@ mod tests {
         assert_eq!(
             run(&read).unwrap().rows,
             vec![vec![Value::String("e2".into())]]
+        );
+    }
+
+    fn var(min: u32, max: Option<u32>, direction: Direction) -> Op {
+        let mut x = expand(0, 1, 2, direction, &[]);
+        x.hops = Some((min, max));
+        Op::Expand(x)
+    }
+
+    #[test]
+    fn a_variable_length_step_counts_paths_that_use_no_edge_twice() {
+        // *1..2 over e0 e1 (a to b, parallel), e2 (b to c), e3 (c loop): from a 2 + 2, from b 1 + 1, from c 1.
+        let rows = |op| count_rows(&plan_of(3, vec![scan(0), op]));
+        assert_eq!(rows(var(1, Some(2), Direction::Out)), 7);
+        // Unbounded: also a-b-c-loop twice more (e0 e2 e3, e1 e2 e3): 9 paths of one or more edges.
+        assert_eq!(rows(var(1, None, Direction::Out)), 9);
+        // *0..0 is the empty path once per node, with an empty list of edges.
+        let zero = run(&plan_of(3, vec![scan(0), var(0, Some(0), Direction::Out)])).unwrap();
+        assert_eq!(zero.rows.len(), 3);
+    }
+
+    #[test]
+    fn a_path_holds_its_edges_in_order() {
+        let plan = Plan {
+            slots: 3,
+            ops: vec![
+                Op::ScanNodes {
+                    slot: 0,
+                    label: None,
+                    props: vec![("id".to_string(), lit(Value::String("a".into())))],
+                },
+                var(2, Some(2), Direction::Out),
+            ],
+            columns: vec![Column {
+                name: "path".into(),
+                slot: 1,
+            }],
+        };
+        let edges =
+            |a: u32, b: u32| Value::List(vec![Value::Edge(EdgeId(a)), Value::Edge(EdgeId(b))]);
+        assert_eq!(
+            run(&plan).unwrap().rows,
+            vec![vec![edges(0, 2)], vec![edges(1, 2)]]
+        );
+    }
+
+    #[test]
+    fn an_unbounded_step_that_could_go_on_stops_at_the_hop_limit_and_says_so() {
+        let plan = plan_of(3, vec![scan(0), var(1, None, Direction::Out)]);
+        let tight = Limits {
+            max_hops: 1,
+            ..Limits::default()
+        };
+        let e = execute(&plan, &Tiny, &BTreeMap::new(), tight).unwrap_err();
+        assert_eq!(e.class, crate::ErrorClass::Limit);
+        assert!(e.message.contains("hop limit"), "{e}");
+        // A bounded step is not cut by that limit.
+        let bounded = plan_of(3, vec![scan(0), var(1, Some(3), Direction::Out)]);
+        assert!(execute(&bounded, &Tiny, &BTreeMap::new(), tight).is_ok());
+    }
+
+    #[test]
+    fn optional_keeps_a_row_without_a_match_once_with_nulls() {
+        // For every node: the S edge it starts. Only b has one.
+        let optional = Op::Optional(vec![Op::Expand(expand(0, 1, 2, Direction::Out, &["S"]))]);
+        let plan = Plan {
+            slots: 3,
+            ops: vec![scan(0), optional],
+            columns: vec![Column {
+                name: "to".into(),
+                slot: 2,
+            }],
+        };
+        assert_eq!(
+            run(&plan).unwrap().rows,
+            vec![
+                vec![Value::Null],
+                vec![Value::Node(NodeId(2))],
+                vec![Value::Null],
+            ]
         );
     }
 }
