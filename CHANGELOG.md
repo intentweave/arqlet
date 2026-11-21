@@ -16,6 +16,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   step each), `apply` for any other change, and `cancel` (drops the steps not started). Every step carries the
   difference between the scenes before and after it (`sceneDiff`: nodes and routes added, removed, changed). Also from
   `arqlet`. Not yet: refinement on a second worker.
+- The view controller takes snapshots a host made itself (`adopt`: a drag, a refinement, a loaded document; with
+  `remember` as an undo step, with `forget` for another graph), merges a follow-up into the last step
+  (`apply(..., {merge: true})`), applies steps that change no decision without remembering them (`remember: false`),
+  names the next steps (`backLabel`, `forwardLabel`) and can leave out the scene (`scenes: false`, for a host that draws
+  from the snapshot). An import or a forgetting `adopt` no longer waits for the steps still under way; they resolve as
+  cancelled. `session.load(snapshot)` continues a layout session from a snapshot.
+
+### Changed
+
+- The playground runs its view through the view controller: every change, the undo stack (now also covering the
+  three modes through `execute`), drags and refinement results handed over with `adopt`.
 - The remembered state (`intent`) keeps the filter (`hidden`), so a step back undoes a filter.
 
 ## 0.7.0 — 2026-11-21

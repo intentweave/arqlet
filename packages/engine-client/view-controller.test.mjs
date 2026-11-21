@@ -69,6 +69,7 @@ for (const resident of [false, true]) {
     // A filter, and a step back over it.
     await view.filter({nodeKinds: ['odd']});
     s = view.getState();
+    assert.equal(s.backLabel, 'Filter');
     assert.deepEqual(s.hide, {nodeKinds: ['odd']});
     assert.ok(!s.scene.nodes.some(n => n.kind === 'odd'), 'odd children hidden');
     await view.back();
@@ -98,3 +99,27 @@ for (const resident of [false, true]) {
     stop();
   });
 }
+
+test('a host hands over its own snapshots; follow-ups merge into one step', {skip: !engine}, async () => {
+  const session = createSession(engine, {resident: false});
+  const view = createViewController(session, {scenes: false});
+  await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  assert.equal(view.getState().scene, null, 'no scene with scenes: false');
+  const start = view.getState().snapshot;
+  // A snapshot the host made (here: the engine's own toggle), remembered as one step.
+  const opened = engine({op: 'toggle', snapshot: start, nodeId: 'box', expectedRevision: start.revision,
+    expectedLayoutVersion: start.layoutVersion ?? 0}).snapshot;
+  assert.equal((await view.adopt(opened, {remember: 'Open box'})).ok, true);
+  assert.equal(view.getState().backLabel, 'Open box');
+  // A follow-up merged into it, and a step that is not remembered.
+  await view.filter({nodeKinds: ['odd']});
+  await view.apply({op: 'filter', hide: {}}, 'Show all', {merge: true});
+  await view.apply({op: 'configure', options: {routingClearance: 9}}, 'clearance', {remember: false});
+  assert.equal(view.getState().backLabel, 'Open box', 'a filter undone by its follow-up leaves no step');
+  await view.back();
+  assert.ok(view.getState().snapshot.collapsedIds.includes('box'), 'back over the adopted step');
+  assert.equal(view.getState().canBack, false);
+  // Another graph: the history starts empty.
+  await view.adopt(start, {forget: true});
+  assert.equal(view.getState().canForward, false);
+});

@@ -39,12 +39,13 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
  * Creates a view controller on `session` (from `createSession`). `page` is how many children `showRest` reveals at a
- * time; `historyLimit` how many steps back are kept.
+ * time; `historyLimit` how many steps back are kept; with `scenes: false` the state carries no scene and no diff (a host
+ * that draws from the snapshot itself saves the engine call).
  */
-export function createViewController(session, {page = 12, historyLimit = 50} = {}) {
+export function createViewController(session, {page = 12, historyLimit = 50, scenes = true} = {}) {
   let state = Object.freeze({
     snapshot: null, scene: null, diff: null, busy: false, error: null,
-    highlight: null, hide: {}, canBack: false, canForward: false, steps: 0,
+    highlight: null, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
   });
   const listeners = new Set();
   const publish = patch => {
@@ -58,14 +59,19 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
   let pending = 0;
 
   // Runs `step` after every step before it; a step queued before `cancel()` and not yet started is dropped.
-  const enqueue = step => {
+  // `fresh`: the step starts a new chain (another view), not waiting for the steps before it, which no longer publish.
+  const enqueue = (step, {fresh = false} = {}) => {
+    if (fresh) {
+      generation += 1;
+      queue = Promise.resolve();
+    }
     const mine = generation;
     pending += 1;
     if (!state.busy) publish({busy: true});
     const result = queue.then(async () => {
       if (mine !== generation) return {ok: false, cancelled: true};
       try {
-        return await step();
+        return await step(() => mine === generation);
       } catch (error) {
         publish({error: error.message ?? String(error)});
         return {ok: false, error: error.message ?? String(error)};
@@ -94,40 +100,52 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
   };
 
   // After an applied change: the new scene, its difference to the one before, the highlight asked again.
-  const settle = async (extra = {}) => {
-    const scene = await session.scene();
+  const settle = async (extra = {}, current = () => true) => {
+    const scene = scenes ? await session.scene() : null;
     const highlight = await refreshHighlight(state.highlight);
+    if (!current()) return;
     publish({
-      snapshot: session.snapshot, scene, diff: sceneDiff(state.scene, scene), highlight, error: null,
-      canBack: back.length > 0, canForward: forward.length > 0, steps: state.steps + 1, ...extra,
+      snapshot: session.snapshot, scene, diff: scenes ? sceneDiff(state.scene, scene) : null, highlight, error: null,
+      canBack: back.length > 0, canForward: forward.length > 0,
+      backLabel: back.at(-1)?.label ?? null, forwardLabel: forward.at(-1)?.label ?? null, steps: state.steps + 1, ...extra,
     });
   };
 
-  // A change the user makes: its decisions before and after are remembered, so that `back` undoes it.
-  const change = (label, run, extra = () => ({})) => enqueue(async () => {
+  // A change the user makes: its decisions before and after are remembered (unless `remember` is false), so that `back`
+  // undoes it.
+  const change = (label, run, extra = () => ({}), remember = true, merge = false) => enqueue(async current => {
     if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
-    const before = await intent();
+    const before = remember ? await intent() : null;
     const result = await run();
+    if (!current()) return {ok: false, cancelled: true};
     if (!result.ok) {
       publish({error: result.error ?? 'The engine refused the change.'});
       return result;
     }
-    const after = await intent();
-    if (!same(before, after)) {
+    const after = remember ? await intent() : null;
+    if (!current()) return {ok: false, cancelled: true};
+    if (remember && merge && back.length) {
+      // A follow-up of the last change (such as a container keeping the size a drop gave it): one entry for both.
+      const last = back.at(-1);
+      last.after = after;
+      if (same(last.before, last.after)) back.pop();
+      forward = [];
+    } else if (remember && !same(before, after)) {
       back.push({label, before, after});
       if (back.length > historyLimit) back.shift();
       forward = [];
     }
-    await settle(extra());
+    await settle(extra(), current);
     return result;
   });
 
   // Back and forward: the engine restores the remembered decisions; a refused restore keeps the entry.
-  const step = direction => enqueue(async () => {
+  const step = direction => enqueue(async current => {
     const from = direction < 0 ? back : forward;
     const entry = from.at(-1);
     if (!entry) return {ok: false, error: direction < 0 ? 'Nothing to undo.' : 'Nothing to redo.'};
     const result = await session.apply({op: 'restore', intent: direction < 0 ? entry.before : entry.after});
+    if (!current()) return {ok: false, cancelled: true};
     if (!result.ok) {
       publish({error: result.error ?? 'The engine refused the restore.'});
       return result;
@@ -135,7 +153,7 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
     from.pop();
     (direction < 0 ? forward : back).push(entry);
     const hidden = (direction < 0 ? entry.before : entry.after).hidden ?? {};
-    await settle({hide: hidden});
+    await settle({hide: hidden}, current);
     return result;
   });
 
@@ -151,19 +169,19 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
 
     /** Lays out `graph` and starts the view on it (see `session.import`); the history and the highlight start empty. */
     import(graph, init) {
-      generation += 1;
       back = [];
       forward = [];
-      return enqueue(async () => {
+      return enqueue(async current => {
         const result = await session.import(graph, init);
+        if (!current()) return {ok: false, cancelled: true};
         if (!result.ok) {
           publish({error: result.error ?? 'The import failed.'});
           return result;
         }
         state = Object.freeze({...state, scene: null, highlight: null, hide: {}, steps: 0});
-        await settle();
+        await settle({}, current);
         return result;
-      });
+      }, {fresh: true});
     },
 
     /** Opens container `id` (nothing when it is open). */
@@ -228,8 +246,44 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
     /** Redoes the last undone change. */
     forward() { return step(1); },
 
-    /** Any other change of the engine's protocol (see `session.apply`), remembered for `back` under `label`. */
-    apply(request, label = request.op) { return change(label, () => session.apply(request)); },
+    /**
+     * Any other change of the engine's protocol (see `session.apply`), remembered for `back` under `label` (not with
+     * `remember: false`, for steps that change no decision, such as settling).
+     */
+    apply(request, label = request.op, {remember = true, merge = false} = {}) {
+      return change(label, () => session.apply(request), () => ({}), remember, merge);
+    },
+
+    /**
+     * Continues from `snapshot`, made by the host (a drag, a refinement, a loaded document); with `forget` the history and
+     * the highlight start empty (another graph).
+     */
+    adopt(snapshot, {forget = false, remember = null} = {}) {
+      return enqueue(async current => {
+        // With `remember` (a label) the change from the session's snapshot to this one is remembered for `back`.
+        const before = remember && session.snapshot ? await intent() : null;
+        const result = await session.load(snapshot, {reset: forget});
+        if (!current()) return {ok: false, cancelled: true};
+        if (!result.ok) {
+          publish({error: result.error ?? 'The snapshot was refused.'});
+          return result;
+        }
+        if (forget) {
+          back = [];
+          forward = [];
+          state = Object.freeze({...state, highlight: null, hide: {}});
+        } else if (before) {
+          const after = await intent();
+          if (!same(before, after)) {
+            back.push({label: remember, before, after});
+            if (back.length > historyLimit) back.shift();
+            forward = [];
+          }
+        }
+        await settle({hide: snapshot.options?.hidden ?? (forget ? {} : state.hide)}, current);
+        return result;
+      }, {fresh: forget});
+    },
 
     /**
      * Drops the steps queued and not started yet (they resolve `{ok: false, cancelled: true}`); a step under way finishes,
