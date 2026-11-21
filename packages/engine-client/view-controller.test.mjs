@@ -312,3 +312,26 @@ test('refinement runs on a second engine; stale results are discarded', {skip: !
   const plain = createViewController(createSession(engine, {resident: false}));
   assert.match((await plain.refine()).error, /No refinement engine/);
 });
+
+test('a look into a collapsed container leaves the view as it is', {skip: !engine}, async () => {
+  const view = createViewController(createSession(engine, {resident: false}));
+  await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  const before = view.getState().snapshot;
+  const look = await view.peek('box', {limit: 12});
+  assert.equal(look.ok, true, JSON.stringify(look));
+  assert.deepEqual([look.children, look.shown, look.omitted], [30, 12, 18]);
+  assert.ok(look.scene.nodes.some(n => n.id === 'c00'));
+  assert.deepEqual(look.external.c00, {incoming: 1, outgoing: 0}, 'src calls c00 from outside');
+  let s = view.getState();
+  assert.equal(s.peek.nodeId, 'box');
+  assert.equal(s.snapshot, before, 'nothing changed');
+  assert.equal(s.canBack, false);
+  assert.ok(s.scene.nodes.find(n => n.id === 'box').collapsed);
+  view.closePeek();
+  assert.equal(view.getState().peek, null);
+  // The next change ends a look.
+  await view.peek('box');
+  await view.open('box');
+  assert.equal(view.getState().peek, null);
+  assert.equal((await view.peek('src')).ok, false, 'a leaf has nothing to look into');
+});

@@ -17,6 +17,7 @@ pub mod hierarchy;
 pub mod history;
 pub mod overview;
 pub mod patch;
+pub mod peek;
 pub mod port_edit;
 pub mod protocol;
 pub mod session;
@@ -4206,6 +4207,9 @@ pub(crate) fn dispatch_legacy(input: &str) -> String {
         }
         if v["op"].as_str() == Some("find") {
             return find::find_response(&v).to_string();
+        }
+        if v["op"].as_str() == Some("peek") {
+            return peek::peek_response(&v).to_string();
         }
         if v["op"].as_str() == Some("digest") {
             return find::digest_response(&v).to_string();

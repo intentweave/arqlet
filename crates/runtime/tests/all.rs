@@ -88,6 +88,8 @@ mod pack_components;
 mod paging;
 #[path = "parallel_straight.rs"]
 mod parallel_straight;
+#[path = "peek.rs"]
+mod peek;
 #[path = "petri_shapes.rs"]
 mod petri_shapes;
 #[path = "pin_search.rs"]

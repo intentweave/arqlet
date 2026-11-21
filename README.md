@@ -269,6 +269,10 @@ In the playground: *Find* in the section *Path*, and *Link to this view*.
 or down, to the container or its first child, between siblings, or along an edge; the
 camera follows `state.focus`. In the playground: arrows, Shift+arrows, `[` and `]`, Enter.
 
+`peek` looks into a collapsed container without opening it: its contents laid out on
+their own as a small scene, and per child the edges that cross its border. In the
+playground: *Look inside* or Space on a selected closed container.
+
 ### Filter
 
 `filter` hides nodes by kind or id (each with what it holds) and edges by kind, without

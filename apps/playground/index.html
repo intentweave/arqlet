@@ -128,6 +128,7 @@ table.stats td{padding:2px 4px;border-bottom:1px solid var(--line)}
 table.stats td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
 .search-results{display:flex;flex-direction:column;align-items:stretch;gap:2px;margin-top:4px}.search-results button{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.peek-panel{border:1px solid var(--line,#ccd);border-radius:6px;padding:6px;margin-top:4px}.peek-graph{display:block;width:100%;height:auto;max-height:320px}
 </style></head>
 <body>
 <header>
@@ -170,6 +171,8 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  <p class="hint">Keys: arrows move the selection, Shift+↑/↓ to the container or its first child, Shift+←/→ along an edge, [ and ] between siblings, Enter opens or closes.</p>
  <p id="route-info" role="status">Click an edge to highlight it.</p>
  <p id="details" role="status"></p>
+ <div class="row"><button id="peek" hidden title="Show what the closed container holds, without opening it (Space)">Look inside</button></div>
+ <div id="peek-panel" class="peek-panel" hidden><div class="row"><p id="peek-info" role="status"></p><button id="peek-close">Close</button></div><svg id="peek-graph" class="peek-graph" role="img" aria-label="The contents of the closed container"></svg></div>
  <div class="row"><button id="pin-node" disabled>Pin</button><button id="unpin-node" disabled>Unpin</button><button id="toggle" disabled>Select a container</button></div>
  <p id="pin-info" class="hint" role="status"></p>
  <label for="name">New node, connected to the selection</label>

@@ -37,6 +37,16 @@ export interface SessionResult {
   unchanged?: boolean;
 }
 
+/** Provisional: a look into a container (`peek`): its contents as a scene, and the border edges per child shown. */
+export interface PeekAnswer {
+  nodeId: string;
+  children: number;
+  shown: number;
+  omitted: number;
+  external: Record<string, {incoming: number; outgoing: number}>;
+  scene: Scene;
+}
+
 /** What `details` asks about: a node, or an edge (a drawn line or an edge of the source graph). */
 export type DetailTarget = {nodeId: string; edgeId?: never} | {edgeId: string; nodeId?: never};
 
@@ -98,6 +108,8 @@ export interface Session {
    * shows each; at most `limit` (default 20), only `nodeKinds` if given.
    */
   find(query: string, init?: {limit?: number; nodeKinds?: string[]}): Promise<ReadAnswer<FindAnswer>>;
+  /** Provisional (read only): a look into a collapsed container without opening it. */
+  peek(nodeId: string, init?: {limit?: number}): Promise<ReadAnswer<PeekAnswer>>;
   /**
    * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
    * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from
