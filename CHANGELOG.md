@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Performance
 
+- Dense channels: the order of a channel's lane changes is found without copying the order or reading a full cost
+  matrix along columns, and a channel's cross-flow pairs are built into their map at once; the output is byte-identical.
+  On an anonymized 500-node graph of 3 138 edges in almost one layer the default layout takes 773 ms instead of 1 400 ms
+  (623 instead of 1 607 ms with `POLYLINE`). Measurements: `benchmarks/results/dense-channels-20261121.md`.
 - The constructive search finds the lane changes of a corridor in two sweeps instead of a scan from every lane (linear
   instead of quadratic in the lanes); the output is byte-identical. On an anonymized 500-node graph with long edges and
   `POLYLINE` routing the layout takes 1 883 ms instead of 3 505 ms (routing 1 520 instead of 3 143 ms); the default

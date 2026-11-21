@@ -627,20 +627,32 @@ fn reserve_once(
                 .push(i);
         }
     }
+    // The pairs of one channel whose cross ranges come within a track: collected first and built into the map at once (a
+    // channel of a dense graph gives millions), each keeping the larger of its gaps as an insertion one by one would.
+    let mut pairs: Vec<((usize, usize), f64)> = Vec::new();
     for members in by_channel.values() {
         for (k, &a) in members.iter().enumerate() {
             for &b in &members[k + 1..] {
                 if bends[a].cross.0 < bends[b].cross.1 + spacing.track - EPS
                     && bends[b].cross.0 < bends[a].cross.1 + spacing.track - EPS
                 {
-                    constraints
-                        .entry((a, b))
-                        .and_modify(|v| *v = v.max(spacing.track))
-                        .or_insert(spacing.track);
+                    pairs.push(((a, b), spacing.track));
                     summary.cross_flow_constraints += 1;
                 }
             }
         }
+    }
+    if !pairs.is_empty() {
+        pairs.extend(std::mem::take(&mut constraints));
+        pairs.sort_by(|x, y| x.0.cmp(&y.0));
+        let mut merged: Vec<((usize, usize), f64)> = Vec::with_capacity(pairs.len());
+        for (key, gap) in pairs {
+            match merged.last_mut() {
+                Some(last) if last.0 == key => last.1 = last.1.max(gap),
+                _ => merged.push((key, gap)),
+            }
+        }
+        constraints = merged.into_iter().collect();
     }
     Ok(Reserved {
         bends,
