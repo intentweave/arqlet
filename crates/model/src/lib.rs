@@ -751,6 +751,7 @@ pub fn validate(graph: &Graph) -> Result<(), String> {
         }
         good.extend(seen);
     }
+    graph.memberships.validate()?;
     let mut edges = BTreeSet::new();
     for e in &graph.edges {
         if !edges.insert(&e.id) {
@@ -2383,6 +2384,51 @@ impl Memberships {
     pub fn dimension(&self, id: &str) -> Option<&MembershipDimension> {
         self.dimensions.iter().find(|d| d.id == id)
     }
+
+    /// The refusals of ADR 0022 §5 that concern the data itself: a dimension id declared twice, a group id declared
+    /// twice within its dimension, a `parent` that names no group of the same dimension, and a cycle of `parent` links.
+    /// Member ids the graph does not have are not refused (they are ignored and counted).
+    pub fn validate(&self) -> Result<(), String> {
+        let mut dimensions = BTreeSet::new();
+        for d in &self.dimensions {
+            if d.id.is_empty() || !dimensions.insert(d.id.as_str()) {
+                return Err(format!("Empty or duplicate membership dimension: {}", d.id));
+            }
+            let mut parent: BTreeMap<&str, Option<&str>> = BTreeMap::new();
+            for g in &d.groups {
+                if g.id.is_empty() || parent.insert(g.id.as_str(), g.parent.as_deref()).is_some() {
+                    return Err(format!(
+                        "Empty or duplicate membership group: {}/{}",
+                        d.id, g.id
+                    ));
+                }
+            }
+            for g in &d.groups {
+                if let Some(p) = g.parent.as_deref() {
+                    if !parent.contains_key(p) {
+                        return Err(format!(
+                            "Membership group {}/{} names the parent {p}, which {} does not declare",
+                            d.id, g.id, d.id
+                        ));
+                    }
+                }
+                // Bounded by the number of groups: a longer walk is a cycle.
+                let mut at = g.parent.as_deref();
+                let mut walked = 0usize;
+                while let Some(p) = at {
+                    walked += 1;
+                    if walked > d.groups.len() {
+                        return Err(format!(
+                            "Membership groups of {} form a parent cycle at {}",
+                            d.id, g.id
+                        ));
+                    }
+                    at = parent.get(p).copied().flatten();
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Provisional (ADR 0022): one dimension of memberships (`zone`, `team`, `layer`, …) with its groups in the order they
@@ -2648,6 +2694,20 @@ impl LayoutOptions {
     pub fn normalize_container_sizing(&mut self) {
         self.container_sizing
             .retain(|_, sizing| !sizing.is_content());
+    }
+
+    /// The refusal of ADR 0022 §5 that concerns the options: `groups` together with a `hierarchy` membership view (both
+    /// would make the one grouping tree of the view). Too many `hierarchy` or `lanes` dimensions are reported, not refused.
+    pub fn validate_membership_views(&self) -> Result<(), String> {
+        if !self.groups.is_empty()
+            && self
+                .membership_views
+                .values()
+                .any(|m| *m == MembershipView::Hierarchy)
+        {
+            return Err("groups and a hierarchy membership view cannot be used together".into());
+        }
+        Ok(())
     }
 
     /// Checks every authored container size (ADR 0010). Invalid values are rejected before any layout runs.

@@ -153,6 +153,8 @@ pub fn peek_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
         nodes,
         edges,
         buses: Vec::new(),
+        // The memberships as declared: members outside the look are ignored and counted, as anywhere else.
+        memberships: source.memberships.clone(),
     };
     // The view's options, with the containers inside collapsed and without what belongs to the view's own geometry.
     let mut options: LayoutOptions = snapshot.options.clone();

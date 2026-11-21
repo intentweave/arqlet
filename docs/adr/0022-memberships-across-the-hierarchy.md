@@ -2,8 +2,9 @@
 
 Date: 2026-11-21.
 Status: accepted for the first slice (2026-11-21): **M0 and a narrowed M2 are implemented** behind `membershipViews`, off
-by default — the model, the validation, the padded convex hull as scene geometry, the typed report, the SVG viewer and the
-playground checkbox. The modes `hierarchy` (M1) and `lanes` (M4), memberships through `patch` (§5b), `details` per
+by default — the model, the validation (the refusals of §5: duplicate dimension or group ids, an unknown or cyclic
+`parent`, `groups` together with a `hierarchy` view), the padded convex hull as scene geometry, the typed report, the SVG
+viewer and the playground checkbox. The modes `hierarchy` (M1) and `lanes` (M4), memberships through `patch` (§5b), `details` per
 dimension and proxies (M5) stay proposed.
 
 Related: [ADR 0003](0003-container-direction-constraints.md) (direction and strategy per area), [ADR 0005](0005-routing-constraints.md)

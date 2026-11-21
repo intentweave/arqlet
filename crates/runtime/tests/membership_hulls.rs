@@ -318,3 +318,63 @@ fn carrying_memberships_without_a_view_option_draws_the_same_picture() {
         "while the canonical graph does keep what it was given"
     );
 }
+
+/// The refusals of ADR 0022 §5: data the engine would otherwise accept now and have to refuse later.
+#[test]
+fn malformed_memberships_and_conflicting_options_are_refused() {
+    let base = |memberships: serde_json::Value| {
+        serde_json::json!({
+            "nodes": [{"id": "a", "kind": "k", "label": "a"}, {"id": "b", "kind": "k", "label": "b"}],
+            "edges": [],
+            "memberships": memberships,
+        })
+    };
+    let import = |g: serde_json::Value| {
+        let graph: Graph = serde_json::from_value(g).expect("parses");
+        import_graph_with(graph, 100, &LayoutOptions::default())
+    };
+    let cases = [
+        (
+            "a dimension twice",
+            serde_json::json!({"dimensions": [{"id": "z", "groups": [{"id": "g", "members": ["a"]}]},
+            {"id": "z", "groups": [{"id": "h", "members": ["b"]}]}]}),
+            "duplicate membership dimension",
+        ),
+        (
+            "a group twice",
+            serde_json::json!({"dimensions": [{"id": "z", "groups": [{"id": "g", "members": ["a"]},
+            {"id": "g", "members": ["b"]}]}]}),
+            "duplicate membership group",
+        ),
+        (
+            "an unknown parent",
+            serde_json::json!({"dimensions": [{"id": "z", "groups": [{"id": "g", "members": ["a"],
+            "parent": "nowhere"}]}]}),
+            "does not declare",
+        ),
+        (
+            "a parent cycle",
+            serde_json::json!({"dimensions": [{"id": "z", "groups": [{"id": "g", "members": ["a"],
+            "parent": "h"}, {"id": "h", "members": ["b"], "parent": "g"}]}]}),
+            "parent cycle",
+        ),
+    ];
+    for (what, memberships, message) in cases {
+        let error = import(base(memberships)).expect_err(what);
+        assert!(error.contains(message), "{what}: {error}");
+    }
+    // An unknown member id is not refused (ignored and counted).
+    assert!(import(base(
+        serde_json::json!({"dimensions": [{"id": "z", "groups": [{"id": "g",
+        "members": ["a", "nobody"]}]}]})
+    ))
+    .is_ok());
+    // `groups` together with a hierarchy dimension.
+    let options = arqlet_runtime::options_from_patch(&serde_json::json!({
+        "groups": {"a": ["G"]}, "membershipViews": {"z": "hierarchy"}}));
+    assert!(options.unwrap_err().contains("cannot be used together"));
+    assert!(arqlet_runtime::options_from_patch(
+        &serde_json::json!({"membershipViews": {"z": "hierarchy"}})
+    )
+    .is_ok());
+}

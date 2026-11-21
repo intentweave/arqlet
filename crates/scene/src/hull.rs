@@ -13,9 +13,7 @@ use arqlet_model::{Point, Rect};
 /// Orders two coordinates totally. Scene coordinates are finite, so this is a total order; a NaN would sort last rather
 /// than poison the sort.
 fn by_xy(a: &Point, b: &Point) -> std::cmp::Ordering {
-    a.x.partial_cmp(&b.x)
-        .unwrap_or(std::cmp::Ordering::Equal)
-        .then(a.y.partial_cmp(&b.y).unwrap_or(std::cmp::Ordering::Equal))
+    a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y))
 }
 
 /// Twice the signed area of the triangle `o, a, b`: positive when `o → a → b` turns counter-clockwise.

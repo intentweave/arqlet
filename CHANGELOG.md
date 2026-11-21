@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Memberships across the hierarchy, first slice (provisional, ADR 0022): `Graph.memberships` (dimensions of groups,
+  besides the containment) and `LayoutOptions.membershipViews`; a dimension shown as `overlay` is drawn as a padded
+  convex hull behind the nodes (`Scene.membershipHulls`, with the boxes it encloses and the foreign leaf boxes inside
+  it), with a typed report per dimension (`Scene.membershipReport`). Nothing moves: boxes and routes are identical with
+  and without hulls. Refused: duplicate dimension or group ids, an unknown or cyclic `parent`, `groups` together with a
+  `hierarchy` view; unknown member ids are ignored and counted. `hierarchy` and `lanes` are accepted and reported as not
+  yet applied. SVG viewer and playground (*Membership hulls*, demo *Memberships*).
 - A look into a collapsed container (provisional): the read-only operation `peek` (`nodeId`, optional `limit`, default
   50) lays out the container's contents on their own as a small scene (the containers inside collapsed, at most `limit`
   direct children in the source order, the rest counted) and counts per child the edges that cross the container's
