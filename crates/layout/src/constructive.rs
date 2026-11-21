@@ -1345,7 +1345,10 @@ fn build_planned(
             .iter()
             .any(|o| segment_hits(w[0].clone(), w[1].clone(), o))
     });
-    let segments = segments_of(&points);
+    let mut segments = segments_of(&points);
+    for s in &mut segments {
+        s.group = p.group;
+    }
     if !clear {
         work.borrow_mut().planned_obstacle_failures += 1;
         #[cfg(feature = "benchmark-timings")]
@@ -1396,7 +1399,13 @@ struct Segment {
     horizontal: bool,
     coord: f64,
     range: (f64, f64),
+    /// Provisional (`LayoutOptions::shared_tracks`): the group of the edge the segment belongs to; segments of one group may
+    /// run on one track (`conflicts`). `NO_GROUP` for an edge without a group.
+    group: u32,
 }
+
+/// No shared group (`Segment::group`, `Prepared::group`).
+const NO_GROUP: u32 = u32::MAX;
 
 /// The absolute segments of a polyline; zero-length legs are skipped.
 fn segments_of(points: &[Point]) -> Vec<Segment> {
@@ -1409,12 +1418,14 @@ fn segments_of(points: &[Point]) -> Vec<Segment> {
                     horizontal: true,
                     coord: a.y,
                     range: (a.x.min(b.x), a.x.max(b.x)),
+                    group: NO_GROUP,
                 })
             } else if (a.x - b.x).abs() < EPS {
                 Some(Segment {
                     horizontal: false,
                     coord: a.x,
                     range: (a.y.min(b.y), a.y.max(b.y)),
+                    group: NO_GROUP,
                 })
             } else {
                 // Not axis-aligned: the construction never produces one.
@@ -1454,6 +1465,8 @@ struct Prepared {
     /// `edge_gaps` of the obstacles, computed at the first search and shared by the copies of the edge (which change only
     /// its ends).
     gaps: std::rc::Rc<std::cell::OnceCell<(Vec<(f64, f64)>, Vec<(f64, f64)>)>>,
+    /// Provisional (`LayoutOptions::shared_tracks`): the edge's shared group (`Segment::group`), `NO_GROUP` without one.
+    group: u32,
 }
 
 impl Prepared {
@@ -1707,6 +1720,7 @@ fn prepare_edge_inner(
         lead: (lead_first, lead_last),
         window: spacing.search_window,
         gaps: Default::default(),
+        group: NO_GROUP,
     })
 }
 
@@ -2321,6 +2335,51 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
         }
     }
     order
+}
+
+/// Provisional (`LayoutOptions::shared_tracks`): the track slots of a channel's changes when the changes of one group share
+/// a track. A group stands as one change spanning all of its members, placed where its first member stands in `order`;
+/// every member takes the group's slot. A change without a group stands alone.
+pub(crate) fn shared_track_slots<'g>(
+    spans: &[(f64, f64)],
+    order: &[usize],
+    track: f64,
+    group: impl Fn(usize) -> Option<&'g str>,
+) -> (Vec<usize>, usize) {
+    let mut unit_of: Vec<usize> = vec![usize::MAX; spans.len()];
+    let mut units: Vec<(f64, f64)> = Vec::new();
+    let mut by_group: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut unit_order = Vec::new();
+    for &k in order {
+        let (lo, hi) = (spans[k].0.min(spans[k].1), spans[k].0.max(spans[k].1));
+        let unit = match group(k) {
+            Some(g) => *by_group.entry(g).or_insert_with(|| {
+                units.push((lo, hi));
+                unit_order.push(units.len() - 1);
+                units.len() - 1
+            }),
+            None => {
+                units.push((lo, hi));
+                unit_order.push(units.len() - 1);
+                units.len() - 1
+            }
+        };
+        let u = &mut units[unit];
+        u.0 = u.0.min(lo);
+        u.1 = u.1.max(hi);
+        unit_of[k] = unit;
+    }
+    let (unit_slots, count) = track_slots(&units, &unit_order, track);
+    let slots = (0..spans.len())
+        .map(|k| {
+            if unit_of[k] == usize::MAX {
+                0
+            } else {
+                unit_slots[unit_of[k]]
+            }
+        })
+        .collect();
+    (slots, count)
 }
 
 /// The track slot of every lane change of one channel, in the channel's order (`order`, positions into `changes`): changes
@@ -3095,7 +3154,8 @@ fn across_extent(r: &Rect, vertical: bool) -> (f64, f64) {
 
 /// Whether a new segment runs too close to an assigned one, parallel to it, over an overlapping range.
 fn conflicts(a: &Segment, b: &Segment, track: f64) -> bool {
-    a.horizontal == b.horizontal
+    (a.group == NO_GROUP || a.group != b.group)
+        && a.horizontal == b.horizontal
         && (a.coord - b.coord).abs() < track - EPS
         && a.range.0 < b.range.1
         && b.range.0 < a.range.1
@@ -3703,6 +3763,7 @@ mod tests {
             horizontal: true,
             coord: p.start.y,
             range: (p.start.x, p.end.x),
+            group: NO_GROUP,
         }];
         assert!(build_planned(&p, &[], &mut assigned, SPACING.track, &work).is_none());
         p.obstacles.push(rect(80., 0.));

@@ -148,6 +148,7 @@ pub(super) fn assign(
             .or_insert(i);
     }
     let mut bends = BTreeMap::new();
+    let mut assigned = super::joint::Assigned::new();
     for edge in &plan.edges {
         if !trials.get(&edge.edge).is_some_and(|t| t.failure.is_none()) {
             continue;
@@ -166,10 +167,7 @@ pub(super) fn assign(
                 .and_then(|ranks| ranks.get(&s.channel))
                 .map(|&i| &channels[i]);
             let coordinate = existing.and_then(|c| {
-                c.assignments
-                    .iter()
-                    .find(|(id, _, _)| id == &edge.edge)
-                    .map(|a| a.2)
+                super::joint::assigned_in(&mut assigned, c, &edge.edge)
                     .or_else(|| c.assignments.first().map(|a| a.2))
             });
             let at = match coordinate {

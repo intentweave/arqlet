@@ -19,6 +19,7 @@ import type { PortPlacement } from "./PortPlacement";
 import type { RoutingEngine } from "./RoutingEngine";
 import type { Row } from "./Row";
 import type { RowPortOrder } from "./RowPortOrder";
+import type { SharedTracks } from "./SharedTracks";
 
 /**
  * View configuration. Part of the portable snapshot, so backend and browser compute identically.
@@ -145,6 +146,12 @@ isolatedGridFrom?: number | null,
  * to another sheet. `None` (the default, omitted): every edge is routed.
  */
 hubRefs?: number,
+/**
+ * Provisional (single pass, request 27): edges that share a track in a channel instead of one track each. `target`:
+ * the edges of a channel into the same node run on one track there, drawn over each other like a bus into the node
+ * (as ELK's merged edges). `None` (the default, omitted): one track per edge.
+ */
+sharedTracks?: SharedTracks,
 /**
  * Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
  * (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
@@ -438,6 +445,12 @@ routeSearchWindow?: boolean,
  * single pass, as before.
  */
 singlePassMixed?: boolean,
+/**
+ * Polyline routing (`polyline`, `roundedPolyline`) in single pass: the layout routes such edges orthogonally, as it
+ * always did, and the scene pulls them taut; before, a graph with polyline routing fell back to the pipeline before
+ * single pass. On by default since 0.7.0; written as `false` when turned off (then such graphs fall back as before).
+ */
+singlePassPolyline?: boolean,
 /**
  * The clearance routes keep from nodes, their own nodes included beyond the stub at their port. It is a hard
  * constraint (ADR 0005): the default is `DEFAULT_REQUIRED_CLEARANCE`, so it always applies. An explicit `null` is

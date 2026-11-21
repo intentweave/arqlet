@@ -5,8 +5,64 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+## 0.7.0 — 2026-11-21
+
+Large views read faster and denser. A dense flat graph lays out in 0.58 s instead of 1.4 s, a graph with long edges and
+polyline routing in 0.5 s instead of 3.5 s, with the same drawings (pure speedups) or with single pass now also for
+polyline routing. Views that start abstract lift edges between containers and grid large unlinked areas by default, and
+the first-view budget holds. Buses can be given as data (`Graph.buses` with `taps`) and are navigable, drawn as lines
+without bars if wanted, clear of foreign boxes, and orthogonal in organic areas. New for hosts: paging through
+`+N more` with a step back, child counts on scene nodes, phase timings on request, a typed drag API, and bus lines,
+junctions and hub references from `toReactFlow`. Hub references draw the edges of hubs as stubs; shared tracks
+(experimental) let the edges into one node share a track. The WebGL overview gains bus lines, dragging, a galaxy style,
+orbit, adaptive dimming and names, and builds in steps.
+
+### Upgrading from 0.6
+
+- **The default drawing changes** in three places. Views that start abstract (`levelOfDetail` or `communities` set) lift
+  edges between containers (`liftEdges`) and lay out areas of at least 50 unlinked children as a grid
+  (`isolatedGridFrom`); graphs with polyline routing are laid out in single pass (`singlePassPolyline`). To keep 0.6's
+  drawings, set `liftEdges: false`, `isolatedGridFrom: 0` and `singlePassPolyline: false`. The first-view budget
+  (`levelOfDetail.nodes`) now counts an opened container as a box plus its children, so a budget opens fewer
+  containers than in 0.6; raise it to keep a first view. The reference fingerprints are
+  `fingerprints-20261121-default-0.7.0.jsonl` (orthogonal views without an abstract start are unchanged).
+- **The engine version is `0.7.0`**: edits of a snapshot from an earlier engine are refused, so import the graph again.
+- **The WASM module imports `env.lw_now`** (the host's clock for `timings: true`). `@arqlet/engine-client`'s loader
+  provides it; a host with its own loader must add `lw_now: () => performance.now()` to the `env` imports.
+- **Additions to the formats**, all omitted when empty or default: `Snapshot.hubRefs`, `Scene.hubRefs`,
+  `SceneNode.childCount`/`hiddenCount` (columns `nodeChildCount`/`nodeHiddenCount`), `Intent.partial`, the options
+  `hubRefs`, `sharedTracks`, `singlePassPolyline` (written only as `false`) and `communityHubs.top`, the request fields
+  `timings` and `reveal.more`, and the operation `pin`. Rust: `LayoutOptions::lift_edges` is an `Option<bool>`
+  (`lifts_edges()` gives the effective value); exhaustive struct literals of `LayoutOptions`, `SceneNode`,
+  `CommunityHubs` and `Intent` need the new fields (or `..Default::default()`).
+
+### Changed (default)
+
+- **Polyline routing in single pass** (`singlePassPolyline`, on by default; `false` restores the fallback): `polyline` and
+  `roundedPolyline` are laid out orthogonally and pulled taut by the scene, as before, but a graph with them no longer
+  falls back to the pipeline before single pass. On 36 benchmark datasets with polyline routing: crossings −16 %, bends
+  −2 %, time −29 %, no route through a node; workflow-dag gets its orthogonal single-pass drawing (crossings 136 → 553).
+  `elkLayout` with `POLYLINE` on an anonymized 500-node graph with long edges: 1 778 → 509 ms (request 28). Orthogonal
+  output unchanged. Measurements: `benchmarks/results/polyline-single-pass-20261121.md`.
+
+### Added (experimental)
+
+- `sharedTracks: "target"` (provisional, off by default; request 27): in the last channel before a node, the edges into
+  that node share one track (one bend per group in the coordination, segments of a group may overlap), and the placement
+  makes room for the shared tracks only. When the shared bends make the lane orders cyclic for many edges (groups
+  interleaved in narrow gaps, as in a dense flat graph), the layout is computed again without groups (diagnostic). On an
+  anonymized 500-node graph with long edges: height −46 %, length −16 %, bends equal, crossings +4.8 %, same time; the
+  dense flat graph keeps its drawing (fallback, 1.4 s instead of 0.6 s). 41 datasets: no error, no route through a node;
+  18 change (area 94–100 %, crossings +0.4 % and bends −3.6 % on the smaller ones). Measurements:
+  `benchmarks/results/shared-tracks-20261121.md`. Output without the option is byte-identical.
+
 ### Performance
 
+- The rule that bends of one channel keep a track apart is answered by a range query instead of listing every pair of the
+  channel (1.49 million on a dense graph); the output is byte-identical. The dense 500-node graph above: 773 → 601 ms.
+  Measurements: `benchmarks/results/channel-overlaps-20261121.md`.
+- Indexes instead of scans by edge and node id, and a channel's slots by a range query over its lanes; output
+  byte-identical, the dense 500-node graph about 600 → 578 ms (same file).
 - Dense channels: the order of a channel's lane changes is found without copying the order or reading a full cost
   matrix along columns, and a channel's cross-flow pairs are built into their map at once; the output is byte-identical.
   On an anonymized 500-node graph of 3 138 edges in almost one layer the default layout takes 773 ms instead of 1 400 ms

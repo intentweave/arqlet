@@ -90,6 +90,7 @@ export * from './SceneRoute';
 export * from './SceneRow';
 export * from './SceneTap';
 export * from './Settle';
+export * from './SharedTracks';
 export * from './SizePin';
 export * from './Snapshot';
 export * from './Status';

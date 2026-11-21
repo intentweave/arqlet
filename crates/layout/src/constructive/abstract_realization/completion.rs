@@ -170,6 +170,17 @@ fn run_impl(
     };
     checkpoint()?;
     session.physical_tracks = snapshot.options.abstract_routing;
+    // Provisional (`sharedTracks: target`): the edges into one node share their tracks.
+    session.shared = match snapshot.options.shared_tracks {
+        _ if session.shared_off => BTreeMap::new(),
+        Some(arqlet_model::SharedTracks::Target) => snapshot
+            .graph
+            .edges
+            .iter()
+            .filter_map(|e| Some((e.id.clone(), e.target.clone()?)))
+            .collect(),
+        None => BTreeMap::new(),
+    };
     session.explicit_ports = matches!(method, Method::SinglePass);
     let before = session.work.clone();
     let construction_before = session.construction.as_ref().map(|s| s.work.clone());
@@ -231,6 +242,30 @@ fn run_impl(
             } else {
                 realize_chains(&snapshot.graph, &grown.boxes, &ports, &grown.plans, spacing)?
             };
+            // Provisional (`sharedTracks`): when shared bends make the lane orders cyclic for many edges (groups interleaved
+            // in narrow gaps, as in a dense flat graph), the drawing is completed again without groups: a few such
+            // failures are kept, a mass of them would go to the slow delegated routing.
+            if !session.shared.is_empty() && !session.shared_off {
+                let cyclic = trial
+                    .delegated
+                    .iter()
+                    .filter(|(_, f)| matches!(f, super::Failure::JointOrder { .. }))
+                    .count();
+                let edges = selected.as_ref().map_or(0, |p| p.edges.len());
+                if cyclic > 16.max(edges / 100) {
+                    // The placement already made room for shared tracks: the whole layout is computed again without them
+                    // (`compute_counted`, on this diagnostic); this pass only completes the drawing it has.
+                    session.shared_off = true;
+                    let again = run_impl(snapshot, method, session, stop);
+                    session.shared_off = false;
+                    return again.map(|mut done| {
+                        done.drawing
+                            .layout_diagnostics
+                            .push(crate::SHARED_TRACKS_FALLBACK.into());
+                        done
+                    });
+                }
+            }
             search.construction.add(&trial.work);
             // Single pass: self-loops are nested at a node's freest corner, clear of every route built, as the default
             // constructs them (`nest_self_loops`), instead of going to the seed routes. The other chain methods keep
@@ -465,16 +500,18 @@ fn run_impl(
     }
     // Keep canonical graph and local node coordinates distinct from scene boxes.
     let mut drawing = snapshot.clone();
+    // Each node's parent, the first node of an id as a scan finds it.
+    let mut parent_of: BTreeMap<&str, Option<&String>> = BTreeMap::new();
+    for n in &snapshot.graph.nodes {
+        parent_of
+            .entry(n.id.as_str())
+            .or_insert(n.parent_id.as_ref());
+    }
     drawing.boxes = grown
         .boxes
         .iter()
         .map(|(id, r)| {
-            let parent = snapshot
-                .graph
-                .nodes
-                .iter()
-                .find(|n| n.id == *id)
-                .and_then(|n| n.parent_id.as_ref());
+            let parent = parent_of.get(id.as_str()).copied().flatten();
             let mut local = r.clone();
             if let Some(parent) = parent {
                 local.x -= grown.boxes[parent].x;
@@ -573,7 +610,10 @@ fn input_plans(snapshot: &Snapshot) -> Result<LayeredPlans, String> {
     if snapshot.options.routing_engine != RoutingEngine::Legacy
         || snapshot.options.bundling != Bundling::None
         || !snapshot.straight_edges.is_empty()
-        || (!snapshot.graph.routing_orthogonal_only() && !snapshot.options.single_pass_mixed)
+        || (!snapshot
+            .graph
+            .routing_laid_out_orthogonally(snapshot.options.single_pass_polyline)
+            && !snapshot.options.single_pass_mixed)
     {
         return Err("Routing completion requires the legacy router and unbundled default orthogonal routing".into());
     }
@@ -614,8 +654,13 @@ fn corner_loops(
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
         .collect();
     let preferred = 20. + self_loop_clearance;
+    // Each route's edge, the first of an id as a scan finds it.
+    let mut edge_of: BTreeMap<&str, &arqlet_model::Edge> = BTreeMap::new();
+    for e in &graph.edges {
+        edge_of.entry(e.id.as_str()).or_insert(e);
+    }
     for route in &mut seeds {
-        let Some(edge) = graph.edges.iter().find(|e| e.id == route.id) else {
+        let Some(&edge) = edge_of.get(route.id.as_str()) else {
             continue;
         };
         if edge.target.as_deref() != Some(edge.source.as_str()) {

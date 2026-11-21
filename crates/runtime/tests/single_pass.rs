@@ -799,12 +799,23 @@ fn rounded_orthogonal_routing_is_drawn_by_single_pass_on_the_same_routes() {
     // The root rounds; the list in `q` keeps the plain baseline (`RoutingConstraint::picks`).
     assert!(scene.routes.iter().any(|r| r.rounded));
     assert!(scene.routes.iter().any(|r| !r.rounded));
-    // A style that is not drawn on the orthogonal route still falls back.
+    // Polyline is pulled taut by the scene from the orthogonal route: single pass takes it too since 0.7.0
+    // (`singlePassPolyline`), on the same routes; turned off, it falls back as before. `straight` still falls back.
     let mut polyline = serde_json::to_value(nested()).unwrap();
     polyline["defaultRouting"] = json!("polyline");
     let polyline: Graph = serde_json::from_value(polyline).unwrap();
+    let taut = import(&polyline, json!({"singlePassAuto": true}));
+    assert!(on_single_pass(&taut) && !reported_fallback(&taut), "{taut}");
+    assert_eq!(taut["routes"], plain["routes"]);
     assert!(reported_fallback(&import(
         &polyline,
+        json!({"singlePassAuto": true, "singlePassPolyline": false})
+    )));
+    let mut straight = serde_json::to_value(nested()).unwrap();
+    straight["defaultRouting"] = json!("straight");
+    let straight: Graph = serde_json::from_value(straight).unwrap();
+    assert!(reported_fallback(&import(
+        &straight,
         json!({"singlePassAuto": true})
     )));
 }

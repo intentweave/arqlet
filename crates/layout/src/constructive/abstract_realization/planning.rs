@@ -48,6 +48,13 @@ pub struct Session {
     pub(super) physical_tracks: bool,
     /// Edges with explicit ports are planned (single pass); see `abstract_routing::build_with`.
     pub(super) explicit_ports: bool,
+    /// Provisional (`LayoutOptions::shared_tracks`): the group of every edge whose changes in a channel share one track
+    /// with the other changes of its group there (edge id to group key). Empty: one track per change.
+    pub(super) shared: BTreeMap<String, String>,
+    /// The index of every edge's last section (`shared`: only that one is shared).
+    pub(super) last_section: BTreeMap<String, usize>,
+    /// Set while a drawing is completed again without groups (too many cyclic lane orders with them).
+    pub(super) shared_off: bool,
 }
 
 impl Session {
@@ -119,31 +126,10 @@ fn quality_order(mut channel: abstract_routing::Channel) -> abstract_routing::Ch
         }
     }
     let mut position = vec![0; n];
-    channel.tracks = 0;
     for (at, &i) in channel.order.iter().enumerate() {
         position[i] = at;
-        let a = &channel.assignments[i];
-        let (lo, hi) = if a.from < a.to {
-            (&a.from, &a.to)
-        } else {
-            (&a.to, &a.from)
-        };
-        let slot = channel.order[..at]
-            .iter()
-            .filter_map(|&j| {
-                let b = &channel.assignments[j];
-                let (l, h) = if b.from < b.to {
-                    (&b.from, &b.to)
-                } else {
-                    (&b.to, &b.from)
-                };
-                (lo <= h && l <= hi).then_some(b.slot + 1)
-            })
-            .max()
-            .unwrap_or(0);
-        channel.assignments[i].slot = slot;
-        channel.tracks = channel.tracks.max(slot + 1);
     }
+    channel.tracks = abstract_routing::slots_in_order(&mut channel.assignments, &channel.order);
     channel.broken_dependencies = channel
         .dependencies
         .iter()
@@ -178,6 +164,14 @@ impl Session {
                 channel
             },
         )?;
+        let mut plan = plan;
+        plan.shared = self.shared.clone();
+        self.last_section = plan
+            .edges
+            .iter()
+            .filter(|e| !e.sections.is_empty())
+            .map(|e| (e.edge.clone(), e.sections.len() - 1))
+            .collect();
         self.ordinal.retain(|key, _| active.contains(key));
         self.tracks.retain(|key, _| active.contains(key));
         let edges: BTreeSet<_> = plan.edges.iter().map(|e| e.edge.as_str()).collect();
@@ -253,9 +247,13 @@ impl Session {
         track: f64,
     ) -> (Vec<usize>, usize) {
         let key = (area.to_string(), rank);
+        // The group of each change (shared tracks), part of what the cached result depends on.
         let inputs: Vec<_> = changes
             .iter()
-            .map(|(id, i, a, b)| (id.to_string(), *i, a.to_bits(), b.to_bits()))
+            .map(|(id, i, a, b)| {
+                let group = self.shared.get(*id).cloned().unwrap_or_default();
+                (format!("{id}\u{0}{group}"), *i, a.to_bits(), b.to_bits())
+            })
             .collect();
         if let Some((before, bits, physical, slots, count)) = self.tracks.get(&key) {
             if *before == inputs && *bits == track.to_bits() && *physical == self.physical_tracks {
@@ -272,7 +270,17 @@ impl Session {
         } else {
             (0..spans.len()).collect()
         };
-        let (slots, count) = track_slots(&spans, &order, track);
+        let (slots, count) = if self.shared.is_empty() {
+            track_slots(&spans, &order, track)
+        } else {
+            crate::constructive::shared_track_slots(&spans, &order, track, |k| {
+                // Only an edge's last change (into its target's rank) is shared, as in the joint coordination.
+                let (id, section, _, _) = changes[k];
+                (self.last_section.get(id) == Some(&section))
+                    .then(|| self.shared.get(id).map(String::as_str))
+                    .flatten()
+            })
+        };
         self.work.channel_computations += 1;
         self.tracks.insert(
             key,

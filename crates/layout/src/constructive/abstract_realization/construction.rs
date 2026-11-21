@@ -194,6 +194,9 @@ impl Session {
             entry.key = key;
             entry.points = planned_points(prepared, corners);
             entry.segments = segments_of(&entry.points);
+            for s in &mut entry.segments {
+                s.group = prepared.group;
+            }
             entry.route = finish_planned(prepared, entry.points.clone());
             self.work.geometries_computed += 1;
         }
@@ -284,6 +287,7 @@ mod tests {
             start,
             end,
             lead: (Vec::new(), Vec::new()),
+            group: NO_GROUP,
         }
     }
 
@@ -350,6 +354,7 @@ mod tests {
             horizontal,
             coord,
             range: (from, from + 30.),
+            group: NO_GROUP,
         };
         for track in [0.5, 8., 12.5, 40.] {
             let mut seed: u64 = 0x9e37_79b9_7f4a_7c15;
