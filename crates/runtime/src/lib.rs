@@ -12,6 +12,7 @@ pub mod details;
 pub mod engine_session;
 pub mod execution;
 pub mod filter;
+pub mod find;
 pub mod hierarchy;
 pub mod history;
 pub mod overview;
@@ -4202,6 +4203,12 @@ pub(crate) fn dispatch_legacy(input: &str) -> String {
         }
         if v["op"].as_str() == Some("details") {
             return details::details_response(&v).to_string();
+        }
+        if v["op"].as_str() == Some("find") {
+            return find::find_response(&v).to_string();
+        }
+        if v["op"].as_str() == Some("digest") {
+            return find::digest_response(&v).to_string();
         }
         if v["op"].as_str() == Some("componentRefine") {
             return component_response(&v);

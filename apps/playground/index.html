@@ -127,6 +127,7 @@ table.stats{width:100%;border-collapse:collapse;font-size:12px}
 table.stats td{padding:2px 4px;border-bottom:1px solid var(--line)}
 table.stats td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
+.search-results{display:flex;flex-direction:column;align-items:stretch;gap:2px;margin-top:4px}.search-results button{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style></head>
 <body>
 <header>
@@ -189,6 +190,9 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  <p id="trace-info" role="status"></p>
  <label for="show-node">Show a node</label>
  <div class="row"><input id="show-node" list="trace-nodes" placeholder="node id"><button id="show">Show</button></div>
+ <label for="search-query">Find</label>
+ <div class="row"><input id="search-query" type="search" placeholder="name or id, also hidden ones"><button id="search">Find</button></div>
+ <div id="search-results" class="search-results" role="list"></div>
 </div></details>
 
 <details class="section" open><summary>Filter</summary><div class="body">
@@ -293,7 +297,7 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
 
 <details class="section"><summary>Reference and legacy curation</summary><div class="body">
  <p class="hint">The view is edited directly: drag a node, a container's header, or a pin; drag a corner to resize; Ctrl or Cmd+Z undoes, with Shift (or Ctrl or Cmd+Y) it redoes. Every change goes through the engine.</p>
- <div class="row"><button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button></div>
+ <div class="row"><button id="undo" disabled>Undo</button><button id="redo" disabled>Redo</button><button id="view-link" title="Keep this view (open groups, pages, filter, selection) in the address, to share or open again">Link to this view</button></div>
  <div class="row"><button id="save-ref" disabled>Save reference (.lwref.json)</button></div>
  <label for="load-ref">Open reference</label><input id="load-ref" class="full" type="file" accept=".json,application/json">
  <ul id="capabilities" class="hint">

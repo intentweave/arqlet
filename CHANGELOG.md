@@ -7,6 +7,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Search, focus and bookmarks (provisional). The read-only operation `find` (`query`, optional `limit`, `nodeKinds`)
+  finds nodes of the source graph by label or id (ignoring case; exact, then prefix, then word start, then anywhere),
+  also inside collapsed groups, with the containers above each and the box that shows it (`FindAnswer`); `digest`
+  answers the fingerprint of the snapshot's source graph. In the view controller: `find` (`state.search`), `focus(id)`
+  (opens what hides the node as one undo step, selects it, `state.focus` with the bounds for the host's camera),
+  `bookmark()` (the view as a value: intent, highlight, selection, graph digest) and `openBookmark(bookmark)` (one undo
+  step; another graph's bookmark is refused unless forced), `encodeBookmark`/`decodeBookmark` for URLs. Playground:
+  *Find* with a list of matches (a click focuses), *Link to this view* (`#view=…` in the address, opened on load).
 - View details (provisional): the read-only operation `details` (`nodeId` or `edgeId`, optional `limit`) answers what
   the engine knows about a node or an edge and a host cannot see in the scene: the containers above a node, the box
   that shows it (itself, the collapsed container it is in, or none) with its absolute bounds, what a box holds

@@ -40,6 +40,8 @@ mod engine_choice;
 mod explicit_constraints;
 #[path = "filter.rs"]
 mod filter;
+#[path = "find.rs"]
+mod find;
 #[path = "force_directed.rs"]
 mod force_directed;
 #[path = "geometry_update.rs"]

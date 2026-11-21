@@ -1,4 +1,4 @@
-import type {DetailsAnswer, Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
+import type {DetailsAnswer, FindAnswer, Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
 import type {SceneColumns} from './columns.js';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
@@ -93,6 +93,11 @@ export interface Session {
    * the containers above a node and the box that shows it, what a collapsed box holds, the edges a line stands for.
    */
   details(target: DetailTarget, init?: {limit?: number}): Promise<ReadAnswer<DetailsAnswer>>;
+  /**
+   * Provisional (read only): the nodes whose label or id contains `query` (ignoring case), best first, with the box that
+   * shows each; at most `limit` (default 20), only `nodeKinds` if given.
+   */
+  find(query: string, init?: {limit?: number; nodeKinds?: string[]}): Promise<ReadAnswer<FindAnswer>>;
   /**
    * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
    * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from

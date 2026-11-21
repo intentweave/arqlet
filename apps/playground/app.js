@@ -9,7 +9,7 @@ import {Session} from './session.js';
 import {MoveGesture,releaseOnDrop} from './drag.js';
 import {trackGesture} from './gesture.js';
 import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
-import {createViewController} from '@arqlet/engine-client/view-controller.js';
+import {createViewController,encodeBookmark,decodeBookmark} from '@arqlet/engine-client/view-controller.js';
 import {placementOnBorder,positionOnBorder} from './port-drag.js';
 import {nearResizeCorner,resizedLeaf} from './resize.js';
 import {GeometryReports,labelSize} from './geometry.js';
@@ -827,10 +827,12 @@ $('profile').onchange=async()=>{
  if(result.ok){draw(true);scheduleRefinement();status(`Preset "${preset.title}" applied`);}
  else{status(result.error);draw();}
 };
+// The view link in the address is opened once, after the first load.
+let linkOpened=false;
 async function reset(){
  tracker?.end('modelchange');
  const token=++loadToken;epoch++;cancelRefinement();curation=null;pending=null;selected=null;treeSignature=null;userSizes.clear();geometry.clear();selection.clear();$('add').disabled=true;
- try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;await adopt(snapshot,{forget:true});status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);if(liveFromScratch())return;scheduleRefinement();}
+ try{await sceneEngine;const loaded=await loadInitial();if(token!==loadToken)return;snapshot=loaded.snapshot;await adopt(snapshot,{forget:true});status(loaded.message);$('selected').textContent='Select a node in the diagram.';draw(true);if(!linkOpened){linkOpened=true;await openViewLink();}if(liveFromScratch())return;scheduleRefinement();}
  catch(e){if(token===loadToken)status(e.message);}
 }
 $('reset').onclick=reset;
@@ -1488,11 +1490,60 @@ $('trace-reveal').onclick=()=>{
  edit({op:'reveal',snapshot,nodeIds:traceResult.nodes,partial:$('reveal-partial').checked},{busy:'Opening the groups on the path …',remember:'Reveal path'});
 };
 // Any node by its id, also one inside collapsed groups: its groups open (in part, by default) and it is selected.
-$('show').onclick=async()=>{
- const id=$('show-node').value.trim();
- if(!id||!snapshot||pending)return;
- const r=await edit({op:'reveal',snapshot,nodeIds:[id],partial:$('reveal-partial').checked},{busy:'Opening the groups that hold it …',remember:'Show node'});
- if(r?.ok&&snapshot.graph.nodes.some(n=>n.id===id)){selected=id;draw();}
- else if(r&&!r.ok)$('trace-info').textContent=`Not shown: ${r.error}`;
+// Focus (the view controller's `focus`): opens the groups that hide the node (one undo step), selects it and scrolls the
+// canvas so that the box that shows it is in the middle.
+async function focusNode(id){
+ if(!id||!snapshot||pending)return {ok:false};
+ const r=await edit({op:'reveal'},{busy:'Opening the groups that hold it …',via:()=>viewController.focus(id,{partial:$('reveal-partial').checked})});
+ if(!r?.ok){if(r)$('trace-info').textContent=`Not shown: ${r.error}`;return r;}
+ const f=viewController.getState().focus;
+ if(f?.shownAs&&snapshot.graph.nodes.some(n=>n.id===f.shownAs)){selectNode(f.shownAs);centerOn(f.shownAs,f.bounds);}
+ if(f&&f.shownAs!==id)$('trace-info').textContent=f.shownAs?`${id} is shown by ${f.shownAs}.`:`${id} is hidden by the filter.`;
+ return r;
+}
+function centerOn(id,bounds){
+ const p=drawnPosition(id),c=$('canvas');
+ if(!p||!c)return;
+ autoFit=false;
+ c.scrollLeft=p.x+(bounds?bounds.width*scale/2:0)-c.clientWidth/2;
+ c.scrollTop=p.y+(bounds?bounds.height*scale/2:0)-c.clientHeight/2;
+}
+$('show').onclick=()=>focusNode($('show-node').value.trim());
+// Search (the engine's `find`): nodes by name or id, also inside collapsed groups; a click focuses one.
+async function search(){
+ const query=$('search-query').value.trim(),box=$('search-results');
+ if(!query||!snapshot)return;
+ const r=await viewController.find(query,{limit:20});
+ box.replaceChildren();
+ if(!r.ok){box.textContent=`Not searched: ${r.error}`;return;}
+ if(!r.total){box.textContent='Nothing found.';return;}
+ for(const m of r.matches){
+  const b=document.createElement('button');b.setAttribute('role','listitem');
+  b.textContent=`${m.label} (${m.kind})${m.parents.length?` in ${m.parents.at(-1)}`:''}${m.shownAs===m.id?'':m.shownAs?` · inside ${m.shownAs}`:' · hidden'}`;
+  b.onclick=()=>focusNode(m.id);box.append(b);
+ }
+ if(r.total>r.matches.length){const more=document.createElement('span');more.textContent=`${r.total-r.matches.length} more: refine the query.`;box.append(more);}
+}
+$('search').onclick=search;
+$('search-query').onkeydown=e=>{if(e.key==='Enter')search();};
+// A link to the view (the view controller's bookmark): the decisions, the highlight and the selection in the address
+// (#view=…); opening the page with it opens that view again (one undo step).
+$('view-link').onclick=async()=>{
+ const r=await viewController.bookmark();
+ if(!r.ok){status(`No link: ${r.error}`);return;}
+ const hash=`#view=${encodeBookmark(r.bookmark)}`;
+ if(typeof history!=='undefined'&&typeof location!=='undefined')history.replaceState(null,'',`${location.pathname}${location.search}${hash}`);
+ try{await navigator.clipboard.writeText(typeof location!=='undefined'?location.href:hash);status('Link to this view copied (and kept in the address).');}
+ catch{status('Link to this view kept in the address.');}
 };
+async function openViewLink(){
+ const hash=typeof location!=='undefined'?location.hash:'';
+ if(!hash.startsWith('#view='))return;
+ let bookmark;
+ try{bookmark=decodeBookmark(hash.slice(6));}catch(e){status(`Link not opened: ${e.message}`);return;}
+ const r=await edit({op:'restore'},{busy:'Opening the linked view …',fit:true,via:()=>viewController.openBookmark(bookmark)});
+ if(!r.ok){status(`Link not opened: ${r.error}`);return;}
+ if(bookmark.selection?.nodeId&&snapshot.graph.nodes.some(n=>n.id===bookmark.selection.nodeId))selectNode(bookmark.selection.nodeId);
+ status('Linked view opened.');
+}
 

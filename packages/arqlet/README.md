@@ -79,6 +79,10 @@ await view.showRest('group-1');                   // the next page of its `+N mo
 await view.trace('a', 'z');                       // kept as state.highlight while the view changes; clearHighlight()
 await view.select({edgeId: 'e7'});                // state.details: the edges this line stands for, kept up to date
 view.hover({nodeId: 'a'});                        // state.hover, for a tooltip (no engine call)
+await view.find('parser');                        // state.search: matches by name or id, also hidden ones
+await view.focus('n42');                          // opens what hides it, selects it; state.focus.bounds for the camera
+const {bookmark} = await view.bookmark();         // the view as a value; encodeBookmark(bookmark) for a URL
+await view.openBookmark(decodeBookmark(text));    // one step back undoes it; another graph's is refused
 await view.filter({nodeKinds: ['test']});
 await view.back();                                // forward(); cancel() drops steps not started yet
 ```

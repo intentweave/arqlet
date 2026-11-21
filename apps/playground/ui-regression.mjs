@@ -144,6 +144,28 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
   assert.equal(get('details').textContent,'');
   console.log('Details passed: the engine names the groups above a selected node.');
  }
+ // Search and focus: the engine finds a node inside a collapsed group; a click on the match opens it and selects it.
+ if(leaf){
+  const label=runInNewContext(`snapshot.graph.nodes.find(n=>n.id===${JSON.stringify(leaf)}).label`,context);
+  if(!closed()){const r0=await runInNewContext(`edit({op:'toggle',nodeId:${JSON.stringify(box)}},{busy:'Closing …',remember:'Close'})`,context);await settle();assert.equal(r0.ok,true,JSON.stringify(r0));}
+  assert.equal(closed(),true);
+  get('search-query').value=label;await get('search').onclick();await settle();
+  const results=get('search-results');
+  const match=results.children.find(b=>b.textContent.startsWith(label));
+  assert.ok(match,`the hidden node is found: ${results.textContent}`);
+  await match.onclick();await settle();
+  assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'focus opens the group');
+  assert.equal(runInNewContext('selected',context),leaf,'and selects the node');
+  assert.equal(runInNewContext('viewController.getState().backLabel',context),`Show ${leaf}`);
+  // A bookmark of this view, opened after undoing the focus, brings it back.
+  const {bookmark}=await runInNewContext('viewController.bookmark()',context);
+  await get('undo').onclick();await settle();
+  assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),false);
+  const opened=await runInNewContext(`edit({op:'restore'},{via:()=>viewController.openBookmark(${JSON.stringify(bookmark)})})`,context);await settle();
+  assert.equal(opened.ok,true,JSON.stringify(opened));
+  assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'the bookmark restores the view');
+  console.log('Search, focus and bookmarks passed: a hidden node found, focused, and a kept view opened again.');
+ }
 }
 
 // Browser-only: import, edits and refinement stay in the WASM workers; the backend is never called.
