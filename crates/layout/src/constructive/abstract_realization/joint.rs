@@ -159,94 +159,6 @@ fn snap(value: f64, origin: f64, track: f64, up: bool) -> f64 {
         } * track
 }
 
-/// A segment tree over the elementary pieces between sorted coordinates: `raise(a, b, v)` combines `v` into every piece of
-/// `[a, b)`, `extreme(a, b)` combines what was raised over any piece of `[a, b)` (`max` or `min`).
-struct RangeTree {
-    pieces: usize,
-    max: bool,
-    tag: Vec<f64>,
-    sub: Vec<f64>,
-}
-
-impl RangeTree {
-    fn new(pieces: usize, max: bool) -> Self {
-        let neutral = if max {
-            f64::NEG_INFINITY
-        } else {
-            f64::INFINITY
-        };
-        let size = 4 * pieces.max(1);
-        RangeTree {
-            pieces,
-            max,
-            tag: vec![neutral; size],
-            sub: vec![neutral; size],
-        }
-    }
-
-    fn pick(&self, a: f64, b: f64) -> f64 {
-        if self.max {
-            a.max(b)
-        } else {
-            a.min(b)
-        }
-    }
-
-    fn raise(&mut self, a: usize, b: usize, v: f64) {
-        if a < b {
-            self.raise_at(1, 0, self.pieces, a, b, v);
-        }
-    }
-
-    fn raise_at(&mut self, node: usize, lo: usize, hi: usize, a: usize, b: usize, v: f64) {
-        if b <= lo || hi <= a {
-            return;
-        }
-        if a <= lo && hi <= b {
-            self.tag[node] = self.pick(self.tag[node], v);
-            self.sub[node] = self.pick(self.sub[node], v);
-            return;
-        }
-        let mid = (lo + hi) / 2;
-        self.raise_at(2 * node, lo, mid, a, b, v);
-        self.raise_at(2 * node + 1, mid, hi, a, b, v);
-        let children = self.pick(self.sub[2 * node], self.sub[2 * node + 1]);
-        self.sub[node] = self.pick(self.tag[node], children);
-    }
-
-    fn extreme(&self, a: usize, b: usize) -> f64 {
-        let neutral = if self.max {
-            f64::NEG_INFINITY
-        } else {
-            f64::INFINITY
-        };
-        if a >= b {
-            return neutral;
-        }
-        self.extreme_at(1, 0, self.pieces, a, b)
-    }
-
-    fn extreme_at(&self, node: usize, lo: usize, hi: usize, a: usize, b: usize) -> f64 {
-        let neutral = if self.max {
-            f64::NEG_INFINITY
-        } else {
-            f64::INFINITY
-        };
-        if b <= lo || hi <= a {
-            return neutral;
-        }
-        if a <= lo && hi <= b {
-            return self.sub[node];
-        }
-        let mid = (lo + hi) / 2;
-        let children = self.pick(
-            self.extreme_at(2 * node, lo, mid, a, b),
-            self.extreme_at(2 * node + 1, mid, hi, a, b),
-        );
-        self.pick(self.tag[node], children)
-    }
-}
-
 /// The channel rule of `reserve_once` without its pairs: two bends of one channel whose cross ranges come within a track
 /// (`a.cross.0 < b.cross.1 + track - EPS` and the reverse, i.e. the half-open ranges `[cross.0, cross.1 + track - EPS)`
 /// overlap) keep a track apart, the earlier in `order` first. Holds the bends given so far with a value, per channel, and
@@ -258,8 +170,17 @@ struct Overlaps<'a> {
     max: bool,
     channel_of: Vec<usize>,
     coords: Vec<Vec<f64>>,
-    trees: Vec<Option<RangeTree>>,
+    trees: Vec<Option<crate::range_tree::RangeTree<f64>>>,
     given: Vec<Vec<(usize, f64)>>,
+}
+
+/// A tree of the greatest (`max`) or least values over `pieces`.
+fn new_tree(pieces: usize, max: bool) -> crate::range_tree::RangeTree<f64> {
+    if max {
+        crate::range_tree::RangeTree::new(pieces, f64::NEG_INFINITY, f64::max)
+    } else {
+        crate::range_tree::RangeTree::new(pieces, f64::INFINITY, f64::min)
+    }
 }
 
 impl<'a> Overlaps<'a> {
@@ -280,7 +201,7 @@ impl<'a> Overlaps<'a> {
             points.sort_by(f64::total_cmp);
             points.dedup();
             let pieces = points.len().saturating_sub(1);
-            trees.push((!empty && pieces > 0).then(|| RangeTree::new(pieces, max)));
+            trees.push((!empty && pieces > 0).then(|| new_tree(pieces, max)));
             coords.push(points);
         }
         Overlaps {
@@ -367,13 +288,36 @@ impl<'a> Overlaps<'a> {
                 .collect();
             self.given[c].clear();
             if let Some(tree) = self.trees[c].as_mut() {
-                *tree = RangeTree::new(tree.pieces, self.max);
+                *tree = new_tree(tree.pieces(), self.max);
             }
             for (j, v) in kept {
                 self.give(j, v);
             }
         }
     }
+}
+
+/// A channel's assignments by edge, built once per channel when first asked (a channel of a dense graph holds thousands,
+/// and every section of every edge asks): the first assignment of an edge, as a scan finds it.
+pub(super) type Assigned<'c> = BTreeMap<(&'c str, usize), BTreeMap<&'c str, f64>>;
+
+/// The coordinate of `edge`'s first assignment in channel `c`, from `assigned` (filled on first use).
+pub(super) fn assigned_in<'c>(
+    assigned: &mut Assigned<'c>,
+    c: &'c Channel,
+    edge: &str,
+) -> Option<f64> {
+    assigned
+        .entry((c.area.as_str(), c.rank))
+        .or_insert_with(|| {
+            let mut by_edge = BTreeMap::new();
+            for a in &c.assignments {
+                by_edge.entry(a.0.as_str()).or_insert(a.2);
+            }
+            by_edge
+        })
+        .get(edge)
+        .copied()
 }
 
 fn compact(
@@ -635,6 +579,7 @@ fn reserve_once(
         channel_of.entry((c.area.as_str(), c.rank)).or_insert(c);
     }
     let leads = lead_segments(trials);
+    let mut assigned = Assigned::new();
     for edge in &plan.edges {
         // Growth demand (`narrow`) includes the edges whose channel is too narrow before it grows.
         let Some(trial) = trials.get(&edge.edge).filter(|t| match &t.failure {
@@ -680,8 +625,8 @@ fn reserve_once(
             }
             let preferred = channel_of
                 .get(&(s.area.as_str(), s.channel))
-                .and_then(|c| c.assignments.iter().find(|a| a.0 == edge.edge))
-                .map_or(far / 2. + near / 2., |a| a.2);
+                .and_then(|c| assigned_in(&mut assigned, c, &edge.edge))
+                .unwrap_or(far / 2. + near / 2.);
             if ![origin, bounds.0, bounds.1, preferred]
                 .iter()
                 .all(|v| v.is_finite())

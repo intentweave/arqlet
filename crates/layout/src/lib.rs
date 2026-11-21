@@ -14,6 +14,7 @@ pub mod hierarchy_order;
 mod labels;
 pub mod layered_plan;
 mod ports;
+mod range_tree;
 pub mod ranking;
 pub mod structure;
 mod styles;

@@ -372,6 +372,40 @@ fn between(value: &Lane, a: &Lane, b: &Lane) -> bool {
     lo < value && value < hi
 }
 
+/// The slots of a channel's assignments taken in `order`: each the lowest above every earlier one whose lane range (closed)
+/// overlaps its own, as a scan over the earlier ones finds it, by a range query over the lanes.
+pub(crate) fn slots_in_order(assignments: &mut [Assignment], order: &[usize]) -> usize {
+    let range = |a: &Assignment| {
+        if a.from < a.to {
+            (a.from.clone(), a.to.clone())
+        } else {
+            (a.to.clone(), a.from.clone())
+        }
+    };
+    let mut lanes: Vec<Lane> = assignments
+        .iter()
+        .flat_map(|a| {
+            let (l, h) = range(a);
+            [l, h]
+        })
+        .collect();
+    lanes.sort();
+    lanes.dedup();
+    let at = |l: &Lane| lanes.partition_point(|x| x < l);
+    // One piece per lane: closed ranges overlap exactly when they share a lane of the set.
+    let mut tree = crate::range_tree::RangeTree::new(lanes.len(), 0usize, usize::max);
+    let mut tracks = 0;
+    for &i in order {
+        let (lo, hi) = range(&assignments[i]);
+        let (a, b) = (at(&lo), at(&hi) + 1);
+        let slot = tree.extreme(a, b);
+        assignments[i].slot = slot;
+        tracks = tracks.max(slot + 1);
+        tree.raise(a, b, slot + 1);
+    }
+    tracks
+}
+
 pub(super) fn channel(area: String, rank: usize, mut assignments: Vec<Assignment>) -> Channel {
     assignments.sort_by(|a, b| a.edge.cmp(&b.edge));
     let mut dependencies = Vec::new();
@@ -429,30 +463,7 @@ pub(super) fn channel(area: String, rank: usize, mut assignments: Vec<Assignment
         }
         order.push(next);
     }
-    let mut tracks = 0;
-    for (at, &i) in order.iter().enumerate() {
-        let a = &assignments[i];
-        let (lo, hi) = if a.from < a.to {
-            (&a.from, &a.to)
-        } else {
-            (&a.to, &a.from)
-        };
-        let slot = order[..at]
-            .iter()
-            .filter_map(|&j| {
-                let b = &assignments[j];
-                let (left, right) = if b.from < b.to {
-                    (&b.from, &b.to)
-                } else {
-                    (&b.to, &b.from)
-                };
-                (lo <= right && left <= hi).then_some(b.slot + 1)
-            })
-            .max()
-            .unwrap_or(0);
-        assignments[i].slot = slot;
-        tracks = tracks.max(slot + 1);
-    }
+    let tracks = slots_in_order(&mut assignments, &order);
     Channel {
         area,
         rank,
