@@ -15,6 +15,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   resident sessions and with a snapshot sent per request.
 - Engine operation `pin` (provisional): `{nodeId, position?}` pins a node (default: where it is), `{nodeId, unpin: true}`
   releases it; through `dispatch`, so in all three deployment modes (backend allowlist updated).
+- `toReactFlow(scene, {draggable: true})` marks leaves draggable (containers never), for a host that passes React Flow's
+  drag events to `session.drag`.
 
 ### Added (React Flow)
 
