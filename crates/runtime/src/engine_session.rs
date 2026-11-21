@@ -66,10 +66,40 @@ impl EngineSession {
 
     /// Runs one request given as JSON text and answers as JSON text.
     pub fn run(&mut self, input: &str) -> String {
+        // An import read in one pass, without a JSON value of the whole graph (which takes several times the graph's own
+        // memory and, in WASM, stays as the high-water mark of the linear memory). The same request as the general way;
+        // anything the one-pass reading refuses goes the general way, with the errors it has always given.
+        if let Some(answer) = self.import_text(input) {
+            return answer.to_string();
+        }
         match serde_json::from_str::<Value>(input) {
             Ok(v) => self.run_value(&v).to_string(),
             Err(e) => json!({"ok": false, "error": e.to_string()}).to_string(),
         }
+    }
+
+    /// `run` for a well-formed `import` without `timings`: the request read straight into its types.
+    fn import_text(&mut self, input: &str) -> Option<Value> {
+        // The fields this reading needs besides the import's own; everything else (the graph too) is skipped unparsed.
+        #[derive(serde::Deserialize)]
+        struct Head {
+            op: Option<String>,
+            scene: Option<Value>,
+            timings: Option<Value>,
+        }
+        if !input.contains("\"import\"") {
+            return None;
+        }
+        let head: Head = serde_json::from_str(input).ok()?;
+        if head.op.as_deref() != Some("import") || head.timings.is_some() {
+            return None;
+        }
+        let (request, _) = crate::protocol::Request::from_json_delivered(input).ok()?;
+        let with_scene = head.scene.as_ref().and_then(Value::as_bool) != Some(false);
+        Some(match self.apply(handle(request), with_scene) {
+            Ok(answer) => answer,
+            Err(error) => json!({"ok": false, "error": error}),
+        })
     }
 
     /// Runs one request given as a JSON value.

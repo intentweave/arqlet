@@ -111,3 +111,34 @@ fn peek_shows_a_collapsed_container_without_opening_it() {
         look
     );
 }
+
+/// A session reads an import in one pass (no JSON value of the graph); its answers and kept snapshots are the same as the
+/// general way's, also for refused requests.
+#[test]
+fn a_session_reads_an_import_in_one_pass_with_the_same_answers() {
+    use arqlet_runtime::engine_session::EngineSession;
+    let cases = [
+        json!({"op": "import", "graph": graph(), "limit": 100}),
+        json!({"op": "import", "graph": graph(), "limit": 100, "scene": false, "options": {"levelOfDetail": {"depth": 0}}}),
+        json!({"op": "import", "graph": graph(), "limit": 2, "options": null}),
+        json!({"op": "import", "graph": graph(), "limit": "many"}),
+        json!({"op": "import", "graph": {"nodes": [{"id": "a"}]}, "limit": 10}),
+        json!({"op": "import", "graph": graph(), "limit": 100, "options": {"nothingLikeIt": 1}}),
+    ];
+    for request in cases {
+        let mut by_text = EngineSession::new();
+        let mut by_value = EngineSession::new();
+        let text_answer: Value = serde_json::from_str(&by_text.run(&request.to_string())).unwrap();
+        let value_answer = by_value.run_value(&request);
+        assert_eq!(text_answer, value_answer, "{request}");
+        assert_eq!(
+            by_text
+                .snapshot()
+                .map(|s| serde_json::to_string(s).unwrap()),
+            by_value
+                .snapshot()
+                .map(|s| serde_json::to_string(s).unwrap()),
+            "{request}"
+        );
+    }
+}

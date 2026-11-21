@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- A resident session reads an import in one pass into its types, as `dispatch` already did, instead of a JSON value of
+  the whole graph first, and trims the graph's lists to their length. The peak of the import's heap drops by a third
+  to more than half (synthetic 2k/20k/100k: 8.2/130/1 184 MB to 2.4/69/886 MB), which in WASM is the memory that stays;
+  a session keeps about 0.8 KB per node (`benchmarks/results/session-memory-20261121.md`, tool
+  `benchmarks/session-memory`). Answers are unchanged. The rest of the peak is the layout of the first view.
 - `reveal` takes the id of a bus given as data (`Graph.buses` with `taps` and no node): it opens the containers above
   the bus (`parentId`), so its line is drawn; with `partial` the bus's own container opens in part, its taps at the rest.
   Before, such an id was refused as an unknown node.

@@ -1509,6 +1509,15 @@ impl StrategyConstraint {
 }
 
 impl Graph {
+    /// Trims every list of the graph to its length (after reading it from text, where lists grow by doubling).
+    pub fn shrink_to_fit(&mut self) {
+        self.nodes.shrink_to_fit();
+        self.edges.shrink_to_fit();
+        self.ports.shrink_to_fit();
+        self.edge_ports.shrink_to_fit();
+        self.buses.shrink_to_fit();
+    }
+
     /// Whether every area draws its edges on their orthogonal routes, plain or with rounded corners
     /// (`RoutingConstraint::orthogonal_only`); no routing declared is orthogonal.
     /// Whether every routing constraint lays its edges out orthogonally: orthogonal styles, and with `polyline` also the
