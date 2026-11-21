@@ -7,6 +7,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Content in a resident session (provisional, ADR 0023 step R1): the operation `payload` sets, unsets or clears
+  properties of nodes and edges (JSON values; an integer stays an integer) as one change with its own
+  `contentRevision` (`expectedContentRevision` refuses a stale change). The content is kept beside the snapshot, never
+  in it, and layout never reads it: serialized snapshots are unchanged. Ids the structure does not have are kept and
+  counted; keys named like the model's own properties (`id`, `kind`, `label`, `parentId`, `weight`) are refused. `details`
+  answers a node's or edge's `properties` and the `contentRevision`; `find` with `key` searches that property and answers
+  the matched `value`. A new import starts the content empty, `load` keeps it. `session.payload`, `controller.payload`
+  (refreshes `state.details`). About 740 B per node with a few properties
+  (`benchmarks/results/content-memory-20261122.md`); typed columns per key are the next step if needed.
 - `elkLayout` packs components as ELK does (`separateConnectedComponents`, default true, towards `elk.aspectRatio`,
   default 1.6, now read) when the top level has at least two components with edges and none holds more than half of
   the linked nodes. Flat graphs with many small components no longer stand in one tall column: synthetic flat graphs

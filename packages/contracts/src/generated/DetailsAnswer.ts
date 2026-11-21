@@ -20,4 +20,9 @@ edge?: EdgeDetails,
 /**
  * The drawn line asked for (`edgeId` naming a route), or the one that carries the edge asked for.
  */
-route?: LineDetails, };
+route?: LineDetails,
+/**
+ * Provisional (ADR 0023, R1): the revision of the session's content the properties were read at; omitted without
+ * content.
+ */
+contentRevision?: bigint, };

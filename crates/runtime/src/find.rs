@@ -17,6 +17,16 @@ pub fn find_response(v: &Value) -> Value {
 }
 
 /// The matches of the request `v` (`query`, optional `limit` and `nodeKinds`) on a snapshot the caller holds.
+/// `find_on` with the session's content (ADR 0023, R1): with `key`, the query is searched in that property of every node
+/// instead of in labels and ids.
+pub fn find_on_with(
+    snapshot: &Snapshot,
+    v: &Value,
+    content: Option<&crate::content::Content>,
+) -> Result<Value, String> {
+    find_answer_on_with(snapshot, v, content).and_then(|answer| answered(&answer))
+}
+
 pub fn find_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
     find_answer_on(snapshot, v).and_then(|answer| answered(&answer))
 }
@@ -53,6 +63,30 @@ fn rank(text: &str, query: &str) -> Option<u8> {
 
 /// The typed answer of `find_on`.
 pub fn find_answer_on(snapshot: &Snapshot, v: &Value) -> Result<FindAnswer, String> {
+    find_answer_on_with(snapshot, v, None)
+}
+
+/// The text a property value is searched as: a string as it is, a number or a boolean as JSON writes it; lists, maps and
+/// null are not searched.
+fn searchable(value: &Value) -> Option<String> {
+    match value {
+        Value::String(s) => Some(s.to_lowercase()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
+/// `find_answer_on` with the session's content.
+pub fn find_answer_on_with(
+    snapshot: &Snapshot,
+    v: &Value,
+    content: Option<&crate::content::Content>,
+) -> Result<FindAnswer, String> {
+    let key = v["key"].as_str();
+    if key.is_some() && content.is_none() {
+        return Err("Find by key needs the session's content (payload)".into());
+    }
     let query = v["query"]
         .as_str()
         .ok_or("Missing query")?
@@ -84,6 +118,14 @@ pub fn find_answer_on(snapshot: &Snapshot, v: &Value) -> Result<FindAnswer, Stri
         .filter(|n| kinds.as_ref().is_none_or(|k| k.contains(&n.kind)))
         .filter_map(|n| {
             let label = n.label.to_lowercase();
+            if let Some(key) = key {
+                // Ranked by how the property's value matches; ties by label and id as below.
+                let value = content
+                    .and_then(|c| c.node(&n.id))
+                    .and_then(|p| p.get(key))?;
+                let best = rank(&searchable(value)?, &query)?;
+                return Some((best, label, n));
+            }
             let best = match (rank(&label, &query), rank(&n.id.to_lowercase(), &query)) {
                 (Some(a), Some(b)) => a.min(b),
                 (Some(a), None) | (None, Some(a)) => a,
@@ -120,10 +162,15 @@ pub fn find_answer_on(snapshot: &Snapshot, v: &Value) -> Result<FindAnswer, Stri
                 kind: n.kind.clone(),
                 parents,
                 shown_as: map.owner(&n.id),
+                value: key.and_then(|key| content?.node(&n.id)?.get(key).cloned()),
             }
         })
         .collect();
-    Ok(FindAnswer { matches, total })
+    Ok(FindAnswer {
+        matches,
+        total,
+        content_revision: key.and(content.map(|c| c.revision)),
+    })
 }
 
 /// Provisional (bookmarks): the `digest` operation (read only): the fingerprint of the snapshot's source graph

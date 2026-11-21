@@ -16,6 +16,8 @@ mod community_groups;
 mod community_hubs;
 #[path = "containers_straight.rs"]
 mod containers_straight;
+#[path = "content.rs"]
+mod content;
 #[path = "curation_labels.rs"]
 mod curation_labels;
 #[path = "curation_locks.rs"]

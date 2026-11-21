@@ -4,4 +4,8 @@
  * Provisional: a node `find` found, with the containers above it (outermost first) and the visible box that shows it
  * (itself, the collapsed container it is in, or null when the view hides it), so that a host can `reveal` it.
  */
-export type FindMatch = { id: string, label: string, kind: string, parents: Array<string>, shownAs: string | null, };
+export type FindMatch = { id: string, label: string, kind: string, parents: Array<string>, shownAs: string | null,
+/**
+ * Provisional (ADR 0023, R1): with `key`, the value of that property that matched.
+ */
+value?: unknown, };

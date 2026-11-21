@@ -7,6 +7,7 @@ pub use arqlet_model::clock;
 pub mod columns;
 pub mod components;
 pub mod containers;
+pub mod content;
 pub mod coordinator;
 pub mod details;
 pub mod engine_session;
