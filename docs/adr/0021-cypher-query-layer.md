@@ -239,7 +239,7 @@ belongs in `benchmarks/` with machine, build and seed, as the rules require.
    computed by hand on a graph with a cycle, a self-loop and parallel edges, move into the repository as test data in M0.
    The spike code itself does not.
 
-## The shared in-memory graph (research pass 1, not decided)
+## The shared in-memory graph (research pass 1 and a measurement, not decided)
 
 The query layer and the layout engine should read the same graph in place: no copy of the graph, no comparison of two
 copies, no merge of two versions. This section records what exists and a proposal; the choice is made before M5.
@@ -281,9 +281,27 @@ We found no library that offers a property graph, in-place sharing with a second
    history, hand-over in split mode) are too expensive to copy.
 5. No external graph library for now.
 
-**To measure before deciding:** the copy cost of `view::project` and the build cost of `GraphIndex` on the large
-examples, and the size of a realistic payload table. The first two are the copying this section is meant to avoid; if they
-are small against layout time, the proposal costs nothing.
+**Measured (2026-11-21)**, `benchmarks/results/copy-cost-20261121.md`: Apple M3, release build, a shared machine at load
+about 3, synthetic graphs of 2,286 to 228,614 nodes (seeds in the file), median of 15 runs. Reading the graph in place
+takes 0.01 to 0.8 ms. Against that, a full `Graph::clone()` takes 0.6 to 65 ms, `GraphIndex::of` 1.5 to 238 ms (2.4 to 3.7
+times a clone, and growing faster than the graph, because it clones every id into a `BTreeMap`), `arqlet_model::validate`
+2.2 to 411 ms, and a projection that keeps the whole graph 2.8 to 591 ms. A projection of a small view is cheap (0.25 to 50
+ms); about 90 % of the public `project` call with the top level collapsed is validation and indexing. Against the layout
+time of an import of a bounded view (`bench`, limit 100), validation, index and projection are about 5 % at 2k, 25 % at
+20k and 37 % at 100k graph nodes (two separate measurements, so an order of magnitude, not a breakdown).
+
+What this means for the proposal:
+
+- The copy that matters is not the small projection but the index and the validation, and the import path already builds
+  the index once and keeps it with the view structure (`Arc<GraphIndex>`, `crates/runtime/src/lib.rs`). The query adapter
+  reuses that index; it must not build its own.
+- A query that reads the whole graph must read it in place. Going through `project` costs 36 to 591 ms on the graphs of
+  20k to 200k nodes, where the in-place walk costs 0.06 to 0.8 ms.
+- Persistent collections are not needed for projections: the projection of a view is already cheap compared with the
+  index. They stay a candidate for snapshots only (item 4 of the proposal).
+- The index and the validation grow faster than the graph. Interned dense ids (ADR 0019, step 4) should cut both; this is a
+  hypothesis that no measurement here tests.
+- Still open: the size of a realistic payload table, which none of these graphs has.
 
 ## Not decided here
 
