@@ -1,0 +1,21 @@
+[package]
+name = "arqlet-query-cypher"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Provisional: the openCypher front end of the Arqlet query layer (ADR 0021): decypher behind a guard over its syntax tree."
+publish = false
+
+# The one third-party dependency of the query layer (ADR 0021; record in docs/architecture.md): exact version, default
+# features. It has no host API (no filesystem, network, process, thread or clock) and builds for wasm32.
+[dependencies]
+arqlet-query = { workspace = true }
+decypher = { version = "=0.2.0" }
+
+[dev-dependencies]
+# Tests read the fixtures of `examples/cypher/`.
+serde_json = "1"

@@ -1,8 +1,8 @@
 # ADR 0021: A lean Cypher query layer over the Arqlet graph: own executor, decypher as front end, Grafeo as oracle
 
 Date: 2026-11-21.
-Status: proposed. Nothing is implemented. The evidence below comes from throw-away spikes of 2026-11-21 (kept outside the
-repository), not from code in this repository.
+Status: accepted (2026-11-21, pull request #70). Nothing is implemented yet: stage M1 has not started. The evidence below
+comes from throw-away spikes of 2026-11-21 (kept outside the repository), not from code in this repository.
 
 ## Context
 
@@ -84,12 +84,12 @@ Build a lean Cypher layer of our own, in two crates plus a thin adapter crate (n
 product.
 
 1. **Crates (provisional).**
-   - `crates/query`: the neutral part, with no third-party dependency. It holds a small plan IR, the values, the store
+   - `crates/query`: the neutral part, with no third-party dependency of its own. It holds a small plan IR, the values, the store
      seam (item 3) and the executor. It is synchronous, pure and deterministic and follows the rules of the core crates.
    - `crates/query-cypher`: the front end. It depends on decypher, turns a query into the plan IR, and carries the guard of
      item 4. The dependency stays here so the executor crate never changes with it.
    Both are scaffold APIs and stay marked provisional. The new operation goes through `dispatch`, so it runs in all three
-   deployment modes without new graph semantics.
+   deployment modes without new graph semantics. Both are also usable without the layout engine (item 12).
 2. **Own plan IR between the front end and the executor.** The executor does not read decypher's HIR; the front end lowers
    decypher's HIR (which already resolves scopes and bindings) into our IR. A parser or HIR change then costs one
    translation, not a rewrite, and another front end can replace decypher later. We keep exactly one front end in the
@@ -162,7 +162,7 @@ product.
     view (which box shows a match, which drawn line carries an edge) is the job of the operation in `arqlet-runtime`: it
     reuses `ViewMap` (today `pub(crate)`, shared by `trace`, `details` and `find`) for the ids the answer names and
     returns visible parts as those operations do. The adapter crate knows no view. `ViewMap::new` is built per request
-    over the whole source graph; its cost per query is not measured and is measured before the operation is built (M5):
+    over the whole source graph; its cost per query is not measured and is measured before the operation is built (M5b):
     if it dominates a small answer, it is built lazily or kept per revision.
 11. **Execution limits.** The guard of item 4 limits the size and nesting of a query. Execution is limited too, because
     an unbounded `*`, the cartesian product of several patterns or a `collect` over everything can occupy a WASM worker
@@ -172,6 +172,20 @@ product.
     patterns counts against the budget. When a limit stops a query the answer says so (`stopped after N steps`, with the
     limit that applied); it never returns a silently shortened result as if it were complete. The default values are set
     in M2 by measurement and recorded.
+12. **The query layer is usable without layout.** `arqlet-query`, `arqlet-query-cypher` and `arqlet-query-model` build,
+    test and run without any layout, routing, scene, view, topology, ELK, reference or runtime crate. Their only allowed
+    internal dependencies are each other and `arqlet-model`: for the graph part (`Graph`, `Node`, `Edge`, `GraphIndex`,
+    `validate`) and for `math::PortableMath`. `arqlet-model` depends on `serde`, `serde_json` and `libm` only and holds no
+    layout algorithms; its types do include layout vocabulary (ports, routes, `LayoutOptions`, `Snapshot`) that comes
+    along unused. A graph file with only `nodes` and `edges` is enough. Extracting a smaller graph-only crate from
+    `arqlet-model` would change the published model API and is not done now; it is reconsidered if a measurement shows
+    that the unused vocabulary costs something in a query-only build (compile time or WASM size).
+    A **CI guard** from stage M1 keeps this true: `cargo tree -e normal` for the three crates must show none of
+    `arqlet-layout`, `arqlet-routing`, `arqlet-scene`, `arqlet-view`, `arqlet-topology`, `arqlet-elk`,
+    `arqlet-reference`, `arqlet-runtime`, `arqlet-wasm` and `arqlet`, and fails otherwise. The integration into the
+    engine (item 10: `dispatch`, `ViewMap`) is a separate stage that depends on the runtime; the library and the tool do
+    not. A query-only WASM and npm artifact does not exist yet: `arqlet-wasm` pulls in the whole runtime, so a query
+    in the browser without the layout engine needs its own crate; that is decided in M5c.
 
 ## Third-party code
 
@@ -222,15 +236,17 @@ Each stage ends with a check that can fail. M0 is this document and the preparat
 | Stage | Content | Exit check |
 |---|---|---|
 | M0 | The decisions below; the fixtures of `examples/cypher/` (#81: 40 cases executable now, and the 40-query corpus with a verdict each) | this ADR accepted |
-| M1 | Crates created (`publish = false`), parse, syntax-tree guard, limits, lowering of `MATCH … WHERE … RETURN` into the plan IR | all 40 corpus queries are accepted or rejected as the subset table says; one test per known drop |
+| M1 | Crates created (`publish = false`), parse, syntax-tree guard, limits, lowering of `MATCH … WHERE … RETURN` into the plan IR | all 40 corpus queries are accepted or rejected as the subset table says; one test per known drop; the same query lowers to a byte-identical plan across runs and, in the parity run, on every platform (decypher and its dependencies use hash maps, `hashbrown` and `rustc-hash`; nothing iterated in hash order may reach the plan) |
 | M2 | Executor on a test store: nodes, labels, properties, expressions with three-valued logic, `ORDER BY`, `SKIP`, `LIMIT`, `DISTINCT`, the work budget and row limit (item 11) | the spike cases for nodes and expressions pass; fixed result order |
 | M3 | Relationships: directions, types, self-loops, parallel edges, relationship uniqueness, several patterns | the spike cases for edges and counts pass |
 | M4 | Variable length, `OPTIONAL MATCH`, `WITH`, aggregation | the remaining supported spike cases pass |
-| M5 | Arqlet adapter, operation through `dispatch`, WASM feature, napi path, results in the platform parity run, size of the WASM engine before and after, the cost of `ViewMap` per query (item 10) | gates (a) and (d) of item 8; identical digests on all platforms; the size difference recorded |
+| M5a | The adapter `arqlet-query-model` over `arqlet-model` and a standalone tool (`arqlet-query GRAPH.json 'QUERY'`); no layout, no runtime (item 12); can start with M1 | the executable cases of `examples/cypher/` pass through the tool; the isolation guard of item 12 is green |
+| M5b | Engine integration: operation through `dispatch` with `ViewMap`, WASM feature, napi path, results in the platform parity run, size of the WASM engine before and after, the cost of `ViewMap` per query (item 10) | gates (a) and (d) of item 8; identical digests on all platforms; the size difference recorded |
+| M5c | Decision on a query-only WASM and npm artifact, a crate without the runtime (item 12) | its size measured against the engine's; the decision recorded |
 | M6 | Differential run against Grafeo 0.6.2 (pinned, tooling only), a TCK subset | gates (b) and (c) of item 8 |
 | After | `shortestPath`, quantified paths, `WHERE` inside patterns, `EXISTS { }` subqueries, the search operator, a SQL adapter | each its own decision |
 
-How the graph is shared between functions, processes and backend and browser is ADR 0023 and is not decided here; M5
+How the graph is shared between functions, processes and backend and browser is ADR 0023 and is not decided here; M5b
 needs only the read-only view trait of the last section. A measurement of throughput, if we want to state one,
 belongs in `benchmarks/` with machine, build and seed, as the rules require.
 
@@ -260,8 +276,9 @@ belongs in `benchmarks/` with machine, build and seed, as the rules require.
    only, behind a facade feature that is off by default, keeps the other crates at 1.88. The maintainer chose the single
    floor on 2026-11-21; the choice can be revisited if the cost shows.
 3. **Crates.** `arqlet-query` (plan IR, values, store seam, executor), `arqlet-query-cypher` (front end, depends on
-   decypher), `arqlet-query-model` (adapter to `arqlet-model`). The first two have no `arqlet-*` dependency, so they could
-   leave the repository later without a rewrite. The facade `arqlet` takes the feature that enables them; it is not on by
+   decypher), `arqlet-query-model` (adapter to `arqlet-model`). The first two depend on no layout crate (`arqlet-query` may use `arqlet-model` for
+   `PortableMath`, `arqlet-query-model` uses it for the graph; item 12), and `arqlet-model` is a published crate, so they
+   could leave the repository later without a rewrite. The facade `arqlet` takes the feature that enables them; it is not on by
    default. They start with `publish = false` and join the release when accepted.
 4. **Third-party records.** Before M1: the exact decypher version, crates.io checksum and upstream revision are recorded;
    `NOTICE` and the license handling of `tools/npm-prepack.mjs` (today only the two license files) are extended for the
@@ -333,5 +350,6 @@ What this means for the query layer:
 - Whether to propose the planner change to Grafeo upstream, and whether to fork.
 - Whether and when to contribute fixes for decypher #132 to #134 (item 9 sets the conditions).
 - The names of the traits and types (the crate names are fixed in M0).
+- A query-only WASM and npm artifact (M5c), and a smaller graph-only crate split from `arqlet-model` (item 12).
 - How the graph is shared between functions, processes, backend and browser, and any coordination or replication
   between them (ADR 0023); the payload representation beyond the first table.
