@@ -236,7 +236,7 @@ Each stage ends with a check that can fail. M0 is this document and the preparat
 | Stage | Content | Exit check |
 |---|---|---|
 | M0 | The decisions below; the fixtures of `examples/cypher/` (#81: 40 cases executable now, and the 40-query corpus with a verdict each) | this ADR accepted |
-| M1 | Crates created (`publish = false`), parse, syntax-tree guard, limits, lowering of `MATCH … WHERE … RETURN` into the plan IR | all 40 corpus queries are accepted or rejected as the subset table says; one test per known drop |
+| M1 | Crates created (`publish = false`), parse, syntax-tree guard, limits, lowering of `MATCH … WHERE … RETURN` into the plan IR | all 40 corpus queries are accepted or rejected as the subset table says; one test per known drop; the same query lowers to a byte-identical plan across runs and, in the parity run, on every platform (decypher and its dependencies use hash maps, `hashbrown` and `rustc-hash`; nothing iterated in hash order may reach the plan) |
 | M2 | Executor on a test store: nodes, labels, properties, expressions with three-valued logic, `ORDER BY`, `SKIP`, `LIMIT`, `DISTINCT`, the work budget and row limit (item 11) | the spike cases for nodes and expressions pass; fixed result order |
 | M3 | Relationships: directions, types, self-loops, parallel edges, relationship uniqueness, several patterns | the spike cases for edges and counts pass |
 | M4 | Variable length, `OPTIONAL MATCH`, `WITH`, aggregation | the remaining supported spike cases pass |
