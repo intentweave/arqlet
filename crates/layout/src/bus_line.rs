@@ -227,8 +227,63 @@ pub(crate) fn draw(
         }
     }
     let mut lines: BTreeMap<String, BusLine> = BTreeMap::new();
+    // What a bar or a tap must not pass: boxes that are neither a bus, a member of this bus, nor a container around the
+    // bus or around that member.
+    let ancestors = |id: &str| {
+        let mut out = BTreeSet::new();
+        let mut at = parent.get(id).copied().flatten();
+        while let Some(p) = at {
+            out.insert(p.to_string());
+            at = parent.get(p).copied().flatten();
+        }
+        out
+    };
+    let mut placed_bars: Vec<Rect> = Vec::new();
     for (i, plan) in plans.iter().enumerate() {
-        let across = plan.across + offset[i] - THICKNESS / 2.;
+        let members: BTreeSet<&str> = plan.attached.iter().map(|(_, m, _)| m.as_str()).collect();
+        let around_bus = ancestors(&plan.bus);
+        let blocks = |id: &str, extra: &BTreeSet<String>| {
+            !bus_set.contains(id)
+                && !members.contains(id)
+                && !around_bus.contains(id)
+                && !extra.contains(id)
+        };
+        let bar_at = |across: f64| {
+            if plan.horizontal {
+                Rect {
+                    x: plan.lo,
+                    y: across,
+                    width: plan.hi - plan.lo,
+                    height: THICKNESS,
+                }
+            } else {
+                Rect {
+                    x: across,
+                    y: plan.lo,
+                    width: THICKNESS,
+                    height: plan.hi - plan.lo,
+                }
+            }
+        };
+        let none = BTreeSet::new();
+        let bar_free = |r: &Rect| {
+            absolute
+                .iter()
+                .all(|(id, b)| !blocks(id, &none) || !overlaps(r, b))
+                && placed_bars.iter().all(|b| !overlaps(r, b))
+        };
+        // On its lane, or the nearest free one beside it (away from its nodes first).
+        let base = plan.across + offset[i] - THICKNESS / 2.;
+        let step = THICKNESS + CLEARANCE;
+        let across = (0..=40)
+            .flat_map(|k| {
+                let d = k as f64 * step;
+                [base + d * plan.away, base - d * plan.away]
+            })
+            .find(|&a| bar_free(&bar_at(a)))
+            .unwrap_or(base);
+        placed_bars.push(bar_at(across));
+        let across = across;
         let bar = if plan.horizontal {
             Rect {
                 x: plan.lo,
@@ -246,7 +301,34 @@ pub(crate) fn draw(
         };
         let mut taps = BTreeMap::new();
         for (edge, member, from_member) in &plan.attached {
+            // The straight tap, or one beside it along the stretch the node and the bar share that passes no box.
+            // A tap passes no box but its own member's (another member of the bus too is in its way).
+            let around_member = ancestors(member);
+            let tap_blocks = |id: &str| {
+                id != member.as_str()
+                    && !bus_set.contains(id)
+                    && !around_bus.contains(id)
+                    && !around_member.contains(id)
+            };
+            let clear = |points: &[Point]| {
+                absolute
+                    .iter()
+                    .all(|(id, b)| !tap_blocks(id) || !path_hits(points, b))
+            };
             let mut points = tap(&absolute[member], &bar, plan.horizontal);
+            if !clear(&points) {
+                let obstacles: Vec<Rect> = absolute
+                    .iter()
+                    .filter(|(id, _)| tap_blocks(id))
+                    .map(|(_, r)| r.clone())
+                    .collect();
+                if let Some(better) = tap_beside(&absolute[member], &bar, plan.horizontal, &clear)
+                    .or_else(|| tap_around(&absolute[member], &bar, plan.horizontal, &clear))
+                    .or_else(|| tap_routed(&absolute[member], &bar, plan.horizontal, &obstacles))
+                {
+                    points = better;
+                }
+            }
             if !from_member {
                 points.reverse();
             }
@@ -341,6 +423,330 @@ fn tap(member: &Rect, bar: &Rect, horizontal: bool) -> Vec<Point> {
         let end = if c < b_along.0 { b_along.0 } else { b_along.1 };
         vec![point(c, leave), point(c, mid), point(end, mid)]
     }
+}
+
+/// Whether two boxes overlap by more than half a unit.
+fn overlaps(a: &Rect, b: &Rect) -> bool {
+    a.x + a.width > b.x + 0.5
+        && a.x < b.x + b.width - 0.5
+        && a.y + a.height > b.y + 0.5
+        && a.y < b.y + b.height - 0.5
+}
+
+/// Whether a polyline of axis-parallel segments passes through a box (by more than half a unit).
+fn path_hits(points: &[Point], b: &Rect) -> bool {
+    points.windows(2).any(|w| {
+        let (x0, x1) = (w[0].x.min(w[1].x), w[0].x.max(w[1].x));
+        let (y0, y1) = (w[0].y.min(w[1].y), w[0].y.max(w[1].y));
+        x1 > b.x + 0.5 && x0 < b.x + b.width - 0.5 && y1 > b.y + 0.5 && y0 < b.y + b.height - 0.5
+    })
+}
+
+/// A straight tap from `member` to `bar` at another place along the stretch they share, nearest the member's centre first,
+/// that `clear` accepts. `None` when the stretch has no such place.
+fn tap_beside(
+    member: &Rect,
+    bar: &Rect,
+    horizontal: bool,
+    clear: &dyn Fn(&[Point]) -> bool,
+) -> Option<Vec<Point>> {
+    let (m_along, m_across) = axes(member, horizontal);
+    let (b_along, b_across) = axes(bar, horizontal);
+    let (lo, hi) = (
+        m_along.0.max(b_along.0) + CLEARANCE / 2.,
+        m_along.1.min(b_along.1) - CLEARANCE / 2.,
+    );
+    if lo > hi {
+        return None;
+    }
+    let above = (m_across.0 + m_across.1) / 2. < (b_across.0 + b_across.1) / 2.;
+    let (leave, meet) = if above {
+        (m_across.1, b_across.0)
+    } else {
+        (m_across.0, b_across.1)
+    };
+    let point = |along: f64, across: f64| {
+        if horizontal {
+            Point {
+                x: along,
+                y: across,
+            }
+        } else {
+            Point {
+                x: across,
+                y: along,
+            }
+        }
+    };
+    let c = ((m_along.0 + m_along.1) / 2.).clamp(lo, hi);
+    let steps = ((hi - lo) / 4.).ceil() as usize;
+    (0..=steps)
+        .flat_map(|k| [c + k as f64 * 4., c - k as f64 * 4.])
+        .filter(|&at| at >= lo && at <= hi)
+        .map(|at| vec![point(at, leave), point(at, meet)])
+        .find(|points| clear(points))
+}
+
+/// A tap from `member` to `bar` that bends around what is in the way, the shortest that `clear` accepts: an L (out of the
+/// member's side along the bar, then square onto the bar) or a Z (square out of the member's side facing the bar, along,
+/// then square onto the bar), at places along the bar every 8 units within its span and, for a Z, at a few distances from
+/// the member. `None` when none is clear.
+fn tap_around(
+    member: &Rect,
+    bar: &Rect,
+    horizontal: bool,
+    clear: &dyn Fn(&[Point]) -> bool,
+) -> Option<Vec<Point>> {
+    let (m_along, m_across) = axes(member, horizontal);
+    let (b_along, b_across) = axes(bar, horizontal);
+    let point = |along: f64, across: f64| {
+        if horizontal {
+            Point {
+                x: along,
+                y: across,
+            }
+        } else {
+            Point {
+                x: across,
+                y: along,
+            }
+        }
+    };
+    let mid_m = (m_across.0 + m_across.1) / 2.;
+    let above = mid_m < (b_across.0 + b_across.1) / 2.;
+    let (leave, meet) = if above {
+        (m_across.1, b_across.0)
+    } else {
+        (m_across.0, b_across.1)
+    };
+    let c = (m_along.0 + m_along.1) / 2.;
+    let (lo, hi) = (b_along.0 + CLEARANCE / 2., b_along.1 - CLEARANCE / 2.);
+    if lo > hi {
+        return None;
+    }
+    let length = |pts: &[Point]| -> f64 {
+        pts.windows(2)
+            .map(|w| (w[0].x - w[1].x).abs() + (w[0].y - w[1].y).abs())
+            .sum()
+    };
+    let mut candidates: Vec<Vec<Point>> = Vec::new();
+    let steps = ((hi - lo) / 8.).ceil() as usize;
+    for k in 0..=steps {
+        let x = lo + k as f64 * 8.;
+        if x > hi {
+            break;
+        }
+        // L: out of the member's side towards x, along to x, square onto the bar.
+        if x < m_along.0 - 0.5 || x > m_along.1 + 0.5 {
+            let side = if x < m_along.0 { m_along.0 } else { m_along.1 };
+            candidates.push(vec![point(side, mid_m), point(x, mid_m), point(x, meet)]);
+        }
+        // Z: square out of the member's side facing the bar, along to x at a few depths, square onto the bar.
+        let gap = meet - leave;
+        for share in [0.5, 0.25, 0.75, 0.1, 0.9] {
+            let turn = leave + gap * share;
+            let start = c.clamp(m_along.0 + 2., m_along.1 - 2.);
+            candidates.push(vec![
+                point(start, leave),
+                point(start, turn),
+                point(x, turn),
+                point(x, meet),
+            ]);
+        }
+    }
+    candidates.sort_by(|a, b| length(a).total_cmp(&length(b)));
+    candidates.into_iter().find(|pts| clear(pts))
+}
+
+/// A tap found by a search: the shortest orthogonal way (each bend costs as much as 24 units) on a grid of the edges of
+/// the boxes near the member and the bar, from the middle of a side of the member to the bar's face towards it, passing no
+/// box of `obstacles`, the member or the bar. `None` when there is none within the region around both.
+fn tap_routed(
+    member: &Rect,
+    bar: &Rect,
+    horizontal: bool,
+    obstacles: &[Rect],
+) -> Option<Vec<Point>> {
+    const MARGIN: f64 = 6.;
+    const BEND: f64 = 24.;
+    // Work along the bar (a) and across it (c).
+    let to_ac = |r: &Rect| {
+        let (a, c) = axes(r, horizontal);
+        (a.0, a.1, c.0, c.1)
+    };
+    let (ma0, ma1, mc0, mc1) = to_ac(member);
+    let (ba0, ba1, bc0, bc1) = to_ac(bar);
+    let above = (mc0 + mc1) / 2. < (bc0 + bc1) / 2.;
+    let meet = if above { bc0 } else { bc1 };
+    // The region: around the member and the nearest stretch of the bar (not the whole bar, which may be long).
+    let pad = 240.;
+    let near = ((ma0 + ma1) / 2.).clamp(ba0, ba1);
+    let (ra0, ra1) = (ma0.min(near) - pad, ma1.max(near) + pad);
+    let (rc0, rc1) = (mc0.min(bc0) - pad, mc1.max(bc1) + pad);
+    let mut walls: Vec<(f64, f64, f64, f64)> = obstacles
+        .iter()
+        .map(to_ac)
+        .filter(|&(a0, a1, c0, c1)| a1 > ra0 && a0 < ra1 && c1 > rc0 && c0 < rc1)
+        .collect();
+    walls.push((ma0, ma1, mc0, mc1));
+    walls.push((ba0, ba1, bc0, bc1));
+    let mut a_lines = vec![(ma0 + ma1) / 2., ma0 - MARGIN, ma1 + MARGIN, ra0, ra1];
+    let mut c_lines = vec![(mc0 + mc1) / 2., mc0 - MARGIN, mc1 + MARGIN, meet, rc0, rc1];
+    for &(a0, a1, c0, c1) in &walls {
+        a_lines.extend([a0 - MARGIN, a1 + MARGIN]);
+        c_lines.extend([c0 - MARGIN, c1 + MARGIN]);
+    }
+    let mut a_lines: Vec<f64> = a_lines
+        .into_iter()
+        .filter(|a| *a >= ra0 && *a <= ra1)
+        .collect();
+    let mut c_lines: Vec<f64> = c_lines
+        .into_iter()
+        .filter(|c| *c >= rc0 && *c <= rc1)
+        .collect();
+    a_lines.sort_by(f64::total_cmp);
+    a_lines.dedup_by(|x, y| (*x - *y).abs() < 0.5);
+    c_lines.sort_by(f64::total_cmp);
+    c_lines.dedup_by(|x, y| (*x - *y).abs() < 0.5);
+    if a_lines.len() * c_lines.len() > 40_000 {
+        return None;
+    }
+    // A segment is open when its inside meets no wall's inside (a point on a face, as the start and the goal, is open).
+    let open = |p: (f64, f64), q: (f64, f64)| {
+        let (a0, a1) = (p.0.min(q.0), p.0.max(q.0));
+        let (c0, c1) = (p.1.min(q.1), p.1.max(q.1));
+        walls.iter().all(|&(wa0, wa1, wc0, wc1)| {
+            !(a1 > wa0 + 0.5 && a0 < wa1 - 0.5 && c1 > wc0 + 0.5 && c0 < wc1 - 0.5)
+                || (a1 - a0 < 1e-9 && (a0 <= wa0 + 0.5 || a0 >= wa1 - 0.5))
+                || (c1 - c0 < 1e-9 && (c0 <= wc0 + 0.5 || c0 >= wc1 - 0.5))
+        })
+    };
+    let na = a_lines.len();
+    let nc = c_lines.len();
+    let at = |i: usize, j: usize| (a_lines[i], c_lines[j]);
+    // Starts: the middle of every side of the member, on the grid.
+    let ia = |v: f64| a_lines.iter().position(|x| (x - v).abs() < 0.5);
+    let ic = |v: f64| c_lines.iter().position(|x| (x - v).abs() < 0.5);
+    let mid_a = (ma0 + ma1) / 2.;
+    let mid_c = (mc0 + mc1) / 2.;
+    // A start lies just outside the member (a margin off its side), reached by a stub from the side.
+    let starts: Vec<((usize, usize), (f64, f64))> = [
+        (ia(mid_a), ic(mc0 - MARGIN), (mid_a, mc0)),
+        (ia(mid_a), ic(mc1 + MARGIN), (mid_a, mc1)),
+        (ia(ma0 - MARGIN), ic(mid_c), (ma0, mid_c)),
+        (ia(ma1 + MARGIN), ic(mid_c), (ma1, mid_c)),
+    ]
+    .into_iter()
+    .filter_map(|(i, j, side)| Some(((i?, j?), side)))
+    .collect();
+    let jm = ic(meet)?;
+    // Dijkstra over (cell, direction: 0 along, 1 across).
+    let idx = |i: usize, j: usize, d: usize| (i * nc + j) * 2 + d;
+    let mut dist = vec![f64::INFINITY; na * nc * 2];
+    let mut prev: Vec<Option<usize>> = vec![None; na * nc * 2];
+    let mut heap = std::collections::BinaryHeap::new();
+    #[derive(PartialEq)]
+    struct Item(f64, usize);
+    impl Eq for Item {}
+    impl PartialOrd for Item {
+        fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(o))
+        }
+    }
+    impl Ord for Item {
+        fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+            o.0.total_cmp(&self.0)
+        }
+    }
+    for &((i, j), _) in &starts {
+        for d in 0..2 {
+            let k = idx(i, j, d);
+            dist[k] = 0.;
+            heap.push(Item(0., k));
+        }
+    }
+    let mut goal = None;
+    while let Some(Item(cost, k)) = heap.pop() {
+        if cost > dist[k] {
+            continue;
+        }
+        let d = k % 2;
+        let cell = k / 2;
+        let (i, j) = (cell / nc, cell % nc);
+        if j == jm && a_lines[i] >= ba0 + CLEARANCE / 2. && a_lines[i] <= ba1 - CLEARANCE / 2. {
+            goal = Some(k);
+            break;
+        }
+        let mut step = |ni: usize, nj: usize, nd: usize| {
+            if !open(at(i, j), at(ni, nj)) {
+                return;
+            }
+            let (p, q) = (at(i, j), at(ni, nj));
+            let c = cost + (p.0 - q.0).abs() + (p.1 - q.1).abs() + if nd == d { 0. } else { BEND };
+            let nk = idx(ni, nj, nd);
+            if c < dist[nk] {
+                dist[nk] = c;
+                prev[nk] = Some(k);
+                heap.push(Item(c, nk));
+            }
+        };
+        if i > 0 {
+            step(i - 1, j, 0);
+        }
+        if i + 1 < na {
+            step(i + 1, j, 0);
+        }
+        if j > 0 {
+            step(i, j - 1, 1);
+        }
+        if j + 1 < nc {
+            step(i, j + 1, 1);
+        }
+    }
+    let mut k = goal?;
+    let mut cells = vec![k / 2];
+    while let Some(p) = prev[k] {
+        k = p;
+        if *cells.last().expect("a cell") != k / 2 {
+            cells.push(k / 2);
+        }
+    }
+    cells.reverse();
+    let first = cells[0];
+    let (fi, fj) = (first / nc, first % nc);
+    let side = starts
+        .iter()
+        .find(|((i, j), _)| *i == fi && *j == fj)
+        .map(|(_, s)| *s)?;
+    let mut ac: Vec<(f64, f64)> = vec![side];
+    ac.extend(cells.iter().map(|&c| at(c / nc, c % nc)));
+    // Only the corners.
+    let mut corners: Vec<(f64, f64)> = Vec::new();
+    for p in ac {
+        if corners.len() >= 2 {
+            let (a, b) = (corners[corners.len() - 2], corners[corners.len() - 1]);
+            let straight = ((a.0 - b.0).abs() < 1e-9 && (b.0 - p.0).abs() < 1e-9)
+                || ((a.1 - b.1).abs() < 1e-9 && (b.1 - p.1).abs() < 1e-9);
+            if straight {
+                corners.pop();
+            }
+        }
+        if corners.last() != Some(&p) {
+            corners.push(p);
+        }
+    }
+    Some(
+        corners
+            .into_iter()
+            .map(|(a, c)| {
+                if horizontal {
+                    Point { x: a, y: c }
+                } else {
+                    Point { x: c, y: a }
+                }
+            })
+            .collect(),
+    )
 }
 
 /// A box's extent along the bar and across it.
@@ -723,6 +1129,17 @@ pub(crate) fn collapse(snapshot: &mut Snapshot, view: &Graph) {
         .partition(|c| !taps.contains(c.edge_id.as_str()));
     snapshot.boundary_crossings = crossings;
     snapshot.bus_taps.boundary_crossings = kept;
+    // The taps are drawn from the bar's geometry, not from their routes: issues found on those routes do not hold for the
+    // drawing (they named every tap of an organic area, a few thousand times, though none is drawn so).
+    snapshot.routing_issues.retain(|issue| {
+        issue
+            .strip_prefix("Edge ")
+            .and_then(|rest| rest.split(' ').next())
+            .is_none_or(|id| !taps.contains(id))
+    });
+    snapshot
+        .route_conflicts
+        .retain(|c| !taps.contains(c.edge_id.as_str()));
     snapshot.graph = view.clone();
     snapshot.bus_lines = lines;
 }
@@ -799,6 +1216,7 @@ pub(crate) fn trunks(
     view: &Graph,
     levels: &BTreeMap<String, usize>,
     always: bool,
+    skip: &dyn Fn(&Bus) -> bool,
 ) -> Option<Graph> {
     if !view
         .buses
@@ -824,7 +1242,7 @@ pub(crate) fn trunks(
     for bus in graph
         .buses
         .iter_mut()
-        .filter(|b| !b.taps.is_empty() && b.edges.is_empty())
+        .filter(|b| !b.taps.is_empty() && b.edges.is_empty() && !skip(b))
     {
         let members: Vec<&BusTap> = bus
             .taps
@@ -1003,4 +1421,243 @@ pub(crate) fn orient_joining(
         }
     }
     (graph, flipped)
+}
+
+/// Provisional (`busStyle: trunk`/`lines` in an area that is not layered): the head of every bus of `heads` (bus id ->
+/// head) drawn as a bar becomes shared lines along the bar's middle: for every other member one route, from the member down
+/// its tap to the bar's middle, along it to the head's foot, and up the head's tap to the head (orthogonal throughout, as
+/// the bar and its taps are), in the tap's direction; the bus lists those edges (an explicit bus, junction dots where they
+/// branch) and its bar goes. The bar geometry already keeps clear of the boxes.
+pub(crate) fn bars_to_lines(snapshot: &mut Snapshot, heads: &BTreeMap<String, String>) {
+    for bus in snapshot.graph.buses.iter_mut() {
+        let Some(head) = heads.get(&bus.id) else {
+            continue;
+        };
+        let Some(line) = snapshot.bus_lines.get(&bus.id) else {
+            continue;
+        };
+        let b = &line.bar;
+        let horizontal = b.width >= b.height;
+        let middle = if horizontal {
+            b.y + b.height / 2.
+        } else {
+            b.x + b.width / 2.
+        };
+        let onto = |p: &Point| {
+            if horizontal {
+                Point { x: p.x, y: middle }
+            } else {
+                Point { x: middle, y: p.y }
+            }
+        };
+        // A member's way from its box to the bar's middle.
+        let to_bar = |tap: &BusTap| -> Option<Vec<Point>> {
+            let mut points = line.taps.get(&tap.edge)?.clone();
+            if !tap.to_bus {
+                points.reverse();
+            }
+            // Down to the bar's middle: square from the last point (a tap may end with a stretch along the bar's face).
+            let last = points.last()?.clone();
+            let before = points.len().checked_sub(2).map(|k| points[k].clone());
+            let along_face = before.is_some_and(|b| {
+                if horizontal {
+                    (b.y - last.y).abs() < 1e-9
+                } else {
+                    (b.x - last.x).abs() < 1e-9
+                }
+            });
+            if along_face {
+                points.push(onto(&last));
+            } else {
+                points.pop();
+                points.push(onto(&last));
+            }
+            Some(points)
+        };
+        let Some(head_tap) = bus.taps.iter().find(|t| &t.node == head) else {
+            continue;
+        };
+        let Some(head_way) = to_bar(head_tap) else {
+            continue;
+        };
+        let mut routes = Vec::new();
+        for tap in bus.taps.iter().filter(|t| &t.node != head) {
+            let Some(mut points) = to_bar(tap) else {
+                continue;
+            };
+            points.extend(head_way.iter().rev().cloned());
+            points.dedup_by(|a, b| (a.x - b.x).abs() < 1e-9 && (a.y - b.y).abs() < 1e-9);
+            // In the edge's direction: from the member to the head for a tap to the bus, else back.
+            let (source, target) = if tap.to_bus {
+                (tap.node.clone(), head.clone())
+            } else {
+                points.reverse();
+                (head.clone(), tap.node.clone())
+            };
+            routes.push((tap, source, target, points));
+        }
+        for (tap, source, target, points) in routes {
+            snapshot.graph.edges.push(Edge {
+                id: tap.edge.clone(),
+                kind: tap.kind.clone(),
+                source,
+                target: Some(target),
+                weight: None,
+            });
+            snapshot.routes.push(arqlet_model::Route {
+                id: tap.edge.clone(),
+                points,
+                weight: 1,
+                bundle_of: None,
+            });
+            bus.edges.push(tap.edge.clone());
+        }
+        snapshot.bus_lines.remove(&bus.id);
+    }
+    // The new lines checked against the boxes they pass (not their own ends or those ends' containers).
+    let absolute = crate::absolute_all(&snapshot.graph, &snapshot.boxes);
+    let parent: BTreeMap<&str, Option<&str>> = snapshot
+        .graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let around = |id: &str| {
+        let mut out = BTreeSet::new();
+        let mut at = Some(id);
+        while let Some(n) = at {
+            out.insert(n.to_string());
+            at = parent.get(n).copied().flatten();
+        }
+        out
+    };
+    let lines: BTreeSet<&str> = heads
+        .keys()
+        .flat_map(|bus| {
+            snapshot
+                .graph
+                .buses
+                .iter()
+                .filter(move |b| &b.id == bus)
+                .flat_map(|b| b.edges.iter().map(String::as_str))
+        })
+        .collect();
+    let mut found = Vec::new();
+    for e in snapshot
+        .graph
+        .edges
+        .iter()
+        .filter(|e| lines.contains(e.id.as_str()))
+    {
+        let Some(route) = snapshot.routes.iter().find(|r| r.id == e.id) else {
+            continue;
+        };
+        let mut skip = around(&e.source);
+        if let Some(t) = e.target.as_deref() {
+            skip.extend(around(t));
+        }
+        for (id, r) in &absolute {
+            if skip.contains(id) {
+                continue;
+            }
+            let hit = route.points.windows(2).any(|w| {
+                let (x0, x1) = (w[0].x.min(w[1].x), w[0].x.max(w[1].x));
+                let (y0, y1) = (w[0].y.min(w[1].y), w[0].y.max(w[1].y));
+                x1 > r.x + 0.5
+                    && x0 < r.x + r.width - 0.5
+                    && y1 > r.y + 0.5
+                    && y0 < r.y + r.height - 0.5
+            });
+            if hit {
+                found.push(arqlet_model::RouteConflict {
+                    edge_id: e.id.clone(),
+                    node_id: id.clone(),
+                });
+            }
+        }
+    }
+    snapshot.route_conflicts.extend(found);
+}
+
+/// The head every bus line of `view` (`Bus::taps`, no edges) that `pick` accepts takes as `trunks` chooses it, by bus id.
+pub(crate) fn heads(
+    view: &Graph,
+    levels: &BTreeMap<String, usize>,
+    always: bool,
+    pick: &dyn Fn(&Bus) -> bool,
+) -> BTreeMap<String, String> {
+    let Some(graph) = trunks(view, levels, always, &|b| !pick(b)) else {
+        return BTreeMap::new();
+    };
+    let ends: BTreeMap<&str, (&str, &str)> = graph
+        .edges
+        .iter()
+        .filter_map(|e| Some((e.id.as_str(), (e.source.as_str(), e.target.as_deref()?))))
+        .collect();
+    graph
+        .buses
+        .iter()
+        .filter(|b| !b.taps.is_empty() && pick(b))
+        .filter_map(|b| {
+            // `trunks` draws an edge from the head to every other member.
+            let first = b.edges.first()?;
+            let (source, _) = ends.get(first.as_str())?;
+            Some((b.id.clone(), source.to_string()))
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod geometry_tests {
+    use super::*;
+
+    fn rect(x: f64, y: f64, w: f64, h: f64) -> Rect {
+        Rect {
+            x,
+            y,
+            width: w,
+            height: h,
+        }
+    }
+
+    #[test]
+    fn a_bar_moves_off_a_foreign_box_and_a_tap_goes_around_one() {
+        // Flow top to bottom: the bus box at y 100, members a (left) and b (right) below it. A foreign box c lies on the
+        // bar's line between them; a foreign box d stands between a and the bar.
+        let graph: Graph = serde_json::from_value(serde_json::json!({
+            "defaultDirection": "tb",
+            "nodes": [
+                {"id": "bus", "kind": "bus", "label": "bus", "shape": "busLine"},
+                {"id": "a", "kind": "k", "label": "a"}, {"id": "b", "kind": "k", "label": "b"},
+                {"id": "c", "kind": "k", "label": "c"}, {"id": "d", "kind": "k", "label": "d"}],
+            "edges": [{"id": "ta", "kind": "k", "source": "a", "target": "bus"},
+                {"id": "tb", "kind": "k", "source": "b", "target": "bus"}]
+        }))
+        .unwrap();
+        let boxes = BTreeMap::from([
+            ("bus".to_string(), rect(150., 96., 100., 8.)),
+            ("a".to_string(), rect(0., 220., 100., 50.)),
+            ("b".to_string(), rect(300., 220., 100., 50.)),
+            ("c".to_string(), rect(170., 90., 60., 20.)),
+            ("d".to_string(), rect(20., 150., 60., 40.)),
+        ]);
+        let lines = draw(&graph, &boxes, &BTreeMap::new());
+        let line = &lines["bus"];
+        assert!(
+            !overlaps(&line.bar, &boxes["c"]),
+            "bar {:?} over c",
+            line.bar
+        );
+        for (edge, points) in &line.taps {
+            for foreign in ["c", "d"] {
+                assert!(
+                    !path_hits(points, &boxes[foreign]),
+                    "{edge} {points:?} through {foreign}"
+                );
+            }
+        }
+        // The taps still run from their member to the bar.
+        let first = &line.taps["ta"][0];
+        assert!(first.x >= 0. && first.x <= 100. && first.y >= 220. - 1e-6 && first.y <= 270.);
+    }
 }
