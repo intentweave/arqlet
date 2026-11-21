@@ -1,0 +1,47 @@
+{
+  "defaultDirection": "lr",
+  "nodes": [
+    { "id": "order", "kind": "task", "label": "Place order", "parentId": null },
+    { "id": "pay", "kind": "task", "label": "Pay", "parentId": null },
+    { "id": "receive", "kind": "task", "label": "Receive", "parentId": null },
+    { "id": "check", "kind": "task", "label": "Check stock", "parentId": null },
+    { "id": "approve", "kind": "task", "label": "Approve", "parentId": null },
+    { "id": "invoice", "kind": "task", "label": "Invoice", "parentId": null },
+    { "id": "ship", "kind": "task", "label": "Ship", "parentId": null }
+  ],
+  "edges": [
+    { "id": "f1", "kind": "flow", "source": "order", "target": "check" },
+    { "id": "f2", "kind": "flow", "source": "check", "target": "approve" },
+    { "id": "f3", "kind": "flow", "source": "approve", "target": "pay" },
+    { "id": "f4", "kind": "flow", "source": "pay", "target": "invoice" },
+    { "id": "f5", "kind": "flow", "source": "invoice", "target": "ship" },
+    { "id": "f6", "kind": "flow", "source": "ship", "target": "receive" },
+    { "id": "f7", "kind": "flow", "source": "approve", "target": "order" }
+  ],
+  "memberships": {
+    "dimensions": [
+      {
+        "id": "pool",
+        "label": "Pool",
+        "groups": [
+          { "id": "customer", "label": "Customer", "members": ["order", "pay", "receive"] },
+          {
+            "id": "supplier",
+            "label": "Supplier",
+            "members": ["check", "approve", "invoice", "ship"]
+          }
+        ]
+      },
+      {
+        "id": "phase",
+        "label": "Phase",
+        "groups": [
+          { "id": "request", "label": "Request", "members": ["order", "check"] },
+          { "id": "approval", "label": "Approval", "members": ["pay", "approve"] },
+          { "id": "fulfil", "label": "Fulfilment", "members": ["receive", "invoice", "ship"] }
+        ]
+      }
+    ]
+  },
+  "membershipViews": { "pool": "lanes", "phase": "lanes" }
+}

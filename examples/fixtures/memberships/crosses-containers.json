@@ -1,0 +1,36 @@
+{
+  "defaultDirection": "lr",
+  "nodes": [
+    { "id": "left", "kind": "group", "label": "Left", "parentId": null },
+    { "id": "right", "kind": "group", "label": "Right", "parentId": null },
+
+    { "id": "l1", "kind": "unit", "label": "L1", "parentId": "left" },
+    { "id": "l2", "kind": "unit", "label": "L2", "parentId": "left" },
+    { "id": "l3", "kind": "unit", "label": "L3", "parentId": "left" },
+
+    { "id": "r1", "kind": "unit", "label": "R1", "parentId": "right" },
+    { "id": "r2", "kind": "unit", "label": "R2", "parentId": "right" },
+    { "id": "r3", "kind": "unit", "label": "R3", "parentId": "right" }
+  ],
+  "edges": [
+    { "id": "x1", "kind": "flow", "source": "l1", "target": "l2" },
+    { "id": "x2", "kind": "flow", "source": "l2", "target": "l3" },
+    { "id": "x3", "kind": "flow", "source": "l2", "target": "r1" },
+    { "id": "x4", "kind": "flow", "source": "r1", "target": "r2" },
+    { "id": "x5", "kind": "flow", "source": "r2", "target": "r3" },
+    { "id": "x6", "kind": "flow", "source": "r3", "target": "l1" }
+  ],
+  "memberships": {
+    "dimensions": [
+      {
+        "id": "focus",
+        "label": "Focus",
+        "groups": [
+          { "id": "hot-path", "label": "Hot path", "members": ["l2", "r1", "r2"] },
+          { "id": "local", "label": "Local only", "members": ["l1", "l3"] }
+        ]
+      }
+    ]
+  },
+  "membershipViews": { "focus": "overlay" }
+}
