@@ -80,7 +80,8 @@ the projection drops (`RETURN n.name ORDER BY n.age`), so the sort must see the 
 
 ## Decision
 
-Build a lean Cypher layer of our own, in two crates, and keep Grafeo out of the product.
+Build a lean Cypher layer of our own, in two crates plus a thin adapter crate (named in M0), and keep Grafeo out of the
+product.
 
 1. **Crates (provisional).**
    - `crates/query`: the neutral part, with no third-party dependency. It holds a small plan IR, the values, the store
@@ -96,9 +97,11 @@ Build a lean Cypher layer of our own, in two crates, and keep Grafeo out of the 
    current is not justified; see the switch criteria in item 9).
 3. **A store seam of our own.** A small trait (names provisional): the node by id, the edges of a node by direction and
    type, node ids, labels, edge types, property keys, and property reads. Reads return values in a fixed order (by id), never
-   by hash order. The Arqlet adapter implements it over the canonical graph without copying it. Grafeo and SQL adapters can
-   be added later without a change to the executor. Batch reads and pushdown hooks (property equality and range, search)
-   are added when a second store needs them, not before.
+   by hash order. The Arqlet adapter implements it over the canonical graph without copying it. Every read names the
+   revision it reads at (the idea of Grafeo's `ReadView`), so a result carries its revision and a stale one is rejected, as
+   the project rules require. Grafeo and SQL adapters can be added later without a change to the executor. Batch reads and
+   pushdown hooks (property equality and range, search) are added when a second store needs them, not before. How the
+   adapter reads the graph in place is the open question of the last section.
 4. **A front-end guard: every construct either runs correctly or is rejected.**
    - Walk decypher's syntax tree (CST) before lowering and reject, with an error that names the construct: `shortestPath`
      and `allShortestPaths` (the `IDENT` token in a path assignment), `WHERE_CLAUSE` nodes inside node and relationship
@@ -190,6 +193,98 @@ Build a lean Cypher layer of our own, in two crates, and keep Grafeo out of the 
 - Semantic search and structure similarity are not covered by the first release, and no engine we found provides them
   across arbitrary stores; this ADR only reserves the place.
 
+## Plan
+
+Each stage ends with a check that can fail. M0 is this document and the preparation around it; no code before M1.
+
+| Stage | Content | Exit check |
+|---|---|---|
+| M0 | The decisions below; spike corpus and the 17 cases with their hand-computed expectations as fixtures | this ADR accepted |
+| M1 | Crates created (`publish = false`), parse, syntax-tree guard, limits, lowering of `MATCH … WHERE … RETURN` into the plan IR | all 40 corpus queries are accepted or rejected as the subset table says; one test per known drop |
+| M2 | Executor on a test store: nodes, labels, properties, expressions with three-valued logic, `ORDER BY`, `SKIP`, `LIMIT`, `DISTINCT` | the spike cases for nodes and expressions pass; fixed result order |
+| M3 | Relationships: directions, types, self-loops, parallel edges, relationship uniqueness, several patterns | the spike cases for edges and counts pass |
+| M4 | Variable length, `OPTIONAL MATCH`, `WITH`, aggregation | the remaining supported spike cases pass |
+| M5 | Arqlet adapter, operation through `dispatch`, WASM feature, napi path, results in the platform parity run, size of the WASM engine before and after | gates (a) and (d) of item 8; identical digests on all platforms; the size difference recorded |
+| M6 | Differential run against Grafeo 0.6.2 (pinned, tooling only), a TCK subset | gates (b) and (c) of item 8 |
+| After | `shortestPath`, quantified paths, `WHERE` inside patterns, `EXISTS { }` subqueries, the search operator, a SQL adapter | each its own decision |
+
+The shared-graph question (last section) must be decided before M5. A measurement of throughput, if we want to state one,
+belongs in `benchmarks/` with machine, build and seed, as the rules require.
+
+## M0: decisions fixed here
+
+1. **Properties.** The canonical graph carries none: a node is `id`, `kind`, `label`, `parentId`, `shape`; an edge is
+   `id`, `kind`, `source`, `target` (may be missing), `weight`. A query sees two sources:
+   - **Virtual properties**, read-only, taken from the fields the model has today: `id`, `kind`, `label`, `parentId`
+     (nodes), `weight` (edges). The `kind` of a node is its single label and the `kind` of an edge is its relationship
+     type. Containment is not a relationship in the first release; `parentId` answers it as a property. Edges without a
+     target are excluded before selection, as the project rule says.
+   - **A payload table** supplied by the host: for a node or edge id, a map of properties with JSON values (null, boolean,
+     integer as `i64`, float as `f64`, string, list, map; an integer stays an integer). It travels with the query or is held
+     by the session under its own revision. It is never part of the canonical graph, layout does not read it, and the
+     canonical graph's serialized form does not change. A payload key that equals a virtual property is an error at import,
+     not a silent override; an id that names no node or edge is an error, not skipped.
+2. **Rust version.** The workspace `rust-version` is raised from 1.88 to 1.94, decypher's floor. Stable is 1.100.0
+   (2026-11-09); the CI uses unpinned stable. The edition stays 2021 here: decypher's edition 2024 does not force ours, and
+   an edition change is its own decision. The raise itself is a separate change (manifest, documentation, CI check); this
+   ADR does not change `Cargo.toml`.
+3. **Crates.** `arqlet-query` (plan IR, values, store seam, executor), `arqlet-query-cypher` (front end, depends on
+   decypher), `arqlet-query-model` (adapter to `arqlet-model`). The first two have no `arqlet-*` dependency, so they could
+   leave the repository later without a rewrite. The facade `arqlet` takes the feature that enables them; it is not on by
+   default. They start with `publish = false` and join the release when accepted.
+4. **Third-party records.** Before M1: the exact decypher version, crates.io checksum and upstream revision are recorded;
+   `NOTICE` and the license handling of `tools/npm-prepack.mjs` (today only the two license files) are extended for the
+   transitive notices; `CLAUDE.md` gets the one exception to "the core uses only `serde`, `serde_json` and `libm`".
+5. **Fixtures.** The 40-query corpus of the spike (accept or reject) and the 17 executable cases with expected values,
+   computed by hand on a graph with a cycle, a self-loop and parallel edges, move into the repository as test data in M0.
+   The spike code itself does not.
+
+## The shared in-memory graph (research pass 1, not decided)
+
+The query layer and the layout engine should read the same graph in place: no copy of the graph, no comparison of two
+copies, no merge of two versions. This section records what exists and a proposal; the choice is made before M5.
+
+**What Arqlet has today.** `model::Graph` is two vectors (`nodes`, `edges`) with string ids plus constraint maps; the
+runtime session owns it as part of the snapshot. `view::project` builds a new `Graph` for the visible nodes and copies an
+edge only when the view keeps it; callers that project one graph many times keep a `GraphIndex` (id to index, parent,
+container) and call `project_indexed`. Edits go through patches that carry a graph revision and are rejected when stale;
+browser and backend share semantics, not memory (`docs/architecture.md`). ADR 0019 step 4 already plans interned dense
+`u32` indices and columns for large graphs.
+
+**What exists outside** (crates.io, 2026-11-21; descriptions from their own pages and our survey, none built here):
+
+| Candidate | State | Fit |
+|---|---|---|
+| petgraph 0.8.3 (MIT OR Apache-2.0) | last release 2025-09-30; `Graph`, `StableGraph`, `Csr`, `GraphMap`; generic weights; algorithms | no snapshots, diff or merge. As storage it would be a second representation next to `model::Graph`, with a copy at the boundary unless layout moves to it too. Its visit traits can, as far as we recall, be implemented on own types; unverified |
+| imbl 7.0.2 (MPL-2.0+), im 15.1.0 (last release 2022-04-29), rpds 1.2.1 (MIT) | persistent collections with structural sharing; cloning copies nothing | cheap snapshots, but reads are slower than flat vectors (a source we found says so for array-based containers); a sorted map gives a deterministic order, hash-based ones depend on the hasher; MPL-2.0 needs a check against our `MIT OR Apache-2.0` |
+| salsa 0.28.5, differential-dataflow 0.26.0 (MIT) | incremental computation (memoized queries by revision; collections maintained under insertions and deletions) | execution models, not graph stores; Arqlet has its own incremental scheduler, so adopting either is an architecture change |
+| loro 1.18.0 (MIT), automerge 0.12.0 (MIT) | CRDT documents for merging concurrent edits | merge is their purpose, with their own document model; far more than we need until several writers exist. `grafeo-loro` on crates.io combines Loro with Grafeo as a precedent |
+| Grafeo (row-group store, reads at an epoch, `GraphStore` trait), oxigraph 0.5.13, cozo 0.7.6 (last release 2023-12-11), indradb 5.0.0 (2025-08-16) | embedded stores that own their storage | layout would read through their API or from a copy; the epoch read is the useful idea |
+| Arrow, GraphAr 0.3.0 (Apache-2.0, 788 downloads) | columnar formats | GraphAr is a storage format with a young Rust crate; Arrow IPC is already named in ADR 0019 for the backend-to-browser frame |
+| rkyv 0.8.18, arc-swap 1.9.5 | zero-copy deserialization; swapping an `Arc` snapshot while readers keep the old one | building blocks, not graphs |
+
+We found no library that offers a property graph, in-place sharing with a second engine, cheap diff and merge, a
+`wasm32` build and deterministic iteration together.
+
+**Proposal** (to be tested, then decided):
+
+1. A read-only view trait that `Graph` with its `GraphIndex` implements today, reading in place as `project_indexed`
+   already does, and that the columnar form of ADR 0019 implements later. The query layer borrows during one request;
+   edits run between requests inside the session, so the synchronous core needs no locking.
+2. The payload table (item 1 of M0) lives beside the graph, keyed by interned index, with its own revision, behind an
+   `Arc` so a session and a request share it without a copy. Typed columns per property key replace a JSON value per node
+   when a measurement shows the need.
+3. Every read names a revision (item 3 of the Decision), so compare is a revision check: equal revision means equal data by
+   construction; immutable parts can be checked with `Arc::ptr_eq`. There is no structural diff.
+4. Merge is not built. Stale patches are rejected by revision, as today, until a use with several concurrent writers
+   exists; a CRDT is then the candidate, and the persistent collections only if a measurement shows that snapshots (undo
+   history, hand-over in split mode) are too expensive to copy.
+5. No external graph library for now.
+
+**To measure before deciding:** the copy cost of `view::project` and the build cost of `GraphIndex` on the large
+examples, and the size of a realistic payload table. The first two are the copying this section is meant to avoid; if they
+are small against layout time, the proposal costs nothing.
+
 ## Not decided here
 
 - Syntax and scoring of search operators; hybrid ranking; embedding source.
@@ -197,5 +292,5 @@ Build a lean Cypher layer of our own, in two crates, and keep Grafeo out of the 
 - A SQL backend (mapping of entity tables and JSONB payload, GIN pushdown) and any virtual-graph variant of it.
 - Whether to propose the planner change to Grafeo upstream, and whether to fork.
 - Whether and when to contribute fixes for decypher #132 to #134 (item 9 sets the conditions).
-- The minimum supported Rust version (decypher 0.2.0 declares 1.94).
-- The exact crate and trait names.
+- The names of the traits and types (the crate names are fixed in M0).
+- The shared in-memory graph and the payload representation beyond the first table (last section).
