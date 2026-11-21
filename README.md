@@ -265,6 +265,10 @@ location.hash = `view=${encodeBookmark((await view.bookmark()).bookmark)}`;
 
 In the playground: *Find* in the section *Path*, and *Link to this view*.
 
+`navigate(direction)` moves the selection by keyboard: to the nearest box left, right, up
+or down, to the container or its first child, between siblings, or along an edge; the
+camera follows `state.focus`. In the playground: arrows, Shift+arrows, `[` and `]`, Enter.
+
 ### Filter
 
 `filter` hides nodes by kind or id (each with what it holds) and edges by kind, without

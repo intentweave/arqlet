@@ -1509,6 +1509,38 @@ function centerOn(id,bounds){
  c.scrollTop=p.y+(bounds?bounds.height*scale/2:0)-c.clientHeight/2;
 }
 $('show').onclick=()=>focusNode($('show-node').value.trim());
+// Scrolls only when the node's box is not (wholly) on screen, so that moving with the keys does not jump around.
+function ensureVisible(id,bounds){
+ const p=drawnPosition(id),c=$('canvas');
+ if(!p||!c)return;
+ const w=bounds?bounds.width*scale:0,h=bounds?bounds.height*scale:0;
+ if(p.x>=c.scrollLeft&&p.y>=c.scrollTop&&p.x+w<=c.scrollLeft+c.clientWidth&&p.y+h<=c.scrollTop+c.clientHeight)return;
+ centerOn(id,bounds);
+}
+// Keyboard navigation (the view controller's `navigate`): the arrows move the selection to the nearest box that way,
+// Shift+Up to the container and Shift+Down to its first child, Shift+Left and Shift+Right along an incoming or outgoing
+// edge, [ and ] to the previous and next sibling; Enter opens or closes the selected container (or shows the next page of
+// a `+N more` box). Not while a text field, a select or a button has the focus; Tab stays the browser's.
+const NAV_KEYS={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down','[':'previous',']':'next'};
+const NAV_SHIFT_KEYS={ArrowUp:'parent',ArrowDown:'child',ArrowLeft:'in',ArrowRight:'out'};
+document.addEventListener?.('keydown',async e=>{
+ if(!snapshot||pending||curation||drag||e.metaKey||e.ctrlKey||e.altKey)return;
+ if(/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.target?.tagName??'')||e.target?.isContentEditable)return;
+ if(e.key==='Enter'){
+  const source=snapshot.sourceGraph??snapshot.graph;
+  if(!selected||!(selected.startsWith('rest:')||source.nodes.some(n=>n.parentId===selected)))return;
+  e.preventDefault();toggleContainer(selected,e);return;
+ }
+ const direction=e.shiftKey?NAV_SHIFT_KEYS[e.key]:NAV_KEYS[e.key];
+ if(!direction)return;
+ e.preventDefault();
+ // The controller moves from the node the page has selected.
+ if(selected&&viewController.getState().selection?.nodeId!==selected)await viewController.select({nodeId:selected});
+ const r=await viewController.navigate(direction);
+ if(!r.ok){status(r.collapsed?`${selected} is closed: Enter opens it.`:r.none?'Nothing lies that way.':`Not moved: ${r.error}`);return;}
+ selectNode(r.nodeId);ensureVisible(r.nodeId,r.focus?.bounds);
+ status(`Selected ${snapshot.graph.nodes.find(n=>n.id===r.nodeId)?.label??r.nodeId}`);
+});
 // Search (the engine's `find`): nodes by name or id, also inside collapsed groups; a click focuses one.
 async function search(){
  const query=$('search-query').value.trim(),box=$('search-results');

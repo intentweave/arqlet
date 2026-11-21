@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Keyboard navigation (provisional): the view controller's `navigate(direction)` moves the selection to the nearest box
+  that way (`left`, `right`, `up`, `down`), up to the container or to the first child (`parent`, `child`), between
+  siblings in reading order (`next`, `previous`), or along a drawn edge (`out`, `in`), and sets `state.focus` for the
+  camera; nothing opens, and it is not a step for `back`. `navigateScene(scene, from, direction)` is the pure,
+  deterministic rule. Playground: arrows, Shift+arrows, `[` and `]`, Enter to open or close.
 - Search, focus and bookmarks (provisional). The read-only operation `find` (`query`, optional `limit`, `nodeKinds`)
   finds nodes of the source graph by label or id (ignoring case; exact, then prefix, then word start, then anywhere),
   also inside collapsed groups, with the containers above each and the box that shows it (`FindAnswer`); `digest`

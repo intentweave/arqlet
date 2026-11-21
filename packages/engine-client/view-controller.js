@@ -38,6 +38,96 @@ export function sceneDiff(before, after) {
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
+ * Provisional (keyboard navigation): the node of `scene` that `direction` leads to from node `from`, or null; pure and
+ * deterministic (ties by id). `left`, `right`, `up`, `down`: the nearest box whose centre lies that way (within a cone
+ * of twice the main distance first, then anywhere that way), leaving out the node's own containers and contents;
+ * `parent`; `child`: the first child in reading order (top to bottom, then left to right); `next`, `previous`: the
+ * neighbouring sibling in reading order, wrapping; `out`, `in`: the nearest node a drawn edge leads to or comes from.
+ * Without `from`, the first top-level node in reading order.
+ */
+export function navigateScene(scene, from, direction) {
+  const nodes = scene?.nodes ?? [];
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const centre = n => ({x: n.bounds.x + n.bounds.width / 2, y: n.bounds.y + n.bounds.height / 2});
+  const reading = (a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const first = list => [...list].sort(reading)[0]?.id ?? null;
+  const node = from ? byId.get(from) : null;
+  if (!node) return first(nodes.filter(n => !n.parentId || !byId.has(n.parentId)));
+  const nearest = (candidates, score) => {
+    let best = null;
+    let bestScore = Infinity;
+    for (const c of candidates) {
+      const s = score(c);
+      if (s === null) continue;
+      if (s < bestScore || (s === bestScore && c.id < best.id)) {
+        best = c;
+        bestScore = s;
+      }
+    }
+    return best?.id ?? null;
+  };
+  const here = centre(node);
+  switch (direction) {
+    case 'parent':
+      return node.parentId && byId.has(node.parentId) ? node.parentId : null;
+    case 'child':
+      return first(nodes.filter(n => n.parentId === node.id));
+    case 'next':
+    case 'previous': {
+      const siblings = nodes.filter(n => (n.parentId ?? null) === (node.parentId ?? null)).sort(reading);
+      if (siblings.length < 2) return null;
+      const at = siblings.findIndex(n => n.id === node.id);
+      const step = direction === 'next' ? 1 : siblings.length - 1;
+      return siblings[(at + step) % siblings.length].id;
+    }
+    case 'out':
+    case 'in': {
+      const ends = new Set((scene.routes ?? [])
+        .filter(r => (direction === 'out' ? r.source : r.target) === node.id)
+        .map(r => (direction === 'out' ? r.target : r.source))
+        .filter(id => id !== node.id && byId.has(id)));
+      return nearest([...ends].map(id => byId.get(id)), c => {
+        const p = centre(c);
+        return (p.x - here.x) ** 2 + (p.y - here.y) ** 2;
+      });
+    }
+    case 'left':
+    case 'right':
+    case 'up':
+    case 'down': {
+      // Not its own containers (they hold it) nor its contents (`child` goes there).
+      const above = new Set();
+      for (let at = node.parentId; at && byId.has(at) && !above.has(at); at = byId.get(at).parentId) above.add(at);
+      const inside = c => {
+        for (let at = c.parentId, steps = 0; at && steps <= nodes.length; at = byId.get(at)?.parentId, steps++) {
+          if (at === node.id) return true;
+        }
+        return false;
+      };
+      const candidates = nodes.filter(c => c.id !== node.id && !above.has(c.id) && !inside(c));
+      const axis = c => {
+        const p = centre(c);
+        const dx = p.x - here.x;
+        const dy = p.y - here.y;
+        const main = direction === 'right' ? dx : direction === 'left' ? -dx : direction === 'down' ? dy : -dy;
+        const side = Math.abs(direction === 'left' || direction === 'right' ? dy : dx);
+        return {main, side};
+      };
+      const inCone = nearest(candidates, c => {
+        const {main, side} = axis(c);
+        return main > 0 && side <= 2 * main ? main + 2 * side : null;
+      });
+      return inCone ?? nearest(candidates, c => {
+        const {main, side} = axis(c);
+        return main > 0 ? main + 2 * side : null;
+      });
+    }
+    default:
+      throw Error(`Unknown direction: ${direction}`);
+  }
+}
+
+/**
  * A bookmark as text for a URL (base64url of its JSON, UTF-8), and back. `decodeBookmark` throws on text that is not one.
  */
 export function encodeBookmark(bookmark) {
@@ -339,6 +429,30 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
       const node = answer.node;
       publish({focus: {nodeId, bounds: node.bounds ?? null, shownAs: node.shownAs ?? null, serial: (state.focus?.serial ?? 0) + 1}});
       return {ok: true, focus: state.focus};
+    },
+
+    /**
+     * Keyboard navigation: moves the selection from the selected node (or, without one, to the first top-level node)
+     * the way `direction` says (see `navigateScene`) and sets `state.focus` for the camera, without opening anything
+     * (not a step for `back`). `{ok: false, none: true}` when nothing lies that way; a closed container has no child to go
+     * to until it is opened.
+     */
+    async navigate(direction) {
+      const step = await enqueue(async current => {
+        const scene = state.scene ?? await session.scene();
+        if (!current()) return {ok: false, cancelled: true};
+        if (!scene) return {ok: false, error: 'Nothing imported yet.'};
+        const from = state.selection?.nodeId ?? null;
+        const nodeId = navigateScene(scene, from, direction);
+        if (!nodeId) {
+          const node = scene.nodes.find(n => n.id === from);
+          return {ok: false, none: true, ...(direction === 'child' && node?.collapsed ? {collapsed: true} : {})};
+        }
+        return {ok: true, nodeId};
+      });
+      if (!step.ok) return step;
+      const focused = await controller.focus(step.nodeId, {reveal: false});
+      return focused.ok ? {ok: true, nodeId: step.nodeId, focus: focused.focus} : focused;
     },
 
     /**
