@@ -587,6 +587,8 @@ mod tests {
             collapsed: false,
             invalid: false,
             rows: vec![],
+            child_count: None,
+            hidden_count: None,
         };
         let b = SceneNode {
             node: node("b", Some("a"), "service", NodeShape::Circle),
@@ -599,6 +601,8 @@ mod tests {
                 row("r0", "first", rect(11., 21., 38., 10.)),
                 row("r1", "second", rect(11., 31., 38., 10.)),
             ],
+            child_count: None,
+            hidden_count: None,
         };
         let c = SceneNode {
             node: node("c", Some("a"), "service", NodeShape::Square),
@@ -608,6 +612,8 @@ mod tests {
             collapsed: true,
             invalid: false,
             rows: vec![row("r2", "only", rect(101., 21., 38., 10.))],
+            child_count: None,
+            hidden_count: None,
         };
         let route = |id: &str, target: &str, n: usize| SceneRoute {
             id: id.into(),

@@ -60,10 +60,69 @@ pub fn filter_view(
 /// The scene of a snapshot, without what its view hides.
 pub fn scene_of(snapshot: &Snapshot) -> Result<Scene, String> {
     let mut scene = arqlet_scene::build_scene(snapshot)?;
+    count_children(snapshot, &mut scene)?;
     if !snapshot.options.hidden.is_empty() {
         hide(snapshot, &mut scene)?;
     }
     Ok(scene)
+}
+
+/// Sets every container's `child_count` and `hidden_count` from the view (`structured`, as the snapshot keeps it).
+fn count_children(snapshot: &Snapshot, scene: &mut Scene) -> Result<(), String> {
+    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let kept = snapshot.structure.as_ref().map(|s| s.view.clone());
+    let built;
+    let view: &arqlet_model::Graph = match kept.as_deref() {
+        Some(v) => v,
+        None => {
+            built = crate::structured(canonical, &snapshot.options)?;
+            &built
+        }
+    };
+    let mut children: BTreeMap<&str, usize> = BTreeMap::new();
+    for n in &view.nodes {
+        if let Some(p) = n.parent_id.as_deref() {
+            *children.entry(p).or_default() += 1;
+        }
+    }
+    let rest_of = |id: &str| format!("{}{id}", arqlet_layout::communities::REST_PREFIX);
+    // The rests, each inside the container it belongs to.
+    let rests: std::collections::BTreeSet<&str> = view
+        .nodes
+        .iter()
+        .filter(|n| {
+            n.id.strip_prefix(arqlet_layout::communities::REST_PREFIX)
+                .is_some_and(|c| n.parent_id.as_deref() == Some(c))
+        })
+        .map(|n| n.id.as_str())
+        .collect();
+    for node in scene.nodes.iter_mut() {
+        let id = node.node.id.as_str();
+        let Some(&direct) = children.get(id) else {
+            continue;
+        };
+        // A partly shown container: its rest stands for the children not shown.
+        let rest = rest_of(id);
+        let in_rest = if rests.contains(rest.as_str()) {
+            children.get(rest.as_str()).copied().unwrap_or(0)
+        } else {
+            0
+        };
+        let count = if in_rest > 0 {
+            direct - 1 + in_rest
+        } else {
+            direct
+        };
+        node.child_count = Some(count);
+        node.hidden_count = if node.collapsed {
+            Some(count)
+        } else if in_rest > 0 {
+            Some(in_rest)
+        } else {
+            None
+        };
+    }
+    Ok(())
 }
 
 /// Leaves out of `scene` what the snapshot's view hides. The bounds stay, so that the drawing does not jump.

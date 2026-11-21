@@ -81,3 +81,37 @@ fn reveal_more_pages_through_a_rest_and_a_step_back_undoes_it() {
     .unwrap();
     assert_eq!(refused["ok"], false);
 }
+
+#[test]
+fn scene_nodes_count_their_children_and_the_hidden_ones() {
+    let mut nodes = vec![json!({"id": "box", "kind": "ecu", "label": "box"})];
+    for i in 0..30 {
+        nodes.push(json!({"id": format!("c{i:02}"), "kind": "frame", "label": format!("c{i:02}"), "parentId": "box"}));
+    }
+    let graph = json!({"nodes": nodes, "edges": []});
+    let first = run(json!({"op": "import", "graph": graph, "limit": 100, "options": {"levelOfDetail": {"depth": 0}}}))["snapshot"].clone();
+    let counts = |s: &Value, id: &str| {
+        let scene = run(json!({"op": "scene", "snapshot": s}))["scene"].clone();
+        let node = scene["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["id"] == id)
+            .cloned()
+            .unwrap();
+        (node["childCount"].as_u64(), node["hiddenCount"].as_u64())
+    };
+    // Collapsed: 30 children, all hidden.
+    assert_eq!(counts(&first, "box"), (Some(30), Some(30)));
+    // Two shown: 30 children, 28 in the rest; the rest box holds 28, all hidden; a leaf has no counts.
+    let two = on(&first, json!({"op": "reveal", "nodeIds": ["c05", "c07"]}));
+    assert_eq!(counts(&two, "box"), (Some(30), Some(28)));
+    assert_eq!(counts(&two, "rest:box"), (Some(28), Some(28)));
+    assert_eq!(counts(&two, "c05"), (None, None));
+    // Open: 30 children, none hidden.
+    let open = on(
+        &two,
+        json!({"op": "reveal", "more": {"container": "box", "count": 100}}),
+    );
+    assert_eq!(counts(&open, "box"), (Some(30), None));
+}

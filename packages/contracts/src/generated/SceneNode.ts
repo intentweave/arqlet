@@ -11,7 +11,17 @@ bounds: Rect, container: boolean, aggregate: boolean, collapsed: boolean, invali
 /**
  * The rows of the node's content, top to bottom (empty for a node without rows).
  */
-rows?: Array<SceneRow>, id: string, kind: string, label: string, parentId: string | null,
+rows?: Array<SceneRow>,
+/**
+ * Provisional: for a container, how many children it holds in the view (the communities and groups it adds count
+ * as children; a partly shown container counts the children in its rest too). Omitted for a leaf.
+ */
+childCount?: number,
+/**
+ * Provisional: of those, how many are not drawn: all of them for a collapsed container, those in its rest (`+N more`)
+ * for a partly shown one. Omitted when every child is drawn.
+ */
+hiddenCount?: number, id: string, kind: string, label: string, parentId: string | null,
 /**
  * The outline of the node. `rect` (the default, omitted) uses its size as it is; `square` and `circle` use the larger
  * of its two sizes on both axes. Collision and routing still use the bounding rectangle in this version.

@@ -5,6 +5,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added (scene counts)
+
+- `SceneNode.childCount` and `hiddenCount` (provisional): a container's children in the view (added communities and
+  groups count; a partly shown container counts those in its rest too) and how many of them are not drawn (all of them
+  when collapsed, those in the rest when shown in part); omitted for leaves and when every child is drawn. A host can show
+  "12" on a collapsed box without a copy of the graph. Not yet in the columnar scene.
+
 ### Fixed (first-view budget)
 
 - `levelOfDetail.nodes` counts the boxes as drawn: an opened container stays a box (its frame) and adds its children;
