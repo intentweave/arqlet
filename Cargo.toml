@@ -23,7 +23,7 @@ license = "MIT OR Apache-2.0"
 authors = ["Benjamin Becker"]
 repository = "https://github.com/intentweave/arqlet"
 homepage = "https://github.com/intentweave/arqlet"
-rust-version = "1.88"
+rust-version = "1.94"
 keywords = ["graph", "layout", "diagram", "incremental", "wasm"]
 categories = ["visualization", "algorithms", "wasm"]
 
