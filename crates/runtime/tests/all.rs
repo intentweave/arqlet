@@ -22,6 +22,8 @@ mod curation_labels;
 mod curation_locks;
 #[path = "curation_reroute.rs"]
 mod curation_reroute;
+#[path = "details.rs"]
+mod details;
 #[path = "directed_repair.rs"]
 mod directed_repair;
 #[path = "directions_first.rs"]
@@ -38,6 +40,8 @@ mod engine_choice;
 mod explicit_constraints;
 #[path = "filter.rs"]
 mod filter;
+#[path = "find.rs"]
+mod find;
 #[path = "force_directed.rs"]
 mod force_directed;
 #[path = "geometry_update.rs"]
@@ -58,6 +62,8 @@ mod layered_construction;
 mod level_budget;
 #[path = "local_edit_large.rs"]
 mod local_edit_large;
+#[path = "memberships.rs"]
+mod memberships;
 #[path = "move_gesture.rs"]
 mod move_gesture;
 #[path = "move_only.rs"]
@@ -82,6 +88,8 @@ mod pack_components;
 mod paging;
 #[path = "parallel_straight.rs"]
 mod parallel_straight;
+#[path = "peek.rs"]
+mod peek;
 #[path = "petri_shapes.rs"]
 mod petri_shapes;
 #[path = "pin_search.rs"]

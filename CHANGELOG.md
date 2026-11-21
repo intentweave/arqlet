@@ -5,6 +5,65 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- A look into a collapsed container (provisional): the read-only operation `peek` (`nodeId`, optional `limit`, default
+  50) lays out the container's contents on their own as a small scene (the containers inside collapsed, at most `limit`
+  direct children in the source order, the rest counted) and counts per child the edges that cross the container's
+  border (`external`); the view is not changed. `session.peek`; in the view controller `peek(id)` (`state.peek`, until
+  `closePeek` or the next change; not a step for `back`). Playground: *Look inside* (or Space) for a selected closed
+  container.
+- Refinement on a second engine (provisional): `createViewController(session, {refine})` takes a second engine for
+  refinement (`workerRefineRun(worker)` for its own worker, or any `(request, {onPublication, signal}) => answer`).
+  `refine({op})` (`refine`, `refineProgressive`, `structuredRefine`) runs beside the interactive steps, shows
+  intermediate results throttled (`publicationInterval`), applies a result only while the view is still the one it
+  started from (else `state.refined.stale`, counted in `state.discarded`), and is stopped by any change, step back,
+  import or new refinement (`state.refined.cancelled`); `state.refining` names it meanwhile; `cancelRefinement()`. Not a
+  step for `back`. The playground's whole-view refinement runs through it on the mode's refinement lane.
+- Keyboard navigation (provisional): the view controller's `navigate(direction)` moves the selection to the nearest box
+  that way (`left`, `right`, `up`, `down`), up to the container or to the first child (`parent`, `child`), between
+  siblings in reading order (`next`, `previous`), or along a drawn edge (`out`, `in`), and sets `state.focus` for the
+  camera; nothing opens, and it is not a step for `back`. `navigateScene(scene, from, direction)` is the pure,
+  deterministic rule. Playground: arrows, Shift+arrows, `[` and `]`, Enter to open or close.
+- Search, focus and bookmarks (provisional). The read-only operation `find` (`query`, optional `limit`, `nodeKinds`)
+  finds nodes of the source graph by label or id (ignoring case; exact, then prefix, then word start, then anywhere),
+  also inside collapsed groups, with the containers above each and the box that shows it (`FindAnswer`); `digest`
+  answers the fingerprint of the snapshot's source graph. In the view controller: `find` (`state.search`), `focus(id)`
+  (opens what hides the node as one undo step, selects it, `state.focus` with the bounds for the host's camera),
+  `bookmark()` (the view as a value: intent, highlight, selection, graph digest) and `openBookmark(bookmark)` (one undo
+  step; another graph's bookmark is refused unless forced), `encodeBookmark`/`decodeBookmark` for URLs. Playground:
+  *Find* with a list of matches (a click focuses), *Link to this view* (`#view=…` in the address, opened on load).
+- View details (provisional): the read-only operation `details` (`nodeId` or `edgeId`, optional `limit`) answers what
+  the engine knows about a node or an edge and a host cannot see in the scene: the containers above a node, the box
+  that shows it (itself, the collapsed container it is in, or none) with its absolute bounds, what a box holds
+  (children, all nodes inside), its edges in and out; for a drawn line its visible ends, length, bends, bundle, and the
+  edges of the source graph it stands for in its own direction and in the other (at most `limit` ids each, counts
+  complete); for an edge of the source graph the line that carries it. Typed (`DetailsAnswer`), in sessions and in
+  the typed protocol. `session.details(target)`; in the view controller `select(target)` keeps `state.details` up to
+  date after every change, and `hover(target)` holds what the pointer is over (no engine call). Domain attributes stay
+  with the host. The playground shows the details of the selected node or edge.
+- A headless view controller in `@arqlet/engine-client` (provisional, request 31): `createViewController(session)` keeps
+  what a user does between two scenes in one frozen state object (`scene`, `diff`, `busy`, `error`, `highlight`,
+  `hide`, `canBack`, `canForward`) with `subscribe`, so a React binding is `useSyncExternalStore(view.subscribe,
+  view.getState)`. Operations: `import`, `open`/`close`/`toggle`, `showRest` (the next page of a `+N more` box),
+  `reveal`, `filter`, `trace`/`neighbourhood` kept as the highlight (asked again after every change) until
+  `clearHighlight`, `revealHighlight`, `back`/`forward` over the view's decisions (the engine's `intent`/`restore`, one
+  step each), `apply` for any other change, and `cancel` (drops the steps not started). Every step carries the
+  difference between the scenes before and after it (`sceneDiff`: nodes and routes added, removed, changed). Also from
+  `arqlet`. Not yet: refinement on a second worker.
+- The view controller takes snapshots a host made itself (`adopt`: a drag, a refinement, a loaded document; with
+  `remember` as an undo step, with `forget` for another graph), merges a follow-up into the last step
+  (`apply(..., {merge: true})`), applies steps that change no decision without remembering them (`remember: false`),
+  names the next steps (`backLabel`, `forwardLabel`) and can leave out the scene (`scenes: false`, for a host that draws
+  from the snapshot). An import or a forgetting `adopt` no longer waits for the steps still under way; they resolve as
+  cancelled. `session.load(snapshot)` continues a layout session from a snapshot.
+
+### Changed
+
+- The playground runs its view through the view controller: every change, the undo stack (now also covering the
+  three modes through `execute`), drags and refinement results handed over with `adopt`.
+- The remembered state (`intent`) keeps the filter (`hidden`), so a step back undoes a filter.
+
 ## 0.7.0 — 2026-11-21
 
 Large views read faster and denser. A dense flat graph lays out in 0.58 s instead of 1.4 s, a graph with long edges and

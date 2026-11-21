@@ -234,6 +234,45 @@ await session.reveal(path.nodes);                            // only as far as n
 In the playground: section *Path* (from, to, *Trace*, *Reveal path*, *Fade others*,
 *Show a node*).
 
+### Details
+
+`details` (read only) tells what the engine knows about a node or an edge and the scene
+does not show: the groups above a node, the box that shows it when it is inside a
+collapsed group, what a box holds, and for a drawn line the edges of the graph it stands
+for in each direction. Domain attributes stay with the host, which looks them up by id.
+
+```js
+const {node} = await session.details({nodeId: 'a'});         // node.parents, node.shownAs, node.bounds, node.children
+const {route} = await session.details({edgeId: 'e7'});       // route.edges, route.edgeCount, route.opposite
+```
+
+In the playground: select a node or an edge; the line *Engine:* below the edge details.
+
+### Search, focus and bookmarks
+
+`find` searches the whole graph by name or id, also inside collapsed groups, and names
+the box that shows each match. The view controller's `focus` opens what hides a node
+(one undo step), selects it and hands the host the bounds to center the camera on.
+`bookmark` keeps the view (open groups, pages, filter, highlight, selection) as a value,
+`encodeBookmark` turns it into URL text, and `openBookmark` opens it again; a bookmark of
+another graph is refused (the engine's `digest`).
+
+```js
+const {matches} = await session.find('parser', {limit: 10}); // best first: exact, prefix, word start, anywhere
+await view.focus(matches[0].id);                              // state.focus = {nodeId, bounds, shownAs, serial}
+location.hash = `view=${encodeBookmark((await view.bookmark()).bookmark)}`;
+```
+
+In the playground: *Find* in the section *Path*, and *Link to this view*.
+
+`navigate(direction)` moves the selection by keyboard: to the nearest box left, right, up
+or down, to the container or its first child, between siblings, or along an edge; the
+camera follows `state.focus`. In the playground: arrows, Shift+arrows, `[` and `]`, Enter.
+
+`peek` looks into a collapsed container without opening it: its contents laid out on
+their own as a small scene, and per child the edges that cross its border. In the
+playground: *Look inside* or Space on a selected closed container.
+
 ### Filter
 
 `filter` hides nodes by kind or id (each with what it holds) and edges by kind, without

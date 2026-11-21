@@ -2,6 +2,7 @@ export * from '@arqlet/engine-client/engine.js';
 export * from '@arqlet/engine-client/wasm-client.js';
 export * from '@arqlet/engine-client/elk.js';
 export * from '@arqlet/engine-client/session.js';
+export * from '@arqlet/engine-client/view-controller.js';
 export * from '@arqlet/engine-client/presets.js';
 export * from '@arqlet/viewer/svg.js';
 export * from '@arqlet/viewer/scene.js';
