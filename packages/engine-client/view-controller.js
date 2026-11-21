@@ -38,13 +38,129 @@ export function sceneDiff(before, after) {
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
- * Creates a view controller on `session` (from `createSession`). `page` is how many children `showRest` reveals at a
- * time; `historyLimit` how many steps back are kept.
+ * Provisional (keyboard navigation): the node of `scene` that `direction` leads to from node `from`, or null; pure and
+ * deterministic (ties by id). `left`, `right`, `up`, `down`: the nearest box whose centre lies that way (within a cone
+ * of twice the main distance first, then anywhere that way), leaving out the node's own containers and contents;
+ * `parent`; `child`: the first child in reading order (top to bottom, then left to right); `next`, `previous`: the
+ * neighbouring sibling in reading order, wrapping; `out`, `in`: the nearest node a drawn edge leads to or comes from.
+ * Without `from`, the first top-level node in reading order.
  */
-export function createViewController(session, {page = 12, historyLimit = 50} = {}) {
+export function navigateScene(scene, from, direction) {
+  const nodes = scene?.nodes ?? [];
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const centre = n => ({x: n.bounds.x + n.bounds.width / 2, y: n.bounds.y + n.bounds.height / 2});
+  const reading = (a, b) => a.bounds.y - b.bounds.y || a.bounds.x - b.bounds.x || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const first = list => [...list].sort(reading)[0]?.id ?? null;
+  const node = from ? byId.get(from) : null;
+  if (!node) return first(nodes.filter(n => !n.parentId || !byId.has(n.parentId)));
+  const nearest = (candidates, score) => {
+    let best = null;
+    let bestScore = Infinity;
+    for (const c of candidates) {
+      const s = score(c);
+      if (s === null) continue;
+      if (s < bestScore || (s === bestScore && c.id < best.id)) {
+        best = c;
+        bestScore = s;
+      }
+    }
+    return best?.id ?? null;
+  };
+  const here = centre(node);
+  switch (direction) {
+    case 'parent':
+      return node.parentId && byId.has(node.parentId) ? node.parentId : null;
+    case 'child':
+      return first(nodes.filter(n => n.parentId === node.id));
+    case 'next':
+    case 'previous': {
+      const siblings = nodes.filter(n => (n.parentId ?? null) === (node.parentId ?? null)).sort(reading);
+      if (siblings.length < 2) return null;
+      const at = siblings.findIndex(n => n.id === node.id);
+      const step = direction === 'next' ? 1 : siblings.length - 1;
+      return siblings[(at + step) % siblings.length].id;
+    }
+    case 'out':
+    case 'in': {
+      const ends = new Set((scene.routes ?? [])
+        .filter(r => (direction === 'out' ? r.source : r.target) === node.id)
+        .map(r => (direction === 'out' ? r.target : r.source))
+        .filter(id => id !== node.id && byId.has(id)));
+      return nearest([...ends].map(id => byId.get(id)), c => {
+        const p = centre(c);
+        return (p.x - here.x) ** 2 + (p.y - here.y) ** 2;
+      });
+    }
+    case 'left':
+    case 'right':
+    case 'up':
+    case 'down': {
+      // Not its own containers (they hold it) nor its contents (`child` goes there).
+      const above = new Set();
+      for (let at = node.parentId; at && byId.has(at) && !above.has(at); at = byId.get(at).parentId) above.add(at);
+      const inside = c => {
+        for (let at = c.parentId, steps = 0; at && steps <= nodes.length; at = byId.get(at)?.parentId, steps++) {
+          if (at === node.id) return true;
+        }
+        return false;
+      };
+      const candidates = nodes.filter(c => c.id !== node.id && !above.has(c.id) && !inside(c));
+      const axis = c => {
+        const p = centre(c);
+        const dx = p.x - here.x;
+        const dy = p.y - here.y;
+        const main = direction === 'right' ? dx : direction === 'left' ? -dx : direction === 'down' ? dy : -dy;
+        const side = Math.abs(direction === 'left' || direction === 'right' ? dy : dx);
+        return {main, side};
+      };
+      const inCone = nearest(candidates, c => {
+        const {main, side} = axis(c);
+        return main > 0 && side <= 2 * main ? main + 2 * side : null;
+      });
+      return inCone ?? nearest(candidates, c => {
+        const {main, side} = axis(c);
+        return main > 0 ? main + 2 * side : null;
+      });
+    }
+    default:
+      throw Error(`Unknown direction: ${direction}`);
+  }
+}
+
+/**
+ * A bookmark as text for a URL (base64url of its JSON, UTF-8), and back. `decodeBookmark` throws on text that is not one.
+ */
+export function encodeBookmark(bookmark) {
+  const bytes = new TextEncoder().encode(JSON.stringify(bookmark));
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export function decodeBookmark(text) {
+  const base64 = text.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
+  const bookmark = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, c => c.charCodeAt(0))));
+  if (bookmark?.version !== 1 || typeof bookmark.intent !== 'object') throw Error('Not a view bookmark.');
+  return bookmark;
+}
+
+/**
+ * Creates a view controller on `session` (from `createSession`). `page` is how many children `showRest` reveals at a
+ * time; `historyLimit` how many steps back are kept; with `scenes: false` the state carries no scene and no diff (a host
+ * that draws from the snapshot itself saves the engine call); `detailLimit` caps the edge ids of a line's details.
+ *
+ * `refine` (provisional) is the second engine for refinement, typically another worker (`workerRefineRun`): a function
+ * `(request, {onPublication, signal}) => Promise<answer>` that runs a refinement request on a snapshot the controller
+ * sends and calls `onPublication(publication)` for every intermediate result of a progressive one. It runs beside the
+ * interactive steps, never in their queue; `publicationInterval` (ms) throttles how often intermediate results are shown.
+ */
+export function createViewController(session, {page = 12, historyLimit = 50, scenes = true, detailLimit, refine: refineRun,
+  publicationInterval = 120} = {}) {
   let state = Object.freeze({
     snapshot: null, scene: null, diff: null, busy: false, error: null,
-    highlight: null, hide: {}, canBack: false, canForward: false, steps: 0,
+    highlight: null, selection: null, details: null, hover: null, search: null, focus: null, peek: null, refining: null, refined: null,
+    discarded: 0, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
   });
   const listeners = new Set();
   const publish = patch => {
@@ -58,14 +174,19 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
   let pending = 0;
 
   // Runs `step` after every step before it; a step queued before `cancel()` and not yet started is dropped.
-  const enqueue = step => {
+  // `fresh`: the step starts a new chain (another view), not waiting for the steps before it, which no longer publish.
+  const enqueue = (step, {fresh = false} = {}) => {
+    if (fresh) {
+      generation += 1;
+      queue = Promise.resolve();
+    }
     const mine = generation;
     pending += 1;
     if (!state.busy) publish({busy: true});
     const result = queue.then(async () => {
       if (mine !== generation) return {ok: false, cancelled: true};
       try {
-        return await step();
+        return await step(() => mine === generation);
       } catch (error) {
         publish({error: error.message ?? String(error)});
         return {ok: false, error: error.message ?? String(error)};
@@ -76,6 +197,12 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
     });
     queue = result.catch(() => {});
     return result;
+  };
+
+  // The fingerprint of the graph (`digest`), for bookmarks; null when the engine does not answer it.
+  const digest = async () => {
+    const answer = await session.apply({op: 'digest'});
+    return answer.ok ? answer.digest ?? null : null;
   };
 
   const intent = async () => {
@@ -93,49 +220,121 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
     return answer.ok ? {...highlight, answer} : null;
   };
 
-  // After an applied change: the new scene, its difference to the one before, the highlight asked again.
-  const settle = async (extra = {}) => {
-    const scene = await session.scene();
+  // The details of the selection on the current view (the box that shows a node and the edges a line stands for depend on
+  // what is open); null when the selection is gone (a drawn line the change removed).
+  const detailsOf = async selection => {
+    if (!selection) return null;
+    const answer = await session.details(selection, detailLimit === undefined ? {} : {limit: detailLimit});
+    return answer.ok ? answer : null;
+  };
+
+  // After an applied change: the new scene, its difference to the one before, the highlight and the details asked again.
+  const settle = async (extra = {}, current = () => true) => {
+    const scene = scenes ? await session.scene() : null;
     const highlight = await refreshHighlight(state.highlight);
+    const details = await detailsOf(state.selection);
+    if (!current()) return;
     publish({
-      snapshot: session.snapshot, scene, diff: sceneDiff(state.scene, scene), highlight, error: null,
-      canBack: back.length > 0, canForward: forward.length > 0, steps: state.steps + 1, ...extra,
+      details, selection: details ? state.selection : null,
+      snapshot: session.snapshot, scene, diff: scenes ? sceneDiff(state.scene, scene) : null, highlight, error: null,
+      canBack: back.length > 0, canForward: forward.length > 0,
+      backLabel: back.at(-1)?.label ?? null, forwardLabel: forward.at(-1)?.label ?? null, steps: state.steps + 1, ...extra,
     });
   };
 
-  // A change the user makes: its decisions before and after are remembered, so that `back` undoes it.
-  const change = (label, run, extra = () => ({})) => enqueue(async () => {
+  // The refinement under way on the second engine: its job, the state it started from, the last publication applied.
+  let job = null;
+  let jobs = 0;
+  // Ends the refinement under way (its later results are dropped); `reason` is reported in `state.refined`.
+  const stopRefinement = reason => {
+    if (!job) return;
+    const stopped = job;
+    job = null;
+    clearTimeout(stopped.timer);
+    stopped.abort.abort();
+    publish({refining: null, refined: {op: stopped.op, applied: stopped.applied > 0, [reason]: true}});
+  };
+  // Whether a refinement result still fits the view: the view is the one the job started from (or the job's own last
+  // publication), and the result is the next layout of it.
+  const fits = (j, snapshot) => {
+    const now = session.snapshot;
+    const shown = j.base.layoutVersion + (j.applied > 0 ? 1 : 0);
+    return !!now && !!snapshot && now.revision === j.base.revision && (now.layoutVersion ?? 0) === shown
+      && snapshot.revision === j.base.revision && snapshot.baseRevision === j.base.revision
+      && (snapshot.layoutVersion ?? 0) === j.base.layoutVersion + 1;
+  };
+  // Applies a refinement result after the steps queued before it; a result the view has moved away from is discarded
+  // and counted.
+  const applyRefined = (j, snapshot, final) => enqueue(async current => {
+    if (job !== j) return {ok: false, stale: true};
+    if (!fits(j, snapshot)) {
+      if (final) job = null;
+      publish({discarded: state.discarded + 1, ...(final ? {refining: null, refined: {op: j.op, applied: false, stale: true}} : {})});
+      return {ok: false, stale: true};
+    }
+    const loaded = await session.load(snapshot);
+    if (!current()) return {ok: false, cancelled: true};
+    if (!loaded.ok) {
+      publish({error: loaded.error ?? 'The refined layout was refused.'});
+      return loaded;
+    }
+    j.applied += 1;
+    if (final) job = null;
+    j.onApplied?.(snapshot, {final, shown: j.applied});
+    await settle(final
+      ? {refining: null, refined: {op: j.op, applied: true, optimization: snapshot.optimization ?? null}}
+      : {refining: {op: j.op, jobId: j.id, shown: j.applied}}, current);
+    return {ok: true, applied: true};
+  });
+
+  // A change the user makes: its decisions before and after are remembered (unless `remember` is false), so that `back`
+  // undoes it. A refinement under way is stopped: its result would be for the view before the change.
+  const change = (label, run, extra = () => ({}), remember = true, merge = false) => enqueue(async current => {
     if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
-    const before = await intent();
+    stopRefinement('cancelled');
+    const before = remember ? await intent() : null;
     const result = await run();
+    if (!current()) return {ok: false, cancelled: true};
     if (!result.ok) {
       publish({error: result.error ?? 'The engine refused the change.'});
       return result;
     }
-    const after = await intent();
-    if (!same(before, after)) {
+    const after = remember ? await intent() : null;
+    if (!current()) return {ok: false, cancelled: true};
+    // A look into a container belongs to the view before the change.
+    if (state.peek) state = Object.freeze({...state, peek: null});
+    if (remember && merge && back.length) {
+      // A follow-up of the last change (such as a container keeping the size a drop gave it): one entry for both.
+      const last = back.at(-1);
+      last.after = after;
+      if (same(last.before, last.after)) back.pop();
+      forward = [];
+    } else if (remember && !same(before, after)) {
       back.push({label, before, after});
       if (back.length > historyLimit) back.shift();
       forward = [];
     }
-    await settle(extra());
+    await settle(extra(), current);
     return result;
   });
 
   // Back and forward: the engine restores the remembered decisions; a refused restore keeps the entry.
-  const step = direction => enqueue(async () => {
+  const step = direction => enqueue(async current => {
+    stopRefinement('cancelled');
     const from = direction < 0 ? back : forward;
     const entry = from.at(-1);
     if (!entry) return {ok: false, error: direction < 0 ? 'Nothing to undo.' : 'Nothing to redo.'};
     const result = await session.apply({op: 'restore', intent: direction < 0 ? entry.before : entry.after});
+    if (!current()) return {ok: false, cancelled: true};
     if (!result.ok) {
       publish({error: result.error ?? 'The engine refused the restore.'});
       return result;
     }
     from.pop();
     (direction < 0 ? forward : back).push(entry);
+    if (state.peek) state = Object.freeze({...state, peek: null});
     const hidden = (direction < 0 ? entry.before : entry.after).hidden ?? {};
-    await settle({hide: hidden});
+    await settle({hide: hidden}, current);
     return result;
   });
 
@@ -151,19 +350,21 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
 
     /** Lays out `graph` and starts the view on it (see `session.import`); the history and the highlight start empty. */
     import(graph, init) {
-      generation += 1;
+      stopRefinement('cancelled');
       back = [];
       forward = [];
-      return enqueue(async () => {
+      return enqueue(async current => {
         const result = await session.import(graph, init);
+        if (!current()) return {ok: false, cancelled: true};
         if (!result.ok) {
           publish({error: result.error ?? 'The import failed.'});
           return result;
         }
-        state = Object.freeze({...state, scene: null, highlight: null, hide: {}, steps: 0});
-        await settle();
+        state = Object.freeze({...state, scene: null, highlight: null, selection: null, details: null, hover: null,
+          search: null, focus: null, peek: null, hide: {}, steps: 0});
+        await settle({}, current);
         return result;
-      });
+      }, {fresh: true});
     },
 
     /** Opens container `id` (nothing when it is open). */
@@ -223,13 +424,286 @@ export function createViewController(session, {page = 12, historyLimit = 50} = {
     /** Clears the highlight. */
     clearHighlight() { if (state.highlight) publish({highlight: null}); },
 
+    /**
+     * Selects a node (`{nodeId}`) or an edge (`{edgeId}`: a drawn line or an edge of the source graph), or nothing
+     * (`null`): `state.details` then holds what the engine knows about it (see `session.details`), asked again after
+     * every change until the selection is cleared. How it is shown (a panel, a tooltip, a zoom to `details.node.bounds`)
+     * is the host's; domain attributes the host looks up by id. Not a step for `back`.
+     */
+    select(target) {
+      const selection = target ? ('nodeId' in target ? {nodeId: target.nodeId} : {edgeId: target.edgeId}) : null;
+      if (!selection) {
+        if (state.selection || state.details) publish({selection: null, details: null});
+        return Promise.resolve({ok: true});
+      }
+      return enqueue(async current => {
+        const answer = await session.details(selection, detailLimit === undefined ? {} : {limit: detailLimit});
+        if (!current()) return {ok: false, cancelled: true};
+        if (!answer.ok) {
+          publish({error: answer.error ?? 'No details.'});
+          return answer;
+        }
+        publish({selection, details: answer, error: null});
+        return answer;
+      });
+    },
+
+    /**
+     * Finds nodes by label or id (see `session.find`), also those the view hides; the answer is also `state.search`
+     * until `clearSearch`. Read only.
+     */
+    find(query, init) {
+      return enqueue(async current => {
+        const answer = await session.find(query, init);
+        if (!current()) return {ok: false, cancelled: true};
+        if (!answer.ok) {
+          publish({error: answer.error ?? 'Nothing found.'});
+          return answer;
+        }
+        publish({search: {query, answer}, error: null});
+        return answer;
+      });
+    },
+
+    /**
+     * A look into the collapsed container `nodeId` without opening it (see `session.peek`): `state.peek` holds its contents
+     * as a small scene until `closePeek` or the next change. Read only, not a step for `back`.
+     */
+    peek(nodeId, init) {
+      return enqueue(async current => {
+        const answer = await session.peek(nodeId, init);
+        if (!current()) return {ok: false, cancelled: true};
+        if (!answer.ok) {
+          publish({error: answer.error ?? 'Nothing to look into.'});
+          return answer;
+        }
+        publish({peek: {nodeId, answer}, error: null});
+        return answer;
+      });
+    },
+
+    /** Ends the look into a container. */
+    closePeek() { if (state.peek) publish({peek: null}); },
+
+    /** Clears the search. */
+    clearSearch() { if (state.search) publish({search: null}); },
+
+    /**
+     * Brings node `nodeId` into view: opens the groups that hide it (a step for `back`; not with `reveal: false`, and only
+     * as far as needed unless `partial: false`), selects it (`state.details`), and sets `state.focus` to
+     * `{nodeId, bounds, serial}`: the bounds of the box that shows it, for the host's camera to center or fit (`serial`
+     * counts focus requests, so the same node can be focused again). `bounds` is null when the view hides it anyway (a
+     * filter).
+     */
+    async focus(nodeId, {reveal = true, partial} = {}) {
+      let answer = await controller.select({nodeId});
+      if (!answer.ok) return answer;
+      if (reveal && answer.node.shownAs !== nodeId) {
+        const shown = await change(`Show ${nodeId}`,
+          () => session.reveal([nodeId], partial === undefined ? undefined : {partial}));
+        if (!shown.ok) return shown;
+        answer = state.details ?? answer;
+      }
+      const node = answer.node;
+      publish({focus: {nodeId, bounds: node.bounds ?? null, shownAs: node.shownAs ?? null, serial: (state.focus?.serial ?? 0) + 1}});
+      return {ok: true, focus: state.focus};
+    },
+
+    /**
+     * Keyboard navigation: moves the selection from the selected node (or, without one, to the first top-level node)
+     * the way `direction` says (see `navigateScene`) and sets `state.focus` for the camera, without opening anything
+     * (not a step for `back`). `{ok: false, none: true}` when nothing lies that way; a closed container has no child to go
+     * to until it is opened.
+     */
+    async navigate(direction) {
+      const step = await enqueue(async current => {
+        const scene = state.scene ?? await session.scene();
+        if (!current()) return {ok: false, cancelled: true};
+        if (!scene) return {ok: false, error: 'Nothing imported yet.'};
+        const from = state.selection?.nodeId ?? null;
+        const nodeId = navigateScene(scene, from, direction);
+        if (!nodeId) {
+          const node = scene.nodes.find(n => n.id === from);
+          return {ok: false, none: true, ...(direction === 'child' && node?.collapsed ? {collapsed: true} : {})};
+        }
+        return {ok: true, nodeId};
+      });
+      if (!step.ok) return step;
+      const focused = await controller.focus(step.nodeId, {reveal: false});
+      return focused.ok ? {ok: true, nodeId: step.nodeId, focus: focused.focus} : focused;
+    },
+
+    /**
+     * Refines the current view on the second engine (option `refine`): `{op: 'refine'}` by default, or
+     * `refineProgressive` (intermediate results shown as they arrive, at most one per `publicationInterval`),
+     * `structuredRefine`, with any further fields of the request (such as `threads`). It starts after the steps queued
+     * before it and runs beside the interactive ones; `state.refining` names it meanwhile. A result is applied only if
+     * the view is still the one it started from (otherwise `state.refined.stale` and `state.discarded` counts it); a
+     * change, a step back or a new refinement stops it (`cancelled`). Not a step for `back`: it changes the layout, not a
+     * decision. `onApplied(snapshot, {final, shown})` is called for every result applied (for a host that draws from the
+     * snapshot itself).
+     */
+    refine(request = {}, {onApplied} = {}) {
+      if (!refineRun) return Promise.resolve({ok: false, error: 'No refinement engine (option refine).'});
+      const op = request.op ?? 'refine';
+      return enqueue(async () => {
+        if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        stopRefinement('cancelled');
+        const snapshot = session.snapshot;
+        const j = {id: `refine-${++jobs}`, op, base: {revision: snapshot.revision, layoutVersion: snapshot.layoutVersion ?? 0},
+          applied: 0, lastSequence: 0, pending: null, timer: null, abort: new AbortController(), onApplied};
+        job = j;
+        publish({refining: {op, jobId: j.id, shown: 0}});
+        return {ok: true, j, snapshot};
+      }).then(started => {
+        if (!started.ok) return started;
+        const {j, snapshot} = started;
+        // Intermediate results: the first at once, then the newest one per interval.
+        const showPending = () => {
+          j.timer = null;
+          const next = j.pending;
+          j.pending = null;
+          if (next && job === j) {
+            applyRefined(j, next, false);
+            j.timer = setTimeout(showPending, publicationInterval);
+          }
+        };
+        const onPublication = publication => {
+          if (job !== j || publication?.jobId !== j.id || !(publication.sequence > j.lastSequence)) return;
+          j.lastSequence = publication.sequence;
+          j.pending = publication.snapshot;
+          if (j.timer === null) showPending();
+        };
+        return Promise.resolve(refineRun({...request, op, jobId: j.id, snapshot, expectedRevision: j.base.revision,
+          expectedLayoutVersion: j.base.layoutVersion}, {onPublication, signal: j.abort.signal}))
+          .then(answer => {
+            if (job !== j) return {ok: false, cancelled: true};
+            clearTimeout(j.timer);
+            j.timer = null;
+            if (!answer?.ok) {
+              job = null;
+              publish({refining: null, refined: {op, applied: j.applied > 0, error: answer?.error ?? 'The refinement failed.'}});
+              return {ok: false, error: answer?.error};
+            }
+            return applyRefined(j, answer.snapshot, true).then(r => ({...r, answer}));
+          }, error => {
+            if (job !== j) return {ok: false, cancelled: true};
+            job = null;
+            publish({refining: null, refined: {op, applied: j.applied > 0, error: error.message ?? String(error)}});
+            return {ok: false, error: error.message ?? String(error)};
+          });
+      });
+    },
+
+    /** Stops the refinement under way (`state.refined.cancelled`); its later results are dropped. */
+    cancelRefinement() { stopRefinement('cancelled'); },
+
+    /**
+     * The view as a value to keep or share: the decisions (the engine's intent: open groups, pages, filter, options), the
+     * highlight and the selection, and the digest of the graph it belongs to. `encodeBookmark` makes it text for a URL.
+     */
+    bookmark() {
+      return enqueue(async () => {
+        if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        const h = state.highlight;
+        const highlight = h ? {kind: h.kind, ...(h.kind === 'trace' ? {from: h.from, to: h.to} : {nodeId: h.nodeId}),
+          ...(h.init ? {init: h.init} : {})} : null;
+        const bookmark = {version: 1, digest: await digest(), intent: await intent(),
+          ...(highlight ? {highlight} : {}), ...(state.selection ? {selection: state.selection} : {})};
+        return {ok: true, bookmark};
+      });
+    },
+
+    /**
+     * Opens a bookmark on the current graph (a step for `back`): its decisions, highlight and selection. A bookmark of
+     * another graph (another digest) is refused unless `force`.
+     */
+    openBookmark(bookmark, {force = false} = {}) {
+      return enqueue(async current => {
+        if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        if (bookmark?.version !== 1 || typeof bookmark.intent !== 'object') return {ok: false, error: 'Not a view bookmark.'};
+        const now = bookmark.digest && !force ? await digest() : null;
+        if (now && bookmark.digest !== now) {
+          const error = 'The bookmark belongs to another graph.';
+          publish({error});
+          return {ok: false, error};
+        }
+        stopRefinement('cancelled');
+        const before = await intent();
+        const result = await session.apply({op: 'restore', intent: bookmark.intent});
+        if (!current()) return {ok: false, cancelled: true};
+        if (!result.ok) {
+          publish({error: result.error ?? 'The engine refused the bookmark.'});
+          return result;
+        }
+        const after = await intent();
+        if (!same(before, after)) {
+          back.push({label: 'Open bookmark', before, after});
+          if (back.length > historyLimit) back.shift();
+          forward = [];
+        }
+        state = Object.freeze({...state, highlight: bookmark.highlight ?? null, selection: bookmark.selection ?? null});
+        await settle({hide: bookmark.intent.hidden ?? {}}, current);
+        return result;
+      });
+    },
+
+    /**
+     * What the pointer is over (`{nodeId}`, `{edgeId}` or `null`), for a renderer's hover state (a tooltip from the
+     * scene's label, a lighter outline); no engine call. A tooltip with the engine's facts asks `select` or
+     * `session.details` itself.
+     */
+    hover(target) {
+      const next = target ? ('nodeId' in target ? {nodeId: target.nodeId} : {edgeId: target.edgeId}) : null;
+      if (same(next, state.hover)) return;
+      publish({hover: next});
+    },
+
     /** Undoes the last change (its decisions before it are restored). */
     back() { return step(-1); },
     /** Redoes the last undone change. */
     forward() { return step(1); },
 
-    /** Any other change of the engine's protocol (see `session.apply`), remembered for `back` under `label`. */
-    apply(request, label = request.op) { return change(label, () => session.apply(request)); },
+    /**
+     * Any other change of the engine's protocol (see `session.apply`), remembered for `back` under `label` (not with
+     * `remember: false`, for steps that change no decision, such as settling).
+     */
+    apply(request, label = request.op, {remember = true, merge = false} = {}) {
+      return change(label, () => session.apply(request), () => ({}), remember, merge);
+    },
+
+    /**
+     * Continues from `snapshot`, made by the host (a drag, a refinement, a loaded document); with `forget` the history and
+     * the highlight start empty (another graph).
+     */
+    adopt(snapshot, {forget = false, remember = null} = {}) {
+      return enqueue(async current => {
+        // With `remember` (a label) the change from the session's snapshot to this one is remembered for `back`.
+        stopRefinement('cancelled');
+        const before = remember && session.snapshot ? await intent() : null;
+        const result = await session.load(snapshot, {reset: forget});
+        if (!current()) return {ok: false, cancelled: true};
+        if (!result.ok) {
+          publish({error: result.error ?? 'The snapshot was refused.'});
+          return result;
+        }
+        if (forget) {
+          back = [];
+          forward = [];
+          state = Object.freeze({...state, highlight: null, selection: null, details: null, hover: null, search: null,
+            focus: null, peek: null, hide: {}});
+        } else if (before) {
+          const after = await intent();
+          if (!same(before, after)) {
+            back.push({label: remember, before, after});
+            if (back.length > historyLimit) back.shift();
+            forward = [];
+          }
+        }
+        await settle({hide: snapshot.options?.hidden ?? (forget ? {} : state.hide)}, current);
+        return result;
+      }, {fresh: forget});
+    },
 
     /**
      * Drops the steps queued and not started yet (they resolve `{ok: false, cancelled: true}`); a step under way finishes,

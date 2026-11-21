@@ -107,6 +107,172 @@ pub(crate) fn navigable(snapshot: &Snapshot) -> std::borrow::Cow<'_, arqlet_mode
     }
 }
 
+/// Provisional: how the current view shows the source graph: the visible box of every node (itself, or the outermost
+/// collapsed container above it) and the drawn line that carries every edge. Built once per request (`trace`,
+/// `neighbourhood`, `details`).
+pub(crate) struct ViewMap {
+    pub(crate) parent: BTreeMap<String, Option<String>>,
+    pub(crate) visible: BTreeSet<String>,
+    collapsed: BTreeSet<String>,
+    /// The ends of every edge of the source graph (with buses as nodes).
+    ends: BTreeMap<String, (String, Option<String>)>,
+    /// The drawn edges (and taps of drawn bus lines) by id: their visible ends, and their kinds.
+    pub(crate) drawn: BTreeMap<String, (String, String)>,
+    drawn_kind: BTreeMap<String, String>,
+    /// The drawn edges between two visible nodes, in id order (one direction per key).
+    pairs: BTreeMap<(String, String), Vec<String>>,
+    trunk_taps: BTreeSet<String>,
+    hub_refs: BTreeSet<String>,
+}
+
+impl ViewMap {
+    pub(crate) fn new(
+        snapshot: &Snapshot,
+        canonical: &arqlet_model::Graph,
+    ) -> Result<ViewMap, String> {
+        let view = structured(canonical, &snapshot.options)?;
+        let parent = view
+            .nodes
+            .iter()
+            .map(|n| (n.id.clone(), n.parent_id.clone()))
+            .collect();
+        // A drawn bus line (`Bus::taps`) is shown as its bus node is, its taps as the bus's edges.
+        let lines: Vec<&arqlet_model::Bus> = snapshot
+            .graph
+            .buses
+            .iter()
+            .filter(|b| snapshot.bus_lines.contains_key(&b.id))
+            .collect();
+        let visible = snapshot
+            .graph
+            .nodes
+            .iter()
+            .map(|n| n.id.clone())
+            .chain(lines.iter().map(|b| b.id.clone()))
+            .collect();
+        let ends = canonical
+            .edges
+            .iter()
+            .map(|e| (e.id.clone(), (e.source.clone(), e.target.clone())))
+            .collect();
+        let taps = || {
+            lines.iter().flat_map(|b| {
+                b.taps.iter().map(move |t| {
+                    let ends = if t.to_bus {
+                        (t.node.clone(), b.id.clone())
+                    } else {
+                        (b.id.clone(), t.node.clone())
+                    };
+                    (t.edge.clone(), ends, t.kind.clone())
+                })
+            })
+        };
+        let drawn: BTreeMap<String, (String, String)> = snapshot
+            .graph
+            .edges
+            .iter()
+            .filter_map(|e| Some((e.id.clone(), (e.source.clone(), e.target.clone()?))))
+            .chain(taps().map(|(id, ends, _)| (id, ends)))
+            .collect();
+        let drawn_kind = snapshot
+            .graph
+            .edges
+            .iter()
+            .map(|e| (e.id.clone(), e.kind.clone()))
+            .chain(taps().map(|(id, _, kind)| (id, kind)))
+            .collect();
+        let mut pairs: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
+        for (id, (x, y)) in &drawn {
+            pairs
+                .entry((x.clone(), y.clone()))
+                .or_default()
+                .push(id.clone());
+        }
+        // A tap of a bus drawn as a shared line (`busStyle: trunk`) is the drawn edge with its id.
+        let trunk_taps = snapshot
+            .graph
+            .buses
+            .iter()
+            .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
+            .flat_map(|b| b.edges.iter().cloned())
+            .collect();
+        // A reference to a hub (`hubRefs`) is drawn as a stub with the edge's id.
+        let hub_refs = snapshot.hub_refs.iter().map(|r| r.edge.clone()).collect();
+        Ok(ViewMap {
+            parent,
+            visible,
+            collapsed: snapshot.collapsed_ids.iter().cloned().collect(),
+            ends,
+            drawn,
+            drawn_kind,
+            pairs,
+            trunk_taps,
+            hub_refs,
+        })
+    }
+
+    /// The visible box that shows node `id`: the outermost visible node on its way up, a collapsed one first; `None` when
+    /// the view shows none of them.
+    pub(crate) fn owner(&self, id: &str) -> Option<String> {
+        let mut at = Some(id);
+        let mut shown = None;
+        while let Some(node) = at {
+            if self.visible.contains(node) {
+                // The outermost visible one: a node inside an expanded container is visible as itself.
+                shown.get_or_insert(node);
+                if self.collapsed.contains(node) {
+                    shown = Some(node);
+                }
+            }
+            at = self.parent.get(node).and_then(|p| p.as_deref());
+        }
+        shown.map(String::from)
+    }
+
+    /// The drawn line that carries edge `edge` of the source graph: the edge itself when it is drawn, else the edge the
+    /// view draws between the two visible ends (with communities, one per pair for both directions; with `kinds`, a
+    /// drawn edge of a followed kind first). `None` when the view does not show it.
+    pub(crate) fn route_of(&self, edge: &str, kinds: &Option<BTreeSet<String>>) -> Option<String> {
+        if self.hub_refs.contains(edge) {
+            return Some(edge.to_string());
+        }
+        if self.trunk_taps.contains(edge) && self.drawn.contains_key(edge) {
+            return Some(edge.to_string());
+        }
+        let (s, Some(t)) = self.ends.get(edge)? else {
+            return None;
+        };
+        let (a, b) = (self.owner(s)?, self.owner(t)?);
+        if a == b {
+            return None;
+        }
+        if self
+            .drawn
+            .get(edge)
+            .is_some_and(|(x, y)| *x == a && *y == b)
+        {
+            return Some(edge.to_string());
+        }
+        let none = Vec::new();
+        let forth = self.pairs.get(&(a.clone(), b.clone())).unwrap_or(&none);
+        let back = self.pairs.get(&(b, a)).unwrap_or(&none);
+        let mut between: Vec<&String> = forth.iter().chain(back.iter()).collect();
+        between.sort();
+        let followed = |id: &str| {
+            kinds.as_ref().is_none_or(|k| {
+                self.drawn_kind
+                    .get(id)
+                    .is_some_and(|kind| k.contains(kind.as_str()))
+            })
+        };
+        between
+            .iter()
+            .find(|id| followed(id))
+            .or_else(|| between.first())
+            .map(|id| (*id).clone())
+    }
+}
+
 pub(crate) fn on_view(
     snapshot: &Snapshot,
     path_nodes: &[String],
@@ -114,132 +280,15 @@ pub(crate) fn on_view(
     kinds: &Option<BTreeSet<String>>,
 ) -> Result<OnView, String> {
     let navigable = navigable(snapshot);
-    let canonical = navigable.as_ref();
-    // The visible node of every node of the view: itself, or the outermost collapsed container above it.
-    let view = structured(canonical, &snapshot.options)?;
-    let parent: BTreeMap<&str, Option<&str>> = view
-        .nodes
-        .iter()
-        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
-        .collect();
-    // A drawn bus line (`Bus::taps`) is shown as its bus node is, its taps as the bus's edges.
-    let lines: Vec<&arqlet_model::Bus> = snapshot
-        .graph
-        .buses
-        .iter()
-        .filter(|b| snapshot.bus_lines.contains_key(&b.id))
-        .collect();
-    let visible: BTreeSet<&str> = snapshot
-        .graph
-        .nodes
-        .iter()
-        .map(|n| n.id.as_str())
-        .chain(lines.iter().map(|b| b.id.as_str()))
-        .collect();
-    let owner = |id: &str| -> Option<String> {
-        let mut at = Some(id);
-        let mut shown = None;
-        while let Some(node) = at {
-            if visible.contains(node) {
-                // The outermost visible one: a node inside an expanded container is visible as itself.
-                shown.get_or_insert(node);
-                if snapshot.collapsed_ids.iter().any(|c| c == node) {
-                    shown = Some(node);
-                }
-            }
-            at = parent.get(node).copied().flatten();
-        }
-        shown.map(String::from)
-    };
-    let mut nodes: Vec<String> = path_nodes.iter().filter_map(|n| owner(n)).collect();
+    let map = ViewMap::new(snapshot, navigable.as_ref())?;
+    let mut nodes: Vec<String> = path_nodes.iter().filter_map(|n| map.owner(n)).collect();
     nodes.sort();
     nodes.dedup();
-    // The routes that carry the path's edges: the edge itself when it is drawn, else the edge the view draws between the
-    // two visible ends (with communities, one per pair for both directions).
-    let ends: BTreeMap<&str, (&str, Option<&str>)> = canonical
-        .edges
+    let routes: BTreeSet<String> = path_edges
         .iter()
-        .map(|e| (e.id.as_str(), (e.source.as_str(), e.target.as_deref())))
+        .filter_map(|e| map.route_of(e, kinds))
         .collect();
-    let taps = || {
-        lines.iter().flat_map(|b| {
-            b.taps.iter().map(move |t| {
-                let ends = if t.to_bus {
-                    (t.node.as_str(), b.id.as_str())
-                } else {
-                    (b.id.as_str(), t.node.as_str())
-                };
-                (t.edge.as_str(), ends, t.kind.as_str())
-            })
-        })
-    };
-    let drawn: BTreeMap<&str, (&str, &str)> = snapshot
-        .graph
-        .edges
-        .iter()
-        .filter_map(|e| Some((e.id.as_str(), (e.source.as_str(), e.target.as_deref()?))))
-        .chain(taps().map(|(id, ends, _)| (id, ends)))
-        .collect();
-    let drawn_kind: BTreeMap<&str, &str> = snapshot
-        .graph
-        .edges
-        .iter()
-        .map(|e| (e.id.as_str(), e.kind.as_str()))
-        .chain(taps().map(|(id, _, kind)| (id, kind)))
-        .collect();
-    let followed = |id: &str| {
-        kinds
-            .as_ref()
-            .is_none_or(|k| drawn_kind.get(id).is_some_and(|kind| k.contains(*kind)))
-    };
-    let mut routes = BTreeSet::new();
-    // A tap of a bus drawn as a shared line (`busStyle: trunk`) is the drawn edge with its id.
-    let trunk_taps: BTreeSet<&str> = snapshot
-        .graph
-        .buses
-        .iter()
-        .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
-        .flat_map(|b| b.edges.iter().map(String::as_str))
-        .collect();
-    // A reference to a hub (`hubRefs`) is drawn as a stub with the edge's id.
-    let hub_refs: BTreeSet<&str> = snapshot.hub_refs.iter().map(|r| r.edge.as_str()).collect();
-    for edge in path_edges {
-        if hub_refs.contains(edge.as_str()) {
-            routes.insert(edge.clone());
-            continue;
-        }
-        if trunk_taps.contains(edge.as_str()) && drawn.contains_key(edge.as_str()) {
-            routes.insert(edge.clone());
-            continue;
-        }
-        let (s, Some(t)) = ends[edge.as_str()] else {
-            continue;
-        };
-        let (Some(a), Some(b)) = (owner(s), owner(t)) else {
-            continue;
-        };
-        if a == b {
-            continue;
-        }
-        if drawn
-            .get(edge.as_str())
-            .is_some_and(|&(x, y)| x == a && y == b)
-        {
-            routes.insert(edge.clone());
-            continue;
-        }
-        // With edge kinds, a drawn edge of a followed kind first.
-        let mut between = drawn
-            .iter()
-            .filter(|(_, &(x, y))| (x == a && y == b) || (x == b && y == a))
-            .map(|(id, _)| *id);
-        let pair = between
-            .clone()
-            .find(|id| followed(id))
-            .or_else(|| between.next())
-            .map(String::from);
-        routes.extend(pair);
-    }
+    let (visible, parent, drawn) = (&map.visible, &map.parent, &map.drawn);
     // Hops from the path through the drawn edges (both ways), for fading: the path's visible nodes and the containers
     // around them are 0; nodes the path cannot reach are left out.
     let mut distance: BTreeMap<String, usize> = BTreeMap::new();
@@ -251,13 +300,13 @@ pub(crate) fn on_view(
                 distance.insert(n.to_string(), 0);
                 queue.push_back(n.to_string());
             }
-            at = parent.get(n).copied().flatten();
+            at = parent.get(n).and_then(|p| p.as_deref());
         }
     }
     let mut next: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-    for &(s, t) in drawn.values() {
-        next.entry(s).or_default().push(t);
-        next.entry(t).or_default().push(s);
+    for (s, t) in drawn.values() {
+        next.entry(s.as_str()).or_default().push(t.as_str());
+        next.entry(t.as_str()).or_default().push(s.as_str());
     }
     while let Some(n) = queue.pop_front() {
         let d = distance[&n];

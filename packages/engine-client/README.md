@@ -10,7 +10,13 @@ The Arqlet engine as WebAssembly (`arqlet.wasm`, included) and its JavaScript ac
   send only what changed), and `workerRun(worker)` / `httpRun(base)`, a worker or a backend as an asynchronous `run`;
 - `view-controller.js`: `createViewController(session)`, a headless view over a session (provisional): one state object
   with `subscribe` (for `useSyncExternalStore`), open/close, paging through `+N more`, filters, a path or neighbourhood
-  kept as the highlight, back and forward, and a scene diff per step; `sceneDiff(before, after)`;
+  kept as the highlight, the details of a selected node or edge (`select`, `state.details`) and the hover, back and
+  forward, search (`find`), `focus` for the camera, keyboard navigation (`navigate`, `navigateScene`), bookmarks
+  (`bookmark`, `openBookmark`, `encodeBookmark`), a look into a collapsed container (`peek`), refinement on a second
+  engine (`refine` option,
+  `workerRefineRun`), and a
+  scene diff per step, snapshots the host made (`adopt`);
+  `sceneDiff(before, after)`;
 - `presets.js`: `presetState` and `applyPreset`.
 
 Most users want the [`arqlet`](https://www.npmjs.com/package/arqlet) package, which re-exports these.
