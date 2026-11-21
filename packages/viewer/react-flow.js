@@ -1,5 +1,5 @@
 /** Pure adapter: no React dependency and no secondary routing. */
-export function toReactFlow(scene){
+export function toReactFlow(scene,{overlayNode=false}={}){
  if(scene.schemaVersion!==1)throw Error('Unsupported scene schema');
  const byId=new Map(scene.nodes.map(n=>[n.id,n])),handles=new Map(scene.nodes.map(n=>[n.id,[]]));
  for(const route of scene.routes){
@@ -18,5 +18,15 @@ export function toReactFlow(scene){
     data:{...n,handles:handles.get(n.id),showPorts:scene.showPorts}};
  });
  const edges=scene.routes.filter(r=>r.points.length>=2).map(r=>({id:r.id,source:r.source,target:r.target,sourceHandle:`source:${r.id}`,targetHandle:`target:${r.id}`,type:'arqlet',zIndex:1,deletable:false,data:r}));
- return {nodes,edges,labels:scene.labels,crossings:scene.crossings};
+ // What is neither a node nor an edge between two nodes, in flow coordinates (the scene's): bus bars with their taps, the
+ // junction dots where shared lines branch, and the stubs of hub references.
+ const overlays={busLines:scene.busLines??[],junctions:scene.junctions??[],hubRefs:scene.hubRefs??[]};
+ if(overlayNode&&(overlays.busLines.length||overlays.junctions.length||overlays.hubRefs.length)){
+  // One node over the whole scene that draws them (type `arqletOverlay`); `origin` turns flow into node coordinates.
+  const b=scene.bounds;
+  nodes.push({id:'arqlet:overlay',type:'arqletOverlay',position:{x:b.x,y:b.y},width:b.width,height:b.height,
+   style:{width:b.width,height:b.height,pointerEvents:'none'},draggable:false,selectable:false,connectable:false,
+   deletable:false,focusable:false,zIndex:1,data:{...overlays,origin:{x:b.x,y:b.y}}});
+ }
+ return {nodes,edges,labels:scene.labels,crossings:scene.crossings,...overlays};
 }
