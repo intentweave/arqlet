@@ -23,7 +23,7 @@ const graph = JSON.parse(readFileSync(new URL('../../examples/fixtures/small.jso
 const names = ['nodeBounds', 'nodeParent', 'nodeFlags', 'nodeKind', 'nodeShape', 'routeSource', 'routeTarget', 'routeWeight', 'routeFlags',
   'routeOffsets', 'routePoints', 'routeKind', 'routeBackWeight', 'routeMemberOffsets', 'routeMembers', 'portNode', 'portEdge', 'portFlags', 'portSide', 'portPosition', 'crossingEdge', 'crossingContainer',
   'crossingOrdinal', 'crossingSide', 'crossingFlags', 'crossingPosition', 'labelKind', 'labelBounds', 'rowNode', 'rowBounds',
-  'conflictKind', 'conflictNodeOffsets', 'conflictNodes', 'conflictRouteOffsets', 'conflictRoutes', 'junctions'];
+  'conflictKind', 'conflictNodeOffsets', 'conflictNodes', 'conflictRouteOffsets', 'conflictRoutes', 'junctions', 'nodeChildCount', 'nodeHiddenCount'];
 const tables = ['schemaVersion', 'routeKinds', 'revision', 'layoutVersion', 'nodeIds', 'nodeLabels', 'nodeKinds', 'routeIds', 'portIds', 'edgeIds', 'labelIds',
   'labelTexts', 'labelKinds', 'rowIds', 'rowLabels', 'conflictKinds', 'conflictReasons', 'buses', 'bounds', 'showPorts'];
 
@@ -290,4 +290,21 @@ test('a session whose engine has no columns (a backend) falls back to the scene'
   assert.deepEqual(Array.from(c.routeFlags), [2]);
   assert.deepEqual(Array.from(c.routeOffsets), [0, 2]);
   assert.deepEqual(Array.from(c.routePoints), [1, 1, 4, 2.5]);
+});
+
+test('the columns carry each container\'s child and hidden counts', {skip: !engine}, async () => {
+  const {createSession} = await import('./session.js');
+  for (const resident of [false, true]) {
+    if (resident && !engine.openSession) continue;
+    const session = createSession(engine, {resident});
+    await session.import(graph);
+    await session.collapse('root');
+    const c = await session.columns();
+    const i = c.nodeIds.indexOf('root');
+    assert.equal(c.nodeChildCount[i], 2, `resident ${resident}`);
+    assert.equal(c.nodeHiddenCount[i], 2);
+    const scene = await session.scene();
+    assert.equal(scene.nodes.find(n => n.id === 'root').childCount, 2);
+    await session.close();
+  }
 });

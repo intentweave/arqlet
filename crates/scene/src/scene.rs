@@ -124,6 +124,16 @@ pub struct SceneNode {
     /// The rows of the node's content, top to bottom (empty for a node without rows).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rows: Vec<SceneRow>,
+    /// Provisional: for a container, how many children it holds in the view (the communities and groups it adds count
+    /// as children; a partly shown container counts the children in its rest too). Omitted for a leaf.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub child_count: Option<usize>,
+    /// Provisional: of those, how many are not drawn: all of them for a collapsed container, those in its rest (`+N more`)
+    /// for a partly shown one. Omitted when every child is drawn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub hidden_count: Option<usize>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -278,6 +288,8 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             collapsed: closed.contains(node.id.as_str()),
             invalid: invalid.contains(node.id.as_str()),
             rows,
+            child_count: None,
+            hidden_count: None,
         });
     }
 

@@ -2,6 +2,8 @@
 #[cfg(test)]
 use arqlet_model::math::PortableMath;
 pub mod budget;
+/// Provisional (phase timings): the clock a host installs for `timings: true` (`arqlet_model::clock`).
+pub use arqlet_model::clock;
 pub mod columns;
 pub mod components;
 pub mod containers;
@@ -4123,6 +4125,53 @@ pub fn resolved_source(graph: &mut Graph) {
 }
 
 pub fn dispatch(input: &str) -> String {
+    // Provisional (phase timings): `timings: true` on a request adds where its time went to the answer.
+    if input.contains("\"timings\"") {
+        if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(input) {
+            if v.get("timings").and_then(|t| t.as_bool()) == Some(true) {
+                if let Some(map) = v.as_object_mut() {
+                    map.remove("timings");
+                }
+                return timed(|| dispatch_untimed(&v.to_string()));
+            }
+        }
+    }
+    dispatch_untimed(input)
+}
+
+/// Runs `run` (one request) and adds `timings` to its answer when a host installed a clock (`arqlet_model::clock`): the
+/// whole request, the layouts in it and their phases, in ms. Without a clock the answer is as it is.
+pub fn timed(run: impl FnOnce() -> String) -> String {
+    let Some(start) = arqlet_model::clock::now() else {
+        return run();
+    };
+    let _ = arqlet_model::clock::take();
+    let answer = run();
+    let total = arqlet_model::clock::now().map_or(0., |now| now - start);
+    let p = arqlet_model::clock::take();
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&answer) else {
+        return answer;
+    };
+    let round = |ms: f64| (ms * 1000.).round() / 1000.;
+    if let Some(map) = v.as_object_mut() {
+        map.insert(
+            "timings".into(),
+            serde_json::json!({
+                "total": round(total),
+                "layout": round(p.layout),
+                "placement": round(p.placement),
+                "organicStress": round(p.organic_stress),
+                "separation": round(p.separation),
+                "repair": round(p.repair),
+                "portResolution": round(p.port_resolution),
+                "routing": round(p.routing),
+            }),
+        );
+    }
+    v.to_string()
+}
+
+fn dispatch_untimed(input: &str) -> String {
     match protocol::Request::from_json_delivered(input) {
         Ok((request, delivery)) => delivery.deliver(protocol::handle(request)).to_json(),
         Err(error) => protocol::Response::Error(error).to_json(),
@@ -7104,8 +7153,8 @@ mod tests {
                 &std::fs::read_to_string(dir.join(format!("{name}.scene.json"))).unwrap(),
             )
             .unwrap();
-            let actual =
-                serde_json::to_value(arqlet_scene::build_scene(&snapshot).unwrap()).unwrap();
+            // The scene as the engine answers it (with the runtime's child counts).
+            let actual = serde_json::to_value(filter::scene_of(&snapshot).unwrap()).unwrap();
             // JavaScript writes 318, Rust writes 318.0: compare numbers as floats.
             assert_eq!(
                 as_floats(actual),

@@ -1,4 +1,5 @@
 //! Portable graph and resumable scene contract for the first prototype.
+pub mod clock;
 pub mod math;
 pub mod outline;
 

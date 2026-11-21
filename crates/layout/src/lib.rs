@@ -43,8 +43,11 @@ pub(crate) fn stage_timer_start() -> std::time::Instant {
     std::time::Instant::now()
 }
 
+// Otherwise the clock a host installed (`arqlet_model::clock`), if any; the times are only reported.
 #[cfg(not(all(feature = "benchmark-timings", not(target_arch = "wasm32"))))]
-pub(crate) fn stage_timer_start() {}
+pub(crate) fn stage_timer_start() -> Option<f64> {
+    arqlet_model::clock::now()
+}
 
 #[cfg(all(feature = "benchmark-timings", not(target_arch = "wasm32")))]
 pub(crate) fn elapsed_nanos(start: std::time::Instant) -> u64 {
@@ -52,8 +55,11 @@ pub(crate) fn elapsed_nanos(start: std::time::Instant) -> u64 {
 }
 
 #[cfg(not(all(feature = "benchmark-timings", not(target_arch = "wasm32"))))]
-pub(crate) fn elapsed_nanos(_: ()) -> u64 {
-    0
+pub(crate) fn elapsed_nanos(start: Option<f64>) -> u64 {
+    match (start, arqlet_model::clock::now()) {
+        (Some(start), Some(now)) if now > start => ((now - start) * 1e6) as u64,
+        _ => 0,
+    }
 }
 
 /// Why a candidate construction ended without a snapshot: the stop signal fired, or the construction failed.
@@ -331,6 +337,30 @@ pub fn compute(
 /// `compute` that also returns the stage work of the first layout (placement, routing, and so on), so that a caller can
 /// report where the time of an import goes. The snapshot is the same as `compute` returns.
 pub fn compute_counted(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    let started = stage_timer_start();
+    let result = compute_counted_unclocked(graph, previous, dirty, options);
+    // Provisional (phase timings): the time of this layout and its phases, for a host that installed a clock.
+    if let Ok((_, stages)) = &result {
+        let ms = |nanos: u64| nanos as f64 / 1e6;
+        arqlet_model::clock::add(arqlet_model::clock::Phases {
+            layout: ms(elapsed_nanos(started)),
+            placement: ms(stages.placement_nanos),
+            organic_stress: ms(stages.organic_stress_nanos),
+            separation: ms(stages.separation_nanos),
+            repair: ms(stages.repair_nanos),
+            port_resolution: ms(stages.port_resolution_nanos),
+            routing: ms(stages.routing_nanos),
+        });
+    }
+    result
+}
+
+fn compute_counted_unclocked(
     graph: &Graph,
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,

@@ -15,6 +15,14 @@ use std::collections::BTreeMap;
 use std::io::{self, BufRead, Read, Write};
 
 fn main() {
+    // A clock for phase timings (`timings: true` on a request); the layout never reads it.
+    static ORIGIN: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    ORIGIN.get_or_init(std::time::Instant::now);
+    arqlet_model::clock::install(|| {
+        ORIGIN
+            .get()
+            .map_or(0., |o| o.elapsed().as_secs_f64() * 1000.)
+    });
     if std::env::args().any(|a| a == "--sessions") {
         return sessions();
     }

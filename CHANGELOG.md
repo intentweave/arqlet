@@ -5,6 +5,23 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added (phase timings)
+
+- `timings: true` on any request (provisional) adds `timings` to the answer, in ms: `total`, `layout` (every layout in
+  the request) and its phases `placement`, `organicStress`, `separation`, `repair`, `portResolution`, `routing`; through
+  `dispatch` and resident sessions alike. The core reads no clock of its own: the host installs one
+  (`arqlet_model::clock`, re-exported as `arqlet_runtime::clock`); the native binaries use `Instant`, and the WASM module
+  imports `env.lw_now` (the loader `wasm-client.js` passes `performance.now`). A host with its own loader must provide
+  that import now. The times are only reported: the output is the same with and without (15 fingerprint views
+  identical).
+
+### Added (scene counts)
+
+- `SceneNode.childCount` and `hiddenCount` (provisional): a container's children in the view (added communities and
+  groups count; a partly shown container counts those in its rest too) and how many of them are not drawn (all of them
+  when collapsed, those in the rest when shown in part); omitted for leaves and when every child is drawn. A host can show
+  "12" on a collapsed box without a copy of the graph. The columnar scene carries them as `nodeChildCount` and
+  `nodeHiddenCount` (`NONE` when absent).
 ### Added (drag API)
 
 - A typed drag API in the session (provisional): `session.drag(nodeId, position, {others})` returns a handle with
