@@ -471,9 +471,11 @@ here first, as the project rules ask before third-party code is taken in. Record
   (`Apache-2.0 OR BSL-1.0`), `text-size` 1.1.1 (`MIT OR Apache-2.0`) and `unicode-ident` 1.0.27
   (`(MIT OR Apache-2.0) AND Unicode-3.0`). Check the `Unicode-3.0` notice of `unicode-ident` at adoption.
 - Notices: the MIT and Apache-2.0 licenses these crates are used under require their copyright and license notices to
-  accompany a distribution (confirm per crate at adoption, as some offer other options). Today
-  `NOTICE` and `tools/npm-prepack.mjs` (which copies only the project's two license files) do not carry them. Both are
-  extended before the first release that contains the parser, in the WASM package and the native binaries alike.
+  accompany a distribution (confirm per crate at adoption, as some offer other options). For the npm package of the
+  engine this is done: `tools/npm-prepack.mjs` writes `THIRD_PARTY_NOTICES.md` from the crates the WASM links
+  (`tools/third-party-notices.mjs`), so decypher and its crates are picked up when they are linked, and a test fails when
+  a linked crate ships no license file (the `Unicode-3.0` file of `unicode-ident` is then the thing to look at). The
+  project distributes no native binaries today; if it does, they need the same.
 - Known defects that shape its use are listed in ADR 0021 (upstream issues #132 to #134, mitigated by a guard over the
   syntax tree). The fallback front end is https://github.com/a-poor/open-cypher (0.5.0, Apache-2.0); it is not a
   dependency, and the same record is made before it would become one.

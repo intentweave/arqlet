@@ -3,3 +3,7 @@ Copyright 2026 Benjamin Becker
 
 Licensed under either of the Apache License, Version 2.0 (LICENSE-APACHE)
 or the MIT license (LICENSE-MIT), at your option.
+
+The npm package of the engine (@arqlet/engine-client) contains a WebAssembly build of this project together with the
+Rust crates it links. Their copyright and license notices are in THIRD_PARTY_NOTICES.md in that package, which
+tools/npm-prepack.mjs generates from the crates the build links (tools/third-party-notices.mjs).

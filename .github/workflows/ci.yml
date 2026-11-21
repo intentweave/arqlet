@@ -28,6 +28,10 @@ jobs:
       # The hand-written declarations of the published npm packages.
       - run: pnpm --filter arqlet run typecheck
       - run: pnpm --filter arqlet-react-flow-example run build
+      # The license notices of the crates linked into the WASM engine: its npm package ships them.
+      - run: node --test tools/third-party-notices.test.mjs
+        env:
+          RUSTUP_TOOLCHAIN: stable
   # The declared minimum Rust version (`rust-version` in Cargo.toml) must keep building the workspace.
   msrv:
     runs-on: ubuntu-latest
