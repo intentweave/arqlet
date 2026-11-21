@@ -31,6 +31,21 @@ const state = useSyncExternalStore(view.subscribe, view.getState);   // React; a
 await view.import(graph, {options: {levelOfDetail: {depth: 0}}});
 ```
 
+### `elkLayout` as a drop-in for ELK
+
+`elkLayout` reads a graph in ELK's JSON form and answers in that form, but it is not ELK: options without a counterpart
+are reported, not silently ignored (`diagnostics`). Two things differ in what you see:
+
+- **Spacing.** The adapter takes ELK's spacings (`elk.spacing.nodeNode`, `elk.layered.spacing.nodeNodeBetweenLayers`,
+  the edge spacings) only when the graph names them; otherwise Arqlet's own defaults apply, which are wider than ELK's
+  (20 between nodes and between layers). If your drawings should look like ELK's, set those spacings on the root
+  explicitly. On flat graphs this alone brings the area from about 1.2–1.4 to 1.16–1.28 times elk-rs's
+  ([results](../benchmarks/results/elk-flat-components-20261121.md)). Whether the adapter takes ELK's defaults itself is
+  open (a visual comparison is planned first).
+- **Components.** As ELK does by default (`separateConnectedComponents`), components are packed as boxes in rows towards
+  `elk.aspectRatio` (default 1.6) when the top level has several components with edges and none of them dominates;
+  `separateConnectedComponents: false` turns it off.
+
 ## 2. Where the engine runs
 
 The same Rust dispatcher answers every request in three places. A `run` is the function that sends a request there:
