@@ -303,6 +303,29 @@ What this means for the proposal:
   hypothesis that no measurement here tests.
 - Still open: the size of a realistic payload table, which none of these graphs has.
 
+### Evaluation matrix for a coordinator model
+
+A decision aid, not a decision. The model under consideration for the medium term: a **coordinator** takes changes into
+the official snapshot (typed changes with a base revision; stale ones are rejected, as patches are today), and each
+function (layout, query, filter) writes and manages its own projections, in the same thread or across a worker or process
+boundary with a copy. Sharing happens only inside the browser or inside the backend, never between machines. The variants
+to compare are {sequential in one thread, worker with a copy, worker with a transfer of a flat snapshot, process with a
+copy} against {recompute, incremental}.
+
+| Question | What is measured | Correctness check | Gate | Status today |
+|---|---|---|---|---|
+| Q1 Edit cost | time to apply one edit, against the size of the snapshot's graph (the view limit) | result identical to today's | to be fixed before the first run | measurable now with `bench` (`editMs`, `--limit`); `add_node` validates `snapshot.graph`, then calls `project_view` without a kept index, so `project` validates again and builds an index: linear in the view, not in the source graph |
+| Q2 Projection refresh | recompute against incremental after an edit, per function | recompute equals incremental, byte for byte, over random edit sequences with fixed seeds | to be fixed | needs coordinator, change log and projections: not built |
+| Q3 Boundary crossing | serialize, transfer and parse today's JSON and a flat form; copy against transfer; worker against process; size and apply time of a delta | the receiver sees identical content | to be fixed | JSON size and parse time measurable now; a flat form needs a prototype; browser figures need real browsers |
+| Q4 Consistency | stale changes rejected, revisions increase, output identical for any thread count and on every platform | equal digests (`tools/platform-parity.mjs`) | none: any difference is a failure | exists for the current snapshot and patch path |
+| Q5 Staleness window | time from an accepted change until every projection is at the new revision, with several projections and coalesced edits | as Q4 | to be fixed | needs the coordinator |
+
+Rules for the measurements: the gates are written down before the first run; the machine is quiet, and load before and
+after and the spread between min and max are recorded; a run with a wide spread is marked noisy and discarded (as in
+`benchmarks/copy-cost/README.md`); figures go to `benchmarks/results/` with machine and revision. Q1 and the baseline of Q3
+can be answered with what exists. Q2, Q4 for the new path and Q5 are the specification of the coordinator code and are
+written together with it, as tests that fail first. A new harness is not needed before then.
+
 ## Not decided here
 
 - Syntax and scoring of search operators; hybrid ranking; embedding source.
