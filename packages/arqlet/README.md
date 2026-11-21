@@ -52,6 +52,17 @@ Changes run one after the other on the newest snapshot. A change that a new `imp
 a browser, run the engine in a worker: `createSession(workerRun(createEngineWorker()))`. The snapshot stays in the
 engine: `session.snapshot` is the view's state, and `await session.exportSnapshot()` gives the whole snapshot.
 
+Dragging (provisional): positions are in the parent's frame, as `toReactFlow` gives `node.position`. The engine moves
+the node step by step and keeps it pinned where it is dropped; positions that arrive while a step is computed replace
+each other.
+
+```js
+const drag = session.drag(node.id, node.position);   // onNodeDragStart
+drag.move(node.position);                            // onNodeDrag (each event)
+await drag.drop({settle: true});                     // onNodeDragStop; or drag.cancel()
+await session.unpin(node.id);                        // pin(id, position?) / unpin(id)
+```
+
 ### Cluster overview
 
 For a whole graph (tens of thousands of nodes), the `overview` operation lays it out as nested discs, and the WebGL
