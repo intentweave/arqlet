@@ -5,6 +5,19 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- A headless view controller in `@arqlet/engine-client` (provisional, request 31): `createViewController(session)` keeps
+  what a user does between two scenes in one frozen state object (`scene`, `diff`, `busy`, `error`, `highlight`,
+  `hide`, `canBack`, `canForward`) with `subscribe`, so a React binding is `useSyncExternalStore(view.subscribe,
+  view.getState)`. Operations: `import`, `open`/`close`/`toggle`, `showRest` (the next page of a `+N more` box),
+  `reveal`, `filter`, `trace`/`neighbourhood` kept as the highlight (asked again after every change) until
+  `clearHighlight`, `revealHighlight`, `back`/`forward` over the view's decisions (the engine's `intent`/`restore`, one
+  step each), `apply` for any other change, and `cancel` (drops the steps not started). Every step carries the
+  difference between the scenes before and after it (`sceneDiff`: nodes and routes added, removed, changed). Also from
+  `arqlet`. Not yet: refinement on a second worker.
+- The remembered state (`intent`) keeps the filter (`hidden`), so a step back undoes a filter.
+
 ## 0.7.0 — 2026-11-21
 
 Large views read faster and denser. A dense flat graph lays out in 0.58 s instead of 1.4 s, a graph with long edges and

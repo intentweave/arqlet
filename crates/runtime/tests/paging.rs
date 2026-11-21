@@ -115,3 +115,33 @@ fn scene_nodes_count_their_children_and_the_hidden_ones() {
     );
     assert_eq!(counts(&open, "box"), (Some(30), None));
 }
+
+#[test]
+fn the_remembered_state_keeps_a_filter_and_a_step_back_undoes_it() {
+    let mut nodes = vec![json!({"id": "box", "kind": "ecu", "label": "box"})];
+    for i in 0..6 {
+        nodes.push(json!({"id": format!("c{i}"), "kind": if i % 2 == 0 { "even" } else { "odd" }, "label": format!("c{i}"), "parentId": "box"}));
+    }
+    let first = run(json!({"op": "import", "graph": {"nodes": nodes, "edges": []}, "limit": 100}))
+        ["snapshot"]
+        .clone();
+    let before = run(json!({"op": "intent", "snapshot": first}))["intent"].clone();
+    assert!(
+        before.get("hidden").is_none(),
+        "omitted when nothing is hidden"
+    );
+    let filtered = on(
+        &first,
+        json!({"op": "filter", "hide": {"nodeKinds": ["odd"]}}),
+    );
+    let remembered = run(json!({"op": "intent", "snapshot": filtered}))["intent"].clone();
+    assert_eq!(remembered["hidden"]["nodeKinds"], json!(["odd"]));
+    let back = on(&filtered, json!({"op": "restore", "intent": before}));
+    assert!(
+        back["options"].get("hidden").is_none(),
+        "{}",
+        back["options"]
+    );
+    let again = on(&back, json!({"op": "restore", "intent": remembered}));
+    assert_eq!(again["options"]["hidden"]["nodeKinds"], json!(["odd"]));
+}

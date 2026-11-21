@@ -63,6 +63,24 @@ await drag.drop({settle: true});                     // onNodeDragStop; or drag.
 await session.unpin(node.id);                        // pin(id, position?) / unpin(id)
 ```
 
+A view controller (provisional) keeps what a user does between two scenes, so a host does not write it again: one
+state object with `subscribe`, the view operations, a highlight that stays until it is cleared, back and forward over
+the decisions (opening, paging, filters), and the difference between the scenes of every step for animation. No DOM
+and no framework; in React the binding is `useSyncExternalStore`:
+
+```js
+import {createViewController} from 'arqlet';
+
+const view = createViewController(createSession(await loadEngine()), {page: 12});
+const state = useSyncExternalStore(view.subscribe, view.getState);   // {scene, diff, busy, error, highlight, hide, canBack, canForward}
+await view.import(graph, {options: {levelOfDetail: {depth: 0}}});
+await view.open('group-1');                       // close, toggle, reveal(nodes)
+await view.showRest('group-1');                   // the next page of its `+N more` box
+await view.trace('a', 'z');                       // kept as state.highlight while the view changes; clearHighlight()
+await view.filter({nodeKinds: ['test']});
+await view.back();                                // forward(); cancel() drops steps not started yet
+```
+
 ### Cluster overview
 
 For a whole graph (tens of thousands of nodes), the `overview` operation lays it out as nested discs, and the WebGL

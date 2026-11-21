@@ -47,6 +47,10 @@
       "types": "./session.d.ts",
       "default": "./session.js"
     },
+    "./view-controller.js": {
+      "types": "./view-controller.d.ts",
+      "default": "./view-controller.js"
+    },
     "./columns.js": {
       "types": "./columns.d.ts",
       "default": "./columns.js"
@@ -60,12 +64,14 @@
     "presets.js",
     "elk.js",
     "session.js",
+    "view-controller.js",
     "columns.js",
     "engine.d.ts",
     "wasm-client.d.ts",
     "presets.d.ts",
     "elk.d.ts",
     "session.d.ts",
+    "view-controller.d.ts",
     "columns.d.ts",
     "worker.js",
     "arqlet.wasm",
