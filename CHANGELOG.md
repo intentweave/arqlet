@@ -22,6 +22,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   when collapsed, those in the rest when shown in part); omitted for leaves and when every child is drawn. A host can show
   "12" on a collapsed box without a copy of the graph. The columnar scene carries them as `nodeChildCount` and
   `nodeHiddenCount` (`NONE` when absent).
+### Added (React Flow)
+
+- `toReactFlow(scene, {overlayNode})` returns what is neither a node nor an edge between nodes, in flow coordinates:
+  `busLines` (bars and their taps), `junctions` (where shared bus lines branch) and `hubRefs` (stubs and labels of hub
+  references); before, a React Flow host lost them. With `overlayNode: true` one inert node of type `arqletOverlay` over
+  the scene's bounds carries them (`data.origin` turns flow into node coordinates), so a host draws them with a node type
+  instead of a viewport portal. Types in `react-flow.d.ts`.
 
 ### Fixed (first-view budget)
 

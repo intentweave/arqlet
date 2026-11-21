@@ -3,7 +3,9 @@
 Rendering helpers for Arqlet scenes. The engine computes all geometry; these modules only draw or map it.
 
 - `svg.js`: `renderSvg(svgElement, scene, options)`;
-- `react-flow.js`: `toReactFlow(scene)`, nodes and edges for React Flow (no React dependency);
+- `react-flow.js`: `toReactFlow(scene, {overlayNode?})`, nodes and edges for React Flow (no React dependency); bus bars
+  and taps, junction dots and hub-reference stubs come back as overlays in flow coordinates (`busLines`, `junctions`,
+  `hubRefs`), or, with `overlayNode`, as one inert node of type `arqletOverlay` that a host's node type draws;
 - `navigation.js`: wheel zoom at the pointer and drag panning;
 - `scene.js`, `routes.js`: schema check, path data and route details;
 - `overview.js`, `overview-gl.js`: the cluster overview of a whole graph (engine operation `overview`), drawn with WebGL, with picking and the excerpt for a drill-down.
