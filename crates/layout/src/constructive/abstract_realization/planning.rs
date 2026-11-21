@@ -57,51 +57,6 @@ pub struct Session {
     pub(super) shared_off: bool,
 }
 
-/// Provisional (`LayoutOptions::shared_tracks`): the track slots of a channel's changes when the changes of one group share
-/// a track. A group stands as one change spanning all of its members, placed where its first member stands in `order`;
-/// every member takes the group's slot. A change without a group stands alone.
-fn shared_track_slots<'g>(
-    spans: &[(f64, f64)],
-    order: &[usize],
-    track: f64,
-    group: impl Fn(usize) -> Option<&'g str>,
-) -> (Vec<usize>, usize) {
-    let mut unit_of: Vec<usize> = vec![usize::MAX; spans.len()];
-    let mut units: Vec<(f64, f64)> = Vec::new();
-    let mut by_group: BTreeMap<&str, usize> = BTreeMap::new();
-    let mut unit_order = Vec::new();
-    for &k in order {
-        let (lo, hi) = (spans[k].0.min(spans[k].1), spans[k].0.max(spans[k].1));
-        let unit = match group(k) {
-            Some(g) => *by_group.entry(g).or_insert_with(|| {
-                units.push((lo, hi));
-                unit_order.push(units.len() - 1);
-                units.len() - 1
-            }),
-            None => {
-                units.push((lo, hi));
-                unit_order.push(units.len() - 1);
-                units.len() - 1
-            }
-        };
-        let u = &mut units[unit];
-        u.0 = u.0.min(lo);
-        u.1 = u.1.max(hi);
-        unit_of[k] = unit;
-    }
-    let (unit_slots, count) = track_slots(&units, &unit_order, track);
-    let slots = (0..spans.len())
-        .map(|k| {
-            if unit_of[k] == usize::MAX {
-                0
-            } else {
-                unit_slots[unit_of[k]]
-            }
-        })
-        .collect();
-    (slots, count)
-}
-
 impl Session {
     /// Share immutable grown-geometry projections across the chain probe and
     /// final passes. Solver constraints/results and occupancy stay fresh.
@@ -318,7 +273,7 @@ impl Session {
         let (slots, count) = if self.shared.is_empty() {
             track_slots(&spans, &order, track)
         } else {
-            shared_track_slots(&spans, &order, track, |k| {
+            crate::constructive::shared_track_slots(&spans, &order, track, |k| {
                 // Only an edge's last change (into its target's rank) is shared, as in the joint coordination.
                 let (id, section, _, _) = changes[k];
                 (self.last_section.get(id) == Some(&section))
