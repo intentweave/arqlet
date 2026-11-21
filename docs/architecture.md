@@ -452,6 +452,32 @@ layout scheduling.
   2026-11-11 for 0.2.1 after organic layouts and the cluster overview were found to differ between a native build and
   the browser. Used as a dependency, no code copied.
 
+## Planned dependency of the query layer (ADR 0021, proposed)
+
+Not yet a dependency: it is in no `Cargo.toml` or `Cargo.lock` until ADR 0021 is accepted and stage M1 starts. Recorded
+here first, as the project rules ask before third-party code is taken in. Recorded 2026-11-21.
+
+- `decypher` 0.2.0 (exact; `EUPL-1.2 OR MIT OR Apache-2.0`, used under `MIT OR Apache-2.0`;
+  https://github.com/sunsided/decypher), a Rust parser for openCypher with a lossless syntax tree, a typed AST and a
+  scope-resolved HIR. Upstream revision `8b40b52a787a599e0d0e8d23ec78e41fb7cb9850` (tag `v0.2.0`, 2026-11-13, "Release
+  0.2.0 (#131)"; the revision is also what the crate's `.cargo_vcs_info.json` names). crates.io checksum
+  `76d97d5e8591358e7aa4be91d531cbdccd0bad9f24dc48455087b7fe7f941e76`. A fork and complete re-implementation of
+  https://github.com/a-poor/open-cypher. It will be a dependency of `arqlet-query-cypher` only, with default features
+  (`hir`; `serde` and `miette` stay off). Declares edition 2024 and `rust-version = "1.94"`, which is why the workspace
+  minimum is raised to 1.94. No code is copied.
+- Its runtime dependencies with default features, with their license expressions as `cargo tree` printed them on
+  2026-11-21: `rowan` 0.17.0 (`MIT OR Apache-2.0`), `countme` 3.0.1 (`MIT OR Apache-2.0`), `hashbrown` 0.14.5
+  (`MIT OR Apache-2.0`), `memoffset` 0.9.1 (`MIT`), `rustc-hash` 1.1.0 (`Apache-2.0/MIT`), `ryu` 1.0.23
+  (`Apache-2.0 OR BSL-1.0`), `text-size` 1.1.1 (`MIT OR Apache-2.0`) and `unicode-ident` 1.0.27
+  (`(MIT OR Apache-2.0) AND Unicode-3.0`). Check the `Unicode-3.0` notice of `unicode-ident` at adoption.
+- Notices: the MIT and Apache-2.0 licenses these crates are used under require their copyright and license notices to
+  accompany a distribution (confirm per crate at adoption, as some offer other options). Today
+  `NOTICE` and `tools/npm-prepack.mjs` (which copies only the project's two license files) do not carry them. Both are
+  extended before the first release that contains the parser, in the WASM package and the native binaries alike.
+- Known defects that shape its use are listed in ADR 0021 (upstream issues #132 to #134, mitigated by a guard over the
+  syntax tree). The fallback front end is https://github.com/a-poor/open-cypher (0.5.0, Apache-2.0); it is not a
+  dependency, and the same record is made before it would become one.
+
 ## Reuse candidates, not selected dependencies
 
 - https://github.com/paddison/rust-sugiyama
@@ -459,6 +485,9 @@ layout scheduling.
 - https://docs.rs/mermaid-dagre/latest/dagre_rust/
 - https://github.com/eclipse-elk/elk (behavior and quality reference)
 - https://github.com/coldteadotai/pr-lens (presentation and interaction reference)
+- https://github.com/GrafeoDB/grafeo (0.6.2, Apache-2.0): a graph database with a Cypher engine, used only as an
+  independent oracle for differential tests of the query layer (ADR 0021); evaluation only, its version pinned exactly,
+  no code copied.
 
 Evaluate individual phases behind an adapter before adopting a whole engine.
 Audit exact source and license before copying. No 100K scaling claim is inferred
