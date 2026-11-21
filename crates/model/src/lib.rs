@@ -829,7 +829,7 @@ fn is_symmetric(value: &PortPlacement) -> bool {
 }
 /// The engine version a snapshot carries. 0.2: single pass is the default (ADR 0016); a snapshot of another version is
 /// rejected explicitly rather than read with another meaning.
-pub const ENGINE_VERSION: &str = "0.6.0";
+pub const ENGINE_VERSION: &str = "0.7.0";
 
 fn is_false(value: &bool) -> bool {
     !*value
