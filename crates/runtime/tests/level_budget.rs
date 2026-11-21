@@ -26,30 +26,24 @@ fn options(level: serde_json::Value) -> LayoutOptions {
     serde_json::from_value(json!({"levelOfDetail": level, "liftEdges": false})).unwrap()
 }
 
-fn units(snapshot: &arqlet_model::Snapshot) -> usize {
-    let frames: BTreeSet<&str> = snapshot
-        .graph
-        .nodes
-        .iter()
-        .filter_map(|n| n.parent_id.as_deref())
-        .collect();
-    snapshot
-        .graph
-        .nodes
-        .iter()
-        .filter(|n| !frames.contains(n.id.as_str()))
-        .count()
+/// The boxes of the first view: every node shown, an opened container's frame too (as the budget counts them).
+fn boxes(snapshot: &arqlet_model::Snapshot) -> usize {
+    snapshot.graph.nodes.len()
 }
 
 #[test]
 fn the_first_view_stays_within_its_node_and_edge_budget() {
-    // Closed: 4 groups and the 4 edges between them. Each group opened adds 5 nodes and 6 ring edges.
+    // Closed: 4 groups and the 4 edges between them. Each group opened adds its 6 leaves (its frame stays a box) and 6
+    // ring edges.
     let closed = import_graph_with(grouped(), 100, &options(json!({"nodes": 4}))).unwrap();
-    assert_eq!(units(&closed), 4);
+    assert_eq!(boxes(&closed), 4);
     assert_eq!(closed.collapsed_ids.len(), 4);
-    let two = import_graph_with(grouped(), 100, &options(json!({"nodes": 14}))).unwrap();
-    assert_eq!(units(&two), 14);
+    let two = import_graph_with(grouped(), 100, &options(json!({"nodes": 16}))).unwrap();
+    assert_eq!(boxes(&two), 16);
     assert_eq!(two.collapsed_ids, ["g2", "g3"]);
+    // One box less than two groups need: one group opens.
+    let one = import_graph_with(grouped(), 100, &options(json!({"nodes": 15}))).unwrap();
+    assert_eq!(boxes(&one), 10);
     // The edge budget: one group open draws 4 + 6 edges, two draw 16 or more.
     let edges =
         import_graph_with(grouped(), 100, &options(json!({"nodes": 100, "edges": 12}))).unwrap();
@@ -95,7 +89,7 @@ fn a_node_budget_divides_a_flat_graph_into_communities() {
         snapshot.options.communities, 12,
         "the budget gave the communities"
     );
-    assert!(units(&snapshot) <= 12, "{} units", units(&snapshot));
+    assert!(boxes(&snapshot) <= 12, "{} boxes", boxes(&snapshot));
     assert!(!snapshot.collapsed_ids.is_empty());
     // Given communities are kept.
     let own: LayoutOptions =
@@ -204,4 +198,32 @@ fn lift_edges_is_on_by_default_in_views_that_start_abstract() {
     assert!(!serde_json::to_string(&lifted.options)
         .unwrap()
         .contains("liftEdges"));
+}
+
+#[test]
+fn a_first_view_over_its_budget_says_by_how_much_and_why() {
+    // Ten top-level nodes and no containers: a budget of 4 cannot hold the top level.
+    let nodes: Vec<serde_json::Value> = (0..10)
+        .map(|i| json!({"id": format!("n{i}"), "kind": "k", "label": "n"}))
+        .collect();
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": []})).unwrap();
+    let opts: LayoutOptions =
+        serde_json::from_value(json!({"levelOfDetail": {"nodes": 4}, "communities": 0})).unwrap();
+    let s = import_graph_with(g, 100, &opts).unwrap();
+    assert_eq!(s.graph.nodes.len(), 10);
+    {
+        assert!(
+            s.layout_diagnostics
+                .iter()
+                .any(|d| d.starts_with("First view:") && d.contains("over the node budget of 4")),
+            "{:?}",
+            s.layout_diagnostics
+        );
+    }
+    // Within its budget nothing is said.
+    let within = import_graph_with(grouped(), 100, &options(json!({"nodes": 16}))).unwrap();
+    assert!(!within
+        .layout_diagnostics
+        .iter()
+        .any(|d| d.starts_with("First view:")));
 }

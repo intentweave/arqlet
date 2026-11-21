@@ -800,6 +800,32 @@ pub fn import_graph_counted(
         }));
         snapshot.collapsed_ids = collapsed.into_iter().collect();
         snapshot.omitted_unresolved_edges = omitted;
+        // A first view over its budget says by how much and why: everything is collapsed that can be, so the rest is
+        // the top level (and the edges between what it shows).
+        if let Some(level) = options.level_of_detail.as_ref().filter(|l| l.budgeted()) {
+            let boxes = snapshot.graph.nodes.len();
+            let top = snapshot
+                .graph
+                .nodes
+                .iter()
+                .filter(|n| n.parent_id.is_none())
+                .count();
+            if let Some(budget) = level.nodes.filter(|&b| boxes > b) {
+                snapshot.layout_diagnostics.push(format!(
+                    "First view: {boxes} boxes, {} over the node budget of {budget}: the top level alone has {top} \
+                     (set communities to divide it)",
+                    boxes - budget
+                ));
+            }
+            let edges = snapshot.graph.edges.len();
+            if let Some(budget) = level.edges.filter(|&b| edges > b) {
+                snapshot.layout_diagnostics.push(format!(
+                    "First view: {edges} edges, {} over the edge budget of {budget}: the edges between the top-level \
+                     boxes alone are that many",
+                    edges - budget
+                ));
+            }
+        }
         return Ok((snapshot, stages));
     }
     let (mut snapshot, stages) =
