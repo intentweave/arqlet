@@ -51,6 +51,8 @@ pub struct Session {
     /// Provisional (`LayoutOptions::shared_tracks`): the group of every edge whose changes in a channel share one track
     /// with the other changes of its group there (edge id to group key). Empty: one track per change.
     pub(super) shared: BTreeMap<String, String>,
+    /// The index of every edge's last section (`shared`: only that one is shared).
+    pub(super) last_section: BTreeMap<String, usize>,
 }
 
 /// Provisional (`LayoutOptions::shared_tracks`): the track slots of a channel's changes when the changes of one group share
@@ -207,6 +209,12 @@ impl Session {
         )?;
         let mut plan = plan;
         plan.shared = self.shared.clone();
+        self.last_section = plan
+            .edges
+            .iter()
+            .filter(|e| !e.sections.is_empty())
+            .map(|e| (e.edge.clone(), e.sections.len() - 1))
+            .collect();
         self.ordinal.retain(|key, _| active.contains(key));
         self.tracks.retain(|key, _| active.contains(key));
         let edges: BTreeSet<_> = plan.edges.iter().map(|e| e.edge.as_str()).collect();
@@ -309,7 +317,11 @@ impl Session {
             track_slots(&spans, &order, track)
         } else {
             shared_track_slots(&spans, &order, track, |k| {
-                self.shared.get(changes[k].0).map(String::as_str)
+                // Only an edge's last change (into its target's rank) is shared, as in the joint coordination.
+                let (id, section, _, _) = changes[k];
+                (self.last_section.get(id) == Some(&section))
+                    .then(|| self.shared.get(id).map(String::as_str))
+                    .flatten()
             })
         };
         self.work.channel_computations += 1;
