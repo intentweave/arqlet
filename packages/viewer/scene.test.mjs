@@ -72,3 +72,34 @@ test('unsupported scene schemas fail explicitly', () => {
   assert.throws(() => checkScene({schemaVersion: 2}), /Unsupported scene schema/);
 });
 
+
+test('React Flow returns bus bars, junctions and hub references as overlays, optionally as one node', () => {
+  const base = scene('state-tcp');
+  // Without them nothing is added.
+  const plain = toReactFlow(base, {overlayNode: true});
+  assert.deepEqual([plain.busLines, plain.junctions, plain.hubRefs], [[], [], []]);
+  assert.ok(!plain.nodes.some(n => n.id === 'arqlet:overlay'));
+  // A scene that has them: they come back in flow coordinates, unchanged.
+  const busLines = [{id: 'can', label: 'CAN', kind: 'bus', bounds: {x: 10, y: 20, width: 200, height: 8},
+    taps: [{edge: 't0', node: base.nodes[0].id, points: [{x: 30, y: 60}, {x: 30, y: 28}]}]}];
+  const junctions = [{x: 50, y: 24}];
+  const hubRefs = [{edge: 'h0', node: base.nodes[0].id, hub: 'gw', outgoing: true, text: 'Gateway',
+    points: [{x: 0, y: 0}, {x: 18, y: 0}], label: {x: 21, y: -7, width: 60, height: 14}}];
+  const s = {...base, busLines, junctions, hubRefs};
+  const mapped = toReactFlow(s);
+  assert.deepEqual(mapped.busLines, busLines);
+  assert.deepEqual(mapped.junctions, junctions);
+  assert.deepEqual(mapped.hubRefs, hubRefs);
+  assert.ok(!mapped.nodes.some(n => n.id === 'arqlet:overlay'), 'no overlay node unless asked');
+  assert.equal(mapped.edges.length, toReactFlow(base).edges.length, 'the edges stay those between nodes');
+  // With `overlayNode`: one inert node over the scene's bounds carries them, with the origin to draw them inside it.
+  const withNode = toReactFlow(s, {overlayNode: true});
+  const overlay = withNode.nodes.find(n => n.id === 'arqlet:overlay');
+  assert.equal(overlay.type, 'arqletOverlay');
+  assert.deepEqual(overlay.position, {x: s.bounds.x, y: s.bounds.y});
+  assert.deepEqual(overlay.data.origin, overlay.position);
+  assert.equal(overlay.draggable, false);
+  assert.equal(overlay.style.pointerEvents, 'none');
+  assert.deepEqual(overlay.data.busLines, busLines);
+  assert.equal(withNode.nodes.at(-1), overlay, 'after every scene node');
+});
