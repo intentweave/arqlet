@@ -170,6 +170,17 @@ fn run_impl(
     };
     checkpoint()?;
     session.physical_tracks = snapshot.options.abstract_routing;
+    // Provisional (`sharedTracks: target`): the edges into one node share their tracks.
+    session.shared = match snapshot.options.shared_tracks {
+        _ if session.shared_off => BTreeMap::new(),
+        Some(arqlet_model::SharedTracks::Target) => snapshot
+            .graph
+            .edges
+            .iter()
+            .filter_map(|e| Some((e.id.clone(), e.target.clone()?)))
+            .collect(),
+        None => BTreeMap::new(),
+    };
     session.explicit_ports = matches!(method, Method::SinglePass);
     let before = session.work.clone();
     let construction_before = session.construction.as_ref().map(|s| s.work.clone());
@@ -231,6 +242,23 @@ fn run_impl(
             } else {
                 realize_chains(&snapshot.graph, &grown.boxes, &ports, &grown.plans, spacing)?
             };
+            // Provisional (`sharedTracks`): when shared bends make the lane orders cyclic for many edges (groups interleaved
+            // in narrow gaps, as in a dense flat graph), the drawing is completed again without groups: a few such
+            // failures are kept, a mass of them would go to the slow delegated routing.
+            if !session.shared.is_empty() && !session.shared_off {
+                let cyclic = trial
+                    .delegated
+                    .iter()
+                    .filter(|(_, f)| matches!(f, super::Failure::JointOrder { .. }))
+                    .count();
+                let edges = selected.as_ref().map_or(0, |p| p.edges.len());
+                if cyclic > 16.max(edges / 100) {
+                    session.shared_off = true;
+                    let again = run_impl(snapshot, method, session, stop);
+                    session.shared_off = false;
+                    return again;
+                }
+            }
             search.construction.add(&trial.work);
             // Single pass: self-loops are nested at a node's freest corner, clear of every route built, as the default
             // constructs them (`nest_self_loops`), instead of going to the seed routes. The other chain methods keep

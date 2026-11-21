@@ -1987,6 +1987,12 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
     pub hub_refs: Option<usize>,
+    /// Provisional (single pass, request 27): edges that share a track in a channel instead of one track each. `target`:
+    /// the edges of a channel into the same node run on one track there, drawn over each other like a bus into the node
+    /// (as ELK's merged edges). `None` (the default, omitted): one track per edge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub shared_tracks: Option<SharedTracks>,
     /// Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
     /// (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -2436,6 +2442,7 @@ impl Default for LayoutOptions {
             isolated_grid: false,
             isolated_grid_from: None,
             hub_refs: None,
+            shared_tracks: None,
             hub_ref_room: 0.,
             isolated_grid_areas: BTreeSet::new(),
             bus_roots: Vec::new(),
@@ -2586,6 +2593,15 @@ pub enum EdgeRouting {
     #[default]
     Orthogonal,
     Straight,
+}
+
+/// Provisional: which edges share a track in a channel (`LayoutOptions::shared_tracks`).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum SharedTracks {
+    /// The edges into the same node.
+    Target,
 }
 
 /// Provisional: how a bus kept as a node of shape `busLine` is drawn (`LayoutOptions::bus_style`).

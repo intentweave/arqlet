@@ -5,6 +5,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added (experimental)
+
+- `sharedTracks: "target"` (provisional, off by default; request 27): in the last channel before a node, the edges into
+  that node share one track (one bend per group in the coordination, segments of a group may overlap). When the shared
+  bends make the lane orders cyclic for many edges (groups interleaved in narrow gaps, as in a dense flat graph), the
+  drawing is completed again without groups. On an anonymized 500-node graph with long edges the drawn tracks fall from
+  753 to 307 at the same time; the height falls only 2 %, because the channel demand still stacks each bend above the
+  highest earlier overlapping one (next step). The dense flat graph falls back to the drawing without groups (824 instead
+  of 586 ms). On the 41 benchmark datasets: no error, no route through a node, 3 datasets change. Output without the
+  option is byte-identical.
+
 ### Performance
 
 - The rule that bends of one channel keep a track apart is answered by a range query instead of listing every pair of the

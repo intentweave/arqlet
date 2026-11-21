@@ -751,6 +751,17 @@ fn realize_plan(
     }
     report.times.coordination = crate::elapsed_nanos(coordination_started);
     report.coordination_work = coordination_geometry.work();
+    // Provisional (`sharedTracks`): the segments of one group's edges may share a track.
+    if !plan.shared.is_empty() {
+        let mut ids: BTreeMap<&str, u32> = BTreeMap::new();
+        for (edge, group) in &plan.shared {
+            let next = ids.len() as u32;
+            let id = *ids.entry(group.as_str()).or_insert(next);
+            if let Some(trial) = trials.get_mut(edge) {
+                trial.prepared.group = id;
+            }
+        }
+    }
     let materialization_started = crate::stage_timer_start();
     let work = RefCell::new(ConstructionCounters {
         preparations: 1,
@@ -1114,6 +1125,7 @@ fn prepare_leg(
         lead: (Vec::new(), Vec::new()),
         window: spacing.search_window,
         gaps: Default::default(),
+        group: NO_GROUP,
     })
 }
 

@@ -116,6 +116,9 @@ pub struct Plan {
     pub channels: Vec<Channel>,
     /// Intentionally false: ordinal intervals do not establish geometry/clearance feasibility.
     pub safe_to_prune: bool,
+    /// Provisional (`LayoutOptions::shared_tracks`): the group of every edge whose bends in a channel share a track with
+    /// the others of its group (edge id to group key); set by the realization's session. Empty: none share.
+    pub shared: std::collections::BTreeMap<String, String>,
 }
 
 fn chain(
@@ -699,6 +702,7 @@ pub(super) fn build_with(
         channels,
         summary,
         safe_to_prune: false,
+        shared: std::collections::BTreeMap::new(),
     })
 }
 

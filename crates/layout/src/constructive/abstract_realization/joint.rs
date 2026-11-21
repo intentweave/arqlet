@@ -37,6 +37,9 @@ struct Bend {
     cross: (f64, f64),
     /// Room the channel needs beyond the bend's upper bound for a port lead there (`lead_segments`): the demand adds it.
     high_reserve: f64,
+    /// Provisional (`LayoutOptions::shared_tracks`): the other edges whose bend in this channel is this one (edge and
+    /// section): the edges of one group share one bend per channel, so they come out on one track.
+    members: Vec<(String, usize)>,
 }
 
 /// The segments across the flow of the port leads (option `portSides`, `Prepared::lead`), by edge: (edge, vertical flow,
@@ -580,6 +583,7 @@ fn reserve_once(
     }
     let leads = lead_segments(trials);
     let mut assigned = Assigned::new();
+    let mut group_bends: BTreeMap<(String, usize, String), usize> = BTreeMap::new();
     for edge in &plan.edges {
         // Growth demand (`narrow`) includes the edges whose channel is too narrow before it grows.
         let Some(trial) = trials.get(&edge.edge).filter(|t| match &t.failure {
@@ -589,7 +593,9 @@ fn reserve_once(
         }) else {
             continue;
         };
-        let first = bends.len();
+        // The bend of each section: the edge's own, or the one its group has in that channel (`Plan::shared`).
+        let mut index: Vec<usize> = Vec::with_capacity(edge.sections.len());
+        let group = plan.shared.get(&edge.edge);
         for (i, s) in edge.sections.iter().enumerate() {
             let (far, near) = geometry
                 .main_span(&s.area, s.channel)
@@ -633,22 +639,48 @@ fn reserve_once(
             {
                 return Err(format!("Nonfinite joint bend for {}", edge.edge));
             }
-            bends.push(Bend {
-                reservation: BendReservation {
-                    edge: edge.edge.clone(),
-                    section: i,
-                    area: s.area.clone(),
-                    rank: s.channel,
-                    bounds,
-                    preferred,
-                    coordinate: None,
-                },
-                origin,
-                cross,
-                high_reserve,
-            });
-            if i > 0 {
-                constraints.insert((first + i - 1, first + i), 0.);
+            // Only the last channel before the target is shared: after it each edge enters its node, so no lane of the
+            // group runs on where another edge could be ordered between them.
+            // Only the last channel before the target is shared: after it each edge enters its node, so no lane of the
+            // group runs on where another edge could be ordered between them.
+            let last = i + 1 == edge.sections.len();
+            let key = group
+                .filter(|_| last)
+                .map(|g| (s.area.clone(), s.channel, g.clone()));
+            if let Some(&shared) = key.as_ref().and_then(|k| group_bends.get(k)) {
+                // A later member of the group: the group's bend takes in its bounds, cross range and reserve.
+                let b: &mut Bend = &mut bends[shared];
+                b.reservation.bounds = (
+                    b.reservation.bounds.0.max(bounds.0),
+                    b.reservation.bounds.1.min(bounds.1),
+                );
+                b.cross = (b.cross.0.min(cross.0), b.cross.1.max(cross.1));
+                b.high_reserve = b.high_reserve.max(high_reserve);
+                b.members.push((edge.edge.clone(), i));
+                index.push(shared);
+            } else {
+                if let Some(k) = key {
+                    group_bends.insert(k, bends.len());
+                }
+                index.push(bends.len());
+                bends.push(Bend {
+                    reservation: BendReservation {
+                        edge: edge.edge.clone(),
+                        section: i,
+                        area: s.area.clone(),
+                        rank: s.channel,
+                        bounds,
+                        preferred,
+                        coordinate: None,
+                    },
+                    origin,
+                    cross,
+                    high_reserve,
+                    members: Vec::new(),
+                });
+            }
+            if i > 0 && index[i - 1] != index[i] {
+                constraints.insert((index[i - 1], index[i]), 0.);
             }
         }
         for i in 0..trial.lanes.len() {
@@ -665,23 +697,23 @@ fn reserve_once(
                     if i == 0 {
                         trial.prepared.from.0
                     } else {
-                        bends[first + i - 1].reservation.preferred
+                        bends[index[i - 1]].reservation.preferred
                     },
                     if i == edge.sections.len() {
                         trial.prepared.to.0
                     } else {
-                        bends[first + i].reservation.preferred
+                        bends[index[i]].reservation.preferred
                     },
                 ),
                 start: if i == 0 {
                     End::Fixed(trial.prepared.from.0)
                 } else {
-                    End::Bend(first + i - 1)
+                    End::Bend(index[i - 1])
                 },
                 end: if i == edge.sections.len() {
                     End::Fixed(trial.prepared.to.0)
                 } else {
-                    End::Bend(first + i)
+                    End::Bend(index[i])
                 },
             });
         }
@@ -716,8 +748,15 @@ fn reserve_once(
                 } else {
                     (b, a)
                 };
-            // The string comparison comes last: most pairs of this scan end at the numbers.
-            if upper.cross.1 - lower.cross.0 >= spacing.track - EPS || a.edge == b.edge {
+            // The string comparison comes last: most pairs of this scan end at the numbers. Edges of one shared group
+            // (`Plan::shared`) may run on one lane, as an edge with itself.
+            if upper.cross.1 - lower.cross.0 >= spacing.track - EPS
+                || a.edge == b.edge
+                || plan
+                    .shared
+                    .get(&a.edge)
+                    .is_some_and(|g| plan.shared.get(&b.edge) == Some(g))
+            {
                 continue;
             }
             summary.longitudinal_pairs += 1;
@@ -929,6 +968,30 @@ pub(super) fn assign(
         &mut failed,
         spacing.track,
     )?;
+    // An edge that shares a bend with a failed edge has no bend there: it fails with it (and so on, through the groups it
+    // shares bends with in other channels).
+    loop {
+        let mut more = Vec::new();
+        for b in &bends {
+            if b.members.is_empty() {
+                continue;
+            }
+            let edges = std::iter::once(&b.reservation.edge).chain(b.members.iter().map(|m| &m.0));
+            if let Some(failure) = edges.clone().find_map(|e| failed.get(e)) {
+                for e in edges {
+                    if !failed.contains_key(e) {
+                        more.push((e.clone(), failure.clone()));
+                    }
+                }
+            }
+        }
+        if more.is_empty() {
+            break;
+        }
+        for (e, failure) in more {
+            failed.entry(e).or_insert(failure);
+        }
+    }
     summary.capacity_edges = failed.len() - summary.blocked_edges;
     let mut result = BTreeMap::new();
     channels.clear();
@@ -946,6 +1009,16 @@ pub(super) fn assign(
                 ),
                 at,
             );
+            for (member, _) in &b.members {
+                result.insert(
+                    (
+                        member.clone(),
+                        b.reservation.area.clone(),
+                        b.reservation.rank,
+                    ),
+                    at,
+                );
+            }
             let index = channel_of
                 .get(&b.reservation.area)
                 .and_then(|ranks| ranks.get(&b.reservation.rank))
@@ -988,8 +1061,19 @@ pub(super) fn assign(
             }
             c.assignments
                 .push((b.reservation.edge.clone(), slot as usize, at));
+            for (member, _) in &b.members {
+                c.assignments.push((member.clone(), slot as usize, at));
+            }
         }
         summary.bends.push(b.reservation.clone());
+        // The members' bends are the group's, under their own edge and section.
+        for (member, section) in &b.members {
+            summary.bends.push(BendReservation {
+                edge: member.clone(),
+                section: *section,
+                ..b.reservation.clone()
+            });
+        }
     }
     // The precedences as the diagnostics list them: the constraints and, in benchmark builds, the channel pairs.
     #[cfg(feature = "benchmark-timings")]
@@ -1030,6 +1114,7 @@ mod tests {
             origin: 12.,
             cross: (0., 40.),
             high_reserve: 0.,
+            members: Vec::new(),
         }
     }
 
