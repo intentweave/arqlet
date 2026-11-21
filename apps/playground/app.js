@@ -4,8 +4,7 @@ import {renderSvg} from '@arqlet/viewer/svg.js';
 import {containmentRows} from '@arqlet/containment-tree/model.js';
 import {settingsOf,rootSettingsOf} from '@arqlet/containment-tree/settings.js';
 import {renderContainmentTree,settingsElementOf} from '@arqlet/containment-tree/render.js';
-import {acceptPublication,refinementFits} from './revisions.js';
-import {Session} from './session.js';
+import {refinementFits} from './revisions.js';
 import {MoveGesture,releaseOnDrop} from './drag.js';
 import {trackGesture} from './gesture.js';
 import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
@@ -29,9 +28,8 @@ let autoFit=true;
 const selection=new Selection();
 // The curation draft, when manual curation is on. While it is active the view is not recomputed by other operations.
 let curation=null;
-let epoch=0,loadToken=0,refinement=null,refineTimer=null,requestId=0,structuring=null;
+let epoch=0,loadToken=0,refineTimer=null,requestId=0,structuring=null;
 // The job lifecycle of progressive refinement: which job may still show results, and which result is pending.
-const session=new Session();
 // Edits and background refinement use separate workers, so a long refinement never blocks an edit.
 const workers={interactive:createEngineWorker('./generated/arqlet.wasm'),background:createEngineWorker('./generated/arqlet.wasm')};
 const replies=new Map();
@@ -176,7 +174,10 @@ function toggleContainer(id,event){
 // requests through `execute`, so all three modes keep working. One action is one entry, however many engine steps it
 // took; the stack starts empty when another graph is loaded or the graph changes.
 const layoutSession=createLayoutSession(request=>execute('edit',request),{resident:false});
-const viewController=createViewController(layoutSession,{page:PAGE,scenes:false});
+// Refinement runs on the refinement lane of the mode (`placement`): the background worker or the backend, never in the
+// interactive queue.
+const viewController=createViewController(layoutSession,{page:PAGE,scenes:false,
+ refine:(request,{onPublication,signal})=>execute('refine',request,signal,onPublication?publication=>onPublication(publication):undefined)});
 viewController.subscribe(()=>{syncHistoryButtons();showDetails();});
 // What the engine knows about the selected node or edge (`state.details`, kept up to date by the controller): the groups
 // above a node and the box that shows it, what a box holds, the edges a line stands for.
@@ -1203,13 +1204,10 @@ execute('edit',{op:'optionDefaults'}).then(reply=>{if(reply.ok){optionDefaults=r
 
 $('refine').textContent=refineLabels[mode()];reset();
 
-function cancelRefinement(){clearTimeout(refineTimer);refineTimer=null;if(refinement)refinement.abort();refinement=null;session.cancel();if(structuring)structuring.abort();structuring=null;}
+function cancelRefinement(){clearTimeout(refineTimer);refineTimer=null;viewController.cancelRefinement();if(structuring)structuring.abort();structuring=null;}
 function scheduleRefinement(){clearTimeout(refineTimer);if(snapshot&&!curation&&$('auto').checked&&presetState(snapshot,presets).preset?.refine!==false)refineTimer=setTimeout(refine,350);}
 // Why a refinement stopped early; the published result is always the last complete candidate.
 const STOP_TEXT={workBudget:'Work limit reached: last complete result.',timeBudget:'Time limit reached: last complete result.',cancelled:'Cancelled: last complete result.'};
-// Host-side throttle for shown intermediate results: at most one redraw per interval; the newest result wins.
-const PUBLICATION_INTERVAL_MS=120;
-let jobCounter=0;
 // Results that arrive for a view that has changed since (or for a job that a newer one superseded) are not applied. They are counted
 // and shown, so a result that does not appear is explained.
 let staleDiscarded=0;
@@ -1218,53 +1216,30 @@ function noteDiscarded(){
  const note=$('discarded');
  note.hidden=false;note.textContent=`Stale results discarded: ${staleDiscarded}`;
 }
+// The whole view's refinement runs through the view controller on the refinement lane (the background worker, or the
+// backend): beside the interactive steps, applied only while the view is still the one it started from, stopped by any
+// change. Progressive results are shown as they arrive (the controller throttles them).
 async function refine(){
  if(!snapshot||pending||drag||resize||containerResize||portDrag||labelDrag)return;
- cancelRefinement();const controller=new AbortController();refinement=controller;
- // The job's base is the state it starts from. Shown publications move the displayed snapshot forward, so every
- // publication and the final result are checked against this base, never against what is displayed.
- const job={id:`refine-${++jobCounter}`,epoch,revision:snapshot.revision,layoutVersion:snapshot.layoutVersion??0,lastSequence:0};
- // The page's current state is the snapshot the job starts from. The session policy keeps the job's base apart from
- // the displayed snapshot, which moves forward with every shown publication.
- session.edit({graphRevision:snapshot.revision,baseLayoutVersion:snapshot.layoutVersion??0});
- session.start(job.id,session.current);
+ cancelRefinement();
  const streaming=placement[mode()].refine!=='backend';
  $('backend').textContent='Optimizing the whole view …';
- const started=performance.now(),sentAt=Date.now();let firstShownMs=null;
- // Latency of each shown publication: computation (request to emission), transfer and display.
- const timeline=globalThis.lwRefineTimeline=[];
- let showTimer=null;
- const show=()=>{
-   const next=session.takePending();
-   if(!next)return;
-   snapshot=next.snapshot;adopt(snapshot);
-   if(firstShownMs===null)firstShownMs=Math.round(performance.now()-started);
-   draw();
-   const shownAt=Date.now(),meta=next.meta??{};
-   timeline.push({sequence:next.sequence,bytes:meta.bytes??null,computeMs:meta.emittedAt-sentAt,transferMs:meta.receivedAt-meta.emittedAt,displayMs:shownAt-meta.receivedAt,shownMs:shownAt-sentAt});
-   $('backend').textContent=`Improving … ${next.sequence} intermediate layouts, newest shown.`;
- };
- // Leading and trailing throttle: the first result is shown at once; results that arrive within the interval are
- // merged, and the newest one is shown when the interval ends.
- const onPublication=(publication,meta)=>{
-   if(refinement!==controller||!acceptPublication(publication,job,epoch,!!pending)){noteDiscarded();return;}
-   if(session.offer(publication).verdict!=='accepted')return;
-   job.lastSequence=publication.sequence;
-   publication.meta=meta;
-   if(showTimer===null){show();showTimer=setTimeout(()=>{showTimer=null;show();},PUBLICATION_INTERVAL_MS);}
- };
- const op=streaming?'refineProgressive':'refine';
- try{
-   const data=await execute('refine',{op,jobId:job.id,snapshot,expectedRevision:job.revision,expectedLayoutVersion:job.layoutVersion,threads:threads()},controller.signal,streaming?onPublication:undefined);
-   if(!data.ok)throw Error(data.error||'Optimization not available');
-   clearTimeout(showTimer);showTimer=null;
-   if(refinement!==controller){noteDiscarded();return;}
-   // The final result replaces whatever was shown or pending; the job is complete.
-   session.finish(job.id);
-   if(!refinementFits({revision:job.revision,layoutVersion:job.layoutVersion},data.snapshot,job,epoch,!!pending)){noteDiscarded();$('backend').textContent='Stale refinement discarded.';return;}
-   snapshot=data.snapshot;adopt(snapshot);draw();const q=snapshot.optimization;const timing=firstShownMs===null?'':` First improvement shown after ${firstShownMs} ms.`;$('backend').textContent=q?`${q.stopReason?STOP_TEXT[q.stopReason]+' ':''}${q.candidatesEvaluated} layouts checked · ${q.strategy==='keep-existing'?'existing layout kept':'new layout adopted'}. Edges through nodes: ${q.before.edgeNodeHits} → ${q.after.edgeNodeHits}. Crossing edge pairs: ${q.before.routedCrossings} → ${q.after.routedCrossings}. Shared lines (pairs): ${q.before.sharedRoutePairs} → ${q.after.sharedRoutePairs}. Edge length: ${Math.round(q.before.routeLength)} → ${Math.round(q.after.routeLength)}.${timing}`:'Refinement complete.';
- }catch(e){clearTimeout(showTimer);session.fail(job.id);if(e.name!=='AbortError'&&refinement===controller)$('backend').textContent=`Refinement: ${e.message}. Local editing stays available.`;}
- finally{if(refinement===controller)refinement=null;}
+ const started=performance.now();let firstShownMs=null;
+ const startedEpoch=epoch;
+ const r=await viewController.refine({op:streaming?'refineProgressive':'refine',threads:threads()},{onApplied:(next,{final,shown})=>{
+  if(epoch!==startedEpoch)return;
+  snapshot=next;
+  if(!final){if(firstShownMs===null)firstShownMs=Math.round(performance.now()-started);$('backend').textContent=`Improving … ${shown} intermediate layouts, newest shown.`;}
+  draw();
+ }});
+ if(epoch!==startedEpoch)return;
+ const outcome=viewController.getState().refined;
+ if(r.ok){
+  const q=snapshot.optimization;const timing=firstShownMs===null?'':` First improvement shown after ${firstShownMs} ms.`;
+  $('backend').textContent=q?`${q.stopReason?STOP_TEXT[q.stopReason]+' ':''}${q.candidatesEvaluated} layouts checked · ${q.strategy==='keep-existing'?'existing layout kept':'new layout adopted'}. Edges through nodes: ${q.before.edgeNodeHits} → ${q.after.edgeNodeHits}. Crossing edge pairs: ${q.before.routedCrossings} → ${q.after.routedCrossings}. Shared lines (pairs): ${q.before.sharedRoutePairs} → ${q.after.sharedRoutePairs}. Edge length: ${Math.round(q.before.routeLength)} → ${Math.round(q.after.routeLength)}.${timing}`:'Refinement complete.';
+ } else if(outcome?.stale){noteDiscarded();$('backend').textContent='Stale refinement discarded.';}
+ else if(outcome?.error)$('backend').textContent=`Refinement: ${outcome.error}. Local editing stays available.`;
+ else if(outcome?.cancelled&&!viewController.getState().refining)$('backend').textContent='Refinement stopped: the view changed.';
 }
 $('refine').onclick=refine;
 // The approaches the structured optimization can report, in plain words. A route is an edge's path; these are the

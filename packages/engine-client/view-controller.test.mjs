@@ -236,3 +236,79 @@ test('a view controller navigates by keyboard directions', {skip: !engine}, asyn
   assert.equal(out.ok, true, JSON.stringify(out));
   assert.notEqual(out.nodeId, 'src');
 });
+
+// A second engine for refinement, as a second worker would be: it reports the intermediate results of the request it runs.
+async function refineEngine() {
+  let onPublication = null;
+  const second = await createEngine(readFileSync(wasm), {onPublish: text => onPublication?.(JSON.parse(text).publication)});
+  return (request, init = {}) => {
+    onPublication = init.onPublication ?? null;
+    try { return second(request); } finally { onPublication = null; }
+  };
+}
+
+test('refinement runs on a second engine; stale results are discarded', {skip: !engine}, async () => {
+  const refine = await refineEngine();
+  const view = createViewController(createSession(engine, {resident: false}), {refine, publicationInterval: 0});
+  // A graph and the earlier pipeline, where refinement finds an improvement and publishes it before the end.
+  const improvable = {
+    nodes: [{id: 'root', kind: 'directory', label: 'root'}, {id: 'a', kind: 'symbol', label: 'A', parentId: 'root'},
+      {id: 'b', kind: 'symbol', label: 'B', parentId: 'root'}],
+    edges: [{id: '1', kind: 'calls', source: 'a', target: 'b'}, {id: '2', kind: 'calls', source: 'b', target: 'a'},
+      {id: '3', kind: 'calls', source: 'a', target: 'a'}, {id: '4', kind: 'calls', source: 'a', target: 'b'}],
+  };
+  await view.import(improvable, {limit: 20, options: {singlePassAuto: false, singlePass: false, abstractRouting: false,
+    layeredConstruction: false, hierarchicalOrdering: false}});
+  const before = view.getState().snapshot;
+  // Applied: the next layout version of the same revision, not a step for back.
+  let shown = 0;
+  const stop = view.subscribe(() => { shown = Math.max(shown, view.getState().refining?.shown ?? 0); });
+  const done = await view.refine({op: 'refineProgressive', threads: 1});
+  stop();
+  assert.equal(done.ok, true, JSON.stringify(done));
+  assert.ok(shown > 0, 'intermediate results were shown');
+  let s = view.getState();
+  assert.equal(s.refining, null);
+  assert.equal(s.refined.applied, true, JSON.stringify(s.refined));
+  assert.equal(s.snapshot.revision, before.revision);
+  assert.equal(s.snapshot.layoutVersion, (before.layoutVersion ?? 0) + 1);
+  assert.equal(s.canBack, false, 'refining changes no decision');
+  // A change while it runs: the refinement is stopped and its result dropped; the change stays.
+  const slow = (request, init) => new Promise(resolve => setTimeout(() => resolve(refine(request, init)), 30));
+  const view2 = createViewController(createSession(engine, {resident: false}), {refine: slow});
+  await view2.import(graph(), {limit: 100});
+  const running = view2.refine();
+  await new Promise(r => setTimeout(r, 0));
+  assert.ok(view2.getState().refining, 'named while it runs');
+  await view2.toggle('box');
+  const late = await running;
+  assert.equal(late.ok, false);
+  s = view2.getState();
+  assert.equal(s.refined.cancelled, true, JSON.stringify(s.refined));
+  assert.ok(s.snapshot.collapsedIds.includes('box'), 'the toggle stays');
+  assert.equal(s.canBack, true);
+  // A result for a view that has moved on is discarded and counted: here the layout changes underneath (as a host's own
+  // snapshot would) while the refinement runs.
+  const session3 = createSession(engine, {resident: false});
+  const view3 = createViewController(session3, {
+    refine: async (request, init) => {
+      const answer = refine(request, init);
+      const moved = engine({op: 'configure', snapshot: request.snapshot, options: {routingClearance: 9},
+        expectedRevision: request.expectedRevision, expectedLayoutVersion: request.expectedLayoutVersion});
+      assert.equal(moved.ok, true, JSON.stringify(moved));
+      await session3.load(moved.snapshot);
+      return answer;
+    },
+  });
+  await view3.import(graph(), {limit: 100});
+  const stale = await view3.refine();
+  assert.equal(stale.ok, false);
+  assert.equal(view3.getState().refined.stale, true, JSON.stringify(view3.getState().refined));
+  assert.equal(view3.getState().discarded, 1);
+  assert.equal((await view3.refine({op: 'nothing-like-it'})).ok, false, 'an unknown operation is an error');
+  assert.ok(view3.getState().refined.error);
+  // Without a second engine there is no refinement.
+  assert.equal((await view.refine()).ok, true);
+  const plain = createViewController(createSession(engine, {resident: false}));
+  assert.match((await plain.refine()).error, /No refinement engine/);
+});

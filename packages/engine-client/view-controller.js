@@ -149,11 +149,18 @@ export function decodeBookmark(text) {
  * Creates a view controller on `session` (from `createSession`). `page` is how many children `showRest` reveals at a
  * time; `historyLimit` how many steps back are kept; with `scenes: false` the state carries no scene and no diff (a host
  * that draws from the snapshot itself saves the engine call); `detailLimit` caps the edge ids of a line's details.
+ *
+ * `refine` (provisional) is the second engine for refinement, typically another worker (`workerRefineRun`): a function
+ * `(request, {onPublication, signal}) => Promise<answer>` that runs a refinement request on a snapshot the controller
+ * sends and calls `onPublication(publication)` for every intermediate result of a progressive one. It runs beside the
+ * interactive steps, never in their queue; `publicationInterval` (ms) throttles how often intermediate results are shown.
  */
-export function createViewController(session, {page = 12, historyLimit = 50, scenes = true, detailLimit} = {}) {
+export function createViewController(session, {page = 12, historyLimit = 50, scenes = true, detailLimit, refine: refineRun,
+  publicationInterval = 120} = {}) {
   let state = Object.freeze({
     snapshot: null, scene: null, diff: null, busy: false, error: null,
-    highlight: null, selection: null, details: null, hover: null, search: null, focus: null, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
+    highlight: null, selection: null, details: null, hover: null, search: null, focus: null, refining: null, refined: null,
+    discarded: 0, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
   });
   const listeners = new Set();
   const publish = patch => {
@@ -235,10 +242,56 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     });
   };
 
+  // The refinement under way on the second engine: its job, the state it started from, the last publication applied.
+  let job = null;
+  let jobs = 0;
+  // Ends the refinement under way (its later results are dropped); `reason` is reported in `state.refined`.
+  const stopRefinement = reason => {
+    if (!job) return;
+    const stopped = job;
+    job = null;
+    clearTimeout(stopped.timer);
+    stopped.abort.abort();
+    publish({refining: null, refined: {op: stopped.op, applied: stopped.applied > 0, [reason]: true}});
+  };
+  // Whether a refinement result still fits the view: the view is the one the job started from (or the job's own last
+  // publication), and the result is the next layout of it.
+  const fits = (j, snapshot) => {
+    const now = session.snapshot;
+    const shown = j.base.layoutVersion + (j.applied > 0 ? 1 : 0);
+    return !!now && !!snapshot && now.revision === j.base.revision && (now.layoutVersion ?? 0) === shown
+      && snapshot.revision === j.base.revision && snapshot.baseRevision === j.base.revision
+      && (snapshot.layoutVersion ?? 0) === j.base.layoutVersion + 1;
+  };
+  // Applies a refinement result after the steps queued before it; a result the view has moved away from is discarded
+  // and counted.
+  const applyRefined = (j, snapshot, final) => enqueue(async current => {
+    if (job !== j) return {ok: false, stale: true};
+    if (!fits(j, snapshot)) {
+      if (final) job = null;
+      publish({discarded: state.discarded + 1, ...(final ? {refining: null, refined: {op: j.op, applied: false, stale: true}} : {})});
+      return {ok: false, stale: true};
+    }
+    const loaded = await session.load(snapshot);
+    if (!current()) return {ok: false, cancelled: true};
+    if (!loaded.ok) {
+      publish({error: loaded.error ?? 'The refined layout was refused.'});
+      return loaded;
+    }
+    j.applied += 1;
+    if (final) job = null;
+    j.onApplied?.(snapshot, {final, shown: j.applied});
+    await settle(final
+      ? {refining: null, refined: {op: j.op, applied: true, optimization: snapshot.optimization ?? null}}
+      : {refining: {op: j.op, jobId: j.id, shown: j.applied}}, current);
+    return {ok: true, applied: true};
+  });
+
   // A change the user makes: its decisions before and after are remembered (unless `remember` is false), so that `back`
-  // undoes it.
+  // undoes it. A refinement under way is stopped: its result would be for the view before the change.
   const change = (label, run, extra = () => ({}), remember = true, merge = false) => enqueue(async current => {
     if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+    stopRefinement('cancelled');
     const before = remember ? await intent() : null;
     const result = await run();
     if (!current()) return {ok: false, cancelled: true};
@@ -265,6 +318,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
 
   // Back and forward: the engine restores the remembered decisions; a refused restore keeps the entry.
   const step = direction => enqueue(async current => {
+    stopRefinement('cancelled');
     const from = direction < 0 ? back : forward;
     const entry = from.at(-1);
     if (!entry) return {ok: false, error: direction < 0 ? 'Nothing to undo.' : 'Nothing to redo.'};
@@ -293,6 +347,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
 
     /** Lays out `graph` and starts the view on it (see `session.import`); the history and the highlight start empty. */
     import(graph, init) {
+      stopRefinement('cancelled');
       back = [];
       forward = [];
       return enqueue(async current => {
@@ -456,6 +511,71 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     },
 
     /**
+     * Refines the current view on the second engine (option `refine`): `{op: 'refine'}` by default, or
+     * `refineProgressive` (intermediate results shown as they arrive, at most one per `publicationInterval`),
+     * `structuredRefine`, with any further fields of the request (such as `threads`). It starts after the steps queued
+     * before it and runs beside the interactive ones; `state.refining` names it meanwhile. A result is applied only if
+     * the view is still the one it started from (otherwise `state.refined.stale` and `state.discarded` counts it); a
+     * change, a step back or a new refinement stops it (`cancelled`). Not a step for `back`: it changes the layout, not a
+     * decision. `onApplied(snapshot, {final, shown})` is called for every result applied (for a host that draws from the
+     * snapshot itself).
+     */
+    refine(request = {}, {onApplied} = {}) {
+      if (!refineRun) return Promise.resolve({ok: false, error: 'No refinement engine (option refine).'});
+      const op = request.op ?? 'refine';
+      return enqueue(async () => {
+        if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        stopRefinement('cancelled');
+        const snapshot = session.snapshot;
+        const j = {id: `refine-${++jobs}`, op, base: {revision: snapshot.revision, layoutVersion: snapshot.layoutVersion ?? 0},
+          applied: 0, lastSequence: 0, pending: null, timer: null, abort: new AbortController(), onApplied};
+        job = j;
+        publish({refining: {op, jobId: j.id, shown: 0}});
+        return {ok: true, j, snapshot};
+      }).then(started => {
+        if (!started.ok) return started;
+        const {j, snapshot} = started;
+        // Intermediate results: the first at once, then the newest one per interval.
+        const showPending = () => {
+          j.timer = null;
+          const next = j.pending;
+          j.pending = null;
+          if (next && job === j) {
+            applyRefined(j, next, false);
+            j.timer = setTimeout(showPending, publicationInterval);
+          }
+        };
+        const onPublication = publication => {
+          if (job !== j || publication?.jobId !== j.id || !(publication.sequence > j.lastSequence)) return;
+          j.lastSequence = publication.sequence;
+          j.pending = publication.snapshot;
+          if (j.timer === null) showPending();
+        };
+        return Promise.resolve(refineRun({...request, op, jobId: j.id, snapshot, expectedRevision: j.base.revision,
+          expectedLayoutVersion: j.base.layoutVersion}, {onPublication, signal: j.abort.signal}))
+          .then(answer => {
+            if (job !== j) return {ok: false, cancelled: true};
+            clearTimeout(j.timer);
+            j.timer = null;
+            if (!answer?.ok) {
+              job = null;
+              publish({refining: null, refined: {op, applied: j.applied > 0, error: answer?.error ?? 'The refinement failed.'}});
+              return {ok: false, error: answer?.error};
+            }
+            return applyRefined(j, answer.snapshot, true).then(r => ({...r, answer}));
+          }, error => {
+            if (job !== j) return {ok: false, cancelled: true};
+            job = null;
+            publish({refining: null, refined: {op, applied: j.applied > 0, error: error.message ?? String(error)}});
+            return {ok: false, error: error.message ?? String(error)};
+          });
+      });
+    },
+
+    /** Stops the refinement under way (`state.refined.cancelled`); its later results are dropped. */
+    cancelRefinement() { stopRefinement('cancelled'); },
+
+    /**
      * The view as a value to keep or share: the decisions (the engine's intent: open groups, pages, filter, options), the
      * highlight and the selection, and the digest of the graph it belongs to. `encodeBookmark` makes it text for a URL.
      */
@@ -485,6 +605,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           publish({error});
           return {ok: false, error};
         }
+        stopRefinement('cancelled');
         const before = await intent();
         const result = await session.apply({op: 'restore', intent: bookmark.intent});
         if (!current()) return {ok: false, cancelled: true};
@@ -535,6 +656,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     adopt(snapshot, {forget = false, remember = null} = {}) {
       return enqueue(async current => {
         // With `remember` (a label) the change from the session's snapshot to this one is remembered for `back`.
+        stopRefinement('cancelled');
         const before = remember && session.snapshot ? await intent() : null;
         const result = await session.load(snapshot, {reset: forget});
         if (!current()) return {ok: false, cancelled: true};

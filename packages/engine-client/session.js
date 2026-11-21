@@ -12,6 +12,34 @@ import {columnsOfScene} from './columns.js';
  * Wraps a worker of `createEngineWorker` as an asynchronous `run`: each request gets an id, and the answer with that id
  * resolves it. Progressive publications are passed to `onPublication(requestId, message)`.
  */
+/**
+ * Provisional: a refinement engine for `createViewController({refine})` on its own worker (`createEngineWorker`), so that
+ * refinement never waits behind the interactive steps: `(request, {onPublication, signal}) => Promise<answer>`, with the
+ * intermediate results of a progressive request (`refineProgressive`) handed to that request's `onPublication`. An
+ * aborted request resolves at once as cancelled; the worker finishes it in the background and its answer is dropped.
+ */
+export function workerRefineRun(worker) {
+  let next = 0;
+  const waiting = new Map();
+  worker.addEventListener('message', ({data}) => {
+    const pending = waiting.get(data?.requestId);
+    if (!pending) return;
+    if (data.publication !== undefined) { pending.onPublication?.(data.publication); return; }
+    waiting.delete(data.requestId);
+    const {requestId, ...response} = data;
+    pending.resolve(response);
+  });
+  return (request, {onPublication, signal} = {}) => new Promise(resolve => {
+    const requestId = ++next;
+    if (signal?.aborted) { resolve({ok: false, cancelled: true}); return; }
+    waiting.set(requestId, {resolve, onPublication});
+    signal?.addEventListener('abort', () => {
+      if (waiting.delete(requestId)) resolve({ok: false, cancelled: true});
+    }, {once: true});
+    worker.postMessage({requestId, request});
+  });
+}
+
 export function workerRun(worker, {onPublication} = {}) {
   let next = 0;
   const waiting = new Map();

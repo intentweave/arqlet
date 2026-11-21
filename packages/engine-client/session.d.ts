@@ -168,6 +168,15 @@ export function createSession(
  * Wraps a worker of `createEngineWorker` as an asynchronous run. `onPublication` receives the progressive publications
  * of a running request.
  */
+/** Provisional: what `createViewController({refine})` runs refinements with. */
+export type RefineRun = (
+  request: EngineRequest,
+  init?: {onPublication?: (publication: {jobId: string; sequence: number; snapshot: Snapshot}) => void; signal?: AbortSignal},
+) => Promise<EngineResponse>;
+
+/** Provisional: a refinement engine on its own worker, with each progressive request's intermediate results. */
+export function workerRefineRun(worker: Worker): RefineRun;
+
 export function workerRun(
   worker: Worker,
   init?: {onPublication?: (requestId: number, message: unknown) => void},
