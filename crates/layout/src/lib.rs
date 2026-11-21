@@ -1011,7 +1011,7 @@ fn compute_mode(
 ) -> Result<Snapshot, Abort> {
     // Provisional (`isolatedGridFrom`): the areas whose unlinked children reach the threshold get the grid.
     let gridded;
-    let options = match options.isolated_grid_from {
+    let options = match options.isolated_grid_threshold() {
         Some(from) if options.isolated_grid_areas.is_empty() => {
             gridded = LayoutOptions {
                 isolated_grid_areas: isolated_grid_areas(graph, from),
