@@ -74,6 +74,16 @@ impl EngineSession {
 
     /// Runs one request given as a JSON value.
     pub fn run_value(&mut self, v: &Value) -> Value {
+        // Provisional (phase timings), as `dispatch` adds them.
+        if v.get("timings").and_then(Value::as_bool) == Some(true) {
+            let mut plain = v.clone();
+            if let Some(map) = plain.as_object_mut() {
+                map.remove("timings");
+            }
+            let answer = crate::timed(|| self.run_value(&plain).to_string());
+            return serde_json::from_str(&answer)
+                .unwrap_or_else(|e| json!({"ok": false, "error": e.to_string()}));
+        }
         match self.answer(v) {
             Ok(answer) => answer,
             Err(error) => json!({"ok": false, "error": error}),

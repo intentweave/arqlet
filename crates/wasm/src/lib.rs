@@ -2,6 +2,8 @@
 //! JSON is used for the prototype; no per-node boundary calls.
 #[no_mangle]
 pub extern "C" fn lw_alloc(len: usize) -> *mut u8 {
+    // Every request starts with an allocation: the host's clock is installed before the first one runs.
+    install_clock();
     Box::into_raw(vec![0u8; len].into_boxed_slice()) as *mut u8
 }
 /// # Safety
@@ -18,6 +20,17 @@ pub unsafe extern "C" fn lw_free(ptr: *mut u8, len: usize) {
 #[link(wasm_import_module = "env")]
 extern "C" {
     fn lw_publish(ptr: *const u8, len: usize);
+    /// The host's clock in ms (`performance.now()`), for phase timings only (`timings: true` on a request).
+    fn lw_now() -> f64;
+}
+
+/// Installs the host's clock (provisional, phase timings). The layout never reads it; only reported times do.
+fn install_clock() {
+    #[cfg(target_arch = "wasm32")]
+    arqlet_runtime::clock::install(|| {
+        // SAFETY: the import takes no arguments and returns a number.
+        unsafe { lw_now() }
+    });
 }
 
 /// Hands one publication to the host. A no-op on native targets, where there is no host to receive it.

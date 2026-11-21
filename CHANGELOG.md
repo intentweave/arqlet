@@ -5,6 +5,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added (phase timings)
+
+- `timings: true` on any request (provisional) adds `timings` to the answer, in ms: `total`, `layout` (every layout in
+  the request) and its phases `placement`, `organicStress`, `separation`, `repair`, `portResolution`, `routing`; through
+  `dispatch` and resident sessions alike. The core reads no clock of its own: the host installs one
+  (`arqlet_model::clock`, re-exported as `arqlet_runtime::clock`); the native binaries use `Instant`, and the WASM module
+  imports `env.lw_now` (the loader `wasm-client.js` passes `performance.now`). A host with its own loader must provide
+  that import now. The times are only reported: the output is the same with and without (15 fingerprint views
+  identical).
+
 ### Added (scene counts)
 
 - `SceneNode.childCount` and `hiddenCount` (provisional): a container's children in the view (added communities and

@@ -1,9 +1,11 @@
 // `onPublish(message)` receives each progressive publication as JSON while the call that produced it is still running.
-// The module always imports `lw_publish`; without a callback the messages are dropped.
+// The module always imports `lw_publish` and `lw_now`; without a callback the messages are dropped.
 export async function createEngine(bytes,{onPublish}={}) {
   const decoder=new TextDecoder();
   let api;
   const imports={env:{
+    // The clock for phase timings (`timings: true` on a request); the layout itself never reads it.
+    lw_now:()=>performance.now(),
     lw_publish:(ptr,len)=>{
       if(!onPublish) return;
       // Copy out of linear memory now: the module releases the buffer when this returns.
