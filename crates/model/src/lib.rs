@@ -1663,6 +1663,21 @@ impl LayoutOptions {
             .unwrap_or(self.level_of_detail.is_some() || self.communities > 0)
     }
 
+    /// The effective `isolated_grid_from`: as set (`0`: none), else 50 in views that start abstract, unless `isolatedGrid`
+    /// already grids every area.
+    pub fn isolated_grid_threshold(&self) -> Option<usize> {
+        match self.isolated_grid_from {
+            Some(0) => None,
+            Some(from) => Some(from),
+            None if !self.isolated_grid
+                && (self.level_of_detail.is_some() || self.communities > 0) =>
+            {
+                Some(50)
+            }
+            None => None,
+        }
+    }
+
     pub fn isolated_grid_in(&self, parent: Option<&str>) -> bool {
         self.isolated_grid
             || (!self.isolated_grid_areas.is_empty()
@@ -1961,7 +1976,8 @@ pub struct LayoutOptions {
     pub isolated_grid: bool,
     /// Provisional: `isolatedGrid` only in the areas with at least this many children that have no edge to another child
     /// of the area (a container opened with hundreds of unlinked members would stand as one long column). `None` (the
-    /// default, omitted): as `isolatedGrid` says.
+    /// default, omitted): 50 in views that start abstract (`levelOfDetail` or `communities` set, and `isolatedGrid` off),
+    /// else as `isolatedGrid` says. `0`: no such grid (`isolated_grid_threshold`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub isolated_grid_from: Option<usize>,
     /// Provisional (hub references): an edge of a node with at least this many edges in the view is not laid out or routed;

@@ -135,7 +135,8 @@ isolatedGrid?: boolean,
 /**
  * Provisional: `isolatedGrid` only in the areas with at least this many children that have no edge to another child
  * of the area (a container opened with hundreds of unlinked members would stand as one long column). `None` (the
- * default, omitted): as `isolatedGrid` says.
+ * default, omitted): 50 in views that start abstract (`levelOfDetail` or `communities` set, and `isolatedGrid` off),
+ * else as `isolatedGrid` says. `0`: no such grid (`isolated_grid_threshold`).
  */
 isolatedGridFrom?: number | null,
 /**

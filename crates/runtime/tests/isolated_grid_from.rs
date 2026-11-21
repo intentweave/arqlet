@@ -68,3 +68,32 @@ fn below_the_threshold_the_drawing_is_the_default_one() {
         serde_json::to_string(&plain).unwrap()
     );
 }
+
+#[test]
+fn views_that_start_abstract_grid_large_unlinked_areas_by_default() {
+    // With a level of detail and nothing set, a container of 60 unlinked children opens as a grid; `0` turns it off;
+    // without an abstract start nothing changes.
+    let aspect = |s: &arqlet_model::Snapshot| {
+        let b = &s.boxes["box"];
+        b.width.max(b.height) / b.width.min(b.height)
+    };
+    let open = |opts: serde_json::Value| {
+        let s = import_graph_with(graph(60), 1000, &options(opts)).unwrap();
+        arqlet_runtime::toggle_container(&s, s.revision, s.layout_version, "box").unwrap()
+    };
+    let default = open(json!({"levelOfDetail": {"depth": 0}}));
+    let off = open(json!({"levelOfDetail": {"depth": 0}, "isolatedGridFrom": 0}));
+    assert!(aspect(&default) < 4., "a grid: {}", aspect(&default));
+    assert!(aspect(&off) > 10., "a column: {}", aspect(&off));
+    assert!(options(json!({"communities": 30})).isolated_grid_threshold() == Some(50));
+    assert!(options(json!({})).isolated_grid_threshold().is_none());
+    assert!(
+        options(json!({"levelOfDetail": {"depth": 0}, "isolatedGrid": true}))
+            .isolated_grid_threshold()
+            .is_none()
+    );
+    // The default is not written into the snapshot.
+    assert!(!serde_json::to_string(&default.options)
+        .unwrap()
+        .contains("isolatedGridFrom"));
+}
