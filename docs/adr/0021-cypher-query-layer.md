@@ -1,8 +1,8 @@
 # ADR 0021: A lean Cypher query layer over the Arqlet graph: own executor, decypher as front end, Grafeo as oracle
 
 Date: 2026-11-21.
-Status: proposed. Nothing is implemented. The evidence below comes from throw-away spikes of 2026-11-21 (kept outside the
-repository), not from code in this repository.
+Status: accepted (2026-11-21, pull request #70). Nothing is implemented yet: stage M1 has not started. The evidence below
+comes from throw-away spikes of 2026-11-21 (kept outside the repository), not from code in this repository.
 
 ## Context
 
