@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `elkLayout` packs components as ELK does (`separateConnectedComponents`, default true, towards `elk.aspectRatio`,
+  default 1.6, now read) when the top level has at least two components with edges and none holds more than half of
+  the linked nodes. Flat graphs with many small components no longer stand in one tall column: synthetic flat graphs
+  go from up to 4.5 to at most 1.9 times elk-rs's area, with fewer crossings (15 → 3 on one), and the 37 corpus views
+  are unchanged (`benchmarks/results/elk-flat-components-20261121.md`).
 - A resident session reads an import in one pass into its types, as `dispatch` already did, instead of a JSON value of
   the whole graph first, and trims the graph's lists to their length. The peak of the import's heap drops by a third
   to more than half (synthetic 2k/20k/100k: 8.2/130/1 184 MB to 2.4/69/886 MB), which in WASM is the memory that stays;
