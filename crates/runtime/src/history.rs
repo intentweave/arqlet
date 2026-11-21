@@ -32,6 +32,7 @@ pub fn intent_of(snapshot: &Snapshot) -> Intent {
         label_positions: options.label_positions.clone(),
         order_hints: options.order_hints.clone(),
         partial: options.partial.clone(),
+        hidden: options.hidden.clone(),
     }
 }
 
@@ -99,6 +100,7 @@ pub fn restore_intent(
     options.label_positions = intent.label_positions.clone();
     options.order_hints = intent.order_hints.clone();
     options.partial = intent.partial.clone();
+    options.hidden = intent.hidden.clone();
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
     validate_pins(&source, &options.pins)?;

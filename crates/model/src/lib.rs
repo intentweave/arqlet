@@ -2833,6 +2833,11 @@ pub struct Intent {
         ts(optional, as = "Option<BTreeMap<String, Vec<String>>>")
     )]
     pub partial: BTreeMap<String, Vec<String>>,
+    /// Provisional: what the view hides (`LayoutOptions::hidden`, set by `filter`), so that a step back undoes a filter.
+    /// Omitted when nothing is hidden.
+    #[serde(default, skip_serializing_if = "Hidden::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Hidden>"))]
+    pub hidden: Hidden,
 }
 
 /// The authored size of one axis of a container (ADR 0010). Absent means content: the extent follows the children,
