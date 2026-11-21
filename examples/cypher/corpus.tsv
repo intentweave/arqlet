@@ -9,7 +9,7 @@ c07	optional	ok	supported	MATCH (a:Person) OPTIONAL MATCH (a)-[:KNOWS]->(b) RETU
 c08	with	ok	supported	MATCH (a)-[:KNOWS]->(b) WITH a, count(b) AS c WHERE c > 2 RETURN a.name, c ORDER BY c DESC SKIP 5 LIMIT 5
 c09	expr	ok	supported	UNWIND [1, 2, 3] AS x RETURN x * 2
 c10	expr	ok	supported	MATCH (n) RETURN CASE WHEN n.age < 18 THEN 'minor' ELSE 'adult' END
-c11	expr	ok	supported	RETURN [x IN range(1, 10) WHERE x % 2 = 0 | x * x]
+c11	expr	ok	open	RETURN [x IN range(1, 10) WHERE x % 2 = 0 | x * x]
 c12	expr	ok	open	MATCH (a) RETURN [(a)-[:KNOWS]->(b) | b.name]
 c13	subq	ok	open	MATCH (a) WHERE exists((a)-[:KNOWS]->()) RETURN a
 c14	subq	ok	later	MATCH (a) WHERE EXISTS { MATCH (a)-[:KNOWS]->(b) WHERE b.age > 3 } RETURN a

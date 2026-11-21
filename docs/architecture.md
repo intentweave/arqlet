@@ -452,17 +452,17 @@ layout scheduling.
   2026-11-11 for 0.2.1 after organic layouts and the cluster overview were found to differ between a native build and
   the browser. Used as a dependency, no code copied.
 
-## Planned dependency of the query layer (ADR 0021, proposed)
+## Dependency of the query layer (ADR 0021)
 
-Not yet a dependency: it is in no `Cargo.toml` or `Cargo.lock` until ADR 0021 is accepted and stage M1 starts. Recorded
-here first, as the project rules ask before third-party code is taken in. Recorded 2026-11-21.
+A dependency of `arqlet-query-cypher` since stage M1 began (ADR 0021 accepted 2026-11-21). It was recorded here first, as
+the project rules ask before third-party code is taken in. The `Cargo.lock` pins the crates below.
 
 - `decypher` 0.2.0 (exact; `EUPL-1.2 OR MIT OR Apache-2.0`, used under `MIT OR Apache-2.0`;
   https://github.com/sunsided/decypher), a Rust parser for openCypher with a lossless syntax tree, a typed AST and a
   scope-resolved HIR. Upstream revision `8b40b52a787a599e0d0e8d23ec78e41fb7cb9850` (tag `v0.2.0`, 2026-11-13, "Release
   0.2.0 (#131)"; the revision is also what the crate's `.cargo_vcs_info.json` names). crates.io checksum
   `76d97d5e8591358e7aa4be91d531cbdccd0bad9f24dc48455087b7fe7f941e76`. A fork and complete re-implementation of
-  https://github.com/a-poor/open-cypher. It will be a dependency of `arqlet-query-cypher` only, with default features
+  https://github.com/a-poor/open-cypher. It is a dependency of `arqlet-query-cypher` only, with default features
   (`hir`; `serde` and `miette` stay off). Declares edition 2024 and `rust-version = "1.94"`, which is why the workspace
   minimum is raised to 1.94. No code is copied.
 - Its runtime dependencies with default features, with their license expressions as `cargo tree` printed them on

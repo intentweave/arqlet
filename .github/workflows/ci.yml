@@ -19,6 +19,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      # ADR 0021, item 12: the query crates stay free of the layout engine (and the guard catches a violation).
+      - run: node tools/check-query-isolation.mjs
+        env:
+          RUSTUP_TOOLCHAIN: stable
+      - run: node --test tools/check-query-isolation.test.mjs
+        env:
+          RUSTUP_TOOLCHAIN: stable
       # The workspace must be installed before build.sh: its Node tests import @arqlet/* by package name.
       - run: corepack enable
       - run: pnpm install --frozen-lockfile --ignore-scripts
