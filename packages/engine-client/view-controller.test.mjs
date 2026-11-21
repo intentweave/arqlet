@@ -52,6 +52,16 @@ for (const resident of [false, true]) {
     assert.equal(s.scene.nodes.find(n => n.id === 'box').collapsed, true);
     assert.equal(s.canBack, false);
 
+    // Details of a node inside the collapsed box: shown by the box; kept up to date after a change, until cleared.
+    assert.equal((await view.select({nodeId: 'c05'})).ok, true);
+    assert.equal(view.getState().details.node.shownAs, 'box');
+    assert.deepEqual(view.getState().details.node.parents, ['box']);
+    view.hover({edgeId: 'e5'});
+    assert.deepEqual(view.getState().hover, {edgeId: 'e5'});
+    const hovered = view.getState();
+    view.hover({edgeId: 'e5'});
+    assert.equal(view.getState(), hovered, 'the same hover changes nothing');
+    view.hover(null);
     // A path into the collapsed box: highlighted, kept while the view changes.
     assert.equal((await view.trace('src', 'out')).ok, true);
     assert.equal(view.getState().highlight.kind, 'trace');
@@ -59,6 +69,14 @@ for (const resident of [false, true]) {
     // Paging: two children asked for, then pages of 10 from the rest.
     await view.reveal(['c05', 'c07']);
     assert.equal(children(view.getState()), 3, 'two children and the rest');
+    assert.equal(view.getState().details.node.shownAs, 'c05', 'the details follow the view');
+    assert.ok(view.getState().details.node.bounds.width > 0);
+    // A line: the edges it stands for.
+    await view.select({edgeId: 'in'});
+    assert.equal(view.getState().details.edge.source, 'src');
+    assert.ok(view.getState().details.route, JSON.stringify(view.getState().details));
+    await view.select(null);
+    assert.equal(view.getState().details, null);
     await view.showRest('box');
     s = view.getState();
     assert.equal(children(s), 13, 'twelve children and the rest');

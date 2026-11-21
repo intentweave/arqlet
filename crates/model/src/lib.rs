@@ -475,7 +475,7 @@ pub struct Gesture {
     pub origin: Option<Point>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Rect {
     // Coordinates relative to the parent container.
@@ -3232,6 +3232,96 @@ pub struct TraceAnswer {
     pub visible: VisibleParts,
     /// Hops of every visible node from the path through the drawn edges (for fading); unreachable nodes are left out.
     pub distance: BTreeMap<String, usize>,
+}
+
+/// Provisional (view details): the answer of `details` (besides `ok`) for a node or an edge: what the engine knows about it
+/// and the host cannot see in the scene (the groups above it, what a collapsed box holds, the edges a drawn line stands
+/// for). Domain attributes stay with the host, which looks them up by id. Read only.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DetailsAnswer {
+    /// The node asked for (`nodeId`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub node: Option<NodeDetails>,
+    /// The edge of the source graph asked for (`edgeId` naming one).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub edge: Option<EdgeDetails>,
+    /// The drawn line asked for (`edgeId` naming a route), or the one that carries the edge asked for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub route: Option<LineDetails>,
+}
+
+/// Provisional: a node of the source graph in the current view (`details`).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NodeDetails {
+    pub id: String,
+    pub kind: String,
+    pub label: String,
+    /// The containers above it, outermost first.
+    pub parents: Vec<String>,
+    /// The visible box that shows it: itself, the collapsed container it is in, or null when the view hides it (a filter,
+    /// outside the view).
+    #[cfg_attr(feature = "ts", ts(type = "string | null"))]
+    pub shown_as: Option<String>,
+    /// That box's bounds in the scene's (absolute) coordinates, or null.
+    #[cfg_attr(
+        feature = "ts",
+        ts(type = "{ x: number, y: number, width: number, height: number } | null")
+    )]
+    pub bounds: Option<Rect>,
+    pub collapsed: bool,
+    /// Its direct children and all nodes inside it, in the source graph.
+    pub children: usize,
+    pub descendants: usize,
+    /// Edges of the source graph that end and start at the node itself (a self-loop counts in both).
+    pub incoming: usize,
+    pub outgoing: usize,
+}
+
+/// Provisional: an edge of the source graph (`details`).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EdgeDetails {
+    pub id: String,
+    pub kind: String,
+    pub source: String,
+    #[cfg_attr(feature = "ts", ts(type = "string | null"))]
+    pub target: Option<String>,
+    /// The drawn line that carries it, or null when the view does not show it (an end hidden, both ends in one box).
+    #[cfg_attr(feature = "ts", ts(type = "string | null"))]
+    pub route: Option<String>,
+}
+
+/// Provisional: a drawn line (`details`): its visible ends, its shape, and the edges of the source graph it stands for in
+/// its own direction (`edges`) and in the other (`opposite`), at most `limit` ids each (the counts are complete).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LineDetails {
+    pub id: String,
+    pub kind: String,
+    pub source: String,
+    pub target: String,
+    pub length: f64,
+    pub bends: usize,
+    /// Edges drawn along it (one unless it leads a bundle).
+    pub weight: usize,
+    /// The line it is bundled into, or null.
+    #[cfg_attr(feature = "ts", ts(type = "string | null"))]
+    pub bundle_of: Option<String>,
+    /// The lines bundled into it.
+    pub bundled: Vec<String>,
+    pub edges: Vec<String>,
+    pub edge_count: usize,
+    pub opposite: Vec<String>,
+    pub opposite_count: usize,
 }
 
 /// Provisional: the answer of `neighbourhood` (besides `ok`): the nodes within some hops of nodes, the edges they were

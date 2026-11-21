@@ -40,12 +40,12 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /**
  * Creates a view controller on `session` (from `createSession`). `page` is how many children `showRest` reveals at a
  * time; `historyLimit` how many steps back are kept; with `scenes: false` the state carries no scene and no diff (a host
- * that draws from the snapshot itself saves the engine call).
+ * that draws from the snapshot itself saves the engine call); `detailLimit` caps the edge ids of a line's details.
  */
-export function createViewController(session, {page = 12, historyLimit = 50, scenes = true} = {}) {
+export function createViewController(session, {page = 12, historyLimit = 50, scenes = true, detailLimit} = {}) {
   let state = Object.freeze({
     snapshot: null, scene: null, diff: null, busy: false, error: null,
-    highlight: null, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
+    highlight: null, selection: null, details: null, hover: null, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
   });
   const listeners = new Set();
   const publish = patch => {
@@ -99,12 +99,22 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     return answer.ok ? {...highlight, answer} : null;
   };
 
-  // After an applied change: the new scene, its difference to the one before, the highlight asked again.
+  // The details of the selection on the current view (the box that shows a node and the edges a line stands for depend on
+  // what is open); null when the selection is gone (a drawn line the change removed).
+  const detailsOf = async selection => {
+    if (!selection) return null;
+    const answer = await session.details(selection, detailLimit === undefined ? {} : {limit: detailLimit});
+    return answer.ok ? answer : null;
+  };
+
+  // After an applied change: the new scene, its difference to the one before, the highlight and the details asked again.
   const settle = async (extra = {}, current = () => true) => {
     const scene = scenes ? await session.scene() : null;
     const highlight = await refreshHighlight(state.highlight);
+    const details = await detailsOf(state.selection);
     if (!current()) return;
     publish({
+      details, selection: details ? state.selection : null,
       snapshot: session.snapshot, scene, diff: scenes ? sceneDiff(state.scene, scene) : null, highlight, error: null,
       canBack: back.length > 0, canForward: forward.length > 0,
       backLabel: back.at(-1)?.label ?? null, forwardLabel: forward.at(-1)?.label ?? null, steps: state.steps + 1, ...extra,
@@ -178,7 +188,8 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           publish({error: result.error ?? 'The import failed.'});
           return result;
         }
-        state = Object.freeze({...state, scene: null, highlight: null, hide: {}, steps: 0});
+        state = Object.freeze({...state, scene: null, highlight: null, selection: null, details: null, hover: null,
+          hide: {}, steps: 0});
         await settle({}, current);
         return result;
       }, {fresh: true});
@@ -241,6 +252,41 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     /** Clears the highlight. */
     clearHighlight() { if (state.highlight) publish({highlight: null}); },
 
+    /**
+     * Selects a node (`{nodeId}`) or an edge (`{edgeId}`: a drawn line or an edge of the source graph), or nothing
+     * (`null`): `state.details` then holds what the engine knows about it (see `session.details`), asked again after
+     * every change until the selection is cleared. How it is shown (a panel, a tooltip, a zoom to `details.node.bounds`)
+     * is the host's; domain attributes the host looks up by id. Not a step for `back`.
+     */
+    select(target) {
+      const selection = target ? ('nodeId' in target ? {nodeId: target.nodeId} : {edgeId: target.edgeId}) : null;
+      if (!selection) {
+        if (state.selection || state.details) publish({selection: null, details: null});
+        return Promise.resolve({ok: true});
+      }
+      return enqueue(async current => {
+        const answer = await session.details(selection, detailLimit === undefined ? {} : {limit: detailLimit});
+        if (!current()) return {ok: false, cancelled: true};
+        if (!answer.ok) {
+          publish({error: answer.error ?? 'No details.'});
+          return answer;
+        }
+        publish({selection, details: answer, error: null});
+        return answer;
+      });
+    },
+
+    /**
+     * What the pointer is over (`{nodeId}`, `{edgeId}` or `null`), for a renderer's hover state (a tooltip from the
+     * scene's label, a lighter outline); no engine call. A tooltip with the engine's facts asks `select` or
+     * `session.details` itself.
+     */
+    hover(target) {
+      const next = target ? ('nodeId' in target ? {nodeId: target.nodeId} : {edgeId: target.edgeId}) : null;
+      if (same(next, state.hover)) return;
+      publish({hover: next});
+    },
+
     /** Undoes the last change (its decisions before it are restored). */
     back() { return step(-1); },
     /** Redoes the last undone change. */
@@ -271,7 +317,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         if (forget) {
           back = [];
           forward = [];
-          state = Object.freeze({...state, highlight: null, hide: {}});
+          state = Object.freeze({...state, highlight: null, selection: null, details: null, hover: null, hide: {}});
         } else if (before) {
           const after = await intent();
           if (!same(before, after)) {

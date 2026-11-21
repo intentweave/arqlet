@@ -182,6 +182,11 @@ pub enum Request {
         #[serde(flatten)]
         body: Map<String, Value>,
     },
+    /// What the engine knows about a node or an edge of the view (read only, provisional).
+    Details {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
     /// The cluster overview of a whole graph.
     Overview {
         #[serde(flatten)]
@@ -317,6 +322,8 @@ pub enum Response {
     Trace(Box<arqlet_model::TraceAnswer>),
     /// The nodes within some hops of nodes (`neighbourhood`).
     Neighbourhood(Box<arqlet_model::NeighbourhoodAnswer>),
+    /// A node or an edge of the view (`details`).
+    Details(Box<arqlet_model::DetailsAnswer>),
     /// The cluster overview of a graph (`overview`).
     Overview(Box<arqlet_model::Overview>),
     /// The decisions a snapshot carries (`intent`).
@@ -336,6 +343,7 @@ impl Response {
             Response::Scene(s) => serde_json::json!({"ok": true, "scene": s}).to_string(),
             Response::Trace(a) => answered(a),
             Response::Neighbourhood(a) => answered(a),
+            Response::Details(a) => answered(a),
             Response::Overview(o) => serde_json::json!({"ok": true, "overview": o}).to_string(),
             Response::Intent(i) => serde_json::json!({"ok": true, "intent": i}).to_string(),
             Response::Metrics(m) => serde_json::json!({"ok": true, "metrics": m}).to_string(),
@@ -549,6 +557,7 @@ impl Request {
             Some("scene") => return Ok(Request::Scene { body: body() }),
             Some("trace") => return Ok(Request::Trace { body: body() }),
             Some("neighbourhood") => return Ok(Request::Neighbourhood { body: body() }),
+            Some("details") => return Ok(Request::Details { body: body() }),
             Some("componentRefine") => return Ok(Request::ComponentRefine { body: body() }),
             Some("elkLayout") => return Ok(Request::ElkLayout { body: body() }),
             Some("overview") => return Ok(Request::Overview { body: body() }),
@@ -1027,6 +1036,10 @@ fn handle_request(request: Request) -> Response {
         Request::Neighbourhood { body } => typed_answer(
             trace::neighbourhood_answer(&with_op("neighbourhood", body)),
             |a| Response::Neighbourhood(Box::new(a)),
+        ),
+        Request::Details { body } => typed_answer(
+            crate::details::details_answer(&with_op("details", body)),
+            |a| Response::Details(Box::new(a)),
         ),
         Request::Overview { body } => {
             let v = with_op("overview", body);

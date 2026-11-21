@@ -1,5 +1,5 @@
-import type {Graph, Hidden, NeighbourhoodAnswer, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
-import type {ReadAnswer, Session, SessionResult} from './session.js';
+import type {DetailsAnswer, Graph, Hidden, NeighbourhoodAnswer, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
+import type {DetailTarget, ReadAnswer, Session, SessionResult} from './session.js';
 import type {EngineRequest} from './wasm-client.js';
 
 /** What changed between two scenes, by id. */
@@ -31,6 +31,12 @@ export interface ViewState {
   /** The last error, cleared by the next successful step. */
   readonly error: string | null;
   readonly highlight: ViewHighlight | null;
+  /** The selected node or edge (`select`), or null. */
+  readonly selection: DetailTarget | null;
+  /** What the engine knows about the selection, asked again after every change; null without a selection. */
+  readonly details: (DetailsAnswer & {ok: true}) | null;
+  /** What the pointer is over (`hover`), or null. */
+  readonly hover: DetailTarget | null;
   /** What the view hides (the last `filter`). */
   readonly hide: Hidden;
   readonly canBack: boolean;
@@ -68,6 +74,10 @@ export interface ViewController {
   /** Opens the groups the highlight passes through. */
   revealHighlight(): Promise<ViewResult>;
   clearHighlight(): void;
+  /** Selects a node or an edge (or nothing): `state.details` holds the engine's facts about it, kept up to date. */
+  select(target: DetailTarget | null): Promise<ViewResult>;
+  /** What the pointer is over (no engine call). */
+  hover(target: DetailTarget | null): void;
   back(): Promise<ViewResult>;
   forward(): Promise<ViewResult>;
   /** Any other change of the protocol, remembered for `back` under `label`. */
@@ -86,6 +96,6 @@ export interface ViewController {
   cancel(): void;
 }
 
-export function createViewController(session: Session, options?: {page?: number; historyLimit?: number; scenes?: boolean}): ViewController;
+export function createViewController(session: Session, options?: {page?: number; historyLimit?: number; scenes?: boolean; detailLimit?: number}): ViewController;
 
 export function sceneDiff(before: Scene | null, after: Scene | null): SceneDiff;

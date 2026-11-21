@@ -10,7 +10,8 @@ The Arqlet engine as WebAssembly (`arqlet.wasm`, included) and its JavaScript ac
   send only what changed), and `workerRun(worker)` / `httpRun(base)`, a worker or a backend as an asynchronous `run`;
 - `view-controller.js`: `createViewController(session)`, a headless view over a session (provisional): one state object
   with `subscribe` (for `useSyncExternalStore`), open/close, paging through `+N more`, filters, a path or neighbourhood
-  kept as the highlight, back and forward, and a scene diff per step, snapshots the host made (`adopt`);
+  kept as the highlight, the details of a selected node or edge (`select`, `state.details`) and the hover, back and
+  forward, and a scene diff per step, snapshots the host made (`adopt`);
   `sceneDiff(before, after)`;
 - `presets.js`: `presetState` and `applyPreset`.
 
