@@ -1,0 +1,17 @@
+{
+  "nodes": [
+    { "id": "ann", "kind": "Person", "label": "Ann", "parentId": null },
+    { "id": "bob", "kind": "Person", "label": "Bob", "parentId": null },
+    { "id": "cid", "kind": "Person", "label": "Cid", "parentId": null },
+    { "id": "dee", "kind": "Person", "label": "Dee", "parentId": null }
+  ],
+  "edges": [
+    { "id": "e1", "kind": "KNOWS", "source": "ann", "target": "bob" },
+    { "id": "e2", "kind": "KNOWS", "source": "ann", "target": "bob" },
+    { "id": "e3", "kind": "KNOWS", "source": "bob", "target": "cid" },
+    { "id": "e4", "kind": "KNOWS", "source": "cid", "target": "ann" },
+    { "id": "e5", "kind": "KNOWS", "source": "ann", "target": "cid" },
+    { "id": "e6", "kind": "KNOWS", "source": "cid", "target": "cid" },
+    { "id": "e7", "kind": "FOLLOWS", "source": "dee", "target": "ann" }
+  ]
+}

@@ -1,0 +1,41 @@
+id	category	parse	verdict	query
+c01	basic	ok	supported	MATCH (n:Person) RETURN n
+c02	basic	ok	supported	MATCH (n:Person {name: 'Ann'}) WHERE n.age > 30 RETURN n.name AS name ORDER BY name LIMIT 10
+c03	rel	ok	supported	MATCH (a:Person)-[r:KNOWS]->(b:Person) RETURN a, r, b
+c04	rel	ok	supported	MATCH (a)-[r:KNOWS|FOLLOWS]-(b) RETURN count(*)
+c05	varlen	ok	supported	MATCH (a)-[:KNOWS*1..3]->(b) RETURN DISTINCT b
+c06	varlen	ok	open	MATCH p = (a)-[*]->(b) RETURN length(p)
+c07	optional	ok	supported	MATCH (a:Person) OPTIONAL MATCH (a)-[:KNOWS]->(b) RETURN a, b
+c08	with	ok	supported	MATCH (a)-[:KNOWS]->(b) WITH a, count(b) AS c WHERE c > 2 RETURN a.name, c ORDER BY c DESC SKIP 5 LIMIT 5
+c09	expr	ok	supported	UNWIND [1, 2, 3] AS x RETURN x * 2
+c10	expr	ok	supported	MATCH (n) RETURN CASE WHEN n.age < 18 THEN 'minor' ELSE 'adult' END
+c11	expr	ok	supported	RETURN [x IN range(1, 10) WHERE x % 2 = 0 | x * x]
+c12	expr	ok	open	MATCH (a) RETURN [(a)-[:KNOWS]->(b) | b.name]
+c13	subq	ok	open	MATCH (a) WHERE exists((a)-[:KNOWS]->()) RETURN a
+c14	subq	ok	later	MATCH (a) WHERE EXISTS { MATCH (a)-[:KNOWS]->(b) WHERE b.age > 3 } RETURN a
+c15	param	ok	supported	MATCH (n) WHERE n.id = $id AND n.name STARTS WITH $prefix RETURN n
+c16	string	ok	supported	MATCH (n) WHERE n.name =~ '(?i)an.*' AND n.name CONTAINS 'n' RETURN n
+c17	expr	ok	supported	MATCH (n) WHERE n.x IN [1, 2, 3] AND n.y IS NOT NULL RETURN n
+c18	expr	ok	open	MATCH (n) WHERE all(x IN n.tags WHERE x <> '') RETURN n
+c19	expr	ok	open	MATCH (n) RETURN n {.name, .age, extra: 1}
+c20	varlen	ok	later	MATCH p = shortestPath((a)-[*..5]-(b)) RETURN p
+c21	union	ok	supported	MATCH (a:A) RETURN a.x AS x UNION ALL MATCH (b:B) RETURN b.x AS x
+c22	rel	ok	supported	MATCH (a)-[:R]->(b), (b)-[:S]->(c) RETURN a, c
+c23	basic	ok	open	MATCH (n:A:B) RETURN n
+c24	rel	ok	supported	MATCH (a)-[r]->(a) RETURN r
+c25	search	ok	rejected	CALL db.index.vector.queryNodes('emb', 5, $vec) YIELD node, score RETURN node, score
+c26	search	ok	rejected	CALL db.index.fulltext.queryNodes('ft', 'foo AND bar') YIELD node, score WHERE score > 0.5 RETURN node
+c27	write	ok	rejected	CREATE (a:Person {name: 'x'})-[:KNOWS]->(b:Person)
+c28	write	ok	rejected	MERGE (n:Person {id: 1}) ON CREATE SET n.c = 1 SET n.x = 2
+c29	write	ok	rejected	MATCH (n) DETACH DELETE n
+c30	cypher25	ok	later	MATCH (a)-[:KNOWS]->{1,3}(b) RETURN b
+c31	rel	ok	supported	MATCH (a)-[r:KNOWS {since: 2020}]->(b) RETURN r.since
+c32	expr	ok	supported	RETURN {a: [1, 2, {b: 'c'}], d: null}
+c33	basic	ok	supported	MATCH (`my node`:`My Label`) RETURN `my node`.`a b`
+c34	cypher25	ok	open	MATCH (n:A|B) RETURN n
+c35	cypher25	ok	open	MATCH (n:!A&(B|C)) RETURN n
+c36	expr	ok	open	MATCH (n) RETURN toString(n.x) + 'a' AS s, coalesce(n.y, 0) AS y, n.z[0] AS z0, n.l[1..3] AS sl
+e01	neg	err	invalid	MATCH (n RETURN n
+e02	neg	err	invalid	MATCH (n) RETRUN n
+e03	neg	err	invalid	RETURN
+e04	neg	err	invalid	MATCH (a)-[r:KNOWS->(b) RETURN a

@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "id": "root",
+      "kind": "directory",
+      "label": "Example",
+      "parentId": null
+    },
+    {
+      "id": "a",
+      "kind": "symbol",
+      "label": "Parse",
+      "parentId": "root"
+    },
+    {
+      "id": "b",
+      "kind": "symbol",
+      "label": "Analyze",
+      "parentId": "root"
+    }
+  ],
+  "edges": [
+    {
+      "id": "ab",
+      "kind": "calls",
+      "source": "a",
+      "target": "b"
+    },
+    {
+      "id": "ba",
+      "kind": "calls",
+      "source": "b",
+      "target": "a"
+    },
+    {
+      "id": "aa",
+      "kind": "calls",
+      "source": "a",
+      "target": "a"
+    },
+    {
+      "id": "ab2",
+      "kind": "calls",
+      "source": "a",
+      "target": "b"
+    },
+    {
+      "id": "unknown",
+      "kind": "calls",
+      "source": "a",
+      "target": null
+    }
+  ]
+}
