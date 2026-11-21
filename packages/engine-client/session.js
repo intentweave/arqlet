@@ -12,6 +12,34 @@ import {columnsOfScene} from './columns.js';
  * Wraps a worker of `createEngineWorker` as an asynchronous `run`: each request gets an id, and the answer with that id
  * resolves it. Progressive publications are passed to `onPublication(requestId, message)`.
  */
+/**
+ * Provisional: a refinement engine for `createViewController({refine})` on its own worker (`createEngineWorker`), so that
+ * refinement never waits behind the interactive steps: `(request, {onPublication, signal}) => Promise<answer>`, with the
+ * intermediate results of a progressive request (`refineProgressive`) handed to that request's `onPublication`. An
+ * aborted request resolves at once as cancelled; the worker finishes it in the background and its answer is dropped.
+ */
+export function workerRefineRun(worker) {
+  let next = 0;
+  const waiting = new Map();
+  worker.addEventListener('message', ({data}) => {
+    const pending = waiting.get(data?.requestId);
+    if (!pending) return;
+    if (data.publication !== undefined) { pending.onPublication?.(data.publication); return; }
+    waiting.delete(data.requestId);
+    const {requestId, ...response} = data;
+    pending.resolve(response);
+  });
+  return (request, {onPublication, signal} = {}) => new Promise(resolve => {
+    const requestId = ++next;
+    if (signal?.aborted) { resolve({ok: false, cancelled: true}); return; }
+    waiting.set(requestId, {resolve, onPublication});
+    signal?.addEventListener('abort', () => {
+      if (waiting.delete(requestId)) resolve({ok: false, cancelled: true});
+    }, {once: true});
+    worker.postMessage({requestId, request});
+  });
+}
+
 export function workerRun(worker, {onPublication} = {}) {
   let next = 0;
   const waiting = new Map();
@@ -152,8 +180,23 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
      * Any change still under way is dropped.
      */
     import(graph, {limit = Math.min(graph.nodes.length, MAX_VIEW_LIMIT), options} = {}) {
+      // A new view does not wait for the changes still under way: they resolve as stale.
       generation++;
+      queue = Promise.resolve();
       return enqueue(() => call({op: 'import', graph, limit, ...(options ? {options} : {})}));
+    },
+
+    /**
+     * Provisional: continues from `snapshot` (a host made it: a drag, a refinement, a document it loaded), after the changes
+     * queued before; with a resident session the engine takes it over (`load`).
+     */
+    load(snapshot, {reset = false} = {}) {
+      // With `reset` (another view) it does not wait for the changes still under way: they resolve as stale.
+      if (reset) {
+        generation++;
+        queue = Promise.resolve();
+      }
+      return enqueue(() => (resident ? call({op: 'load', snapshot}) : {ok: true, snapshot}));
     },
 
     /** Drops the snapshot; changes still under way resolve as stale. */
@@ -195,6 +238,36 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
      * `{ok, nodes, edges, hops, visible: {nodes, routes}, distance}` as for `trace`; `nodes` can go to `reveal`.
      * `direction`: `out`, `in` or `both` (default); `edgeKinds`: follow only edges of these kinds.
      */
+    /**
+     * Provisional (search, read only): the nodes of the source graph whose label or id contains `query` (ignoring case),
+     * best first, with the containers above each and the box that shows it (also inside collapsed groups); at most
+     * `limit` (default 20), only `nodeKinds` if given; `total` counts them all.
+     */
+    /**
+     * Provisional (read only): a look into the collapsed container `nodeId` without opening it: its contents laid out on
+     * their own as a small scene (the containers inside collapsed, at most `limit` direct children, default 50), and per
+     * child shown the edges that cross the container's border (`external`).
+     */
+    async peek(nodeId, {limit} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'peek', snapshot, nodeId, ...(limit !== undefined ? {limit} : {})});
+    },
+
+    async find(query, {limit, nodeKinds} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'find', snapshot, query, ...(limit !== undefined ? {limit} : {}), ...(nodeKinds ? {nodeKinds} : {})});
+    },
+
+    /**
+     * Provisional (view details, read only): what the engine knows about a node (`{nodeId}`) or an edge (`{edgeId}`, a
+     * drawn line or an edge of the source graph): the containers above a node and the box that shows it, what a collapsed
+     * box holds, the edges a line stands for in either direction (at most `limit` ids each, counts complete).
+     */
+    async details(target, {limit} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'details', snapshot, ...target, ...(limit !== undefined ? {limit} : {})});
+    },
+
     async neighbourhood(nodeId, {hops, direction, edgeKinds} = {}) {
       if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
       return call({op: 'neighbourhood', snapshot, ...(Array.isArray(nodeId) ? {nodeIds: nodeId} : {nodeId}),

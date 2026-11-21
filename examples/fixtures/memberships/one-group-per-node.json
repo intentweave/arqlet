@@ -1,0 +1,30 @@
+{
+  "defaultDirection": "tb",
+  "nodes": [
+    { "id": "a", "kind": "host", "label": "A", "parentId": null },
+    { "id": "b", "kind": "host", "label": "B", "parentId": null },
+    { "id": "shared", "kind": "host", "label": "Shared", "parentId": null },
+    { "id": "c", "kind": "host", "label": "C", "parentId": null },
+    { "id": "d", "kind": "host", "label": "D", "parentId": null }
+  ],
+  "edges": [
+    { "id": "s1", "kind": "link", "source": "a", "target": "shared" },
+    { "id": "s2", "kind": "link", "source": "b", "target": "shared" },
+    { "id": "s3", "kind": "link", "source": "shared", "target": "c" },
+    { "id": "s4", "kind": "link", "source": "shared", "target": "d" },
+    { "id": "s5", "kind": "link", "source": "c", "target": "a" }
+  ],
+  "memberships": {
+    "dimensions": [
+      {
+        "id": "zone",
+        "label": "Zone",
+        "groups": [
+          { "id": "north", "label": "North", "members": ["a", "b", "shared", "ghost"] },
+          { "id": "south", "label": "South", "members": ["shared", "c", "d"] }
+        ]
+      }
+    ]
+  },
+  "membershipViews": { "zone": "overlay" }
+}

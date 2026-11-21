@@ -1,0 +1,79 @@
+{
+  "defaultDirection": "lr",
+  "nodes": [
+    { "id": "front", "kind": "deployment", "label": "Front", "parentId": null },
+    { "id": "back", "kind": "deployment", "label": "Back", "parentId": null },
+    { "id": "ops", "kind": "deployment", "label": "Ops", "parentId": null },
+
+    { "id": "gateway", "kind": "service", "label": "Gateway", "parentId": "front" },
+    { "id": "authn", "kind": "service", "label": "Authn", "parentId": "front" },
+    { "id": "authz", "kind": "service", "label": "Authz", "parentId": "front" },
+
+    { "id": "orders", "kind": "service", "label": "Orders", "parentId": "back" },
+    { "id": "billing", "kind": "service", "label": "Billing", "parentId": "back" },
+    { "id": "ledger", "kind": "service", "label": "Ledger", "parentId": "back" },
+
+    { "id": "notify", "kind": "service", "label": "Notify", "parentId": "ops" },
+    { "id": "search", "kind": "service", "label": "Search", "parentId": "ops" },
+    { "id": "audit", "kind": "service", "label": "Audit", "parentId": "ops" }
+  ],
+  "edges": [
+    { "id": "e1", "kind": "calls", "source": "gateway", "target": "authn" },
+    { "id": "e2", "kind": "calls", "source": "authn", "target": "authz" },
+    { "id": "e3", "kind": "calls", "source": "authz", "target": "orders" },
+    { "id": "e3b", "kind": "calls", "source": "authz", "target": "orders" },
+    { "id": "e4", "kind": "calls", "source": "orders", "target": "billing" },
+    { "id": "e5", "kind": "calls", "source": "billing", "target": "ledger" },
+    { "id": "e6", "kind": "calls", "source": "orders", "target": "notify" },
+    { "id": "e7", "kind": "calls", "source": "search", "target": "orders" },
+    { "id": "e8", "kind": "calls", "source": "audit", "target": "ledger" },
+    { "id": "e9", "kind": "calls", "source": "ledger", "target": "audit" },
+    { "id": "e10", "kind": "calls", "source": "gateway", "target": "gateway" },
+    { "id": "e11", "kind": "calls", "source": "notify", "target": "gateway" }
+  ],
+  "memberships": {
+    "dimensions": [
+      {
+        "id": "zone",
+        "label": "Zone",
+        "groups": [
+          { "id": "dmz", "label": "DMZ", "members": ["gateway", "authn"] },
+          {
+            "id": "internal",
+            "label": "Internal",
+            "members": ["authz", "orders", "billing", "notify", "search"]
+          },
+          {
+            "id": "restricted",
+            "label": "Restricted",
+            "parent": "internal",
+            "members": ["ledger", "audit"]
+          }
+        ]
+      },
+      {
+        "id": "team",
+        "label": "Team",
+        "groups": [
+          {
+            "id": "platform",
+            "label": "Platform",
+            "members": ["gateway", "authn", "authz", "notify"]
+          },
+          { "id": "payments", "label": "Payments", "members": ["orders", "billing", "ledger"] },
+          { "id": "data", "label": "Data", "members": ["search", "audit"] }
+        ]
+      },
+      {
+        "id": "layer",
+        "label": "Layer",
+        "groups": [
+          { "id": "api", "label": "API", "members": ["gateway", "orders", "search"] },
+          { "id": "logic", "label": "Logic", "members": ["authn", "authz", "billing", "notify"] },
+          { "id": "store", "label": "Store", "members": ["ledger", "audit"] }
+        ]
+      }
+    ]
+  },
+  "membershipViews": { "zone": "lanes", "team": "overlay", "layer": "overlay" }
+}

@@ -1,4 +1,4 @@
-import type {Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
+import type {DetailsAnswer, FindAnswer, Graph, GraphNeighbourhood, GraphPatch, GraphTrace, Hidden, NeighbourhoodAnswer, Overview, OverviewRequest, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
 import type {SceneColumns} from './columns.js';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
@@ -37,6 +37,19 @@ export interface SessionResult {
   unchanged?: boolean;
 }
 
+/** Provisional: a look into a container (`peek`): its contents as a scene, and the border edges per child shown. */
+export interface PeekAnswer {
+  nodeId: string;
+  children: number;
+  shown: number;
+  omitted: number;
+  external: Record<string, {incoming: number; outgoing: number}>;
+  scene: Scene;
+}
+
+/** What `details` asks about: a node, or an edge (a drawn line or an edge of the source graph). */
+export type DetailTarget = {nodeId: string; edgeId?: never} | {edgeId: string; nodeId?: never};
+
 /** The answer of a read-only request (`trace`, `neighbourhood`): its fields beside `ok: true`, or the error. */
 export type ReadAnswer<T> = ({ok: true} & T) | {ok: false; error: string};
 
@@ -54,6 +67,11 @@ export interface Session {
    */
   import(graph: Graph, init?: {limit?: number; options?: Record<string, unknown>}): Promise<SessionResult>;
   /** Drops the snapshot; changes still under way resolve as stale. */
+  /**
+   * Provisional: continues from `snapshot` (made by the host), after the changes queued before; with `reset` (another
+   * view) at once, the changes still under way resolving as stale.
+   */
+  load(snapshot: Snapshot, options?: {reset?: boolean}): Promise<SessionResult>;
   reset(): void;
   /** Whether container `id` is collapsed in the current snapshot. */
   isCollapsed(id: string): boolean;
@@ -80,6 +98,18 @@ export interface Session {
     nodeId: string | string[],
     init?: {hops?: number; direction?: 'out' | 'in' | 'both'; edgeKinds?: string[]},
   ): Promise<ReadAnswer<NeighbourhoodAnswer>>;
+  /**
+   * Provisional (read only): what the engine knows about a node or an edge (a drawn line or an edge of the source graph):
+   * the containers above a node and the box that shows it, what a collapsed box holds, the edges a line stands for.
+   */
+  details(target: DetailTarget, init?: {limit?: number}): Promise<ReadAnswer<DetailsAnswer>>;
+  /**
+   * Provisional (read only): the nodes whose label or id contains `query` (ignoring case), best first, with the box that
+   * shows each; at most `limit` (default 20), only `nodeKinds` if given.
+   */
+  find(query: string, init?: {limit?: number; nodeKinds?: string[]}): Promise<ReadAnswer<FindAnswer>>;
+  /** Provisional (read only): a look into a collapsed container without opening it. */
+  peek(nodeId: string, init?: {limit?: number}): Promise<ReadAnswer<PeekAnswer>>;
   /**
    * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
    * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from
@@ -150,6 +180,15 @@ export function createSession(
  * Wraps a worker of `createEngineWorker` as an asynchronous run. `onPublication` receives the progressive publications
  * of a running request.
  */
+/** Provisional: what `createViewController({refine})` runs refinements with. */
+export type RefineRun = (
+  request: EngineRequest,
+  init?: {onPublication?: (publication: {jobId: string; sequence: number; snapshot: Snapshot}) => void; signal?: AbortSignal},
+) => Promise<EngineResponse>;
+
+/** Provisional: a refinement engine on its own worker, with each progressive request's intermediate results. */
+export function workerRefineRun(worker: Worker): RefineRun;
+
 export function workerRun(
   worker: Worker,
   init?: {onPublication?: (requestId: number, message: unknown) => void},

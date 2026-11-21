@@ -48,7 +48,8 @@ Performance work and algorithm replacements per layout family are planned step b
 ## 6. Memberships across the hierarchy (proposed)
 
 Today a node belongs to one container (`parentId`); `groups` and communities nest inside that one hierarchy. A node
-that belongs to a zone, a team and a security domain at once cannot be shown. Planned (needs an ADR, 0021):
+that belongs to a zone, a team and a security domain at once cannot be shown. Decided as a proposal in
+[ADR 0022](adr/0022-memberships-across-the-hierarchy.md), with test data in `examples/fixtures/memberships/`:
 
 - Model: memberships separate from `parentId`, as groups with a dimension (`zone`, `team`, `layer`, …); the canonical
   graph keeps its hierarchy.
@@ -58,8 +59,9 @@ that belongs to a zone, a team and a security domain at once cannot be shown. Pl
   group cannot be kept together.
 - Hard parts: contiguity is not always possible (Euler diagrams); hulls cross container borders and must not obstruct
   the routing; a measure of group contiguity and overlap is needed before any default.
-- Open questions for the ADR: the concrete dimensions of the exports, how many groups and dimensions, and whether the
-  extra memberships shape the layout or are only drawn at first.
+- Still open after the ADR: the concrete dimensions of the exports (`tools/intentweave-export` emits none yet), how many
+  groups and dimensions a view can carry, and whether the extra memberships shape the layout or are only drawn at first
+  (the ADR draws in M2 and shapes in M3, and the M3 gate decides).
 
 ## 7. Scaling from 20K to 1M nodes (planned)
 
