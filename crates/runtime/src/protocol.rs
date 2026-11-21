@@ -121,6 +121,16 @@ pub enum Request {
         #[serde(flatten)]
         on: Edit,
     },
+    /// Provisional (drag API): pin a node at a position in its parent's frame (default: where it is), or release its pin.
+    Pin {
+        #[serde(flatten)]
+        on: Edit,
+        node_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        position: Option<arqlet_model::Point>,
+        #[serde(skip_serializing_if = "std::ops::Not::not")]
+        unpin: bool,
+    },
     /// Restore the decisions of an earlier snapshot (undo).
     Restore {
         #[serde(flatten)]
@@ -462,6 +472,7 @@ impl Request {
             | Request::Configure { on, .. }
             | Request::Port { on, .. }
             | Request::Settle { on, .. }
+            | Request::Pin { on, .. }
             | Request::Restore { on, .. }
             | Request::Shape { on, .. }
             | Request::Measure { on, .. }
@@ -613,6 +624,7 @@ impl Request {
                     | "configure"
                     | "port"
                     | "settle"
+                    | "pin"
                     | "restore"
                     | "shape"
                     | "measure"
@@ -731,6 +743,18 @@ impl Request {
                 }
             }
             "settle" => Request::Settle { on },
+            "pin" => Request::Pin {
+                on,
+                node_id: v["nodeId"].as_str().ok_or("Missing nodeId")?.into(),
+                position: match v.get("position") {
+                    None | Some(Value::Null) => None,
+                    Some(p) => Some(
+                        serde_json::from_value(p.clone())
+                            .map_err(|_| "pin: position must be {x, y}")?,
+                    ),
+                },
+                unpin: v["unpin"].as_bool().unwrap_or(false),
+            },
             "restore" => Request::Restore {
                 on,
                 intent: Box::new(typed(&v["intent"])?),
@@ -928,6 +952,19 @@ fn handle_request(request: Request) -> Response {
             &edge_id,
             &endpoint,
             side.zip(offset),
+        )),
+        Request::Pin {
+            on,
+            node_id,
+            position,
+            unpin,
+        } => snapshot(crate::pin_node(
+            &on.snapshot,
+            on.expected_revision,
+            on.expected_layout_version,
+            &node_id,
+            position,
+            unpin,
         )),
         Request::Settle { on } => snapshot(settle::settle_snapshot(
             &on.snapshot,
@@ -1135,6 +1172,11 @@ mod tests {
             edit("port", json!({"edgeId": "ab", "endpoint": "source", "side": "top"})),
             edit("port", json!({"edgeId": "ab"})),
             edit("settle", json!({})),
+            edit("pin", json!({"nodeId": "a"})),
+            edit("pin", json!({"nodeId": "a", "position": {"x": 10, "y": 20}})),
+            edit("pin", json!({"nodeId": "a", "unpin": true})),
+            edit("pin", json!({"nodeId": "nope"})),
+            edit("pin", json!({"nodeId": "a", "position": 3})),
             edit("restore", json!({"intent": intent["intent"]})),
             edit("restore", json!({"intent": 5})),
             edit("shape", json!({"nodeId": "a", "shape": "circle"})),

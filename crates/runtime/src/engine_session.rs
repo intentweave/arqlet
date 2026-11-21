@@ -140,8 +140,8 @@ impl EngineSession {
             }
             Some(
                 "direction" | "strategy" | "routing" | "move" | "add" | "toggle" | "reveal"
-                | "filter" | "patch" | "configure" | "port" | "settle" | "restore" | "shape"
-                | "measure" | "refine" | "refineProgressive",
+                | "filter" | "patch" | "configure" | "port" | "settle" | "pin" | "restore"
+                | "shape" | "measure" | "refine" | "refineProgressive",
             ) => {
                 let current = self.current()?;
                 // The session's versions unless the request names its own (then a stale request is refused as always).

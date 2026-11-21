@@ -22,6 +22,19 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   when collapsed, those in the rest when shown in part); omitted for leaves and when every child is drawn. A host can show
   "12" on a collapsed box without a copy of the graph. The columnar scene carries them as `nodeChildCount` and
   `nodeHiddenCount` (`NONE` when absent).
+### Added (drag API)
+
+- A typed drag API in the session (provisional): `session.drag(nodeId, position, {others})` returns a handle with
+  `move(position)` (positions that arrive while a step is computed replace each other; only the newest is sent),
+  `drop({release, settle})` (the node stays pinned where it was dropped, or released; `settle` lets force-directed areas
+  settle afterwards) and `cancel()` (back to where it was), plus `active`, `stats` and `begun`; `session.pin(nodeId,
+  position?)` and `session.unpin(nodeId)`. Positions are in the parent's frame, as `toReactFlow` gives them. Works with
+  resident sessions and with a snapshot sent per request.
+- Engine operation `pin` (provisional): `{nodeId, position?}` pins a node (default: where it is), `{nodeId, unpin: true}`
+  releases it; through `dispatch`, so in all three deployment modes (backend allowlist updated).
+- `toReactFlow(scene, {draggable: true})` marks leaves draggable (containers never), for a host that passes React Flow's
+  drag events to `session.drag`.
+
 ### Added (React Flow)
 
 - `toReactFlow(scene, {overlayNode})` returns what is neither a node nor an edge between nodes, in flow coordinates:

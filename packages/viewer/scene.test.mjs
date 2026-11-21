@@ -103,3 +103,12 @@ test('React Flow returns bus bars, junctions and hub references as overlays, opt
   assert.deepEqual(overlay.data.busLines, busLines);
   assert.equal(withNode.nodes.at(-1), overlay, 'after every scene node');
 });
+
+test('React Flow marks leaves draggable on request, never containers', () => {
+  const s = scene('bpmn-pools');
+  assert.ok(toReactFlow(s).nodes.every(n => n.draggable === false));
+  const mapped = toReactFlow(s, {draggable: true});
+  const container = new Set(s.nodes.filter(n => n.container).map(n => n.id));
+  assert.ok(container.size > 0);
+  for (const n of mapped.nodes) assert.equal(n.draggable, !container.has(n.id), n.id);
+});

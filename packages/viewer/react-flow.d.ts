@@ -16,7 +16,8 @@ export interface ArqletFlowNode {
   width: number;
   height: number;
   style: {width: number; height: number};
-  draggable: false;
+  /** True for leaves with `draggable`; containers are never draggable. */
+  draggable: boolean;
   connectable: false;
   deletable: false;
   zIndex: number;
@@ -66,6 +67,12 @@ export interface ArqletFlowOverlayNode {
 export interface ToReactFlowOptions {
   /** Add an `arqletOverlay` node that carries the overlays (only when the scene has any). Default false. */
   overlayNode?: boolean;
+  /**
+   * Mark leaves draggable, so that React Flow lets them be dragged; pass the drag to the engine (`session.drag` on
+   * `onNodeDragStart`, `move(node.position)` on `onNodeDrag`, `drop()` on `onNodeDragStop`). Containers stay fixed.
+   * Default false.
+   */
+  draggable?: boolean;
 }
 
 /**

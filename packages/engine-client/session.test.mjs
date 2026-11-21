@@ -350,3 +350,45 @@ test('a session patches the graph without a new import and keeps its view', {ski
   }
   assert.deepEqual(states[0], states[1]);
 });
+
+for (const resident of [false, true]) {
+  test(`a drag moves a node step by step, drops it pinned, and pin/unpin work (resident ${resident})`, {skip: !engine || (resident && !engine.openSession)}, async () => {
+    const changes = [];
+    const session = createSession(engine, {resident, onChange: s => changes.push(s.layoutVersion)});
+    assert.equal((await session.import(graph)).ok, true);
+    const boundsOf = async id => (await session.scene()).nodes.find(n => n.id === id).bounds;
+    const parent = await boundsOf('root');
+    const start = await boundsOf('a');
+    const rel = {x: start.x - parent.x, y: start.y - parent.y};
+    const handle = session.drag('a', rel);
+    assert.equal((await handle.begun).ok, true, (await handle.begun).error);
+    // Three positions at once: the ones overtaken before they were sent are dropped, the newest is applied.
+    const moves = [1, 2, 3].map(k => handle.move({x: rel.x + 40 * k, y: rel.y + 10 * k}));
+    for (const m of await Promise.all(moves)) assert.equal(m.ok, true, m.error);
+    assert.ok(handle.stats.coalesced >= 1, JSON.stringify(handle.stats));
+    const dropped = await handle.drop();
+    assert.equal(dropped.ok, true, dropped.error);
+    assert.equal(handle.active, false);
+    const exported = await session.exportSnapshot();
+    assert.deepEqual(exported.options.pins.a, {x: rel.x + 120, y: rel.y + 30}, 'pinned where it was dropped');
+    // The drawing follows the pin within the parent's frame.
+    const now = await boundsOf('a'), p2 = await boundsOf('root');
+    assert.deepEqual({x: now.x - p2.x, y: now.y - p2.y}, {x: rel.x + 120, y: rel.y + 30});
+    // Unpin, then pin where it is.
+    assert.equal((await session.unpin('a')).ok, true);
+    assert.equal((await session.exportSnapshot()).options.pins?.a, undefined);
+    assert.equal((await session.pin('a')).ok, true);
+    assert.ok((await session.exportSnapshot()).options.pins.a);
+    // After a drop the handle takes nothing more; a cancelled drag puts the node back.
+    assert.equal((await handle.move({x: 0, y: 0})).ok, false);
+    const before = await boundsOf('b');
+    const pb = await boundsOf('root');
+    const other = session.drag('b', {x: before.x - pb.x + 60, y: before.y - pb.y});
+    await other.begun;
+    assert.equal((await other.cancel()).ok, true);
+    const after = await boundsOf('b'), pa = await boundsOf('root');
+    assert.deepEqual({x: after.x - pa.x, y: after.y - pa.y}, {x: before.x - pb.x, y: before.y - pb.y});
+    assert.ok(changes.length >= 6);
+    await session.close();
+  });
+}
