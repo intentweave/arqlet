@@ -51,3 +51,23 @@ the bounded view graph 0.6 MB, routes 0.1 MB, the rest of the snapshot 2.4 MB.
   MB. A dhat profile of the 20k import puts the peak in placement and routing structures (rects, the placement plan,
   range trees, cross plans, the joint coordination's bends), each a few percent. Reducing it is a layout change of its
   own (measured before and after, output byte-identical).
+
+## Where the layout's peak sits (114 196 nodes, first view of 100 boxes and 4 160 routes)
+
+A dhat profile of the import from a typed graph (release with line tables, `--features profile`) peaks at 877 MB in
+10.9 million blocks, all in the layout of the first view. The largest sites at the peak:
+
+| MB | Blocks | Site |
+|---|---|---|
+| 43.7 | 575 898 | `constructive/abstract_realization/completion.rs:145` (called from `layout/src/lib.rs:5006`) |
+| 39.2 | 98 | a clone of the abstract plan, `abstract_routing.rs:89`, in `planning.rs:163` |
+| 36.2 | 581 222 | `placement_geometry.rs:90` |
+| 35.4 | 54 | `abstract_routing.rs:425` in `planning.rs:161` |
+| 28.0 + 28.0 | 1 + 1 | `continuity.rs:304`, once through `chains.rs:152` and once through `completion.rs:145` |
+| 26.0 + 26.0 | 1 + 1 | `joint.rs:1068`, once through `chains.rs:144` and once through `completion.rs:145` |
+| 26.0 | 1 | `continuity.rs:228` |
+| 25.7 | 21 366 | `coordination.rs:328` (from `joint.rs:688`) |
+
+Single blocks of 26 to 28 MB point to tables that grow with the square of the segments of a channel, and two of them
+are alive twice at the same time (through `chains` and through `completion`); the plan is cloned. These are the
+candidates for a layout change that lowers the peak; none of them is changed here.
