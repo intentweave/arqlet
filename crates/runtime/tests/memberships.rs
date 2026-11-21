@@ -330,15 +330,40 @@ fn three_dimensions_cut_across_the_containers_and_across_each_other() {
             d.id
         );
     }
+    // Two dimensions group the same way when they induce the same partition, which is a question about *pairs* of nodes:
+    // do these two nodes share a group here exactly when they share one there? Comparing the group ids instead would never
+    // find a difference, because no two dimensions reuse an id.
+    let leaves: Vec<&String> = node_ids
+        .iter()
+        .filter(|n| parents[n.as_str()].is_some())
+        .collect();
+    let together = |d: &Dimension, x: &str, y: &str| {
+        let gx: BTreeSet<&str> = d.groups_of(x).into_iter().collect();
+        d.groups_of(y).iter().any(|g| gx.contains(g))
+    };
+    let differs = |da: &Dimension, db: &Dimension| {
+        leaves.iter().enumerate().any(|(i, x)| {
+            leaves[i + 1..]
+                .iter()
+                .any(|y| together(da, x, y) != together(db, x, y))
+        })
+    };
     for (a, b) in [("zone", "team"), ("zone", "layer"), ("team", "layer")] {
         let da = dimensions.iter().find(|d| d.id == a).unwrap();
         let db = dimensions.iter().find(|d| d.id == b).unwrap();
-        let same = node_ids.iter().all(|n| {
-            let ga: BTreeSet<&str> = da.groups_of(n).into_iter().collect();
-            let gb: BTreeSet<&str> = db.groups_of(n).into_iter().collect();
-            ga.len() == gb.len() && ga.iter().zip(gb.iter()).all(|(x, y)| x == y)
-        });
-        assert!(!same, "the dimensions {a} and {b} group the same way");
+        assert!(
+            differs(da, db),
+            "the dimensions {a} and {b} induce the same partition, so they group the same way"
+        );
+    }
+    // The comparison above is only worth making if it can come out the other way: a dimension against itself must be found
+    // to group the same way. Without this, an assertion that merely cannot fail would look like a passing check.
+    for d in &dimensions {
+        assert!(
+            !differs(d, d),
+            "the comparison does not recognise {} as grouping like itself, so it proves nothing",
+            d.id
+        );
     }
 
     // The leaves are partitioned, so zone can be shown as lanes: one path per node, and nesting carries the ancestor.

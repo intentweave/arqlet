@@ -128,6 +128,14 @@ solved within the band. Lanes are a constraint on the order, not a container: th
 size policy or a border contract. A node in several groups that are not one path is `membership-multiple-groups`; a node in no group is
 `membership-unassigned` and is placed outside the lanes, where it would be without them.
 
+**Lanes do not span container borders.** A lanes dimension partitions the order of **one area's children**. A container is
+itself placed in the lane of its own membership, and its children are ordered inside it by that container's own area rules
+(ADR 0003), not by the outer lanes. The alternative — a band that stretches across several containers — would make a
+container straddle lanes and would let a nested container cut the bands, which is the second spatial owner ADR 0007
+forbids. A container whose children belong to different groups of the dimension is reported as `membership-lane-straddle`,
+and the dimension is not applied inside it. Pools and lanes still work: a BPMN pool is a lane of the root area, not a
+container with children in other pools.
+
 **`overlay`.** A hull around the group's members, drawn **behind** the nodes:
 
 - The hull is **rectilinear** in layered areas (the union of the member boxes grown by a padding, outlined orthogonally,
@@ -151,46 +159,77 @@ contiguous) break the "one spatial owner" rule of ADR 0007 and need an occurrenc
 and every trace would have to carry. They are step M5 below, and only after M3 and M4 measure how often they would be
 needed.
 
-### 5. Diagnostics: nothing is silent
-
-Reported in `layoutDiagnostics`, never applied silently (the project rule for stale and conflicting results):
+### 5. Diagnostics: nothing is silent, and typed rather than printed
 
 | Diagnostic | When |
 | --- | --- |
 | `membership-multiple-groups` | A node is in several groups of a `hierarchy` or `lanes` dimension that are not one path. The dimension is not applied. |
 | `membership-unassigned` | A node is in no group of a `lanes` dimension. |
+| `membership-lane-straddle` | A container's children belong to different groups of a `lanes` dimension. The dimension is not applied inside it. |
 | `membership-not-contiguous` | A group's members do not form one run in the order that was produced, with the number of runs. |
 | `membership-hull-overlap` | Two hulls intersect, with the pair. |
 | `membership-unknown-members` | The count of member ids the view does not have (information, not a conflict). |
 | `membership-too-many-dimensions` | More than one `hierarchy`, or more than two `lanes` dimensions. |
 
+**The per-group numbers are a typed field, not lines of text.** One string per group in `layoutDiagnostics` would be
+thousands of lines on a real graph, and a host would have to parse them back. So the counts live in a structured
+`membershipReport` (per dimension, and per group within it: the measures of §6 and which of the diagnostics above it
+raised), and `layoutDiagnostics` carries **one summary line per dimension** — "zone: 3 of 14 groups not contiguous" — so a
+host that only prints diagnostics still learns that something is wrong, and a host that acts on them reads the typed field.
+The same answer, bounded in size and machine-readable.
+
 Refused outright (an error, not a diagnostic): a `parent` cycle, a duplicate dimension or group id, and `groups` together
 with a `hierarchy` dimension.
+
+### 5b. Changing memberships: part of `patch`
+
+Memberships are graph data, so they change the way the rest of the graph changes — through `patch` (ADR 0019), not through
+a new import and not through an operation of their own, which would be a second path for graph data. `GraphPatch` gains
+`memberships` (adds or replaces a dimension's groups, as `nodes` and `edges` add or replace) and `removeMemberships` (by
+dimension, or by group within one), applied under the same revision checks, with removals first. A membership change
+advances the revision and the layout version like any other graph change.
+
+One consequence worth stating: a change to a dimension whose mode is `off`, or to a dimension no active mode reads, changes
+no geometry. The view is then answered from the layout it already has, with the new revision — the result must not be a
+re-layout, or editing a membership would move the drawing for no reason.
 
 ### 6. Measurement before any default
 
 The roadmap asks for a measure of group contiguity and overlap before any default. It is this, reported per drawing and
 recorded like every other quality number:
 
-- per group: `contiguityBreaks` (maximal member runs minus one — per rank for lanes, in the final order for overlay),
-  `hullIntruders` (non-member nodes inside the hull), `hullArea`;
-- per dimension: the sums of those;
+- `contiguityBreaks` (maximal member runs minus one), for **`lanes` and `hierarchy` only**: it measures a linear order, so
+  it applies per rank in a layered area and to the order of an area's children;
+- `hullIntruders` (non-member nodes inside the hull) and `hullArea`, for **`overlay` only**;
+- per dimension: the sums of its mode's measures;
 - per drawing: the number of intersecting hull pairs.
+
+**Which measure belongs to which mode matters, because the one-dimensional limit does not bind in two.** Three groups that
+pairwise share a member cannot all be contiguous in one *order* — the Euler case, which `non-contiguous.json` proves by
+exhausting all 720 orders of six nodes. That bounds `lanes` and the rank order of layered areas, and it is why
+non-contiguity is reported rather than avoided (§4). It says nothing about hulls: in the plane, three pairwise-overlapping
+regions without a common intersection are perfectly drawable. Measuring `contiguityBreaks` for an overlay would therefore
+report a failure where there is none, and the honest numbers for a hull are its intruders and its overlaps. The same
+fixture is thus the case that separates the two modes, not a general impossibility.
 
 These numbers are **diagnostics, not part of the published conflict key**: they do not decide acceptance (ADR 0002), because
 an overlay must not outrank geometry. A default for any mode is accepted only by the quality gate in `CLAUDE.md` — valid
 geometry, every edge in logical direction, 0 line–node hits, crossings and bends against the default and elk-rs on the same
-views, recorded timing — **plus** fewer contiguity breaks and hull intruders than the run without the mode.
+views, recorded timing — **plus** its own mode's measure improved against the run without the mode: fewer contiguity breaks
+for `lanes` and `hierarchy`, fewer hull intruders and overlapping pairs for `overlay`.
 
 ### 7. The rest of the engine
 
-- **`details`** (ADR 0019, request 31) reports a node's groups **per dimension** beside the containers above it. The
-  containment path and the memberships stay distinguishable in the answer.
+- **`details`** (request 31, #77) reports a node's groups **per dimension** beside the containers above it, so the
+  containment path and the memberships stay distinguishable in the answer. `NodeDetails` is serialized with
+  `deny_unknown_fields`, so the new field is **optional and omitted when empty**: a typed host built before this ADR keeps
+  deserializing the answer unchanged.
 - **`trace`, `neighbourhood`, `filter`:** a membership group is not a node and carries no edges, so a trace does **not**
   cross it — unlike a bus, which is a view node with taps. A filter that keeps a node keeps its memberships; groups recount
   against what is left.
-- **`patch`:** removing a node removes it from its groups; a group that loses every member is not drawn. Unknown member ids
-  stay ignored, so a patch that adds a node can make an already-declared membership take effect.
+- **`patch`:** memberships are changed through `patch` itself (§5b). Removing a node also removes it from its groups, and a
+  group that loses every member is not drawn. Unknown member ids stay ignored, so a patch that adds a node can make an
+  already-declared membership take effect.
 - **Containment tree** (`packages/containment-tree`): unchanged, it shows containment only. A dimension selector is a later
   UI step (ADR 0009/0010), out of scope here.
 - **Projection cost:** one reverse index (node id → groups per dimension) is built once per projection, as for `groups`. No
@@ -207,12 +246,39 @@ Each step is behind the option and measured before the next. Nothing becomes a d
   equivalent `groups` mapping on the same graph; `details` reports the dimension; `groups` keeps working unchanged.
 - **M2 — `overlay` drawn only**, with no influence on the layout. *Exit:* the geometry is identical to the run without the
   overlay (the hull is the only addition), hulls are valid, the §6 metrics are reported.
-- **M3 — `overlay` keeps members together softly.** *Exit:* the §6 gate on the corpus, and the contiguity and intruder
-  numbers improve against M2.
+- **M3 — `overlay` keeps members together softly.** *Exit:* the §6 gate on the corpus, and the intruder and overlap numbers
+  improve against M2.
 - **M4 — `lanes`**, first one dimension across the flow, then the grid. *Exit:* the §6 gate; `pools-and-lanes.json` draws as
   the 2×3 grid with no lane violation; `three-dimensions.json` reports what it cannot satisfy.
 - **M5 — proxies**, only if M3 and M4 show that reporting is not enough, with an explicit occurrence identity and its rules
   for every operation.
+
+### The first slice: M0 plus M2, narrowed
+
+M2 is the MVP, and deliberately not M4. The reason is where the work lands: **an overlay that is only drawn touches no
+layout code at all.** The hulls are computed from the boxes the layout has already produced, so the exit check is
+mechanical — with the option off the bytes are unchanged, and with it on the node boxes and routes are unchanged and the
+hull field is the only addition. Nothing moves, so no crossings, bends or area change, so the §6 quality gate has nothing
+to weigh and `crates/layout` is not opened. Lanes are the opposite: they constrain the order, which means the
+crossing-minimisation in `crates/layout`, lane bands with extents of their own in the placement, and the full gate against
+elk-rs on the corpus.
+
+The slice is narrowed further so it stays one slice:
+
+- One dimension, mode `overlay`, off by default.
+- `memberships` parsed without `parent` nesting (flat groups), which `one-group-per-node.json` and `crosses-containers.json`
+  already exercise. Nesting arrives with M1, where it is the group path `hierarchy` needs anyway.
+- A padded **convex hull** for every area, including layered ones, instead of the rectilinear outline §3 decides. A
+  monotone chain over the member boxes' corners is about twenty lines of comparisons — no trigonometry, so no
+  `PortableMath` call and no cross-platform risk — whereas a rectangle union has to be traced into an outline. The
+  rectilinear hull of §3 stays the target for layered areas and becomes a refinement of M2, measured against the convex one
+  on the same views. Until then the drawing shows diagonal edges against orthogonal geometry, which is a known cosmetic
+  debt, not a deviation from the decision.
+- `hullIntruders` and the overlapping pairs reported through `membershipReport` (§5), with the summary line.
+
+What this proves end to end: the model parses and round-trips, a view option reaches the engine, the scene carries a new
+kind of geometry, the viewer draws it, and the measures that any later default depends on are being recorded — all without
+a single changed pixel in an existing drawing.
 
 ## Test data
 
@@ -236,8 +302,11 @@ What this ADR does not decide, and what it needs before it can:
   (how many dimensions and groups a drawing can carry) is a measured question, not a guess.
 - **Whether lanes and overlays should shape the layout at all, or only be drawn.** M2 draws, M3 shapes; the decision between
   them is the M3 gate's outcome, not an assumption here.
-- **A rank-space interaction with stacked containers.** A lanes dimension partitions rank order, and packing already sets
-  rank offsets before placement; which of the two runs first is an M4 question.
+- **A rank-space interaction with stacked containers.** A lanes dimension partitions the order within an area (§3), and
+  packing already sets rank offsets before placement; which of the two runs first is an M4 question. The question is now
+  only about order inside one area, since lanes no longer span container borders.
+- **The rectilinear hull.** §3 decides it for layered areas, and the first slice ships the convex hull instead. Whether the
+  rectilinear outline is worth its code is an M2 refinement, measured on the same views.
 
 ## Consequences
 
