@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, existsSync} from 'node:fs';
 import {createSession} from './session.js';
-import {createViewController, sceneDiff, encodeBookmark, decodeBookmark} from './view-controller.js';
+import {createViewController, sceneDiff, encodeBookmark, decodeBookmark, navigateScene} from './view-controller.js';
 import {createEngine} from './wasm-client.js';
 
 const shipped = new URL('./arqlet.wasm', import.meta.url);
@@ -193,3 +193,46 @@ for (const resident of [false, true]) {
     assert.equal((await view.openBookmark(other, {force: true})).ok, true);
   });
 }
+
+test('navigateScene moves by space, hierarchy, siblings and edges', () => {
+  const box = (id, x, y, w, h, parentId) => ({id, bounds: {x, y, width: w, height: h}, ...(parentId ? {parentId} : {})});
+  const scene = {
+    nodes: [box('P', 0, 0, 200, 100), box('a', 10, 10, 40, 20, 'P'), box('b', 100, 10, 40, 20, 'P'),
+      box('c', 10, 60, 40, 20, 'P'), box('x', 300, 10, 40, 20)],
+    routes: [{id: 'ab', source: 'a', target: 'b'}, {id: 'bx', source: 'b', target: 'x'}, {id: 'xa', source: 'x', target: 'a'}],
+  };
+  const go = (from, d) => navigateScene(scene, from, d);
+  assert.equal(go(null, 'right'), 'P', 'without a selection: the first top-level node');
+  assert.deepEqual([go('a', 'right'), go('b', 'right'), go('x', 'left'), go('a', 'down'), go('c', 'up')], ['b', 'x', 'b', 'c', 'a']);
+  assert.equal(go('x', 'up'), null, 'nothing lies that way');
+  assert.equal(go('P', 'right'), 'x', 'not into its own contents');
+  assert.equal(go('a', 'left'), null, 'not out to its own container');
+  assert.deepEqual([go('a', 'parent'), go('P', 'child'), go('x', 'parent'), go('a', 'child')], ['P', 'a', null, null]);
+  assert.deepEqual([go('a', 'next'), go('b', 'next'), go('c', 'next'), go('a', 'previous')], ['b', 'c', 'a', 'c']);
+  assert.deepEqual([go('a', 'out'), go('a', 'in'), go('x', 'in'), go('c', 'out')], ['b', 'x', 'b', null]);
+  assert.throws(() => go('a', 'sideways'));
+});
+
+test('a view controller navigates by keyboard directions', {skip: !engine}, async () => {
+  const view = createViewController(createSession(engine, {resident: false}), {scenes: false});
+  await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  const first = await view.navigate('right');
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(view.getState().selection.nodeId, first.nodeId);
+  assert.ok(view.getState().focus.bounds, 'the camera target');
+  // The box is closed: no child until it is opened, then the first child; back up to it.
+  await view.select({nodeId: 'box'});
+  const closed = await view.navigate('child');
+  assert.deepEqual([closed.ok, closed.collapsed], [false, true]);
+  await view.open('box');
+  const inside = await view.navigate('child');
+  assert.equal(inside.ok, true, JSON.stringify(inside));
+  assert.equal(view.getState().details.node.parents.at(-1), 'box');
+  assert.equal((await view.navigate('parent')).nodeId, 'box');
+  assert.equal(view.getState().backLabel, 'Open box', 'navigating is not a step for back');
+  // Along the edges: from src out into the box.
+  await view.select({nodeId: 'src'});
+  const out = await view.navigate('out');
+  assert.equal(out.ok, true, JSON.stringify(out));
+  assert.notEqual(out.nodeId, 'src');
+});

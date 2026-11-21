@@ -15,6 +15,12 @@ export interface ViewBookmark {
 export function encodeBookmark(bookmark: ViewBookmark): string;
 export function decodeBookmark(text: string): ViewBookmark;
 
+/** Provisional: where keyboard navigation goes (see `navigateScene`). */
+export type NavigationDirection = 'left' | 'right' | 'up' | 'down' | 'parent' | 'child' | 'next' | 'previous' | 'out' | 'in';
+
+/** The node of `scene` that `direction` leads to from `from` (without `from`, the first top-level node), or null. */
+export function navigateScene(scene: Scene | null, from: string | null, direction: NavigationDirection): string | null;
+
 /** What changed between two scenes, by id. */
 export interface SceneDiff {
   nodes: {added: string[]; removed: string[]; changed: string[]};
@@ -100,6 +106,8 @@ export interface ViewController {
   clearSearch(): void;
   /** Opens what hides `nodeId` (a step for `back`), selects it, and sets `state.focus` for the host's camera. */
   focus(nodeId: string, options?: {reveal?: boolean; partial?: boolean}): Promise<ViewResult>;
+  /** Moves the selection the way `direction` says and sets `state.focus` (nothing opened, not a step for `back`). */
+  navigate(direction: NavigationDirection): Promise<ViewResult | {ok: false; none: true; collapsed?: boolean}>;
   /** The view as a value to keep or share (`encodeBookmark` for a URL). */
   bookmark(): Promise<{ok: true; bookmark: ViewBookmark} | {ok: false; error?: string; cancelled?: boolean}>;
   /** Opens a bookmark (a step for `back`); another graph's is refused unless `force`. */
