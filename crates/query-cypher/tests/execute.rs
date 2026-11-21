@@ -4,14 +4,14 @@
 //! Python oracle read, and its rows are compared with the oracle's. A case the engine says it has not built yet is
 //! *pending*; a case that gets a wrong answer, or any other error, is a failure. `MIN_PASSING` is a ratchet: it goes up
 //! with each stage and never down, so that a regression in a case that used to pass is seen.
-use arqlet_query::{ErrorClass, GraphStore, Limits, NodeId, Value};
+use arqlet_query::{Direction, EdgeId, EdgeRef, ErrorClass, GraphStore, Limits, NodeId, Value};
 use arqlet_query_cypher::run;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
 /// How many of the supported cases pass today. Raised by every stage that makes more of them pass.
-const MIN_PASSING: usize = 15;
+const MIN_PASSING: usize = 37;
 
 fn fixture(path: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -37,6 +37,8 @@ fn json_value(v: &serde_json::Value) -> Value {
 struct JsonStore {
     labels: Vec<String>,
     props: Vec<BTreeMap<String, Value>>,
+    /// Resolved edges only: source, target, type, properties. An edge whose end is not a node is left out.
+    edges: Vec<(u32, u32, String, BTreeMap<String, Value>)>,
 }
 
 impl JsonStore {
@@ -50,7 +52,9 @@ impl JsonStore {
         let mut store = JsonStore {
             labels: vec![],
             props: vec![],
+            edges: vec![],
         };
+        let mut index: BTreeMap<String, u32> = BTreeMap::new();
         for n in g["nodes"].as_array().unwrap() {
             let id = n["id"].as_str().unwrap();
             let mut props = BTreeMap::new();
@@ -65,8 +69,29 @@ impl JsonStore {
                     props.insert(k.clone(), json_value(v));
                 }
             }
+            index.insert(id.to_string(), store.labels.len() as u32);
             store.labels.push(n["kind"].as_str().unwrap().to_string());
             store.props.push(props);
+        }
+        for e in g["edges"].as_array().into_iter().flatten() {
+            let end = |k: &str| e[k].as_str().and_then(|id| index.get(id)).copied();
+            let (Some(source), Some(target)) = (end("source"), end("target")) else {
+                continue; // unresolved: not in the store
+            };
+            let id = e["id"].as_str().unwrap();
+            let mut props = BTreeMap::new();
+            props.insert("id".to_string(), Value::String(id.to_string()));
+            props.insert("kind".to_string(), json_value(&e["kind"]));
+            if let Some(w) = e.get("weight") {
+                props.insert("weight".to_string(), json_value(w));
+            }
+            if let Some(map) = extra["edges"].get(id).and_then(|m| m.as_object()) {
+                for (k, v) in map {
+                    props.insert(k.clone(), json_value(v));
+                }
+            }
+            let kind = e["kind"].as_str().unwrap().to_string();
+            store.edges.push((source, target, kind, props));
         }
         store
     }
@@ -84,6 +109,43 @@ impl GraphStore for JsonStore {
             .get(key)
             .cloned()
             .unwrap_or(Value::Null)
+    }
+    fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+    fn edge_type(&self, edge: EdgeId) -> &str {
+        &self.edges[edge.0 as usize].2
+    }
+    fn edge_property(&self, edge: EdgeId, key: &str) -> Value {
+        self.edges[edge.0 as usize]
+            .3
+            .get(key)
+            .cloned()
+            .unwrap_or(Value::Null)
+    }
+    fn edges_of(&self, node: NodeId, direction: Direction) -> Vec<EdgeRef> {
+        let mut out = Vec::new();
+        for (i, (source, target, _, _)) in self.edges.iter().enumerate() {
+            let (outgoing, incoming) = (*source == node.0, *target == node.0);
+            let wanted = match direction {
+                Direction::Out => outgoing,
+                Direction::In => incoming,
+                Direction::Both => outgoing || incoming,
+            };
+            if wanted {
+                // A self-loop is listed once; its other end is the node itself.
+                let other = if outgoing && direction != Direction::In {
+                    *target
+                } else {
+                    *source
+                };
+                out.push(EdgeRef {
+                    edge: EdgeId(i as u32),
+                    other: NodeId(other),
+                });
+            }
+        }
+        out
     }
 }
 

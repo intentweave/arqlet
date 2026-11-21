@@ -8,13 +8,18 @@
 //! columns are read from the `RETURN` clause and matched to the aliases the HIR created. A name that does not match is a
 //! refusal.
 
-use arqlet_query::plan::{AggFunc, Aggregate, BinOp, CmpOp, Column, Expr, Op, Plan, SortKey};
+use arqlet_query::plan::{
+    AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Op, Plan, SortKey,
+};
+use arqlet_query::Direction;
 use arqlet_query::{QueryError, Value};
 use decypher::hir::arena::ExprId;
 use decypher::hir::arena::HirArenas;
 use decypher::hir::expr::{BinaryOp, ComparisonOperator, ExprKind, Literal, UnaryOp};
 use decypher::hir::ops::{AggregateItem, Operation, SortDirection};
-use decypher::hir::pattern::{LabelExpr, NodePattern};
+use decypher::hir::pattern::{
+    GraphPattern, LabelExpr, NodePattern, RelationshipDirection, RelationshipLength,
+};
 use decypher::syntax::{SyntaxKind as K, SyntaxNode};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -56,6 +61,9 @@ struct Lowering<'a> {
     aliases: BTreeMap<String, usize>,
 }
 
+/// The label and the `{key: value}` constraints of a node pattern.
+type Constraints = (Option<String>, Vec<(String, Expr)>);
+
 fn not_yet(what: &str, stage: &str) -> QueryError {
     QueryError::unsupported(format!("{what} is not built yet ({stage} of ADR 0021)"))
 }
@@ -64,17 +72,12 @@ impl Lowering<'_> {
     fn op(&mut self, op: &Operation) -> Result<(), QueryError> {
         match op {
             Operation::Match(m) => {
-                if !m.pattern.relationships.is_empty() {
-                    return Err(not_yet("a relationship in a pattern", "stage M3"));
-                }
                 if !m.pattern.path_bindings.is_empty() {
                     return Err(QueryError::unsupported(
                         "a path variable is undecided (ADR 0021, open)",
                     ));
                 }
-                for node in &m.pattern.nodes {
-                    self.node(node)?;
-                }
+                self.pattern(&m.pattern)?;
                 for predicate in &m.predicates {
                     let e = self.expr(*predicate)?;
                     self.ops.push(Op::Filter(e));
@@ -182,7 +185,13 @@ impl Lowering<'_> {
         }
     }
 
-    fn node(&mut self, node: &NodePattern) -> Result<(), QueryError> {
+    fn fresh(&mut self) -> usize {
+        self.next_slot += 1;
+        self.next_slot - 1
+    }
+
+    /// The label (the kind) and the property constraints of a node pattern.
+    fn node_constraints(&self, node: &NodePattern) -> Result<Constraints, QueryError> {
         if node.label_expression.is_some() {
             return Err(QueryError::unsupported(
                 "a label expression in a pattern is undecided (ADR 0021, open)",
@@ -197,8 +206,13 @@ impl Lowering<'_> {
                 ))
             }
         };
+        Ok((label, self.props(node.properties)?))
+    }
+
+    /// The `{key: value}` constraints of a node or relationship pattern.
+    fn props(&self, map: Option<ExprId>) -> Result<Vec<(String, Expr)>, QueryError> {
         let mut props = Vec::new();
-        if let Some(map) = node.properties {
+        if let Some(map) = map {
             match &self.arenas.expressions.get(map).kind {
                 ExprKind::Map(entries) => {
                     for (key, value) in entries {
@@ -218,16 +232,117 @@ impl Lowering<'_> {
                 }
             }
         }
-        let slot = match node.binding {
-            Some(b) => b.0,
-            None => {
-                self.next_slot += 1;
-                self.next_slot - 1
+        Ok(props)
+    }
+
+    /// One graph pattern (all the comma-separated parts of one `MATCH`): a scan or a check for a node that no
+    /// relationship reaches, and for every relationship an expansion from an end that is bound, in the order written. A
+    /// relationship is used once within the pattern, so each expansion names the relationships before it.
+    fn pattern(&mut self, pattern: &GraphPattern) -> Result<(), QueryError> {
+        let node_slots: Vec<usize> = pattern
+            .nodes
+            .iter()
+            .map(|n| match n.binding {
+                Some(b) => b.0,
+                None => self.fresh(),
+            })
+            .collect();
+        let was_bound: Vec<bool> = node_slots.iter().map(|s| self.bound.contains(s)).collect();
+        let mut touched = vec![false; pattern.nodes.len()];
+        let mut rel_slots: Vec<usize> = Vec::new();
+
+        for rel in &pattern.relationships {
+            if rel.type_expression.is_some() {
+                return Err(QueryError::unsupported(
+                    "a relationship type expression is undecided (ADR 0021, open)",
+                ));
             }
-        };
-        if self.bound.insert(slot) {
-            self.ops.push(Op::ScanNodes { slot, label, props });
-        } else {
+            if !matches!(rel.length, RelationshipLength::Single) {
+                return Err(not_yet("a variable-length relationship", "stage M4"));
+            }
+            let (l, r) = (rel.left, rel.right);
+            // Expand from the end that is bound; if neither is, scan the left one first.
+            let from_left = if self.bound.contains(&node_slots[l]) {
+                true
+            } else if self.bound.contains(&node_slots[r]) {
+                false
+            } else {
+                self.start(&pattern.nodes[l], node_slots[l])?;
+                touched[l] = true;
+                true
+            };
+            let (from, to) = if from_left { (l, r) } else { (r, l) };
+            if !touched[from] {
+                if was_bound[from] {
+                    self.check(&pattern.nodes[from], node_slots[from])?;
+                }
+                touched[from] = true;
+            }
+            let direction = match (rel.direction, from_left) {
+                (RelationshipDirection::LeftToRight, true)
+                | (RelationshipDirection::RightToLeft, false) => Direction::Out,
+                (RelationshipDirection::RightToLeft, true)
+                | (RelationshipDirection::LeftToRight, false) => Direction::In,
+                _ => Direction::Both,
+            };
+            let types = rel
+                .types
+                .iter()
+                .map(|t| {
+                    self.arenas
+                        .relationship_types
+                        .name_of(*t)
+                        .unwrap_or("")
+                        .to_string()
+                })
+                .collect();
+            let (to_label, to_props) = self.node_constraints(&pattern.nodes[to])?;
+            let rel_slot = match rel.binding {
+                Some(b) => b.0,
+                None => self.fresh(),
+            };
+            let to_bound = self.bound.contains(&node_slots[to]);
+            self.ops.push(Op::Expand(Expand {
+                from: node_slots[from],
+                rel: rel_slot,
+                to: node_slots[to],
+                direction,
+                types,
+                props: self.props(rel.properties)?,
+                to_bound,
+                to_label,
+                to_props,
+                distinct_from: rel_slots.clone(),
+            }));
+            touched[to] = true;
+            self.bound.insert(node_slots[to]);
+            self.bound.insert(rel_slot);
+            rel_slots.push(rel_slot);
+        }
+
+        for (i, node) in pattern.nodes.iter().enumerate() {
+            if touched[i] {
+                continue;
+            }
+            if self.bound.contains(&node_slots[i]) {
+                self.check(node, node_slots[i])?;
+            } else {
+                self.start(node, node_slots[i])?;
+            }
+        }
+        Ok(())
+    }
+
+    fn start(&mut self, node: &NodePattern, slot: usize) -> Result<(), QueryError> {
+        let (label, props) = self.node_constraints(node)?;
+        self.bound.insert(slot);
+        self.ops.push(Op::ScanNodes { slot, label, props });
+        Ok(())
+    }
+
+    fn check(&mut self, node: &NodePattern, slot: usize) -> Result<(), QueryError> {
+        let (label, props) = self.node_constraints(node)?;
+        if label.is_some() || !props.is_empty() {
             self.ops.push(Op::CheckNode { slot, label, props });
         }
         Ok(())

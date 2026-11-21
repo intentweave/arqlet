@@ -3,6 +3,7 @@
 //! A plan is a list of operations over rows. A row is a vector of values, one per slot; a variable of the query is a slot.
 //! The IR knows no parser: another front end could produce it.
 
+use crate::store::Direction;
 use crate::value::Value;
 
 /// The position of a variable (or of a computed column) in a row.
@@ -40,6 +41,8 @@ pub enum Op {
         label: Option<String>,
         props: Vec<(String, Expr)>,
     },
+    /// A relationship of a pattern: from the node in `from`, one row per edge that fits.
+    Expand(Expand),
     /// `WHERE`: keeps the rows for which the expression is true (not false, not null).
     Filter(Expr),
     /// `UNWIND`: one row per element of the list.
@@ -62,6 +65,26 @@ pub enum Op {
     Skip(Expr),
     /// `LIMIT`.
     Limit(Expr),
+}
+
+/// One relationship of a pattern, `(from)-[rel:TYPE {key: value}]->(to)`.
+///
+/// For every row it takes the edges of the node in `from` in `direction`, keeps those of one of `types` (any type when
+/// empty) that have `props`, and are not one of the edges already in `distinct_from` (a relationship is used once within
+/// the pattern of one `MATCH`), and whose other end is the node in `to` when `to_bound`, or else has `to_label` and
+/// `to_props` and is bound to `to`. The edge goes into `rel`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Expand {
+    pub from: Slot,
+    pub rel: Slot,
+    pub to: Slot,
+    pub direction: Direction,
+    pub types: Vec<String>,
+    pub props: Vec<(String, Expr)>,
+    pub to_bound: bool,
+    pub to_label: Option<String>,
+    pub to_props: Vec<(String, Expr)>,
+    pub distinct_from: Vec<Slot>,
 }
 
 /// One key of an `ORDER BY`.

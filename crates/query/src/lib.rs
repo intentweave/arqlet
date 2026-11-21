@@ -15,7 +15,7 @@ pub mod value;
 
 pub use exec::{execute, Limits, ResultSet};
 pub use plan::Plan;
-pub use store::GraphStore;
+pub use store::{Direction, EdgeRef, GraphStore};
 pub use value::{EdgeId, NodeId, Value};
 
 use std::fmt;

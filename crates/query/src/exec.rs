@@ -11,7 +11,7 @@
 
 use crate::plan::{AggFunc, Aggregate, BinOp, CmpOp, Column, Expr, Op, Plan, SortKey};
 use crate::store::GraphStore;
-use crate::value::{NodeId, Value};
+use crate::value::{EdgeId, NodeId, Value};
 use crate::QueryError;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -137,6 +137,48 @@ impl Run<'_> {
                 }
                 Ok(out)
             }
+            Op::Expand(x) => {
+                let mut out = Vec::new();
+                for row in &rows {
+                    let Value::Node(from) = &row[x.from] else {
+                        continue;
+                    };
+                    for found in self.store.edges_of(*from, x.direction) {
+                        self.tick(1)?;
+                        if !x.types.is_empty()
+                            && !x
+                                .types
+                                .iter()
+                                .any(|t| t == self.store.edge_type(found.edge))
+                        {
+                            continue;
+                        }
+                        // A relationship is used once within the pattern of one MATCH.
+                        if x.distinct_from
+                            .iter()
+                            .any(|s| row[*s] == Value::Edge(found.edge))
+                        {
+                            continue;
+                        }
+                        if !self.edge_matches(found.edge, &x.props, row)? {
+                            continue;
+                        }
+                        if x.to_bound && row[x.to] != Value::Node(found.other) {
+                            continue;
+                        }
+                        if !self.node_matches(found.other, &x.to_label, &x.to_props, row)? {
+                            continue;
+                        }
+                        let mut next = row.clone();
+                        next[x.rel] = Value::Edge(found.edge);
+                        if !x.to_bound {
+                            next[x.to] = Value::Node(found.other);
+                        }
+                        out.push(next);
+                    }
+                }
+                Ok(out)
+            }
             Op::Filter(expr) => {
                 let mut out = Vec::new();
                 for row in rows {
@@ -232,6 +274,21 @@ impl Run<'_> {
         for (key, expr) in props {
             let wanted = self.eval(expr, row)?;
             if equals(&self.store.node_property(node, key), &wanted) != Some(true) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn edge_matches(
+        &self,
+        edge: EdgeId,
+        props: &[(String, Expr)],
+        row: &Row,
+    ) -> Result<bool, QueryError> {
+        for (key, expr) in props {
+            let wanted = self.eval(expr, row)?;
+            if equals(&self.store.edge_property(edge, key), &wanted) != Some(true) {
                 return Ok(false);
             }
         }
@@ -337,6 +394,7 @@ impl Run<'_> {
             Expr::Property(base, key) => match self.eval(base, row)? {
                 Value::Null => Value::Null,
                 Value::Node(node) => self.store.node_property(node, key),
+                Value::Edge(edge) => self.store.edge_property(edge, key),
                 other => {
                     return Err(QueryError::runtime(format!(
                         "cannot read the property `{key}` of a {}",
@@ -858,7 +916,9 @@ impl Acc {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plan::Aggregate;
+    use crate::plan::{Aggregate, Expand};
+    use crate::store::{Direction, EdgeRef};
+    use crate::value::EdgeId;
 
     /// Three nodes: a (kind K, n = 1), b (kind K, n = 2), c (kind L, no n).
     struct Tiny;
@@ -878,7 +938,47 @@ mod tests {
                 _ => Value::Null,
             }
         }
+        fn edge_count(&self) -> usize {
+            EDGES.len()
+        }
+        fn edge_type(&self, edge: EdgeId) -> &str {
+            EDGES[edge.0 as usize].2
+        }
+        fn edge_property(&self, edge: EdgeId, key: &str) -> Value {
+            match key {
+                "id" => Value::String(format!("e{}", edge.0)),
+                "since" => Value::Int(edge.0 as i64 + 1),
+                _ => Value::Null,
+            }
+        }
+        fn edges_of(&self, node: NodeId, direction: Direction) -> Vec<EdgeRef> {
+            let mut out = Vec::new();
+            for (i, (source, target, _)) in EDGES.iter().enumerate() {
+                let (outgoing, incoming) = (*source == node.0, *target == node.0);
+                let wanted = match direction {
+                    Direction::Out => outgoing,
+                    Direction::In => incoming,
+                    Direction::Both => outgoing || incoming,
+                };
+                if wanted {
+                    // For Both the other end of a non-loop edge is whichever end is not the node.
+                    let other = if outgoing && direction != Direction::In {
+                        *target
+                    } else {
+                        *source
+                    };
+                    out.push(EdgeRef {
+                        edge: EdgeId(i as u32),
+                        other: NodeId(other),
+                    });
+                }
+            }
+            out
+        }
     }
+
+    /// e0: a to b (R), e1: a to b (R, parallel), e2: b to c (S), e3: c to c (R, a self-loop).
+    const EDGES: [(u32, u32, &str); 4] = [(0, 1, "R"), (0, 1, "R"), (1, 2, "S"), (2, 2, "R")];
 
     fn lit(v: Value) -> Expr {
         Expr::Literal(v)
@@ -1265,5 +1365,149 @@ mod tests {
         .unwrap()
         .rows
         .is_empty());
+    }
+
+    fn expand(from: usize, rel: usize, to: usize, direction: Direction, types: &[&str]) -> Expand {
+        Expand {
+            from,
+            rel,
+            to,
+            direction,
+            types: types.iter().map(|t| t.to_string()).collect(),
+            props: vec![],
+            to_bound: false,
+            to_label: None,
+            to_props: vec![],
+            distinct_from: vec![],
+        }
+    }
+
+    fn scan(slot: usize) -> Op {
+        Op::ScanNodes {
+            slot,
+            label: None,
+            props: vec![],
+        }
+    }
+
+    fn count_rows(plan: &Plan) -> usize {
+        run(plan).unwrap().rows.len()
+    }
+
+    fn plan_of(slots: usize, ops: Vec<Op>) -> Plan {
+        Plan {
+            slots,
+            ops,
+            columns: vec![],
+        }
+    }
+
+    #[test]
+    fn a_directed_pattern_follows_edges_in_their_direction_and_counts_parallel_edges() {
+        // (a)-[r:R]->(b): e0, e1 (parallel) and e3 (the self-loop).
+        assert_eq!(
+            count_rows(&plan_of(
+                3,
+                vec![scan(0), Op::Expand(expand(0, 1, 2, Direction::Out, &["R"]))]
+            )),
+            3
+        );
+        // (b)<-[r:R]-(a): the same three edges read from the other end.
+        assert_eq!(
+            count_rows(&plan_of(
+                3,
+                vec![scan(0), Op::Expand(expand(0, 1, 2, Direction::In, &["R"]))]
+            )),
+            3
+        );
+        // Type alternatives, [:R|S]: all four edges.
+        assert_eq!(
+            count_rows(&plan_of(
+                3,
+                vec![
+                    scan(0),
+                    Op::Expand(expand(0, 1, 2, Direction::Out, &["R", "S"]))
+                ]
+            )),
+            4
+        );
+        // No type: all four.
+        assert_eq!(
+            count_rows(&plan_of(
+                3,
+                vec![scan(0), Op::Expand(expand(0, 1, 2, Direction::Out, &[]))]
+            )),
+            4
+        );
+    }
+
+    #[test]
+    fn an_undirected_pattern_matches_a_self_loop_once_and_every_other_edge_twice() {
+        // e0, e1, e2 twice each, e3 once: 7.
+        assert_eq!(
+            count_rows(&plan_of(
+                3,
+                vec![scan(0), Op::Expand(expand(0, 1, 2, Direction::Both, &[]))]
+            )),
+            7
+        );
+    }
+
+    #[test]
+    fn a_bound_end_turns_the_expansion_into_a_check() {
+        // (a)-[r]->(a): only the self-loop.
+        let mut x = expand(0, 1, 0, Direction::Out, &[]);
+        x.to_bound = true;
+        let result = run(&plan_of(2, vec![scan(0), Op::Expand(x)])).unwrap();
+        assert_eq!(result.rows.len(), 1);
+    }
+
+    #[test]
+    fn a_relationship_is_used_once_within_one_pattern() {
+        // (x)-[r1]->(y)-[r2]->(z): (e0,e2), (e1,e2), (e2,e3); the pair (e3,e3) is the same edge twice.
+        let two_steps = |distinct: bool| {
+            let first = expand(0, 1, 2, Direction::Out, &[]);
+            let mut second = expand(2, 3, 4, Direction::Out, &[]);
+            if distinct {
+                second.distinct_from = vec![1];
+            }
+            plan_of(5, vec![scan(0), Op::Expand(first), Op::Expand(second)])
+        };
+        assert_eq!(count_rows(&two_steps(true)), 3);
+        assert_eq!(count_rows(&two_steps(false)), 4);
+    }
+
+    #[test]
+    fn edge_properties_filter_and_can_be_read() {
+        let mut x = expand(0, 1, 2, Direction::Out, &["R"]);
+        x.props = vec![("since".to_string(), lit(Value::Int(2)))]; // e1
+        let plan = Plan {
+            slots: 3,
+            ops: vec![scan(0), Op::Expand(x)],
+            columns: vec![Column {
+                name: "id".into(),
+                slot: 1,
+            }],
+        };
+        assert_eq!(run(&plan).unwrap().rows, vec![vec![Value::Edge(EdgeId(1))]]);
+        let read = Plan {
+            slots: 3,
+            ops: vec![
+                scan(0),
+                Op::Expand(expand(0, 1, 2, Direction::Out, &["S"])),
+                Op::Project {
+                    items: vec![(Expr::Property(Box::new(Expr::Slot(1)), "id".into()), 0)],
+                    distinct: false,
+                },
+            ],
+            columns: vec![Column {
+                name: "id".into(),
+                slot: 0,
+            }],
+        };
+        assert_eq!(
+            run(&read).unwrap().rows,
+            vec![vec![Value::String("e2".into())]]
+        );
     }
 }
