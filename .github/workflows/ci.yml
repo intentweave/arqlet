@@ -12,6 +12,8 @@ jobs:
       - run: cargo +stable check --workspace --locked
       # Tests read the benchmark datasets, which are generated (git-ignored): deterministic, standard library only.
       - run: python3 benchmarks/generate.py --no-manifest
+      # The fixtures of the Cypher query layer (ADR 0021): the cases and the graph hashes must match the oracle.
+      - run: python3 examples/cypher/oracle.py --check
       - run: cargo +stable test --workspace --locked
       - run: rustup target add wasm32-unknown-unknown --toolchain stable
       - uses: actions/setup-node@v4
