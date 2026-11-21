@@ -159,9 +159,227 @@ fn snap(value: f64, origin: f64, track: f64, up: bool) -> f64 {
         } * track
 }
 
+/// A segment tree over the elementary pieces between sorted coordinates: `raise(a, b, v)` combines `v` into every piece of
+/// `[a, b)`, `extreme(a, b)` combines what was raised over any piece of `[a, b)` (`max` or `min`).
+struct RangeTree {
+    pieces: usize,
+    max: bool,
+    tag: Vec<f64>,
+    sub: Vec<f64>,
+}
+
+impl RangeTree {
+    fn new(pieces: usize, max: bool) -> Self {
+        let neutral = if max {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
+        let size = 4 * pieces.max(1);
+        RangeTree {
+            pieces,
+            max,
+            tag: vec![neutral; size],
+            sub: vec![neutral; size],
+        }
+    }
+
+    fn pick(&self, a: f64, b: f64) -> f64 {
+        if self.max {
+            a.max(b)
+        } else {
+            a.min(b)
+        }
+    }
+
+    fn raise(&mut self, a: usize, b: usize, v: f64) {
+        if a < b {
+            self.raise_at(1, 0, self.pieces, a, b, v);
+        }
+    }
+
+    fn raise_at(&mut self, node: usize, lo: usize, hi: usize, a: usize, b: usize, v: f64) {
+        if b <= lo || hi <= a {
+            return;
+        }
+        if a <= lo && hi <= b {
+            self.tag[node] = self.pick(self.tag[node], v);
+            self.sub[node] = self.pick(self.sub[node], v);
+            return;
+        }
+        let mid = (lo + hi) / 2;
+        self.raise_at(2 * node, lo, mid, a, b, v);
+        self.raise_at(2 * node + 1, mid, hi, a, b, v);
+        let children = self.pick(self.sub[2 * node], self.sub[2 * node + 1]);
+        self.sub[node] = self.pick(self.tag[node], children);
+    }
+
+    fn extreme(&self, a: usize, b: usize) -> f64 {
+        let neutral = if self.max {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
+        if a >= b {
+            return neutral;
+        }
+        self.extreme_at(1, 0, self.pieces, a, b)
+    }
+
+    fn extreme_at(&self, node: usize, lo: usize, hi: usize, a: usize, b: usize) -> f64 {
+        let neutral = if self.max {
+            f64::NEG_INFINITY
+        } else {
+            f64::INFINITY
+        };
+        if b <= lo || hi <= a {
+            return neutral;
+        }
+        if a <= lo && hi <= b {
+            return self.sub[node];
+        }
+        let mid = (lo + hi) / 2;
+        let children = self.pick(
+            self.extreme_at(2 * node, lo, mid, a, b),
+            self.extreme_at(2 * node + 1, mid, hi, a, b),
+        );
+        self.pick(self.tag[node], children)
+    }
+}
+
+/// The channel rule of `reserve_once` without its pairs: two bends of one channel whose cross ranges come within a track
+/// (`a.cross.0 < b.cross.1 + track - EPS` and the reverse, i.e. the half-open ranges `[cross.0, cross.1 + track - EPS)`
+/// overlap) keep a track apart, the earlier in `order` first. Holds the bends given so far with a value, per channel, and
+/// answers the greatest (`max`) or least value among those whose range overlaps a bend's. A channel with an empty range
+/// (which the half-open test would not decide as the pair test does) is answered by testing every pair.
+struct Overlaps<'a> {
+    bends: &'a [Bend],
+    track: f64,
+    max: bool,
+    channel_of: Vec<usize>,
+    coords: Vec<Vec<f64>>,
+    trees: Vec<Option<RangeTree>>,
+    given: Vec<Vec<(usize, f64)>>,
+}
+
+impl<'a> Overlaps<'a> {
+    fn new(bends: &'a [Bend], channels: &[Vec<usize>], track: f64, max: bool) -> Self {
+        let mut channel_of = vec![usize::MAX; bends.len()];
+        let mut coords = Vec::with_capacity(channels.len());
+        let mut trees = Vec::with_capacity(channels.len());
+        for (c, members) in channels.iter().enumerate() {
+            let mut points = Vec::with_capacity(2 * members.len());
+            let mut empty = false;
+            for &i in members {
+                channel_of[i] = c;
+                let (lo, hi) = (bends[i].cross.0, bends[i].cross.1 + track - EPS);
+                empty |= !(lo < hi);
+                points.push(lo);
+                points.push(hi);
+            }
+            points.sort_by(f64::total_cmp);
+            points.dedup();
+            let pieces = points.len().saturating_sub(1);
+            trees.push((!empty && pieces > 0).then(|| RangeTree::new(pieces, max)));
+            coords.push(points);
+        }
+        Overlaps {
+            bends,
+            track,
+            max,
+            channel_of,
+            given: vec![Vec::new(); channels.len()],
+            coords,
+            trees,
+        }
+    }
+
+    fn span(&self, c: usize, i: usize) -> (usize, usize) {
+        let at = |v: f64| self.coords[c].partition_point(|&x| x < v);
+        let b = &self.bends[i];
+        (at(b.cross.0), at(b.cross.1 + self.track - EPS))
+    }
+
+    fn overlap(&self, a: usize, b: usize) -> bool {
+        let (x, y) = (&self.bends[a], &self.bends[b]);
+        x.cross.0 < y.cross.1 + self.track - EPS && y.cross.0 < x.cross.1 + self.track - EPS
+    }
+
+    /// Gives bend `i` the value `v`.
+    fn give(&mut self, i: usize, v: f64) {
+        let c = self.channel_of[i];
+        if c == usize::MAX {
+            return;
+        }
+        self.given[c].push((i, v));
+        let (a, b) = self.span(c, i);
+        if let Some(tree) = self.trees[c].as_mut() {
+            tree.raise(a, b, v);
+        }
+    }
+
+    /// The greatest (or least) value given to a bend whose range overlaps bend `i`'s, if any.
+    fn extreme(&self, i: usize) -> Option<f64> {
+        let c = self.channel_of[i];
+        if c == usize::MAX {
+            return None;
+        }
+        let v = match &self.trees[c] {
+            Some(tree) => {
+                let (a, b) = self.span(c, i);
+                tree.extreme(a, b)
+            }
+            None => self.given[c]
+                .iter()
+                .filter(|&&(j, _)| j != i && self.overlap(i, j))
+                .map(|&(_, v)| v)
+                .fold(
+                    if self.max {
+                        f64::NEG_INFINITY
+                    } else {
+                        f64::INFINITY
+                    },
+                    |x, y| {
+                        if self.max {
+                            x.max(y)
+                        } else {
+                            x.min(y)
+                        }
+                    },
+                ),
+        };
+        v.is_finite().then_some(v)
+    }
+
+    /// Takes back every value given to a bend of `edge` (its edge failed).
+    fn forget(&mut self, edge: &str) {
+        for c in 0..self.given.len() {
+            if !self.given[c]
+                .iter()
+                .any(|&(j, _)| self.bends[j].reservation.edge == edge)
+            {
+                continue;
+            }
+            let kept: Vec<(usize, f64)> = self.given[c]
+                .iter()
+                .copied()
+                .filter(|&(j, _)| self.bends[j].reservation.edge != edge)
+                .collect();
+            self.given[c].clear();
+            if let Some(tree) = self.trees[c].as_mut() {
+                *tree = RangeTree::new(tree.pieces, self.max);
+            }
+            for (j, v) in kept {
+                self.give(j, v);
+            }
+        }
+    }
+}
+
 fn compact(
     bends: &[Bend],
     constraints: &BTreeMap<(usize, usize), f64>,
+    channel_members: &[Vec<usize>],
     order: &[usize],
     failed: &mut BTreeMap<String, Failure>,
     track: f64,
@@ -175,6 +393,8 @@ fn compact(
         }
     }
     let mut values = vec![0.; bends.len()];
+    // The channel rule (`Overlaps`): the earlier bends of the channel, a track before.
+    let mut below = Overlaps::new(bends, channel_members, track, true);
     for &i in order {
         let b = &bends[i];
         if failed.contains_key(&b.reservation.edge) {
@@ -186,6 +406,7 @@ fn compact(
             .fold(b.reservation.bounds.0, |v, &(j, distance)| {
                 v.max(values[j] + distance)
             });
+        let need = below.extreme(i).map_or(need, |v| need.max(v + track));
         let at = snap(need, b.origin, track, true);
         if !at.is_finite() {
             return Err("Nonfinite joint bend compaction".into());
@@ -199,8 +420,11 @@ fn compact(
                     available: b.reservation.bounds.1 - b.reservation.bounds.0,
                 },
             );
+            // The edge's earlier bends no longer bind the others.
+            below.forget(&b.reservation.edge);
         } else {
             values[i] = at;
+            below.give(i, at);
         }
     }
     if failed.values().any(|f| {
@@ -213,16 +437,23 @@ fn compact(
         .iter()
         .map(|b| snap(b.reservation.bounds.1, b.origin, track, false))
         .collect();
+    // The channel rule backwards: the later bends of the channel, a track after.
+    let mut after = Overlaps::new(bends, channel_members, track, false);
     for &i in order.iter().rev() {
         if failed.contains_key(&bends[i].reservation.edge) {
             continue;
         }
+        if let Some(u) = after.extreme(i) {
+            upper[i] = upper[i].min(snap(u - track, bends[i].origin, track, false));
+        }
+        after.give(i, upper[i]);
         for &(j, distance) in &previous[i] {
             if !failed.contains_key(&bends[j].reservation.edge) {
                 upper[j] = upper[j].min(snap(upper[i] - distance, bends[j].origin, track, false));
             }
         }
     }
+    let mut below = Overlaps::new(bends, channel_members, track, true);
     for &i in order {
         let b = &bends[i];
         if failed.contains_key(&b.reservation.edge) {
@@ -234,6 +465,7 @@ fn compact(
             .fold(b.reservation.bounds.0, |v, &(j, distance)| {
                 v.max(values[j] + distance)
             });
+        let lower = below.extreme(i).map_or(lower, |v| lower.max(v + track));
         let lower = snap(lower, b.origin, track, true);
         values[i] = snap(b.reservation.preferred, b.origin, track, true)
             .min(upper[i])
@@ -244,6 +476,7 @@ fn compact(
         {
             return Err("Invalid joint bend compaction bounds".into());
         }
+        below.give(i, values[i]);
     }
     Ok(values)
 }
@@ -251,6 +484,13 @@ fn compact(
 struct Reserved {
     bends: Vec<Bend>,
     constraints: BTreeMap<(usize, usize), f64>,
+    /// The bends of each channel in `order`: every two of one channel whose cross ranges come within a track keep a track
+    /// apart along the flow, the earlier first. Kept as lists, not as pairs (a channel of a dense graph has millions of
+    /// pairs): `compact` and `demand` find the binding one by a range query (`Overlaps`).
+    channel_members: Vec<Vec<usize>>,
+    /// Benchmark builds only: those pairs, for the diagnostics (`Summary::precedences`).
+    #[cfg(feature = "benchmark-timings")]
+    channel_pairs: Vec<((usize, usize), f64)>,
     order: Vec<usize>,
     failed: BTreeMap<String, Failure>,
     summary: Summary,
@@ -627,36 +867,31 @@ fn reserve_once(
                 .push(i);
         }
     }
-    // The pairs of one channel whose cross ranges come within a track: collected first and built into the map at once (a
-    // channel of a dense graph gives millions), each keeping the larger of its gaps as an insertion one by one would.
-    let mut pairs: Vec<((usize, usize), f64)> = Vec::new();
-    for members in by_channel.values() {
-        for (k, &a) in members.iter().enumerate() {
-            for &b in &members[k + 1..] {
-                if bends[a].cross.0 < bends[b].cross.1 + spacing.track - EPS
-                    && bends[b].cross.0 < bends[a].cross.1 + spacing.track - EPS
-                {
-                    pairs.push(((a, b), spacing.track));
-                    summary.cross_flow_constraints += 1;
+    let channel_members: Vec<Vec<usize>> = by_channel.into_values().collect();
+    // Benchmark builds report the pairs (their count and, merged, the precedences); the layout does not need them.
+    #[cfg(feature = "benchmark-timings")]
+    let channel_pairs = {
+        let mut pairs = Vec::new();
+        for members in &channel_members {
+            for (k, &a) in members.iter().enumerate() {
+                for &b in &members[k + 1..] {
+                    if bends[a].cross.0 < bends[b].cross.1 + spacing.track - EPS
+                        && bends[b].cross.0 < bends[a].cross.1 + spacing.track - EPS
+                    {
+                        pairs.push(((a, b), spacing.track));
+                        summary.cross_flow_constraints += 1;
+                    }
                 }
             }
         }
-    }
-    if !pairs.is_empty() {
-        pairs.extend(std::mem::take(&mut constraints));
-        pairs.sort_by(|x, y| x.0.cmp(&y.0));
-        let mut merged: Vec<((usize, usize), f64)> = Vec::with_capacity(pairs.len());
-        for (key, gap) in pairs {
-            match merged.last_mut() {
-                Some(last) if last.0 == key => last.1 = last.1.max(gap),
-                _ => merged.push((key, gap)),
-            }
-        }
-        constraints = merged.into_iter().collect();
-    }
+        pairs
+    };
     Ok(Reserved {
         bends,
         constraints,
+        channel_members,
+        #[cfg(feature = "benchmark-timings")]
+        channel_pairs,
         order,
         failed,
         summary,
@@ -675,10 +910,12 @@ pub(super) fn demand(
     let Reserved {
         bends,
         constraints,
+        channel_members,
         order,
         failed,
         ..
     } = reserve(plan, geometry, trials, spacing, channels, &[], true)?;
+    let mut below = Overlaps::new(&bends, &channel_members, spacing.track, true);
     let mut previous = vec![Vec::new(); bends.len()];
     for (&(a, b), &distance) in &constraints {
         previous[b].push((a, distance));
@@ -696,10 +933,14 @@ pub(super) fn demand(
             .fold(b.reservation.bounds.0, |v, &(j, distance)| {
                 v.max(values[j] + distance)
             });
+        let need = below
+            .extreme(i)
+            .map_or(need, |v| need.max(v + spacing.track));
         values[i] = snap(need, b.origin, spacing.track, true);
         if !values[i].is_finite() {
             return Err("Nonfinite joint demand".into());
         }
+        below.give(i, values[i]);
         let width = values[i] - b.origin + 2. * spacing.margin + b.high_reserve;
         let entry = required
             .entry((b.reservation.area.clone(), b.reservation.rank))
@@ -720,6 +961,9 @@ pub(super) fn assign(
     let Reserved {
         mut bends,
         constraints,
+        channel_members,
+        #[cfg(feature = "benchmark-timings")]
+        channel_pairs,
         order,
         mut failed,
         mut summary,
@@ -732,7 +976,14 @@ pub(super) fn assign(
         additional_orders,
         false,
     )?;
-    let values = compact(&bends, &constraints, &order, &mut failed, spacing.track)?;
+    let values = compact(
+        &bends,
+        &constraints,
+        &channel_members,
+        &order,
+        &mut failed,
+        spacing.track,
+    )?;
     summary.capacity_edges = failed.len() - summary.blocked_edges;
     let mut result = BTreeMap::new();
     channels.clear();
@@ -795,6 +1046,17 @@ pub(super) fn assign(
         }
         summary.bends.push(b.reservation.clone());
     }
+    // The precedences as the diagnostics list them: the constraints and, in benchmark builds, the channel pairs.
+    #[cfg(feature = "benchmark-timings")]
+    let constraints = {
+        let mut all = constraints;
+        for (key, gap) in channel_pairs {
+            all.entry(key)
+                .and_modify(|v| *v = v.max(gap))
+                .or_insert(gap);
+        }
+        all
+    };
     summary.precedences = constraints
         .into_iter()
         .map(|((a, b), d)| (a, b, d))
@@ -876,11 +1138,11 @@ mod tests {
         bends[1].reservation.bounds.1 = 30.;
         let constraints = BTreeMap::from([((0, 1), 6.)]);
         let mut failed = BTreeMap::new();
-        let values = compact(&bends, &constraints, &[0, 1], &mut failed, 6.).unwrap();
+        let values = compact(&bends, &constraints, &[], &[0, 1], &mut failed, 6.).unwrap();
         assert!(failed.is_empty());
         assert_eq!(values, [24., 30.]);
         bends[1].reservation.bounds.1 = 17.;
-        compact(&bends, &constraints, &[0, 1], &mut failed, 6.).unwrap();
+        compact(&bends, &constraints, &[], &[0, 1], &mut failed, 6.).unwrap();
         assert_eq!(
             failed["b"],
             Failure::JointCapacity {
@@ -893,6 +1155,7 @@ mod tests {
         assert!(compact(
             &bends,
             &constraints,
+            &[],
             &[0, 1],
             &mut BTreeMap::new(),
             f64::MIN_POSITIVE
@@ -936,7 +1199,7 @@ mod tests {
                 let order = topological(&bends, &constraints);
                 assert_eq!(order.len(), bends.len());
                 let mut failed = BTreeMap::new();
-                let values = compact(&bends, &constraints, &order, &mut failed, 2.).unwrap();
+                let values = compact(&bends, &constraints, &[], &order, &mut failed, 2.).unwrap();
                 if feasible {
                     assert!(failed.is_empty());
                 }
@@ -958,6 +1221,71 @@ mod tests {
                         && !failed.contains_key(&bends[b].reservation.edge)
                     {
                         assert!(values[b] - values[a] >= distance - EPS);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_channel_rule_by_range_query_equals_the_listed_pairs() {
+        // Bends in two channels with random cross ranges (some touching within a track), bounds tight enough that some
+        // edges fail on capacity, and a few given constraints: `compact` with the channel lists gives the values and
+        // failures it gives with every pair of the rule listed as a constraint.
+        let mut state = 41_u64;
+        let mut next = || {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            (state >> 33) as usize
+        };
+        let track = 2.;
+        for case in 0..400 {
+            let mut bends = Vec::new();
+            let mut constraints = BTreeMap::new();
+            let n = 4 + next() % 28;
+            for i in 0..n {
+                let mut b = bend(&format!("e{}", i % (2 + next() % 6)), (next() % 40) as f64);
+                b.origin = 0.;
+                let lo = (next() % 30) as f64 + if next() % 3 == 0 { 0.5 } else { 0. };
+                b.cross = (lo, lo + (next() % 10) as f64);
+                b.reservation.bounds = (0., 8. + (next() % 30) as f64);
+                b.reservation.rank = next() % 2;
+                if i > 0 && next() % 5 == 0 {
+                    constraints.insert((next() % i, i), (next() % 3) as f64);
+                }
+                bends.push(b);
+            }
+            let order = topological(&bends, &constraints);
+            // The channels in `order`, as `reserve_once` lists them.
+            let mut lists: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+            for &i in &order {
+                lists.entry(bends[i].reservation.rank).or_default().push(i);
+            }
+            let lists: Vec<Vec<usize>> = lists.into_values().collect();
+            let mut pairs = constraints.clone();
+            for members in &lists {
+                for (k, &a) in members.iter().enumerate() {
+                    for &b in &members[k + 1..] {
+                        if bends[a].cross.0 < bends[b].cross.1 + track - EPS
+                            && bends[b].cross.0 < bends[a].cross.1 + track - EPS
+                        {
+                            pairs
+                                .entry((a, b))
+                                .and_modify(|v: &mut f64| *v = v.max(track))
+                                .or_insert(track);
+                        }
+                    }
+                }
+            }
+            let (mut f1, mut f2) = (BTreeMap::new(), BTreeMap::new());
+            let listed = compact(&bends, &pairs, &[], &order, &mut f1, track);
+            let queried = compact(&bends, &constraints, &lists, &order, &mut f2, track);
+            assert_eq!(listed.is_ok(), queried.is_ok(), "case {case}");
+            if let (Ok(a), Ok(b)) = (listed, queried) {
+                let keys = |f: &BTreeMap<String, Failure>| f.keys().cloned().collect::<Vec<_>>();
+                assert_eq!(keys(&f1), keys(&f2), "case {case}: failed edges");
+                for (i, bend) in bends.iter().enumerate() {
+                    if !f1.contains_key(&bend.reservation.edge) {
+                        assert_eq!(a[i].to_bits(), b[i].to_bits(), "case {case}: bend {i}");
                     }
                 }
             }

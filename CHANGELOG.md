@@ -7,6 +7,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Performance
 
+- The rule that bends of one channel keep a track apart is answered by a range query instead of listing every pair of the
+  channel (1.49 million on a dense graph); the output is byte-identical. The dense 500-node graph above: 773 → 601 ms.
+  Measurements: `benchmarks/results/channel-overlaps-20261121.md`.
 - Dense channels: the order of a channel's lane changes is found without copying the order or reading a full cost
   matrix along columns, and a channel's cross-flow pairs are built into their map at once; the output is byte-identical.
   On an anonymized 500-node graph of 3 138 edges in almost one layer the default layout takes 773 ms instead of 1 400 ms
