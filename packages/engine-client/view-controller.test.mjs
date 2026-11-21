@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync, existsSync} from 'node:fs';
 import {createSession} from './session.js';
-import {createViewController, sceneDiff, encodeBookmark, decodeBookmark} from './view-controller.js';
+import {createViewController, sceneDiff, encodeBookmark, decodeBookmark, navigateScene} from './view-controller.js';
 import {createEngine} from './wasm-client.js';
 
 const shipped = new URL('./arqlet.wasm', import.meta.url);
@@ -193,3 +193,145 @@ for (const resident of [false, true]) {
     assert.equal((await view.openBookmark(other, {force: true})).ok, true);
   });
 }
+
+test('navigateScene moves by space, hierarchy, siblings and edges', () => {
+  const box = (id, x, y, w, h, parentId) => ({id, bounds: {x, y, width: w, height: h}, ...(parentId ? {parentId} : {})});
+  const scene = {
+    nodes: [box('P', 0, 0, 200, 100), box('a', 10, 10, 40, 20, 'P'), box('b', 100, 10, 40, 20, 'P'),
+      box('c', 10, 60, 40, 20, 'P'), box('x', 300, 10, 40, 20)],
+    routes: [{id: 'ab', source: 'a', target: 'b'}, {id: 'bx', source: 'b', target: 'x'}, {id: 'xa', source: 'x', target: 'a'}],
+  };
+  const go = (from, d) => navigateScene(scene, from, d);
+  assert.equal(go(null, 'right'), 'P', 'without a selection: the first top-level node');
+  assert.deepEqual([go('a', 'right'), go('b', 'right'), go('x', 'left'), go('a', 'down'), go('c', 'up')], ['b', 'x', 'b', 'c', 'a']);
+  assert.equal(go('x', 'up'), null, 'nothing lies that way');
+  assert.equal(go('P', 'right'), 'x', 'not into its own contents');
+  assert.equal(go('a', 'left'), null, 'not out to its own container');
+  assert.deepEqual([go('a', 'parent'), go('P', 'child'), go('x', 'parent'), go('a', 'child')], ['P', 'a', null, null]);
+  assert.deepEqual([go('a', 'next'), go('b', 'next'), go('c', 'next'), go('a', 'previous')], ['b', 'c', 'a', 'c']);
+  assert.deepEqual([go('a', 'out'), go('a', 'in'), go('x', 'in'), go('c', 'out')], ['b', 'x', 'b', null]);
+  assert.throws(() => go('a', 'sideways'));
+});
+
+test('a view controller navigates by keyboard directions', {skip: !engine}, async () => {
+  const view = createViewController(createSession(engine, {resident: false}), {scenes: false});
+  await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  const first = await view.navigate('right');
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(view.getState().selection.nodeId, first.nodeId);
+  assert.ok(view.getState().focus.bounds, 'the camera target');
+  // The box is closed: no child until it is opened, then the first child; back up to it.
+  await view.select({nodeId: 'box'});
+  const closed = await view.navigate('child');
+  assert.deepEqual([closed.ok, closed.collapsed], [false, true]);
+  await view.open('box');
+  const inside = await view.navigate('child');
+  assert.equal(inside.ok, true, JSON.stringify(inside));
+  assert.equal(view.getState().details.node.parents.at(-1), 'box');
+  assert.equal((await view.navigate('parent')).nodeId, 'box');
+  assert.equal(view.getState().backLabel, 'Open box', 'navigating is not a step for back');
+  // Along the edges: from src out into the box.
+  await view.select({nodeId: 'src'});
+  const out = await view.navigate('out');
+  assert.equal(out.ok, true, JSON.stringify(out));
+  assert.notEqual(out.nodeId, 'src');
+});
+
+// A second engine for refinement, as a second worker would be: it reports the intermediate results of the request it runs.
+async function refineEngine() {
+  let onPublication = null;
+  const second = await createEngine(readFileSync(wasm), {onPublish: text => onPublication?.(JSON.parse(text).publication)});
+  return (request, init = {}) => {
+    onPublication = init.onPublication ?? null;
+    try { return second(request); } finally { onPublication = null; }
+  };
+}
+
+test('refinement runs on a second engine; stale results are discarded', {skip: !engine}, async () => {
+  const refine = await refineEngine();
+  const view = createViewController(createSession(engine, {resident: false}), {refine, publicationInterval: 0});
+  // A graph and the earlier pipeline, where refinement finds an improvement and publishes it before the end.
+  const improvable = {
+    nodes: [{id: 'root', kind: 'directory', label: 'root'}, {id: 'a', kind: 'symbol', label: 'A', parentId: 'root'},
+      {id: 'b', kind: 'symbol', label: 'B', parentId: 'root'}],
+    edges: [{id: '1', kind: 'calls', source: 'a', target: 'b'}, {id: '2', kind: 'calls', source: 'b', target: 'a'},
+      {id: '3', kind: 'calls', source: 'a', target: 'a'}, {id: '4', kind: 'calls', source: 'a', target: 'b'}],
+  };
+  await view.import(improvable, {limit: 20, options: {singlePassAuto: false, singlePass: false, abstractRouting: false,
+    layeredConstruction: false, hierarchicalOrdering: false}});
+  const before = view.getState().snapshot;
+  // Applied: the next layout version of the same revision, not a step for back.
+  let shown = 0;
+  const stop = view.subscribe(() => { shown = Math.max(shown, view.getState().refining?.shown ?? 0); });
+  const done = await view.refine({op: 'refineProgressive', threads: 1});
+  stop();
+  assert.equal(done.ok, true, JSON.stringify(done));
+  assert.ok(shown > 0, 'intermediate results were shown');
+  let s = view.getState();
+  assert.equal(s.refining, null);
+  assert.equal(s.refined.applied, true, JSON.stringify(s.refined));
+  assert.equal(s.snapshot.revision, before.revision);
+  assert.equal(s.snapshot.layoutVersion, (before.layoutVersion ?? 0) + 1);
+  assert.equal(s.canBack, false, 'refining changes no decision');
+  // A change while it runs: the refinement is stopped and its result dropped; the change stays.
+  const slow = (request, init) => new Promise(resolve => setTimeout(() => resolve(refine(request, init)), 30));
+  const view2 = createViewController(createSession(engine, {resident: false}), {refine: slow});
+  await view2.import(graph(), {limit: 100});
+  const running = view2.refine();
+  await new Promise(r => setTimeout(r, 0));
+  assert.ok(view2.getState().refining, 'named while it runs');
+  await view2.toggle('box');
+  const late = await running;
+  assert.equal(late.ok, false);
+  s = view2.getState();
+  assert.equal(s.refined.cancelled, true, JSON.stringify(s.refined));
+  assert.ok(s.snapshot.collapsedIds.includes('box'), 'the toggle stays');
+  assert.equal(s.canBack, true);
+  // A result for a view that has moved on is discarded and counted: here the layout changes underneath (as a host's own
+  // snapshot would) while the refinement runs.
+  const session3 = createSession(engine, {resident: false});
+  const view3 = createViewController(session3, {
+    refine: async (request, init) => {
+      const answer = refine(request, init);
+      const moved = engine({op: 'configure', snapshot: request.snapshot, options: {routingClearance: 9},
+        expectedRevision: request.expectedRevision, expectedLayoutVersion: request.expectedLayoutVersion});
+      assert.equal(moved.ok, true, JSON.stringify(moved));
+      await session3.load(moved.snapshot);
+      return answer;
+    },
+  });
+  await view3.import(graph(), {limit: 100});
+  const stale = await view3.refine();
+  assert.equal(stale.ok, false);
+  assert.equal(view3.getState().refined.stale, true, JSON.stringify(view3.getState().refined));
+  assert.equal(view3.getState().discarded, 1);
+  assert.equal((await view3.refine({op: 'nothing-like-it'})).ok, false, 'an unknown operation is an error');
+  assert.ok(view3.getState().refined.error);
+  // Without a second engine there is no refinement.
+  assert.equal((await view.refine()).ok, true);
+  const plain = createViewController(createSession(engine, {resident: false}));
+  assert.match((await plain.refine()).error, /No refinement engine/);
+});
+
+test('a look into a collapsed container leaves the view as it is', {skip: !engine}, async () => {
+  const view = createViewController(createSession(engine, {resident: false}));
+  await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  const before = view.getState().snapshot;
+  const look = await view.peek('box', {limit: 12});
+  assert.equal(look.ok, true, JSON.stringify(look));
+  assert.deepEqual([look.children, look.shown, look.omitted], [30, 12, 18]);
+  assert.ok(look.scene.nodes.some(n => n.id === 'c00'));
+  assert.deepEqual(look.external.c00, {incoming: 1, outgoing: 0}, 'src calls c00 from outside');
+  let s = view.getState();
+  assert.equal(s.peek.nodeId, 'box');
+  assert.equal(s.snapshot, before, 'nothing changed');
+  assert.equal(s.canBack, false);
+  assert.ok(s.scene.nodes.find(n => n.id === 'box').collapsed);
+  view.closePeek();
+  assert.equal(view.getState().peek, null);
+  // The next change ends a look.
+  await view.peek('box');
+  await view.open('box');
+  assert.equal(view.getState().peek, null);
+  assert.equal((await view.peek('src')).ok, false, 'a leaf has nothing to look into');
+});

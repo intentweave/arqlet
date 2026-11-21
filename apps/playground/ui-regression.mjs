@@ -11,8 +11,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import assert from 'node:assert/strict';
 import {createEngine} from '@arqlet/engine-client/wasm-client.js';
-import {acceptPublication,refinementFits} from './revisions.js';
-import {Session} from './session.js';
+import {refinementFits} from './revisions.js';
 import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
 import {createViewController} from '@arqlet/engine-client/view-controller.js';
 import {GeometryReports} from './geometry.js';
@@ -60,7 +59,9 @@ let holdReplies=false;const heldReplies=[];
 class Worker{
  postMessage({requestId,request}){const response=engine(request);if(response.ok&&response.snapshot)latest=response.snapshot;const deliver=()=>this.onmessage({data:{requestId,...response}});if(holdReplies)heldReplies.push(deliver);else queueMicrotask(deliver);}
 }
-const context={GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,acceptPublication,Session,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
+// What the page registers on the document (key handlers), so that a test can press keys.
+const listeners={};
+const context={GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{addEventListener:(type,fn)=>{(listeners[type]??=[]).push(fn);},getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
  setTimeout:fn=>{timers.set(++tid,fn);return tid;},clearTimeout:id=>timers.delete(id),
  fetch:async(url,options)=>{
    if(url.includes('snapshot.json')){latest=structuredClone(initial);return {ok:true,json:async()=>structuredClone(initial)};}
@@ -165,6 +166,28 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
   assert.equal(opened.ok,true,JSON.stringify(opened));
   assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'the bookmark restores the view');
   console.log('Search, focus and bookmarks passed: a hidden node found, focused, and a kept view opened again.');
+  // Keyboard navigation: from the focused node Shift+Up goes to its container, Shift+Down back to a child.
+  const keys=listeners.keydown??[];
+  const press=async(key,shiftKey=false)=>{for(const l of keys)await l({key,shiftKey,target:{tagName:'DIV'},preventDefault(){}});await settle();};
+  if(keys.length){
+   await press('ArrowUp',true);
+   assert.equal(runInNewContext('selected',context),box,'Shift+Up selects the container');
+   await press('ArrowDown',true);
+   assert.equal(runInNewContext(`snapshot.graph.nodes.find(n=>n.id===selected)?.parentId`,context),box,'Shift+Down a child of it');
+   console.log('Keyboard navigation passed: container and child by keys.');
+   // A look inside: close the container, select it, and Space shows its contents without opening it.
+   await press('ArrowUp',true);
+   if(!closed()){const rc=await runInNewContext(`edit({op:'toggle',nodeId:${JSON.stringify(box)}},{busy:'Closing …',remember:'Close'})`,context);await settle();assert.equal(rc.ok,true);}
+   runInNewContext(`selectNode(${JSON.stringify(box)})`,context);
+   assert.equal(get('peek').hidden,false,'the button shows for a closed container');
+   await press(' ');
+   assert.equal(get('peek-panel').hidden,false,'the look is shown');
+   assert.match(get('peek-info').textContent,/^Inside .*children/);
+   assert.equal(closed(),true,'and the container stays closed');
+   get('peek-close').onclick();
+   assert.equal(get('peek-panel').hidden,true);
+   console.log('Peek passed: a closed container shown without opening it.');
+  }
  }
 }
 
