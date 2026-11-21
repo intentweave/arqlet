@@ -45,6 +45,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - The playground runs its view through the view controller: every change, the undo stack (now also covering the
   three modes through `execute`), drags and refinement results handed over with `adopt`.
 - The remembered state (`intent`) keeps the filter (`hidden`), so a step back undoes a filter.
+- The minimum supported Rust version is 1.94 (was 1.88): the parser planned for the Cypher query layer (ADR 0021)
+  needs it, and the workspace follows. A CI job (`msrv`) checks the workspace with that exact version. Edition 2021
+  is unchanged. Crates published earlier keep the version they declared.
 
 ## 0.7.0 — 2026-11-21
 
