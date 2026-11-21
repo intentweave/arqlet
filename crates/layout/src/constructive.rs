@@ -2249,18 +2249,7 @@ fn corridor_order(changes: &[(f64, f64)]) -> Vec<usize> {
 /// one whose placing first costs least against all that remain; then every change moves to its cheapest place among the
 /// others while that lowers the cost.
 pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> {
-    const CONFLICT: i64 = 1_000;
     let n = changes.len();
-    let inside = |v: f64, (a, b): (f64, f64)| v > a.min(b) + EPS && v < a.max(b) - EPS;
-    let first = |a: (f64, f64), b: (f64, f64)| -> i64 {
-        i64::from(inside(a.1, b))
-            + i64::from(inside(b.0, a))
-            + if (a.1 - b.0).abs() < track - EPS {
-                CONFLICT
-            } else {
-                0
-            }
-    };
     // cost(i, j): `i` placed before `j` (0 for i = j). Kept as the difference swap[i][j] = cost(j, i) - cost(i, j), row by
     // row (what moving `i` past `j` changes), and the row sums ahead[i] = sum over j of cost(i, j) (`i` before all): a
     // channel of a dense graph holds thousands of changes, and these are read along rows.
@@ -2268,7 +2257,10 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
     let mut ahead = vec![0i64; n];
     for i in 0..n {
         for j in (i + 1)..n {
-            let (ij, ji) = (first(changes[i], changes[j]), first(changes[j], changes[i]));
+            let (ij, ji) = (
+                change_cost(changes[i], changes[j], track),
+                change_cost(changes[j], changes[i], track),
+            );
             ahead[i] += ij;
             ahead[j] += ji;
             // Each cost is at most 2 + CONFLICT, so the difference fits an i32.
@@ -2276,8 +2268,29 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
             swap[j * n + i] = (ij - ji) as i32;
         }
     }
+    order_by_swaps(n, &swap, &ahead, corridor_order(changes))
+}
+
+/// The cost of lane change `a` placed before `b` in a channel (`dependent_order`): their crossings in that order, and far
+/// more when `a` arrives on a lane (closer than `track`) that `b` leaves.
+fn change_cost(a: (f64, f64), b: (f64, f64), track: f64) -> i64 {
+    const CONFLICT: i64 = 1_000;
+    let inside = |v: f64, (a, b): (f64, f64)| v > a.min(b) + EPS && v < a.max(b) - EPS;
+    i64::from(inside(a.1, b))
+        + i64::from(inside(b.0, a))
+        + if (a.1 - b.0).abs() < track - EPS {
+            CONFLICT
+        } else {
+            0
+        }
+}
+
+/// The order of `n` items by pairwise costs (`dependent_order`): `swap[i * n + j]` = cost(j before i) - cost(i before j),
+/// `ahead[i]` = the cost of `i` before all others. The items are taken greedily from `left` (a first order), each time the
+/// one whose placing first costs least against all that remain; then every item moves to its cheapest place among the
+/// others while that lowers the cost.
+fn order_by_swaps(n: usize, swap: &[i32], ahead: &[i64], mut left: Vec<usize>) -> Vec<usize> {
     let row = |i: usize| &swap[i * n..(i + 1) * n];
-    let mut left: Vec<usize> = corridor_order(changes);
     // balance(i) = sum over j of cost(i, j) - cost(j, i) = -(sum of row i of `swap`).
     let mut balances: Vec<i64> = (0..n)
         .map(|i| -row(i).iter().map(|&d| i64::from(d)).sum::<i64>())
@@ -2298,9 +2311,9 @@ pub(crate) fn dependent_order(changes: &[(f64, f64)], track: f64) -> Vec<usize> 
             balances[i] -= i64::from(gone[i]);
         }
     }
-    // Sifting: each change, taken out, goes to the place where it costs least against the others. The cost of `i` at place
-    // p among the others starts at ahead[i] (before all) and changes by swap[i][j] past each; its cost where it stands is
-    // that sum at its own place, so one pass finds both.
+    // Sifting: each item, taken out, goes to the place where it costs least against the others. The cost of `i` at place p
+    // among the others starts at ahead[i] (before all) and changes by swap[i][j] past each; its cost where it stands is that
+    // sum at its own place, so one pass finds both.
     let mut improved = true;
     let mut rounds = 0;
     while improved && rounds < 8 {
@@ -2346,6 +2359,9 @@ pub(crate) fn shared_track_slots<'g>(
     track: f64,
     group: impl Fn(usize) -> Option<&'g str>,
 ) -> (Vec<usize>, usize) {
+    // Ordering the groups by the summed crossing costs of their members (`change_cost`, greedily or by sifting from this
+    // order) was tried: it gave a third more crossings and failed edges, as the channel cost does not see what a moved
+    // group does to the lane orders and the coordination around it.
     let mut unit_of: Vec<usize> = vec![usize::MAX; spans.len()];
     let mut units: Vec<(f64, f64)> = Vec::new();
     let mut by_group: BTreeMap<&str, usize> = BTreeMap::new();
