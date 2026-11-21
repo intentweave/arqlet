@@ -78,7 +78,9 @@ Each part carries a revision (`structureRevision`, `contentRevision`); a result 
   stale (as `expectedRevision` does today) and publishes the confirmed change to every replica, including the sender. A
   replica never applies its own intent as confirmed before the primary has; an optimistic preview is the host's display
   concern and must be replaced by the confirmed change.
-- **What never travels:** derived views, layouts of the other side, query indexes. A layout's view state (collapsed,
+- **What the stream does not carry:** derived views, layouts and query indexes are not how the *data* is kept in step;
+  each side derives them from its own store. A finished layout may still be handed over as a starting state or offered
+  as a result; that is a different kind of message with its own rule (item 5). A layout's view state (collapsed,
   partial, pins: the engine's `intent`) stays a session matter as today; a bookmark (#79) carries it explicitly.
 
 ### 4. Projections are local
@@ -88,7 +90,37 @@ Each side derives what it needs from its own store: the layout session its view 
 the projections that depend on it; whether a projection is recomputed or updated incrementally is that function's
 decision and is tested by "incremental equals recompute" over seeded change sequences.
 
-### 5. Where a query runs
+### 5. Layout hand-over: render first, compute locally when needed
+
+Two kinds of messages cross the boundary, with different rules:
+
+- **Source changes** (structure and content) come from the primary through the stream (item 3) and are always applied in
+  order.
+- **View results** (a scene, a layout state) are *offered* by whoever computed them and *accepted* only while they fit:
+  the same revisions and the next layout version of the state they were computed from, the rule refinement results
+  already follow (#82). A result that arrives after a local change is discarded and counted, never applied silently.
+
+On this rule, a backend can precompute and the browser can start drawing before it computes anything:
+
+1. **Scene first.** The backend imports and lays out natively and sends the finished scene (JSON today; columnar and
+   progressive, coarse first, as the cluster overview already builds, when measured). The browser renders it at once,
+   without loading the WASM engine and without a local layout. For these first moments it is a pure renderer, as in
+   backend-only mode.
+2. **Layout state without the source.** With the scene, or right after it, the backend sends the layout state as a lean
+   snapshot (`omitSource` with `sourceDigest`, ADR 0019): positions, view decisions, revisions, no graph.
+3. **The engine when it is needed.** The WASM engine starts in the background. At the first local change (filter,
+   trace and reveal, toggle, drag) it loads the lean snapshot and takes the structure from the replica, checked against
+   the digest, and computes the change locally from the backend's layout. Native and WASM give bit-identical results
+   (`platform-parity`), so continuing in the browser gives exactly what the backend would have computed. The step from
+   rendering to computing locally is seamless and leaves backend-only and split mode as two points of one range.
+4. **Who owns the view.** The view (open groups, pages, pins, filter) belongs to the user's session: in split mode the
+   browser's. The backend supplies the starting value and later offers: a better refinement, a precomputed drill-down of
+   a container that is often opened, a layout under other options. The view controller already accepts such offers: its
+   `refine` option may point at the backend (`httpRun`), and a result that no longer fits is discarded (#82).
+5. **Back to the backend.** A local view can be handed back as a lean snapshot or a bookmark (#79), so the backend can
+   continue from it (backend-only mode, another device, a saved view).
+
+### 6. Where a query runs
 
 The plan IR of ADR 0021 tells, before execution, which property keys and which part of the structure a query reads.
 
@@ -101,18 +133,18 @@ The plan IR of ADR 0021 tells, before execution, which property keys and which p
 - A test runs every query of the fixture corpus both ways and asserts identical answers (on top of `platform-parity`).
 - A host may force a place (`local`, `primary`); the default is the rule above.
 
-### 6. The three deployment modes
+### 7. The three deployment modes
 
 | Mode | Primary | The browser holds | Queries |
 |---|---|---|---|
 | Browser-only | browser worker | everything | local |
-| Split | backend | structure (whole or bounded), content on demand | local when covered, else at the backend |
+| Split | backend | the backend's scene and lean layout state first; structure (whole or bounded) and content on demand | local when covered, else at the backend |
 | Backend-only | backend | scenes only | at the backend |
 
 All three keep working with one code path: the difference is where the primary is and what the replica covers. Any new
 operation still goes through `dispatch`.
 
-### 7. What stays as it is
+### 8. What stays as it is
 
 - `dispatch`, the typed protocol, sessions and their revision checks (ADR 0019).
 - Snapshot operations for hosts that hold the state themselves.
@@ -136,6 +168,10 @@ Each step is useful on its own, behind an option or a new operation, and measure
 - **R4 — the query executor** (ADR 0021 M1 to M4) over structure and content through the store seam.
 - **R5 — placement.** Local when covered, else the primary; the same answer both ways for the whole fixture corpus.
 - **R6 — columns, interned ids and a binary frame** (ADR 0019 §4) when the measurements of R1 to R3 ask for them.
+- **H1 — scene first, engine on demand** (item 5), independent of R1 to R5: the backend sends the scene and the lean
+  layout state; the playground's split mode renders before the WASM engine has loaded and starts it at the first local
+  change. *Exit:* the first local change gives the same snapshot as with the full snapshot sent up front (byte for byte);
+  an offer that arrives after a local change is discarded and counted; time to first render recorded both ways.
 
 ## Measurements before defaults
 
@@ -146,13 +182,18 @@ require:
 - size and apply time of a change against a whole snapshot, for typical edits;
 - time from an accepted change to every replica at the new revision (with several replicas and coalesced edits);
 - initial sync size and time, JSON against a columnar frame;
+- time to the first rendered frame: the backend's scene drawn directly against the full snapshot laid out into a scene
+  by the browser's engine; the sizes of the scene and the lean layout state against the full snapshot;
 - query time local against at the primary for the fixture corpus, including the transfer.
 
 ## Consequences
 
 - The browser keeps every capability; what it can do locally depends on what its replica covers, not on the architecture.
-- Backend and browser exchange source changes and ids, never derived views: the smallest messages, one place where
-  staleness is detected, and every function free to keep its own projection.
+- Backend and browser keep the data in step through source changes and ids, not derived views: the smallest messages,
+  one place where staleness is detected, and every function free to keep its own projection. Finished layouts still
+  travel, as starting states and offers, under the acceptance rule of item 5.
+- A browser can show a precomputed drawing before it has loaded the engine, and compute locally only once the user
+  changes something.
 - The same mechanism carries a database as the primary later (through the store seam) and several clients (one writer
   first).
 - Content adds memory to a session that is already the largest consumer per node; it is optional, per key, and measured
@@ -167,5 +208,5 @@ require:
 - A database as the primary, its schema and pushdown (ADR 0021, "Not decided").
 - Which functions update their projections incrementally and which recompute; each decides with the "incremental equals
   recompute" test.
-- Access control on content (which keys a replica may load): a host concern, but the coverage rule of item 5 must respect
+- Access control on content (which keys a replica may load): a host concern, but the coverage rule of item 6 must respect
   it.
