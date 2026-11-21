@@ -11,8 +11,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import assert from 'node:assert/strict';
 import {createEngine} from '@arqlet/engine-client/wasm-client.js';
-import {acceptPublication,refinementFits} from './revisions.js';
-import {Session} from './session.js';
+import {refinementFits} from './revisions.js';
 import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
 import {createViewController} from '@arqlet/engine-client/view-controller.js';
 import {GeometryReports} from './geometry.js';
@@ -62,7 +61,7 @@ class Worker{
 }
 // What the page registers on the document (key handlers), so that a test can press keys.
 const listeners={};
-const context={GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{addEventListener:(type,fn)=>{(listeners[type]??=[]).push(fn);},getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,acceptPublication,Session,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
+const context={GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{addEventListener:(type,fn)=>{(listeners[type]??=[]).push(fn);},getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
  setTimeout:fn=>{timers.set(++tid,fn);return tid;},clearTimeout:id=>timers.delete(id),
  fetch:async(url,options)=>{
    if(url.includes('snapshot.json')){latest=structuredClone(initial);return {ok:true,json:async()=>structuredClone(initial)};}

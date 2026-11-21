@@ -1,5 +1,5 @@
 import type {DetailsAnswer, FindAnswer, Graph, Hidden, Intent, NeighbourhoodAnswer, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
-import type {DetailTarget, ReadAnswer, Session, SessionResult} from './session.js';
+import type {DetailTarget, ReadAnswer, RefineRun, Session, SessionResult} from './session.js';
 import type {EngineRequest} from './wasm-client.js';
 
 /** Provisional: a view as a value (`bookmark`): the engine's intent, the highlight, the selection, the graph's digest. */
@@ -58,6 +58,12 @@ export interface ViewState {
   readonly search: {query: string; answer: FindAnswer & {ok: true}} | null;
   /** The last `focus`: the node and the bounds of the box that shows it (null when hidden); `serial` counts requests. */
   readonly focus: {nodeId: string; bounds: {x: number; y: number; width: number; height: number} | null; shownAs: string | null; serial: number} | null;
+  /** The refinement under way on the second engine (`refine`), or null; `shown` counts intermediate results applied. */
+  readonly refining: {op: string; jobId: string; shown: number} | null;
+  /** How the last refinement ended: applied, stale (the view had moved on), cancelled, or an error. */
+  readonly refined: {op: string; applied: boolean; stale?: true; cancelled?: true; error?: string; optimization?: unknown} | null;
+  /** Refinement results discarded because the view had changed. */
+  readonly discarded: number;
   /** What the pointer is over (`hover`), or null. */
   readonly hover: DetailTarget | null;
   /** What the view hides (the last `filter`). */
@@ -106,6 +112,16 @@ export interface ViewController {
   clearSearch(): void;
   /** Opens what hides `nodeId` (a step for `back`), selects it, and sets `state.focus` for the host's camera. */
   focus(nodeId: string, options?: {reveal?: boolean; partial?: boolean}): Promise<ViewResult>;
+  /**
+   * Refines the view on the second engine (`refine`): `{op: 'refine'}` by default, `refineProgressive` or
+   * `structuredRefine`; applied only if the view is still the one it started from. Not a step for `back`.
+   */
+  refine(
+    request?: {op?: 'refine' | 'refineProgressive' | 'structuredRefine'; [field: string]: unknown},
+    options?: {onApplied?: (snapshot: Snapshot, info: {final: boolean; shown: number}) => void},
+  ): Promise<ViewResult>;
+  /** Stops the refinement under way; its later results are dropped. */
+  cancelRefinement(): void;
   /** Moves the selection the way `direction` says and sets `state.focus` (nothing opened, not a step for `back`). */
   navigate(direction: NavigationDirection): Promise<ViewResult | {ok: false; none: true; collapsed?: boolean}>;
   /** The view as a value to keep or share (`encodeBookmark` for a URL). */
@@ -130,6 +146,6 @@ export interface ViewController {
   cancel(): void;
 }
 
-export function createViewController(session: Session, options?: {page?: number; historyLimit?: number; scenes?: boolean; detailLimit?: number}): ViewController;
+export function createViewController(session: Session, options?: {page?: number; historyLimit?: number; scenes?: boolean; detailLimit?: number; refine?: RefineRun; publicationInterval?: number}): ViewController;
 
 export function sceneDiff(before: Scene | null, after: Scene | null): SceneDiff;

@@ -84,6 +84,10 @@ await view.focus('n42');                          // opens what hides it, select
 const {bookmark} = await view.bookmark();         // the view as a value; encodeBookmark(bookmark) for a URL
 await view.openBookmark(decodeBookmark(text));    // one step back undoes it; another graph's is refused
 await view.navigate('right');                     // keys: left/right/up/down, parent/child, next/previous, out/in
+
+// Refinement on a second worker, beside the interactive steps; applied only while the view is unchanged.
+const refining = createViewController(session, {refine: workerRefineRun(createEngineWorker(wasmUrl))});
+await refining.refine({op: 'refineProgressive'});  // state.refining meanwhile; state.refined: applied, stale or cancelled
 await view.filter({nodeKinds: ['test']});
 await view.back();                                // forward(); cancel() drops steps not started yet
 ```

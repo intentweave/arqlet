@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Refinement on a second engine (provisional): `createViewController(session, {refine})` takes a second engine for
+  refinement (`workerRefineRun(worker)` for its own worker, or any `(request, {onPublication, signal}) => answer`).
+  `refine({op})` (`refine`, `refineProgressive`, `structuredRefine`) runs beside the interactive steps, shows
+  intermediate results throttled (`publicationInterval`), applies a result only while the view is still the one it
+  started from (else `state.refined.stale`, counted in `state.discarded`), and is stopped by any change, step back,
+  import or new refinement (`state.refined.cancelled`); `state.refining` names it meanwhile; `cancelRefinement()`. Not a
+  step for `back`. The playground's whole-view refinement runs through it on the mode's refinement lane.
 - Keyboard navigation (provisional): the view controller's `navigate(direction)` moves the selection to the nearest box
   that way (`left`, `right`, `up`, `down`), up to the container or to the first child (`parent`, `child`), between
   siblings in reading order (`next`, `previous`), or along a drawn edge (`out`, `in`), and sets `state.focus` for the
