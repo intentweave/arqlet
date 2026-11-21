@@ -1,7 +1,10 @@
 # ADR 0022: Memberships across the hierarchy
 
 Date: 2026-11-21.
-Status: proposed. Docs only; no code and no capability status change.
+Status: accepted for the first slice (2026-11-21): **M0 and a narrowed M2 are implemented** behind `membershipViews`, off
+by default — the model, the validation, the padded convex hull as scene geometry, the typed report, the SVG viewer and the
+playground checkbox. The modes `hierarchy` (M1) and `lanes` (M4), memberships through `patch` (§5b), `details` per
+dimension and proxies (M5) stay proposed.
 
 Related: [ADR 0003](0003-container-direction-constraints.md) (direction and strategy per area), [ADR 0005](0005-routing-constraints.md)
 (routing per container, the outline contract), [ADR 0007](0007-recursive-strategy-orchestration.md) (containment, optimization
@@ -204,6 +207,17 @@ recorded like every other quality number:
 - per dimension: the sums of its mode's measures;
 - per drawing: the number of intersecting hull pairs.
 
+Two definitions the first slice had to settle, because "a node inside a hull" and "an overlapping pair" are both
+ambiguous until something counts them:
+
+- **An intruder is a leaf box whose centre lies inside the hull.** The centre, so a box that merely grazes the border is
+  not counted; a leaf, because a *container* that encloses members is the drawing's own structure, not a node the hull
+  swallowed. Counting containers would make every hull inside a container report its parent.
+- **Overlapping pairs are counted within one dimension only.** Two dimensions that cut across each other are *expected*
+  to overlap — that is what the feature is for — so counting those pairs would measure the premise instead of the
+  drawing. Within one dimension an overlap means the layout could not keep two groups of the same kind apart, which is
+  the thing worth knowing.
+
 **Which measure belongs to which mode matters, because the one-dimensional limit does not bind in two.** Three groups that
 pairwise share a member cannot all be contiguous in one *order* — the Euler case, which `non-contiguous.json` proves by
 exhausting all 720 orders of six nodes. That bounds `lanes` and the rank order of layered areas, and it is why
@@ -242,10 +256,23 @@ Each step is behind the option and measured before the next. Nothing becomes a d
 - **M0 — model and validation, nothing drawn.** `Graph.memberships`, `membershipViews`, the refusals and diagnostics of §5,
   the metrics of §6, the typed contracts. *Exit:* default output byte-identical against the 0.7.0 fingerprints; unknown
   member ids ignored and counted; every refusal and diagnostic tested; the fixtures below parse and lay out.
+  **Done** (2026-11-21): `Memberships`, `MembershipDimension`, `MembershipGroup` and `MembershipView` in `arqlet-model`,
+  both fields omitted when empty (tested: a snapshot of a graph without memberships does not contain the string
+  `membership` at all, so the stored fingerprints cannot move), the generated TypeScript contracts, and the validator of
+  §1 and §2 in `crates/runtime/tests/memberships.rs`. The per-group diagnostics of §5 are carried by the typed report;
+  the refusals (`parent` cycles, duplicate ids, `groups` beside a `hierarchy` dimension) arrive with M1, where those
+  modes first read the data.
 - **M1 — `hierarchy` as the general form of `groups`.** *Exit:* a `hierarchy` dimension gives the same scene as the
   equivalent `groups` mapping on the same graph; `details` reports the dimension; `groups` keeps working unchanged.
 - **M2 — `overlay` drawn only**, with no influence on the layout. *Exit:* the geometry is identical to the run without the
   overlay (the hull is the only addition), hulls are valid, the §6 metrics are reported.
+  **Done** (2026-11-21), narrowed as below: `arqlet_scene::hull` (padded convex hull, point-in-polygon, separating-axis
+  overlap — comparisons only, no trigonometry), assembled in `build_scene` from boxes the layout has already produced, as
+  scene `membershipHulls` and `membershipReport`, drawn by the SVG viewer behind everything else and offered in the
+  playground as *Membership hulls*. The exit check holds and is a test, not a measurement: on three fixtures every node
+  box and every route is byte-identical with the overlay on and off (`membership_hulls.rs`), and the same holds through
+  the page (`ui-regression.mjs`: 9 hulls over 3 dimensions, boxes and routes unchanged). No quality gate was needed,
+  because nothing moved.
 - **M3 — `overlay` keeps members together softly.** *Exit:* the §6 gate on the corpus, and the intruder and overlap numbers
   improve against M2.
 - **M4 — `lanes`**, first one dimension across the flow, then the grid. *Exit:* the §6 gate; `pools-and-lanes.json` draws as
@@ -266,8 +293,9 @@ elk-rs on the corpus.
 The slice is narrowed further so it stays one slice:
 
 - One dimension, mode `overlay`, off by default.
-- `memberships` parsed without `parent` nesting (flat groups), which `one-group-per-node.json` and `crosses-containers.json`
-  already exercise. Nesting arrives with M1, where it is the group path `hierarchy` needs anyway.
+- One hull per group, with the nesting of §1 honoured: a group covers its own members and those of every group below it,
+  so `restricted` inside `internal` draws a sub-zone inside its zone. Only the *refusals* around `parent` (cycles,
+  duplicate ids) wait for M1, where the modes that need a partition first read them.
 - A padded **convex hull** for every area, including layered ones, instead of the rectilinear outline §3 decides. A
   monotone chain over the member boxes' corners is about twenty lines of comparisons — no trigonometry, so no
   `PortableMath` call and no cross-platform risk — whereas a rectangle union has to be traced into an outline. The

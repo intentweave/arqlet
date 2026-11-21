@@ -101,6 +101,23 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
   c.append(element('circle',{cx,cy:y+size*.35,r:size*.25,fill:on?colour:'none',stroke:colour,'stroke-width':size*.1,'pointer-events':'none'}));
   return c;
  };
+ // Provisional (ADR 0022): membership hulls, drawn first so that everything else covers them. A hull is a closed
+ // polygon around the boxes of one group; it takes no pointer events, because it is not a thing to select and because a
+ // node under it must stay reachable. One hue per dimension, so two dimensions over the same nodes stay apart; the
+ // group's name sits at the hull's topmost point.
+ const hulls=scene.membershipHulls??[];
+ if(hulls.length){
+  const dimensions=[...new Set(hulls.map(h=>h.dimension))];
+  for(const h of hulls){
+   if(!(h.points?.length>=3))continue;
+   const hue=(dimensions.indexOf(h.dimension)*67+191)%360,points=h.points.map(p=>`${p.x},${p.y}`).join(' ');
+   const shape=element('polygon',{points,fill:`hsl(${hue} 60% 55% / .12)`,stroke:`hsl(${hue} 60% 65% / .55)`,'stroke-width':1.4,'stroke-dasharray':'6 4','pointer-events':'none',class:'lw-hull','data-hull-dimension':h.dimension,'data-hull-group':h.group});
+   shape.append(element('title',{},`${h.dimensionLabel||h.dimension}: ${h.label}${h.intruders?.length?` (${h.intruders.length} foreign inside)`:''}`));
+   svg.append(shape);
+   const at=h.points.reduce((a,b)=>b.y<a.y||(b.y===a.y&&b.x<a.x)?b:a);
+   svg.append(element('text',{x:at.x+6,y:at.y-5,fill:`hsl(${hue} 55% 78%)`,'font-size':11,'pointer-events':'none',class:'lw-hull-label'},h.label));
+  }
+ }
  const rings=[],top=[];
  for(const n of [...nodes.values()].filter(n=>parents.has(n.id)).sort((a,b)=>depth(a)-depth(b))){const r=absolute.get(n.id);
   // A circle container is a disc inscribed in its square box, like a circle leaf; its controls sit on the disc.

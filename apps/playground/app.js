@@ -1053,6 +1053,16 @@ function syncDetails(){
  $('archive-refinement').value=o.archiveRefinement??0;
  syncObjectives(o);
  $('edge-labels').checked=Object.keys(o.edgeLabels??{}).length>0;$('port-labels').checked=Object.keys(o.portLabels??{}).length>0;
+ // Provisional (ADR 0022): one tick for every dimension the graph declares. A graph without memberships has nothing to
+ // show, so the control is disabled rather than silently doing nothing.
+ const dimensions=membershipDimensions();
+ $('membership-hulls').disabled=dimensions.length===0;
+ $('membership-hulls').checked=Object.values(o.membershipViews??{}).some(mode=>mode==='overlay');
+}
+/** The ids of the membership dimensions the current graph declares, in their declared order. */
+function membershipDimensions(){
+ const graph=snapshot?.sourceGraph??snapshot?.graph;
+ return (graph?.memberships?.dimensions??[]).map(d=>d.id);
 }
 // Objectives in priority order: a tick appends or removes one, the arrows move an active one. The list keeps at
 // least one objective; the snapshot's order is the order of the list.
@@ -1124,6 +1134,13 @@ numberOption('archive-refinement','archiveRefinement','archive refinement',{min:
 // On/off options and optional numbers; an empty number field clears its option, so the engine default applies.
 const FLAGS=[['component-packing','componentPacking'],['vpsc-overlap-removal','vpscOverlapRemoval'],['directed-repair','directedRepair'],['node-edge-repulsion','nodeEdgeRepulsion'],['sparse-stress','sparseStress'],['scalable-stress','scalableStress'],['force-directed','forceDirected'],['strict-clearance','strictClearance'],['extended-conflict-selection','extendedConflictSelection'],['routed-candidates','routedCandidates'],['flat-region','flatRegion'],['global-layering','globalLayering'],['simplex-ranks','simplexRanks']];
 for(const [id,key] of FLAGS)$(id).onchange=()=>setOption({[key]:$(id).checked},key);
+// Provisional (ADR 0022): show every declared dimension as an overlay, or none. The hulls are derived from the boxes the
+// layout already produced, so this never moves a node; one `configure` edit carries the option like any other.
+$('membership-hulls').onchange=()=>{
+ const on=$('membership-hulls').checked,dimensions=membershipDimensions();
+ if(!dimensions.length)return;
+ setOption({membershipViews:on?Object.fromEntries(dimensions.map(id=>[id,'overlay'])):{}},'membershipViews');
+};
 // Live needs force-directed behaviour: turning it on turns that on (the configure edit then starts the settling).
 $('live').onchange=()=>{
  if(!$('live').checked)return;

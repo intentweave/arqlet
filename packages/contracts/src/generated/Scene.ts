@@ -7,6 +7,8 @@ import type { ResolvedPort } from "./ResolvedPort";
 import type { SceneBusLine } from "./SceneBusLine";
 import type { SceneConflict } from "./SceneConflict";
 import type { SceneHubRef } from "./SceneHubRef";
+import type { SceneHull } from "./SceneHull";
+import type { SceneMembershipReport } from "./SceneMembershipReport";
 import type { SceneNode } from "./SceneNode";
 import type { SceneRoute } from "./SceneRoute";
 
@@ -35,6 +37,17 @@ busLines?: Array<SceneBusLine>,
  * Provisional (`hubRefs`): edges of hubs drawn as stubs at their other end, named after the hub. Omitted when none.
  */
 hubRefs?: Array<SceneHubRef>,
+/**
+ * Provisional (ADR 0022, `membershipViews` set to `overlay`): a hull per membership group, to be drawn behind the
+ * nodes. In the declared order of the dimensions and of their groups. Omitted when there is none, so every drawing
+ * without the option is unchanged.
+ */
+membershipHulls?: Array<SceneHull>,
+/**
+ * Provisional (ADR 0022 §5): one entry per dimension the options name, with its counts and one summary line.
+ * Omitted when there is none.
+ */
+membershipReport?: Array<SceneMembershipReport>,
 /**
  * Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
  */

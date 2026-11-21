@@ -7231,6 +7231,7 @@ mod tests {
                 },
             ],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let s =
             arqlet_layout::compute(&graph, None, &BTreeSet::new(), &previous_pipeline_options())

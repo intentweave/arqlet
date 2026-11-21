@@ -2415,6 +2415,7 @@ mod tests {
             nodes: vec![],
             edges: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         for i in 0..(MAX_NODES + 1) {
             graph.nodes.push(arqlet_model::Node {

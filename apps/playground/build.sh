@@ -52,6 +52,20 @@ index.append({'name': 'calls-flat', 'title': 'Flat call graph', 'nodes': len(fla
               'source': 'benchmarks/overview/generate.py --nodes 2000 --seed 1 --flat'})
 json.dump(index, open(path, 'w'), indent=1, ensure_ascii=False)
 PY
+# Memberships across the hierarchy (ADR 0022): a committed fixture, not a generated dataset. Three dimensions (zone,
+# team, layer) that cut across the containers and across each other, for the checkbox "Membership hulls".
+cp examples/fixtures/memberships/three-dimensions.json apps/playground/generated/examples/memberships.json
+python3 - <<'PY'
+import json
+graph = json.load(open('apps/playground/generated/examples/memberships.json'))
+path = 'apps/playground/generated/examples/index.json'
+index = [e for e in json.load(open(path)) if e['name'] != 'memberships']
+index.append({'name': 'memberships', 'title': 'Memberships (zone, team, layer)',
+              'nodes': len(graph['nodes']),
+              'description': 'Nine services in three containers, each also in a zone, a team and a layer. Tick "Membership hulls" to draw a hull per group; the drawing does not move.',
+              'source': 'examples/fixtures/memberships/three-dimensions.json'})
+json.dump(index, open(path, 'w'), indent=1, ensure_ascii=False)
+PY
 # Cluster overview (overview.html): deterministic hierarchical graphs of two sizes, seed 1.
 mkdir -p apps/playground/generated/overview
 python3 benchmarks/overview/generate.py --nodes 10000 --seed 1 --out apps/playground/generated/overview/code-10000.json
