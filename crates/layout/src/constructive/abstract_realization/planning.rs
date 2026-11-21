@@ -48,6 +48,54 @@ pub struct Session {
     pub(super) physical_tracks: bool,
     /// Edges with explicit ports are planned (single pass); see `abstract_routing::build_with`.
     pub(super) explicit_ports: bool,
+    /// Provisional (`LayoutOptions::shared_tracks`): the group of every edge whose changes in a channel share one track
+    /// with the other changes of its group there (edge id to group key). Empty: one track per change.
+    pub(super) shared: BTreeMap<String, String>,
+}
+
+/// Provisional (`LayoutOptions::shared_tracks`): the track slots of a channel's changes when the changes of one group share
+/// a track. A group stands as one change spanning all of its members, placed where its first member stands in `order`;
+/// every member takes the group's slot. A change without a group stands alone.
+fn shared_track_slots<'g>(
+    spans: &[(f64, f64)],
+    order: &[usize],
+    track: f64,
+    group: impl Fn(usize) -> Option<&'g str>,
+) -> (Vec<usize>, usize) {
+    let mut unit_of: Vec<usize> = vec![usize::MAX; spans.len()];
+    let mut units: Vec<(f64, f64)> = Vec::new();
+    let mut by_group: BTreeMap<&str, usize> = BTreeMap::new();
+    let mut unit_order = Vec::new();
+    for &k in order {
+        let (lo, hi) = (spans[k].0.min(spans[k].1), spans[k].0.max(spans[k].1));
+        let unit = match group(k) {
+            Some(g) => *by_group.entry(g).or_insert_with(|| {
+                units.push((lo, hi));
+                unit_order.push(units.len() - 1);
+                units.len() - 1
+            }),
+            None => {
+                units.push((lo, hi));
+                unit_order.push(units.len() - 1);
+                units.len() - 1
+            }
+        };
+        let u = &mut units[unit];
+        u.0 = u.0.min(lo);
+        u.1 = u.1.max(hi);
+        unit_of[k] = unit;
+    }
+    let (unit_slots, count) = track_slots(&units, &unit_order, track);
+    let slots = (0..spans.len())
+        .map(|k| {
+            if unit_of[k] == usize::MAX {
+                0
+            } else {
+                unit_slots[unit_of[k]]
+            }
+        })
+        .collect();
+    (slots, count)
 }
 
 impl Session {
@@ -157,6 +205,8 @@ impl Session {
                 channel
             },
         )?;
+        let mut plan = plan;
+        plan.shared = self.shared.clone();
         self.ordinal.retain(|key, _| active.contains(key));
         self.tracks.retain(|key, _| active.contains(key));
         let edges: BTreeSet<_> = plan.edges.iter().map(|e| e.edge.as_str()).collect();
@@ -232,9 +282,13 @@ impl Session {
         track: f64,
     ) -> (Vec<usize>, usize) {
         let key = (area.to_string(), rank);
+        // The group of each change (shared tracks), part of what the cached result depends on.
         let inputs: Vec<_> = changes
             .iter()
-            .map(|(id, i, a, b)| (id.to_string(), *i, a.to_bits(), b.to_bits()))
+            .map(|(id, i, a, b)| {
+                let group = self.shared.get(*id).cloned().unwrap_or_default();
+                (format!("{id}\u{0}{group}"), *i, a.to_bits(), b.to_bits())
+            })
             .collect();
         if let Some((before, bits, physical, slots, count)) = self.tracks.get(&key) {
             if *before == inputs && *bits == track.to_bits() && *physical == self.physical_tracks {
@@ -251,7 +305,13 @@ impl Session {
         } else {
             (0..spans.len()).collect()
         };
-        let (slots, count) = track_slots(&spans, &order, track);
+        let (slots, count) = if self.shared.is_empty() {
+            track_slots(&spans, &order, track)
+        } else {
+            shared_track_slots(&spans, &order, track, |k| {
+                self.shared.get(changes[k].0).map(String::as_str)
+            })
+        };
         self.work.channel_computations += 1;
         self.tracks.insert(
             key,

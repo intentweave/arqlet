@@ -19,6 +19,7 @@ import type { PortPlacement } from "./PortPlacement";
 import type { RoutingEngine } from "./RoutingEngine";
 import type { Row } from "./Row";
 import type { RowPortOrder } from "./RowPortOrder";
+import type { SharedTracks } from "./SharedTracks";
 
 /**
  * View configuration. Part of the portable snapshot, so backend and browser compute identically.
@@ -144,6 +145,12 @@ isolatedGridFrom?: number | null,
  * to another sheet. `None` (the default, omitted): every edge is routed.
  */
 hubRefs?: number,
+/**
+ * Provisional (single pass, request 27): edges that share a track in a channel instead of one track each. `target`:
+ * the edges of a channel into the same node run on one track there, drawn over each other like a bus into the node
+ * (as ELK's merged edges). `None` (the default, omitted): one track per edge.
+ */
+sharedTracks?: SharedTracks,
 /**
  * Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
  * (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.

@@ -170,6 +170,16 @@ fn run_impl(
     };
     checkpoint()?;
     session.physical_tracks = snapshot.options.abstract_routing;
+    // Provisional (`sharedTracks: target`): the edges into one node share their tracks.
+    session.shared = match snapshot.options.shared_tracks {
+        Some(arqlet_model::SharedTracks::Target) => snapshot
+            .graph
+            .edges
+            .iter()
+            .filter_map(|e| Some((e.id.clone(), e.target.clone()?)))
+            .collect(),
+        None => BTreeMap::new(),
+    };
     session.explicit_ports = matches!(method, Method::SinglePass);
     let before = session.work.clone();
     let construction_before = session.construction.as_ref().map(|s| s.work.clone());
