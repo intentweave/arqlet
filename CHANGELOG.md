@@ -7,12 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- The Cypher query layer runs queries (ADR 0021, stages M1 to M5a; provisional, `publish = false`, no `dispatch` operation yet): `arqlet-query` gains values, the store seam, the plan IR and a deterministic executor (three-valued logic, patterns with relationships, variable-length paths, `OPTIONAL MATCH`, `WITH`, `UNWIND`, `DISTINCT`, aggregation, `ORDER BY`, `SKIP`, `LIMIT`, checked integer arithmetic, a work budget in steps, a row limit and a hop limit); `arqlet-query-cypher` lowers decypher's HIR into the plan (the column order, which the HIR loses for aggregating queries, is read from the syntax tree); the new `arqlet-query-model` reads an `arqlet-model` graph in place with a payload table (unresolved edges are left out, payload for unknown ids is ignored and counted); the new tool `arqlet-query GRAPH.json 'QUERY' [--payload F] [--param N=JSON] [--json]` runs a query without the layout engine. All 40 supported cases of `examples/cypher/` give the oracle's rows, over a raw-JSON store and over the real model. Not yet: `UNION`, the power operator, a path variable, `RETURN *`.
 - The first two crates of the Cypher query layer (ADR 0021; provisional, `publish = false`, no operation yet):
   `arqlet-query` (error classes) and `arqlet-query-cypher`, which checks a query with decypher and rejects, from its
   syntax tree, what decypher drops silently (`shortestPath`, quantified paths, `WHERE` inside a pattern: upstream #132 to
   #134), writes, `CALL`, subqueries, `=~` and unknown functions. A test runs the guard against the fixtures of
   `examples/cypher/`. Both crates are usable without the layout engine; `tools/check-query-isolation.mjs` checks it in
-  CI, for the host and for wasm32. No executor, no plan IR and no `dispatch` operation yet.
+  CI, for the host and for wasm32. (The plan IR and the executor followed; see the entry above.)
 - Memberships across the hierarchy, first slice (provisional, ADR 0022): `Graph.memberships` (dimensions of groups,
   besides the containment) and `LayoutOptions.membershipViews`; a dimension shown as `overlay` is drawn as a padded
   convex hull behind the nodes (`Scene.membershipHulls`, with the boxes it encloses and the foreign leaf boxes inside
