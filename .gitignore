@@ -21,3 +21,4 @@ __pycache__/
 /packages/*/LICENSE-APACHE
 /packages/*/LICENSE-MIT
 /packages/engine-client/arqlet.wasm
+/packages/engine-client/THIRD_PARTY_NOTICES.md
