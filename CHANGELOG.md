@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- The first two crates of the Cypher query layer (ADR 0021; provisional, `publish = false`, no operation yet):
+  `arqlet-query` (error classes) and `arqlet-query-cypher`, which checks a query with decypher and rejects, from its
+  syntax tree, what decypher drops silently (`shortestPath`, quantified paths, `WHERE` inside a pattern: upstream #132 to
+  #134), writes, `CALL`, subqueries, `=~` and unknown functions. A test runs the guard against the fixtures of
+  `examples/cypher/`. Both crates are usable without the layout engine; `tools/check-query-isolation.mjs` checks it in
+  CI, for the host and for wasm32. No executor, no plan IR and no `dispatch` operation yet.
 - Memberships across the hierarchy, first slice (provisional, ADR 0022): `Graph.memberships` (dimensions of groups,
   besides the containment) and `LayoutOptions.membershipViews`; a dimension shown as `overlay` is drawn as a padded
   convex hull behind the nodes (`Scene.membershipHulls`, with the boxes it encloses and the foreign leaf boxes inside

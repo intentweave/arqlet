@@ -14,6 +14,7 @@ Arqlet (formerly the working name Layerweave) is an incremental hierarchical gra
 - `crates/topology`: planarity embedding and straight-line grid drawings (A4b, provisional; pure, no dependencies).
 - `crates/runtime`: dispatch, snapshots, patches, incremental scheduling; two bins: `snapshot` and `layout-command`.
 - `crates/elk`: provisional adapter for graphs in ELK's JSON form (translate, write back); no ELK code or dependency. Used by the `elkLayout` operation.
+- `crates/query`, `crates/query-cypher`: the Cypher query layer (ADR 0021; provisional, `publish = false`). `query` holds the error classes (the plan IR, store seam and executor follow); `query-cypher` is the openCypher front end: decypher behind a guard over its syntax tree that rejects what decypher drops silently. Both are usable without the layout engine, and `tools/check-query-isolation.mjs` (CI) fails when a layout, routing, scene, view, topology, ELK, reference, runtime, WASM or facade crate enters their tree. `examples/cypher/` holds the fixtures and the independent Python oracle (`oracle.py --check` in CI).
 - `crates/wasm`: browser ABI (`lw_alloc`/`lw_free`/`lw_run`, JSON payloads). Only adapter that targets WASM.
 - `crates/node`: placeholder for a native Node.js adapter (3 lines).
 - `crates/arqlet` and `packages/arqlet`: the published facades (crate and npm entry point). Packaging and release steps: `docs/releasing.md`; npm `prepack` runs `tools/npm-prepack.mjs` (licenses, WASM, bundled types).
@@ -52,7 +53,7 @@ Use `--offline` locally only if the registry is unavailable; CI uses `--locked`.
 
 ## Project-specific rules
 
-- The core crates (`model`, `view`, `layout`, `routing`, `scene`, `runtime`) must stay free of browser, Node, WASM-bindgen, renderer, filesystem and network dependencies. Only `wasm` and the bins may touch those boundaries. A grep for `wasm_bindgen|web_sys|std::fs|std::net|std::process` in non-test code of core crates currently finds nothing; keep it that way. Test code (`#[cfg(test)]`) may read fixtures from disk.
+- The core crates (`model`, `view`, `layout`, `routing`, `scene`, `runtime`, and the query crates `query` and `query-cypher`) must stay free of browser, Node, WASM-bindgen, renderer, filesystem and network dependencies. Only `wasm` and the bins may touch those boundaries. A grep for `wasm_bindgen|web_sys|std::fs|std::net|std::process` in non-test code of core crates currently finds nothing; keep it that way. Test code (`#[cfg(test)]`) may read fixtures from disk.
 - Keep canonical graph, view projection and scene output as separate types. Layout results must not mutate the canonical graph.
 - Layout results carry a revision. Stale results must be rejected or surfaced explicitly, never applied silently. The demo already discards stale responses; keep that behavior when touching the runtime or worker.
 - Preserve logical edge direction in every output. Cycles, self-loops and parallel edges must work; they are not edge cases to add later.
