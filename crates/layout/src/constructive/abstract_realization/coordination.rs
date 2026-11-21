@@ -42,6 +42,7 @@ mod tests {
                 start: to_point(vertical, (20., 15.)),
                 end: to_point(vertical, (200., 40.)),
                 lead: (Vec::new(), Vec::new()),
+                group: NO_GROUP,
             },
             lanes: vec![15., 30., 40.],
             corners: Vec::new(),

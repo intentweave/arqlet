@@ -641,6 +641,8 @@ fn reserve_once(
             }
             // Only the last channel before the target is shared: after it each edge enters its node, so no lane of the
             // group runs on where another edge could be ordered between them.
+            // Only the last channel before the target is shared: after it each edge enters its node, so no lane of the
+            // group runs on where another edge could be ordered between them.
             let last = i + 1 == edge.sections.len();
             let key = group
                 .filter(|_| last)

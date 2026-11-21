@@ -53,6 +53,8 @@ pub struct Session {
     pub(super) shared: BTreeMap<String, String>,
     /// The index of every edge's last section (`shared`: only that one is shared).
     pub(super) last_section: BTreeMap<String, usize>,
+    /// Set while a drawing is completed again without groups (too many cyclic lane orders with them).
+    pub(super) shared_off: bool,
 }
 
 /// Provisional (`LayoutOptions::shared_tracks`): the track slots of a channel's changes when the changes of one group share
