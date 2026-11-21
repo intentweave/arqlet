@@ -19,6 +19,10 @@ self-loops, parallel and unresolved edges). 2k and 20k use the seeds of the repo
 use seeds 13 and 14 chosen for this measurement. "Level 1 collapsed" and "top level collapsed" collapse the containers
 `g1-*` and `g2-*` of the generator.
 
+The crate is outside the workspace, so its `Cargo.lock` names the version of `arqlet-model` and `arqlet-view` and goes
+stale at every engine version bump (`--locked` then fails). Update it with
+`cargo check --offline --manifest-path benchmarks/copy-cost/Cargo.toml` and commit the two changed version lines.
+
 What is not measured: layout, routing, the view selection of an import, memory use, and any graph that is not this
 generator's. The figures say how the copying and indexing cost grows with the graph; they say nothing about an engine
 that does not exist yet.
