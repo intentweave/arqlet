@@ -221,7 +221,7 @@ Each stage ends with a check that can fail. M0 is this document and the preparat
 
 | Stage | Content | Exit check |
 |---|---|---|
-| M0 | The decisions below; the fixtures of `examples/cypher/` (#81: 51 cases, 40 executable now, and the 40-query corpus with a verdict each) | this ADR accepted |
+| M0 | The decisions below; the fixtures of `examples/cypher/` (#81: 40 cases executable now, and the 40-query corpus with a verdict each) | this ADR accepted |
 | M1 | Crates created (`publish = false`), parse, syntax-tree guard, limits, lowering of `MATCH … WHERE … RETURN` into the plan IR | all 40 corpus queries are accepted or rejected as the subset table says; one test per known drop |
 | M2 | Executor on a test store: nodes, labels, properties, expressions with three-valued logic, `ORDER BY`, `SKIP`, `LIMIT`, `DISTINCT`, the work budget and row limit (item 11) | the spike cases for nodes and expressions pass; fixed result order |
 | M3 | Relationships: directions, types, self-loops, parallel edges, relationship uniqueness, several patterns | the spike cases for edges and counts pass |
@@ -267,9 +267,8 @@ belongs in `benchmarks/` with machine, build and seed, as the rules require.
    `NOTICE` and the license handling of `tools/npm-prepack.mjs` (today only the two license files) are extended for the
    transitive notices; `CLAUDE.md` gets the one exception to "the core uses only `serde`, `serde_json` and `libm`".
 5. **Fixtures.** `examples/cypher/` (#81): pinned copies of five graphs, a payload table, an independent Python oracle,
-   51 cases with expected rows or an error class (40 executable now), and the 40-query corpus of the spike with a
-   verdict each. The spike's 17 executable cases are among them (`spike-01` to `spike-19`). The spike code itself is
-   not in the repository.
+   cases with expected rows or an error class (40 executable now), and the 40-query corpus of the spike with a verdict
+   each. The cases include the spike's 17 executable ones. The spike code itself is not in the repository.
 
 ## Reading the graph in place (what the query layer needs; sharing is ADR 0023)
 
