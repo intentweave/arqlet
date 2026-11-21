@@ -87,6 +87,7 @@ pub fn refine_by_components(
             ports: vec![],
             edge_ports: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let laid = arqlet_layout::compute(&sub, None, &no_dirty, options)?;
         let (mut refined, _, _) =
@@ -302,6 +303,7 @@ mod tests {
             ports: vec![],
             edge_ports: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         // The refinement portfolio of the pipeline before single pass (ADR 0016): single pass plans no candidates, so every
         // component would keep its input.

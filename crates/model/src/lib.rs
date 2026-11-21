@@ -137,6 +137,8 @@ struct GraphWire {
     edges: Vec<Edge>,
     #[serde(default)]
     buses: Vec<Bus>,
+    #[serde(default)]
+    memberships: Memberships,
 }
 
 /// Reads one direction slot: a direction, or a legacy strategy name, which gives a free direction and that strategy.
@@ -224,6 +226,7 @@ impl TryFrom<GraphWire> for Graph {
             nodes: wire.nodes,
             edges: wire.edges,
             buses: wire.buses,
+            memberships: wire.memberships,
         })
     }
 }
@@ -300,6 +303,11 @@ pub struct Graph {
     /// inferred. Omitted when empty, so earlier documents and drawings do not change.
     #[cfg_attr(feature = "ts", ts(as = "Option<Vec<Bus>>", optional))]
     pub buses: Vec<Bus>,
+    /// Provisional (ADR 0022): memberships across the hierarchy — the groupings a node belongs to besides its container,
+    /// by dimension. Never inferred, and never a second containment tree. Omitted when empty, so earlier documents and
+    /// drawings do not change.
+    #[cfg_attr(feature = "ts", ts(as = "Option<Memberships>", optional))]
+    pub memberships: Memberships,
 }
 
 /// The graph as it is written. Each direction slot holds a direction, or the legacy `hybrid` or `shortest` where the graph
@@ -331,6 +339,8 @@ struct GraphOut<'a> {
     edges: &'a Vec<Edge>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     buses: &'a Vec<Bus>,
+    #[serde(skip_serializing_if = "Memberships::is_empty")]
+    memberships: &'a Memberships,
 }
 
 /// One direction slot and the strategy it leaves over: the legacy name where it applies, else the two values apart.
@@ -408,6 +418,7 @@ impl Serialize for Graph {
             nodes: &self.nodes,
             edges: &self.edges,
             buses: &self.buses,
+            memberships: &self.memberships,
         }
         .serialize(serializer)
     }
@@ -740,6 +751,7 @@ pub fn validate(graph: &Graph) -> Result<(), String> {
         }
         good.extend(seen);
     }
+    graph.memberships.validate()?;
     let mut edges = BTreeSet::new();
     for e in &graph.edges {
         if !edges.insert(&e.id) {
@@ -2021,6 +2033,12 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub shared_tracks: Option<SharedTracks>,
+    /// Provisional (ADR 0022): how each membership dimension of the graph is shown, by dimension id. A dimension that is
+    /// not named, or named `off`, is neither drawn nor read. Empty (the default) is omitted from serialized options, so a
+    /// default view stays byte-identical. The first slice draws `overlay`; `hierarchy` and `lanes` are accepted and
+    /// reported as not yet applied.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub membership_views: BTreeMap<String, MembershipView>,
     /// Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
     /// (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -2343,6 +2361,128 @@ pub struct LayoutOptions {
     pub order_hints: BTreeMap<String, OrderHint>,
 }
 
+/// Provisional (ADR 0022): the membership dimensions of a graph. A node has one container (`Node::parent_id`); a
+/// membership says that it also belongs to a zone, a team or a layer, and several of those at once. Memberships are
+/// authored domain data, like `Graph::buses`: the engine never derives them, and they never change the containment tree.
+/// How a dimension is shown is a view option (`LayoutOptions::membership_views`), not data. Omitted when empty, so a
+/// graph without memberships serializes exactly as before.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Memberships {
+    /// The dimensions in the order they are declared, which is the order everything derived uses.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dimensions: Vec<MembershipDimension>,
+}
+
+impl Memberships {
+    pub fn is_empty(&self) -> bool {
+        self.dimensions.is_empty()
+    }
+
+    /// The dimension with this id, if it is declared.
+    pub fn dimension(&self, id: &str) -> Option<&MembershipDimension> {
+        self.dimensions.iter().find(|d| d.id == id)
+    }
+
+    /// The refusals of ADR 0022 §5 that concern the data itself: a dimension id declared twice, a group id declared
+    /// twice within its dimension, a `parent` that names no group of the same dimension, and a cycle of `parent` links.
+    /// Member ids the graph does not have are not refused (they are ignored and counted).
+    pub fn validate(&self) -> Result<(), String> {
+        let mut dimensions = BTreeSet::new();
+        for d in &self.dimensions {
+            if d.id.is_empty() || !dimensions.insert(d.id.as_str()) {
+                return Err(format!("Empty or duplicate membership dimension: {}", d.id));
+            }
+            let mut parent: BTreeMap<&str, Option<&str>> = BTreeMap::new();
+            for g in &d.groups {
+                if g.id.is_empty() || parent.insert(g.id.as_str(), g.parent.as_deref()).is_some() {
+                    return Err(format!(
+                        "Empty or duplicate membership group: {}/{}",
+                        d.id, g.id
+                    ));
+                }
+            }
+            for g in &d.groups {
+                if let Some(p) = g.parent.as_deref() {
+                    if !parent.contains_key(p) {
+                        return Err(format!(
+                            "Membership group {}/{} names the parent {p}, which {} does not declare",
+                            d.id, g.id, d.id
+                        ));
+                    }
+                }
+                // Bounded by the number of groups: a longer walk is a cycle.
+                let mut at = g.parent.as_deref();
+                let mut walked = 0usize;
+                while let Some(p) = at {
+                    walked += 1;
+                    if walked > d.groups.len() {
+                        return Err(format!(
+                            "Membership groups of {} form a parent cycle at {}",
+                            d.id, g.id
+                        ));
+                    }
+                    at = parent.get(p).copied().flatten();
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Provisional (ADR 0022): one dimension of memberships (`zone`, `team`, `layer`, …) with its groups in the order they
+/// are declared. That order is the lane order, the legend order and the iteration order of everything derived from it.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MembershipDimension {
+    pub id: String,
+    /// What the dimension is called in the drawing. The engine does not read it; it is carried to the viewer.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<MembershipGroup>,
+}
+
+/// Provisional (ADR 0022): one group of a dimension. `members` are node ids; an id the graph does not have is ignored
+/// and counted, not an error, because a host mapping may cover more than the imported view.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MembershipGroup {
+    pub id: String,
+    /// What the group is called in the drawing; its id where this is empty.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub label: String,
+    /// Nests this group inside another group of the same dimension, so membership here implies membership there: a group
+    /// covers its own members and those of every group below it, and a parent does not list them again. An overlay
+    /// therefore draws a sub-zone inside its zone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub parent: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<String>,
+}
+
+/// Provisional (ADR 0022): how one membership dimension is shown. `Off` is the default and is omitted from serialized
+/// options, so a default view is unchanged. Only `Overlay` is implemented (the first slice); `Hierarchy` and `Lanes` are
+/// accepted and reported as not yet applied, so a host can declare them before the engine draws them.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum MembershipView {
+    /// Nothing is drawn and nothing is read.
+    #[default]
+    Off,
+    /// The dimension becomes containers in the view only (ADR 0022, M1).
+    Hierarchy,
+    /// The dimension partitions the order of one area's children (ADR 0022, M4).
+    Lanes,
+    /// A hull around the members, drawn behind them and invisible to the router.
+    Overlay,
+}
+
 /// An explicit bus (`Graph::buses`): edges drawn with one shared trunk. The edges that share an end (all one source,
 /// or all one target) leave (enter) that node by one port and share the way to where they branch off.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -2476,6 +2616,7 @@ impl Default for LayoutOptions {
             isolated_grid_from: None,
             hub_refs: None,
             shared_tracks: None,
+            membership_views: BTreeMap::new(),
             hub_ref_room: 0.,
             isolated_grid_areas: BTreeSet::new(),
             bus_roots: Vec::new(),
@@ -2553,6 +2694,20 @@ impl LayoutOptions {
     pub fn normalize_container_sizing(&mut self) {
         self.container_sizing
             .retain(|_, sizing| !sizing.is_content());
+    }
+
+    /// The refusal of ADR 0022 §5 that concerns the options: `groups` together with a `hierarchy` membership view (both
+    /// would make the one grouping tree of the view). Too many `hierarchy` or `lanes` dimensions are reported, not refused.
+    pub fn validate_membership_views(&self) -> Result<(), String> {
+        if !self.groups.is_empty()
+            && self
+                .membership_views
+                .values()
+                .any(|m| *m == MembershipView::Hierarchy)
+        {
+            return Err("groups and a hierarchy membership view cannot be used together".into());
+        }
+        Ok(())
     }
 
     /// Checks every authored container size (ADR 0010). Invalid values are rejected before any layout runs.

@@ -2,6 +2,7 @@
 import type { Bus } from "./Bus";
 import type { Edge } from "./Edge";
 import type { EdgePorts } from "./EdgePorts";
+import type { Memberships } from "./Memberships";
 import type { Node } from "./Node";
 import type { Port } from "./Port";
 
@@ -18,4 +19,10 @@ defaultRouting?: "straight" | "orthogonal" | "roundedOrthogonal" | "polyline" | 
  * Provisional: explicit buses (ADR 0005): each groups edges drawn on one shared trunk with branches. Membership is never
  * inferred. Omitted when empty, so earlier documents and drawings do not change.
  */
-buses?: Array<Bus>, };
+buses?: Array<Bus>,
+/**
+ * Provisional (ADR 0022): memberships across the hierarchy — the groupings a node belongs to besides its container,
+ * by dimension. Never inferred, and never a second containment tree. Omitted when empty, so earlier documents and
+ * drawings do not change.
+ */
+memberships?: Memberships, };

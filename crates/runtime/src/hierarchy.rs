@@ -412,6 +412,7 @@ fn layout_level(
         ports: vec![],
         edge_ports: vec![],
         buses: Vec::new(),
+        memberships: Default::default(),
     };
     let mut level_options = options.clone();
     level_options.node_sizes = level_sizes;

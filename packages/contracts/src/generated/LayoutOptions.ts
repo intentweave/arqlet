@@ -10,6 +10,7 @@ import type { Hidden } from "./Hidden";
 import type { HybridCriterion } from "./HybridCriterion";
 import type { LabelSpec } from "./LabelSpec";
 import type { LevelOfDetail } from "./LevelOfDetail";
+import type { MembershipView } from "./MembershipView";
 import type { NodeSize } from "./NodeSize";
 import type { Objective } from "./Objective";
 import type { OrderHint } from "./OrderHint";
@@ -152,6 +153,13 @@ hubRefs?: number,
  * (as ELK's merged edges). `None` (the default, omitted): one track per edge.
  */
 sharedTracks?: SharedTracks,
+/**
+ * Provisional (ADR 0022): how each membership dimension of the graph is shown, by dimension id. A dimension that is
+ * not named, or named `off`, is neither drawn nor read. Empty (the default) is omitted from serialized options, so a
+ * default view stays byte-identical. The first slice draws `overlay`; `hierarchy` and `lanes` are accepted and
+ * reported as not yet applied.
+ */
+membershipViews?: { [key in string]: MembershipView },
 /**
  * Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
  * (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.

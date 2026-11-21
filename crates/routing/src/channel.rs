@@ -1336,6 +1336,7 @@ mod search_tests {
             nodes: Vec::new(),
             edges: Vec::new(),
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rect = |x: f64, y: f64, width: f64, height: f64| Rect {
             x,
@@ -1441,6 +1442,7 @@ mod search_tests {
             nodes: Vec::new(),
             edges: Vec::new(),
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rects = BTreeMap::from([(
             "a".to_string(),

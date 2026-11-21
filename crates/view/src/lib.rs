@@ -72,6 +72,9 @@ pub fn project_indexed(
             .collect(),
         edges: Vec::new(),
         buses: source.buses.clone(),
+        // Carried unchanged: a membership names nodes of the source graph, and a member the view does not show is
+        // resolved to the box that stands for it when the hulls are built (ADR 0022 §3).
+        memberships: source.memberships.clone(),
     };
     let id = |i: usize| source.nodes[i].id.clone();
     graph.edges = source

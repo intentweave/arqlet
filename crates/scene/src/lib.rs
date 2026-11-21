@@ -2,6 +2,7 @@
 use arqlet_model::*;
 use std::collections::{BTreeMap, BTreeSet};
 pub mod geom;
+pub mod hull;
 pub mod metrics;
 pub mod quality;
 pub mod realize;
@@ -213,6 +214,7 @@ mod tests {
             nodes: vec![node("root", None), node("child", Some("root"))],
             edges: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let b = BTreeMap::from([
             ("root".into(), rect(0., 0., 200., 150.)),
@@ -239,6 +241,7 @@ mod tests {
             ],
             edges: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let b = BTreeMap::from([
             ("a".into(), rect(0., 0., 200., 200.)),
@@ -268,6 +271,7 @@ mod tests {
             ],
             edges: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let b = BTreeMap::from([
             ("root".into(), rect(0., 0., 300., 200.)),
@@ -292,6 +296,7 @@ mod tests {
             nodes: vec![node("a", None), node("b", None)],
             edges: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let b = BTreeMap::from([
             ("a".into(), rect(0., 0., 50., 50.)),
@@ -313,6 +318,7 @@ mod tests {
             nodes: vec![node("a", None), node("b", None)],
             edges: vec![],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let b = BTreeMap::from([("a".into(), rect(f64::NAN, 0., 50., 50.))]);
         assert_eq!(validate_geometry(&g, &b, GeometryRules::default()).len(), 2);

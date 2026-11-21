@@ -652,6 +652,7 @@ mod tests {
                 })
                 .to_vec(),
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let rects = [
             ("a", 0., 0.),

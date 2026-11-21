@@ -127,6 +127,7 @@ pub fn options_from_patch(patch: &serde_json::Value) -> Result<LayoutOptions, St
     let mut options: LayoutOptions = serde_json::from_value(merged).map_err(|e| e.to_string())?;
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
+    options.validate_membership_views()?;
     Ok(options)
 }
 
@@ -1768,6 +1769,7 @@ pub fn configure_snapshot(
     }
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
+    options.validate_membership_views()?;
     validate_pins(&snapshot.graph, &options.pins)?;
     validate_order_hints(&snapshot.graph, &options.order_hints)?;
     recompute_with(snapshot, &options)
@@ -7246,6 +7248,7 @@ mod tests {
                 },
             ],
             buses: Vec::new(),
+            memberships: Default::default(),
         };
         let s =
             arqlet_layout::compute(&graph, None, &BTreeSet::new(), &previous_pipeline_options())

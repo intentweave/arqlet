@@ -1194,6 +1194,7 @@ mod tests {
                 })
                 .collect(),
             buses: Vec::new(),
+            memberships: Default::default(),
         }
     }
 

@@ -43,8 +43,64 @@ pub struct Scene {
     /// Provisional (`hubRefs`): edges of hubs drawn as stubs at their other end, named after the hub. Omitted when none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hub_refs: Vec<SceneHubRef>,
+    /// Provisional (ADR 0022, `membershipViews` set to `overlay`): a hull per membership group, to be drawn behind the
+    /// nodes. In the declared order of the dimensions and of their groups. Omitted when there is none, so every drawing
+    /// without the option is unchanged.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub membership_hulls: Vec<SceneHull>,
+    /// Provisional (ADR 0022 §5): one entry per dimension the options name, with its counts and one summary line.
+    /// Omitted when there is none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub membership_report: Vec<SceneMembershipReport>,
     /// Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
     pub bounds: Rect,
+}
+
+/// Provisional (ADR 0022, first slice): the hull of one membership group, drawn behind the nodes. `points` is a closed
+/// polygon (the last point joins the first) and is empty for no group: a group whose members the view does not show is
+/// left out instead. The hull is **not an obstacle**: the router never saw it, and routes may cross it.
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SceneHull {
+    /// The dimension this group belongs to, and its label for a legend.
+    pub dimension: String,
+    pub dimension_label: String,
+    pub group: String,
+    /// What to write on the hull: the group's label, or its id where it has none.
+    pub label: String,
+    pub points: Vec<Point>,
+    /// The boxes the hull was built from: a member's own box, or the box that stands for it (a collapsed container).
+    pub boxes: Vec<String>,
+    /// Leaf boxes inside the hull that are not members of the group. The honest cost of drawing a hull around nodes the
+    /// layout kept apart, and one of the two numbers a later default depends on (ADR 0022 §6).
+    pub intruders: Vec<String>,
+}
+
+/// Provisional (ADR 0022 §5): what one membership dimension did in this drawing. Typed, because one line of text per
+/// group would be thousands of lines on a real graph; `summary` is the single line a host can simply print.
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SceneMembershipReport {
+    pub dimension: String,
+    /// The mode the options asked for (`overlay`, `hierarchy`, `lanes`).
+    pub mode: String,
+    /// Whether this drawing applied it. `hierarchy` and `lanes` are accepted and not yet applied (ADR 0022, M1 and M4).
+    pub applied: bool,
+    /// Groups the dimension declares, and how many of them were drawn.
+    pub groups: usize,
+    pub drawn: usize,
+    /// Leaf boxes inside a hull they do not belong to, summed over the dimension's groups.
+    pub intruders: usize,
+    /// Pairs of this dimension's hulls that overlap. Hulls of *different* dimensions are expected to overlap — that is
+    /// what cutting across each other means — so only pairs within one dimension are counted.
+    pub overlapping_pairs: usize,
+    /// Member ids the source graph does not have. Information, not a conflict (ADR 0022 §1).
+    pub unknown_members: usize,
+    /// Members the view does not show and for which no box stands in (filtered out, or outside the view).
+    pub hidden_members: usize,
+    pub summary: String,
 }
 
 /// Provisional: one bus line of a scene (`Scene::bus_lines`).
@@ -452,6 +508,20 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     for line in &bus_lines {
         include(&line.bounds);
     }
+    // Provisional (ADR 0022): the membership hulls, which are derived from the boxes above and so cannot move anything.
+    // Their points still widen the extent, because a hull reaches a padding beyond its outermost members.
+    let (membership_hulls, membership_report) =
+        membership_overlays(snapshot, &positions, &containers);
+    for hull in &membership_hulls {
+        for p in &hull.points {
+            include(&Rect {
+                x: p.x,
+                y: p.y,
+                width: 0.,
+                height: 0.,
+            });
+        }
+    }
     let hub_refs = hub_refs_of(snapshot, &positions);
     for r in &hub_refs {
         include(&r.label);
@@ -526,6 +596,8 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
         junctions,
         bus_lines,
         hub_refs,
+        membership_hulls,
+        membership_report,
         bounds: Rect {
             x: left - 30.,
             y: top - 30.,
@@ -533,6 +605,179 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             height: bottom - top + 60.,
         },
     })
+}
+
+/// How far a hull reaches beyond the boxes it encloses, in layout units.
+const HULL_PADDING: f64 = 10.;
+
+/// Provisional (ADR 0022, first slice): the hulls of every dimension the options show as an `overlay`, and the report of
+/// every dimension they name at all.
+///
+/// Everything here is derived from boxes that are already placed, so this function cannot move a node: a drawing with
+/// hulls has the same node boxes and the same routes as the same drawing without them.
+///
+/// A member is resolved to the box that stands for it: its own box when the view shows it, otherwise the nearest
+/// ancestor the view does show (a collapsed container, as bus taps attach to one). A member with no such box is counted
+/// as hidden, and one the source graph does not have at all as unknown.
+fn membership_overlays(
+    snapshot: &Snapshot,
+    positions: &BTreeMap<&str, Rect>,
+    containers: &BTreeSet<&str>,
+) -> (Vec<SceneHull>, Vec<SceneMembershipReport>) {
+    let views = &snapshot.options.membership_views;
+    let memberships = &snapshot.graph.memberships;
+    if views.is_empty() || memberships.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+    let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let parent_of: BTreeMap<&str, Option<&str>> = source
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    // The box that stands for `member`, by walking up the source graph until the view shows an ancestor.
+    let box_for = |member: &str| -> Option<&str> {
+        if positions.contains_key(member) {
+            return Some(positions.get_key_value(member)?.0);
+        }
+        let mut at = *parent_of.get(member)?;
+        while let Some(id) = at {
+            if let Some((key, _)) = positions.get_key_value(id) {
+                return Some(key);
+            }
+            at = parent_of.get(id).copied().flatten();
+        }
+        None
+    };
+
+    let mut hulls = Vec::new();
+    let mut reports = Vec::new();
+    for dimension in &memberships.dimensions {
+        let mode = match views.get(&dimension.id) {
+            None | Some(MembershipView::Off) => continue,
+            Some(mode) => *mode,
+        };
+        let (name, applied) = match mode {
+            MembershipView::Overlay => ("overlay", true),
+            MembershipView::Hierarchy => ("hierarchy", false),
+            MembershipView::Lanes => ("lanes", false),
+            MembershipView::Off => unreachable!("skipped above"),
+        };
+        // Counted once per dimension over the members as they are declared, so a member of a nested group is not counted
+        // again for every ancestor that inherits it.
+        let mut unknown = 0usize;
+        let mut hidden = 0usize;
+        for group in &dimension.groups {
+            for member in &group.members {
+                if !parent_of.contains_key(member.as_str()) {
+                    unknown += 1;
+                } else if box_for(member).is_none() {
+                    hidden += 1;
+                }
+            }
+        }
+        let first = hulls.len();
+        for group in &dimension.groups {
+            let mut boxes: Vec<&str> = Vec::new();
+            // Membership in a nested group implies membership in its ancestors (ADR 0022 §1), so a group encloses its own
+            // members and those of every group below it. A parent therefore does not list its children's members again,
+            // and a sub-zone is drawn inside its zone.
+            let members: Vec<&String> = dimension
+                .groups
+                .iter()
+                .filter(|g| {
+                    let mut at = Some(*g);
+                    let mut walked = 0usize;
+                    while let Some(current) = at {
+                        if current.id == group.id {
+                            return true;
+                        }
+                        walked += 1;
+                        if walked > dimension.groups.len() {
+                            return false; // a cycle, which M1's refusals reject; here it simply stops
+                        }
+                        at = current
+                            .parent
+                            .as_deref()
+                            .and_then(|p| dimension.groups.iter().find(|q| q.id == p));
+                    }
+                    false
+                })
+                .flat_map(|g| g.members.iter())
+                .collect();
+            for member in members {
+                if let Some(id) = box_for(member) {
+                    if !boxes.contains(&id) {
+                        boxes.push(id);
+                    }
+                }
+            }
+            if !applied || boxes.is_empty() {
+                continue;
+            }
+            let rects: Vec<Rect> = boxes.iter().map(|id| positions[*id].clone()).collect();
+            let points = crate::hull::group_hull(&rects, HULL_PADDING);
+            if points.len() < 3 {
+                continue;
+            }
+            // A leaf box inside the hull that is not one of its own boxes. A container that encloses members is not an
+            // intruder: it is the drawing's own structure, not a node the hull swallowed.
+            let intruders: Vec<String> = positions
+                .iter()
+                .filter(|(id, _)| !containers.contains(**id) && !boxes.contains(*id))
+                .filter(|(_, rect)| crate::hull::contains(&points, &crate::hull::centre(rect)))
+                .map(|(id, _)| id.to_string())
+                .collect();
+            hulls.push(SceneHull {
+                dimension: dimension.id.clone(),
+                dimension_label: dimension.label.clone(),
+                group: group.id.clone(),
+                label: if group.label.is_empty() {
+                    group.id.clone()
+                } else {
+                    group.label.clone()
+                },
+                points,
+                boxes: boxes.iter().map(|id| id.to_string()).collect(),
+                intruders,
+            });
+        }
+        let drawn = hulls.len() - first;
+        let intruders: usize = hulls[first..].iter().map(|h| h.intruders.len()).sum();
+        let mut overlapping = 0usize;
+        for i in first..hulls.len() {
+            for j in (i + 1)..hulls.len() {
+                if crate::hull::overlap(&hulls[i].points, &hulls[j].points) {
+                    overlapping += 1;
+                }
+            }
+        }
+        let summary = if applied {
+            format!(
+                "{}: {drawn} of {} groups drawn, {intruders} foreign boxes inside a hull, {overlapping} overlapping pairs",
+                dimension.id,
+                dimension.groups.len()
+            )
+        } else {
+            format!(
+                "{}: {name} is accepted but not applied yet (ADR 0022)",
+                dimension.id
+            )
+        };
+        reports.push(SceneMembershipReport {
+            dimension: dimension.id.clone(),
+            mode: name.to_string(),
+            applied,
+            groups: dimension.groups.len(),
+            drawn,
+            intruders,
+            overlapping_pairs: overlapping,
+            unknown_members: unknown,
+            hidden_members: hidden,
+            summary,
+        });
+    }
+    (hulls, reports)
 }
 
 /// Absolute rectangle of a node, computed once per node. Cycles and invalid rectangles are errors.
