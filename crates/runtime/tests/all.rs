@@ -62,6 +62,8 @@ mod layered_construction;
 mod level_budget;
 #[path = "local_edit_large.rs"]
 mod local_edit_large;
+#[path = "memberships.rs"]
+mod memberships;
 #[path = "move_gesture.rs"]
 mod move_gesture;
 #[path = "move_only.rs"]
