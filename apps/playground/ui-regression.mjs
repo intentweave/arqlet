@@ -175,6 +175,18 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
    await press('ArrowDown',true);
    assert.equal(runInNewContext(`snapshot.graph.nodes.find(n=>n.id===selected)?.parentId`,context),box,'Shift+Down a child of it');
    console.log('Keyboard navigation passed: container and child by keys.');
+   // A look inside: close the container, select it, and Space shows its contents without opening it.
+   await press('ArrowUp',true);
+   if(!closed()){const rc=await runInNewContext(`edit({op:'toggle',nodeId:${JSON.stringify(box)}},{busy:'Closing …',remember:'Close'})`,context);await settle();assert.equal(rc.ok,true);}
+   runInNewContext(`selectNode(${JSON.stringify(box)})`,context);
+   assert.equal(get('peek').hidden,false,'the button shows for a closed container');
+   await press(' ');
+   assert.equal(get('peek-panel').hidden,false,'the look is shown');
+   assert.match(get('peek-info').textContent,/^Inside .*children/);
+   assert.equal(closed(),true,'and the container stays closed');
+   get('peek-close').onclick();
+   assert.equal(get('peek-panel').hidden,true);
+   console.log('Peek passed: a closed container shown without opening it.');
   }
  }
 }

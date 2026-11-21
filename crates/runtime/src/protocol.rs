@@ -192,6 +192,11 @@ pub enum Request {
         #[serde(flatten)]
         body: Map<String, Value>,
     },
+    /// A look into a collapsed container without opening it (read only, provisional).
+    Peek {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
     /// The fingerprint of the snapshot's source graph (read only, provisional).
     Digest {
         #[serde(flatten)]
@@ -573,6 +578,7 @@ impl Request {
             Some("details") => return Ok(Request::Details { body: body() }),
             Some("find") => return Ok(Request::Find { body: body() }),
             Some("digest") => return Ok(Request::Digest { body: body() }),
+            Some("peek") => return Ok(Request::Peek { body: body() }),
             Some("componentRefine") => return Ok(Request::ComponentRefine { body: body() }),
             Some("elkLayout") => return Ok(Request::ElkLayout { body: body() }),
             Some("overview") => return Ok(Request::Overview { body: body() }),
@@ -1056,6 +1062,9 @@ fn handle_request(request: Request) -> Response {
             crate::details::details_answer(&with_op("details", body)),
             |a| Response::Details(Box::new(a)),
         ),
+        Request::Peek { body } => {
+            Response::Encoded(crate::peek::peek_response(&with_op("peek", body)).to_string())
+        }
         Request::Digest { body } => {
             Response::Encoded(crate::find::digest_response(&with_op("digest", body)).to_string())
         }

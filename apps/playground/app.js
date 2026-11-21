@@ -178,10 +178,31 @@ const layoutSession=createLayoutSession(request=>execute('edit',request),{reside
 // interactive queue.
 const viewController=createViewController(layoutSession,{page:PAGE,scenes:false,
  refine:(request,{onPublication,signal})=>execute('refine',request,signal,onPublication?publication=>onPublication(publication):undefined)});
-viewController.subscribe(()=>{syncHistoryButtons();showDetails();});
+viewController.subscribe(()=>{syncHistoryButtons();syncPeekButton();showDetails();showPeek();});
 // What the engine knows about the selected node or edge (`state.details`, kept up to date by the controller): the groups
 // above a node and the box that shows it, what a box holds, the edges a line stands for.
 let shownDetails;
+// A look inside a closed container (the view controller's `peek`): its contents drawn small beside the details, without
+// opening it; the next change ends it. The button shows while a closed container is selected; Space does the same.
+let shownPeek;
+function syncPeekButton(){const current=viewController.getState().snapshot??snapshot;$('peek').hidden=!(selected&&(current?.collapsedIds??[]).includes(selected));}
+async function peekSelected(){
+ if(!selected||!(snapshot?.collapsedIds??[]).includes(selected))return;
+ const r=await viewController.peek(selected,{limit:50});
+ if(!r.ok&&!r.cancelled)status(`No look inside: ${r.error}`);
+}
+function showPeek(){
+ const p=viewController.getState().peek;
+ if(p===shownPeek)return;
+ shownPeek=p;
+ const panel=$('peek-panel');
+ if(!p){panel.hidden=true;return;}
+ const a=p.answer,label=snapshot?.graph.nodes.find(n=>n.id===p.nodeId)?.label??p.nodeId;
+ const border=Object.keys(a.external).length;
+ $('peek-info').textContent=`Inside ${label}: ${a.shown} of ${a.children} children${a.omitted?` (${a.omitted} more)`:''}; ${border} with edges across its border.`;
+ renderSvg($('peek-graph'),a.scene,{document});
+ panel.hidden=false;
+}
 // Selects for the details; a refused request is shown in their place.
 const selectDetails=target=>viewController.select(target).then(r=>{if(!r.ok&&!r.cancelled)$('details').textContent=`Details: ${r.error}`;return r;});
 function showDetails(){
@@ -699,7 +720,7 @@ function onDragEnd(event){
 }
 // Selects a node of the view: the same selection as a click on the drawing, and the same one the containment tree uses.
 function selectNode(id,add=false){viewSelected=false;
- if(add)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=snapshot.graph.nodes.find(n=>n.id===id)?.label??id;selectDetails({nodeId:id});draw();
+ if(add)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=snapshot.graph.nodes.find(n=>n.id===id)?.label??id;selectDetails({nodeId:id});viewController.closePeek();syncPeekButton();draw();
 }
 // Pointer capture on the drawing sends the moves and the release to it, also outside the node. Escape cancels a move.
 // Ctrl/Cmd+Z undoes the last container size change, unless a text field has the focus.
@@ -1484,6 +1505,8 @@ function centerOn(id,bounds){
  c.scrollTop=p.y+(bounds?bounds.height*scale/2:0)-c.clientHeight/2;
 }
 $('show').onclick=()=>focusNode($('show-node').value.trim());
+$('peek').onclick=peekSelected;
+$('peek-close').onclick=()=>viewController.closePeek();
 // Scrolls only when the node's box is not (wholly) on screen, so that moving with the keys does not jump around.
 function ensureVisible(id,bounds){
  const p=drawnPosition(id),c=$('canvas');
@@ -1501,6 +1524,7 @@ const NAV_SHIFT_KEYS={ArrowUp:'parent',ArrowDown:'child',ArrowLeft:'in',ArrowRig
 document.addEventListener?.('keydown',async e=>{
  if(!snapshot||pending||curation||drag||e.metaKey||e.ctrlKey||e.altKey)return;
  if(/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(e.target?.tagName??'')||e.target?.isContentEditable)return;
+ if(e.key===' '&&selected&&(snapshot.collapsedIds??[]).includes(selected)){e.preventDefault();peekSelected();return;}
  if(e.key==='Enter'){
   const source=snapshot.sourceGraph??snapshot.graph;
   if(!selected||!(selected.startsWith('rest:')||source.nodes.some(n=>n.parentId===selected)))return;

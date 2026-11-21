@@ -159,7 +159,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
   publicationInterval = 120} = {}) {
   let state = Object.freeze({
     snapshot: null, scene: null, diff: null, busy: false, error: null,
-    highlight: null, selection: null, details: null, hover: null, search: null, focus: null, refining: null, refined: null,
+    highlight: null, selection: null, details: null, hover: null, search: null, focus: null, peek: null, refining: null, refined: null,
     discarded: 0, hide: {}, canBack: false, canForward: false, backLabel: null, forwardLabel: null, steps: 0,
   });
   const listeners = new Set();
@@ -301,6 +301,8 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     }
     const after = remember ? await intent() : null;
     if (!current()) return {ok: false, cancelled: true};
+    // A look into a container belongs to the view before the change.
+    if (state.peek) state = Object.freeze({...state, peek: null});
     if (remember && merge && back.length) {
       // A follow-up of the last change (such as a container keeping the size a drop gave it): one entry for both.
       const last = back.at(-1);
@@ -330,6 +332,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     }
     from.pop();
     (direction < 0 ? forward : back).push(entry);
+    if (state.peek) state = Object.freeze({...state, peek: null});
     const hidden = (direction < 0 ? entry.before : entry.after).hidden ?? {};
     await settle({hide: hidden}, current);
     return result;
@@ -358,7 +361,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           return result;
         }
         state = Object.freeze({...state, scene: null, highlight: null, selection: null, details: null, hover: null,
-          search: null, focus: null, hide: {}, steps: 0});
+          search: null, focus: null, peek: null, hide: {}, steps: 0});
         await settle({}, current);
         return result;
       }, {fresh: true});
@@ -461,6 +464,26 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         return answer;
       });
     },
+
+    /**
+     * A look into the collapsed container `nodeId` without opening it (see `session.peek`): `state.peek` holds its contents
+     * as a small scene until `closePeek` or the next change. Read only, not a step for `back`.
+     */
+    peek(nodeId, init) {
+      return enqueue(async current => {
+        const answer = await session.peek(nodeId, init);
+        if (!current()) return {ok: false, cancelled: true};
+        if (!answer.ok) {
+          publish({error: answer.error ?? 'Nothing to look into.'});
+          return answer;
+        }
+        publish({peek: {nodeId, answer}, error: null});
+        return answer;
+      });
+    },
+
+    /** Ends the look into a container. */
+    closePeek() { if (state.peek) publish({peek: null}); },
 
     /** Clears the search. */
     clearSearch() { if (state.search) publish({search: null}); },
@@ -668,7 +691,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           back = [];
           forward = [];
           state = Object.freeze({...state, highlight: null, selection: null, details: null, hover: null, search: null,
-            focus: null, hide: {}});
+            focus: null, peek: null, hide: {}});
         } else if (before) {
           const after = await intent();
           if (!same(before, after)) {

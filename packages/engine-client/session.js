@@ -243,6 +243,16 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
      * best first, with the containers above each and the box that shows it (also inside collapsed groups); at most
      * `limit` (default 20), only `nodeKinds` if given; `total` counts them all.
      */
+    /**
+     * Provisional (read only): a look into the collapsed container `nodeId` without opening it: its contents laid out on
+     * their own as a small scene (the containers inside collapsed, at most `limit` direct children, default 50), and per
+     * child shown the edges that cross the container's border (`external`).
+     */
+    async peek(nodeId, {limit} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'peek', snapshot, nodeId, ...(limit !== undefined ? {limit} : {})});
+    },
+
     async find(query, {limit, nodeKinds} = {}) {
       if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
       return call({op: 'find', snapshot, query, ...(limit !== undefined ? {limit} : {}), ...(nodeKinds ? {nodeKinds} : {})});

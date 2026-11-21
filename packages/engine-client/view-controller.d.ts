@@ -1,5 +1,5 @@
 import type {DetailsAnswer, FindAnswer, Graph, Hidden, Intent, NeighbourhoodAnswer, Scene, Snapshot, TraceAnswer} from '@arqlet/contracts';
-import type {DetailTarget, ReadAnswer, RefineRun, Session, SessionResult} from './session.js';
+import type {DetailTarget, PeekAnswer, ReadAnswer, RefineRun, Session, SessionResult} from './session.js';
 import type {EngineRequest} from './wasm-client.js';
 
 /** Provisional: a view as a value (`bookmark`): the engine's intent, the highlight, the selection, the graph's digest. */
@@ -58,6 +58,8 @@ export interface ViewState {
   readonly search: {query: string; answer: FindAnswer & {ok: true}} | null;
   /** The last `focus`: the node and the bounds of the box that shows it (null when hidden); `serial` counts requests. */
   readonly focus: {nodeId: string; bounds: {x: number; y: number; width: number; height: number} | null; shownAs: string | null; serial: number} | null;
+  /** The look into a collapsed container (`peek`), or null; cleared by the next change. */
+  readonly peek: {nodeId: string; answer: PeekAnswer & {ok: true}} | null;
   /** The refinement under way on the second engine (`refine`), or null; `shown` counts intermediate results applied. */
   readonly refining: {op: string; jobId: string; shown: number} | null;
   /** How the last refinement ended: applied, stale (the view had moved on), cancelled, or an error. */
@@ -110,6 +112,9 @@ export interface ViewController {
   /** Finds nodes by label or id, also hidden ones (`state.search` until `clearSearch`). */
   find(query: string, init?: {limit?: number; nodeKinds?: string[]}): Promise<ViewResult>;
   clearSearch(): void;
+  /** A look into a collapsed container without opening it (`state.peek`; not a step for `back`). */
+  peek(nodeId: string, init?: {limit?: number}): Promise<ViewResult>;
+  closePeek(): void;
   /** Opens what hides `nodeId` (a step for `back`), selects it, and sets `state.focus` for the host's camera. */
   focus(nodeId: string, options?: {reveal?: boolean; partial?: boolean}): Promise<ViewResult>;
   /**

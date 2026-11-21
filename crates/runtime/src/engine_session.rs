@@ -137,6 +137,7 @@ impl EngineSession {
             Some("neighbourhood") => crate::trace::neighbourhood_on(self.current()?, v),
             Some("details") => crate::details::details_on(self.current()?, v),
             Some("find") => crate::find::find_on(self.current()?, v),
+            Some("peek") => crate::peek::peek_on(self.current()?, v),
             Some("digest") => Ok(crate::find::digest_on(self.current()?)),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))

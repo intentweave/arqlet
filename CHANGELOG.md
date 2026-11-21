@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- A look into a collapsed container (provisional): the read-only operation `peek` (`nodeId`, optional `limit`, default
+  50) lays out the container's contents on their own as a small scene (the containers inside collapsed, at most `limit`
+  direct children in the source order, the rest counted) and counts per child the edges that cross the container's
+  border (`external`); the view is not changed. `session.peek`; in the view controller `peek(id)` (`state.peek`, until
+  `closePeek` or the next change; not a step for `back`). Playground: *Look inside* (or Space) for a selected closed
+  container.
 - Refinement on a second engine (provisional): `createViewController(session, {refine})` takes a second engine for
   refinement (`workerRefineRun(worker)` for its own worker, or any `(request, {onPublication, signal}) => answer`).
   `refine({op})` (`refine`, `refineProgressive`, `structuredRefine`) runs beside the interactive steps, shows
