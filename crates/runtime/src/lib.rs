@@ -1660,6 +1660,50 @@ fn check_current(snapshot: &Snapshot, expected: u64, layout: u64) -> Result<(), 
 
 /// Applies a partial options object. A `preset` key first sets the candidate scope; explicit keys
 /// then override it. Unknown keys are rejected by the options schema.
+/// Provisional (drag API): pins `node` at `position` (in its parent's frame), or at the place it has now when `position`
+/// is `None`; `unpin` releases its pin instead. A pin is binding for the layout (`LayoutOptions::pins`); the view is laid
+/// out again as `configure` does. Unknown or hidden nodes are refused.
+pub fn pin_node(
+    snapshot: &Snapshot,
+    expected: u64,
+    layout: u64,
+    node: &str,
+    position: Option<arqlet_model::Point>,
+    unpin: bool,
+) -> Result<Snapshot, String> {
+    check_current(snapshot, expected, layout)?;
+    let mut pins = snapshot.options.pins.clone();
+    if unpin {
+        if pins.remove(node).is_none() {
+            return Ok(snapshot.clone());
+        }
+    } else {
+        let at = match position {
+            Some(p) => p,
+            None => {
+                let b = snapshot
+                    .boxes
+                    .get(node)
+                    .ok_or_else(|| format!("Unknown or hidden node: {node}"))?;
+                arqlet_model::Point { x: b.x, y: b.y }
+            }
+        };
+        if !snapshot.boxes.contains_key(node) {
+            return Err(format!("Unknown or hidden node: {node}"));
+        }
+        if pins.get(node) == Some(&at) {
+            return Ok(snapshot.clone());
+        }
+        pins.insert(node.to_string(), at);
+    }
+    configure_snapshot(
+        snapshot,
+        expected,
+        layout,
+        &serde_json::json!({ "pins": pins }),
+    )
+}
+
 pub fn configure_snapshot(
     snapshot: &Snapshot,
     expected: u64,
@@ -4278,6 +4322,22 @@ pub(crate) fn dispatch_legacy(input: &str) -> String {
                 v["expectedLayoutVersion"]
                     .as_u64()
                     .ok_or("Missing expectedLayoutVersion")?,
+            ),
+            Some("pin") => pin_node(
+                &snapshot,
+                expected,
+                v["expectedLayoutVersion"]
+                    .as_u64()
+                    .ok_or("Missing expectedLayoutVersion")?,
+                v["nodeId"].as_str().ok_or("Missing nodeId")?,
+                match v.get("position") {
+                    None | Some(serde_json::Value::Null) => None,
+                    Some(p) => Some(
+                        serde_json::from_value(p.clone())
+                            .map_err(|_| "pin: position must be {x, y}")?,
+                    ),
+                },
+                v["unpin"].as_bool().unwrap_or(false),
             ),
             Some("restore") => history::restore_intent(
                 &snapshot,

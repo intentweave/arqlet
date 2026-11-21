@@ -1,5 +1,5 @@
 /** Pure adapter: no React dependency and no secondary routing. */
-export function toReactFlow(scene,{overlayNode=false}={}){
+export function toReactFlow(scene,{overlayNode=false,draggable=false}={}){
  if(scene.schemaVersion!==1)throw Error('Unsupported scene schema');
  const byId=new Map(scene.nodes.map(n=>[n.id,n])),handles=new Map(scene.nodes.map(n=>[n.id,[]]));
  for(const route of scene.routes){
@@ -14,7 +14,8 @@ export function toReactFlow(scene,{overlayNode=false}={}){
   const p=byId.get(n.parentId)?.bounds??{x:0,y:0};
   return {id:n.id,type:'arqlet',parentId:n.parentId??undefined,position:{x:n.bounds.x-p.x,y:n.bounds.y-p.y},
     width:n.bounds.width,height:n.bounds.height,style:{width:n.bounds.width,height:n.bounds.height},
-    draggable:false,connectable:false,deletable:false,zIndex:n.container?0:2,
+    // With `draggable`, leaves can be dragged (a host passes the drag to `session.drag`); containers stay fixed.
+    draggable:draggable&&!n.container,connectable:false,deletable:false,zIndex:n.container?0:2,
     data:{...n,handles:handles.get(n.id),showPorts:scene.showPorts}};
  });
  const edges=scene.routes.filter(r=>r.points.length>=2).map(r=>({id:r.id,source:r.source,target:r.target,sourceHandle:`source:${r.id}`,targetHandle:`target:${r.id}`,type:'arqlet',zIndex:1,deletable:false,data:r}));

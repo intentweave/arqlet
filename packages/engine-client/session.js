@@ -85,6 +85,8 @@ export function httpRun(base = '/api', {fetchImpl = globalThis.fetch} = {}) {
  * chooses: `'auto'` (default) where the engine can, `true` always (an error without it), `false` never (every request
  * sends the snapshot, as before 0.4).
  */
+let dragCounter = 0;
+
 export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
   let snapshot = null;
   let generation = 0;
@@ -205,6 +207,79 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
      * communities or groups it is laid out as a toggle lays it out, otherwise again from where it was.
      */
     patch(patch) { return change({op: 'patch', patch}); },
+
+    /**
+     * Provisional (drag API): pins `nodeId` at `position` (in its parent's frame, as `toReactFlow` gives `position`), or
+     * where it is now; the layout keeps it there.
+     */
+    pin(nodeId, position) { return change({op: 'pin', nodeId, ...(position ? {position} : {})}); },
+
+    /** Provisional (drag API): releases the pin of `nodeId`; the layout may move it again. */
+    unpin(nodeId) { return change({op: 'pin', nodeId, unpin: true}); },
+
+    /**
+     * Provisional (drag API): starts moving leaf `nodeId` to `position` (in its parent's frame). `others` maps further
+     * nodes moved with it (a selection) to their positions; the set is fixed for the gesture. Returns a handle:
+     * `move(position, others?)` sends a newer position (positions that arrive while one is computed replace each other, so
+     * only the newest is sent); `drop({release, settle})` applies the last position and ends the gesture, keeping the node
+     * pinned there (or releasing the pin with `release`), then with `settle` lets force-directed areas settle; `cancel()`
+     * puts the node back. Every applied step changes the session's snapshot (`onChange`), so a host redraws from
+     * `scene()`. Other changes wait until the gesture ends.
+     */
+    drag(nodeId, position, {others = {}} = {}) {
+      const id = `drag-${++dragCounter}`;
+      let seq = 0, pending = null, inFlight = null, ended = false, refused = null;
+      const stats = {sent: 0, coalesced: 0, applied: 0};
+      const step = (phase, at, release = false) => {
+        seq += 1;
+        stats.sent += 1;
+        return enqueue(() => send({op: 'move', gestureId: id, seq, phase, node: nodeId, position: at, release,
+          ...(Object.keys(others).length ? {others} : {})})).then(answer => {
+          if (answer.ok) stats.applied += 1; else refused ??= answer;
+          return answer;
+        });
+      };
+      // One step at a time; the newest pending position goes next.
+      const pump = () => {
+        if (inFlight || !pending || refused) return inFlight;
+        const at = pending;
+        pending = null;
+        inFlight = step('update', at).finally(() => { inFlight = null; pump(); });
+        return inFlight;
+      };
+      const begun = step('begin', position);
+      const end = async (phase, release, settle) => {
+        if (ended) return {ok: false, error: 'The gesture has ended.'};
+        ended = true;
+        await begun;
+        while (inFlight) await inFlight;
+        if (phase === 'cancel') pending = null;
+        if (pending && !refused) { const at = pending; pending = null; await step('update', at); }
+        if (refused) return refused;
+        const answer = await step(phase, null, release);
+        if (answer.ok && settle) return change({op: 'settle'});
+        return answer;
+      };
+      return {
+        /** The node being moved. */
+        node: nodeId,
+        /** Whether the gesture still takes positions. */
+        get active() { return !ended && !refused; },
+        /** Steps sent, positions replaced by newer ones before they were sent, and steps applied. */
+        get stats() { return {...stats}; },
+        /** The answer of the first step (the engine's view after the node was picked up). */
+        begun,
+        move(at, moved) {
+          if (ended || refused) return Promise.resolve(refused ?? {ok: false, error: 'The gesture has ended.'});
+          if (pending) stats.coalesced += 1;
+          pending = at;
+          if (moved) others = moved;
+          return begun.then(() => pump() ?? {ok: true, unchanged: true});
+        },
+        drop({release = false, settle = false} = {}) { return end('finish', release, settle); },
+        cancel() { return end('cancel', false, false); },
+      };
+    },
 
     /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default) only as far as needed. */
     reveal(nodeIds, {partial = true} = {}) { return change({op: 'reveal', nodeIds, partial}); },

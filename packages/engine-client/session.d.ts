@@ -3,6 +3,31 @@ import type {SceneColumns} from './columns.js';
 import type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 
 /** An engine answer as the session reports it. `stale`: an import or reset overtook the change, nothing was applied. */
+/** Provisional (drag API): a move gesture of `Session.drag`. */
+export interface DragHandle {
+  /** The node being moved. */
+  readonly node: string;
+  /** Whether the gesture still takes positions (not dropped, cancelled or refused). */
+  readonly active: boolean;
+  /** Steps sent, positions replaced by a newer one before they were sent, and steps the engine applied. */
+  readonly stats: {sent: number; coalesced: number; applied: number};
+  /** The answer to picking the node up (the first step). */
+  readonly begun: Promise<SessionResult>;
+  /**
+   * A newer position (and optionally newer positions of the others). Positions that arrive while one is computed replace
+   * each other: only the newest is sent. Resolves with the answer of the step that carried it, or `{ok: true, unchanged}`
+   * when a newer position took its place.
+   */
+  move(position: {x: number; y: number}, others?: Record<string, {x: number; y: number}>): Promise<SessionResult>;
+  /**
+   * Applies the last position and ends the gesture; the node stays pinned there, or with `release` the layout may move it
+   * again. With `settle`, force-directed areas settle afterwards (`op: settle`).
+   */
+  drop(init?: {release?: boolean; settle?: boolean}): Promise<SessionResult>;
+  /** Ends the gesture and puts the node (and the others) back where they were. */
+  cancel(): Promise<SessionResult>;
+}
+
 export interface SessionResult {
   ok: boolean;
   snapshot?: Snapshot;
@@ -61,6 +86,19 @@ export interface Session {
    * where it was.
    */
   patch(patch: GraphPatch): Promise<SessionResult>;
+  /**
+   * Provisional (drag API): pins `nodeId` at `position` (in its parent's frame, as `toReactFlow` gives `position`), or
+   * where it is now. The layout keeps a pinned node in place.
+   */
+  pin(nodeId: string, position?: {x: number; y: number}): Promise<SessionResult>;
+  /** Provisional (drag API): releases the pin of `nodeId`; the layout may move it again. */
+  unpin(nodeId: string): Promise<SessionResult>;
+  /**
+   * Provisional (drag API): starts moving leaf `nodeId` to `position` (in its parent's frame). `others` maps further
+   * nodes moved with it (a selection) to their positions; the set is fixed for the gesture. Each applied step changes the
+   * session's snapshot (`onChange`); other changes wait until the gesture ends.
+   */
+  drag(nodeId: string, position: {x: number; y: number}, init?: {others?: Record<string, {x: number; y: number}>}): DragHandle;
   /** Provisional: opens the groups that hold `nodeIds`; with `partial` (default true) only as far as needed. */
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<SessionResult>;
   /** Provisional: hides nodes by kind or id (with what they hold) and edges by kind, keeping the place of the rest, or
