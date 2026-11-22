@@ -41,25 +41,36 @@ pub fn with_grouping_priority(
         graph.nodes.iter().map(|n| n.id.as_str()).collect();
     let container_id = grouping::container_id;
 
-    // The groups that own a node, with their ancestors in the dimension: they become containers.
+    // Every group's parent, per dimension, so the walk up below costs a lookup per step, not a scan of the groups.
+    let parents: BTreeMap<&str, BTreeMap<&str, Option<&str>>> = graph
+        .memberships
+        .dimensions
+        .iter()
+        .map(|d| {
+            let of = d
+                .groups
+                .iter()
+                .map(|g| (g.id.as_str(), g.parent.as_deref()))
+                .collect();
+            (d.id.as_str(), of)
+        })
+        .collect();
+    // The groups that own a node, with their ancestors in the dimension: they become containers. A walk stops at a group
+    // met already (its ancestors are in), and after as many steps as the dimension has groups (a cycle, refused earlier).
     let mut needed: std::collections::BTreeSet<(String, String)> = Default::default();
     for owner in ownership.owners.values() {
         if let Owner::Group { dimension, group } = owner {
-            let Some(d) = graph.memberships.dimension(dimension) else {
+            let Some(parent_of) = parents.get(dimension.as_str()) else {
                 continue;
             };
             let mut at = Some(group.as_str());
             let mut walked = 0usize;
             while let Some(g) = at {
-                if !needed.insert((dimension.clone(), g.to_string())) || walked > d.groups.len() {
+                if !needed.insert((dimension.clone(), g.to_string())) || walked > parent_of.len() {
                     break;
                 }
                 walked += 1;
-                at = d
-                    .groups
-                    .iter()
-                    .find(|x| x.id == g)
-                    .and_then(|x| x.parent.as_deref());
+                at = parent_of.get(g).copied().flatten();
             }
         }
     }

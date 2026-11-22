@@ -2049,6 +2049,17 @@ pub struct LayoutOptions {
     /// default, omitted) means `[parent]`: today's view, byte-identical. See `grouping::owners`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub grouping_priority: Vec<GroupingCriterion>,
+    /// Removed (ADR 0022, M1): `membershipViews` was replaced by `groupingPriority`. The options never serialize it, and a
+    /// snapshot or a request that still carries it is refused with that message instead of having it ignored silently.
+    #[doc(hidden)]
+    #[serde(
+        default,
+        rename = "membershipViews",
+        deserialize_with = "refuse_membership_views",
+        skip_serializing
+    )]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub removed_membership_views: (),
     /// Provisional (ADR 0022 §3): the shape of a membership hull. `rectangle` (the default, omitted) draws the padded
     /// bounding box of the group's boxes, which looks like a container and may overlap one; `polygon` draws the padded
     /// convex hull. A criterion of `groupingPriority` may override it (M1).
@@ -2503,6 +2514,14 @@ impl HullShape {
     }
 }
 
+/// Refuses the removed option `membershipViews` (ADR 0022, M1) with the way to say the same with `groupingPriority`.
+fn refuse_membership_views<'de, D: serde::Deserializer<'de>>(_: D) -> Result<(), D::Error> {
+    Err(serde::de::Error::custom(
+        "membershipViews was removed (ADR 0022, M1): use groupingPriority, e.g. \
+         [{\"by\": \"parent\"}, {\"by\": \"<dimension>\"}] to draw a dimension as hulls",
+    ))
+}
+
 /// Provisional (ADR 0022 §2): one criterion of `LayoutOptions::grouping_priority`.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2682,6 +2701,7 @@ impl Default for LayoutOptions {
             hub_refs: None,
             shared_tracks: None,
             grouping_priority: Vec::new(),
+            removed_membership_views: (),
             membership_hull: HullShape::Rectangle,
             hub_ref_room: 0.,
             isolated_grid_areas: BTreeSet::new(),

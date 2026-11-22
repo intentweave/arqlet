@@ -716,36 +716,37 @@ fn membership_overlays(
             }
         } else if let Some(d) = source.memberships.dimension(&criterion.by) {
             dimension_label = d.label.clone();
+            // Membership in a nested group implies its ancestors (§1): a group encloses the members of every group below.
+            // One walk up from each group, by a map of the parents, gives every group what it encloses; groups are taken in
+            // their declared order, so each list keeps the order of the groups its members come from.
+            let group_parent: BTreeMap<&str, Option<&str>> = d
+                .groups
+                .iter()
+                .map(|g| (g.id.as_str(), g.parent.as_deref()))
+                .collect();
+            let mut enclosed: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+            for g in &d.groups {
+                let mut at = Some(g.id.as_str());
+                let mut walked = 0usize;
+                while let Some(a) = at {
+                    enclosed
+                        .entry(a)
+                        .or_default()
+                        .extend(g.members.iter().cloned());
+                    walked += 1;
+                    if walked > d.groups.len() {
+                        break; // a cycle, which validation refuses
+                    }
+                    at = group_parent.get(a).copied().flatten();
+                }
+            }
             for group in &d.groups {
                 for m in &group.members {
                     if !parent_of.contains_key(m.as_str()) {
                         unknown += 1;
                     }
                 }
-                // Membership in a nested group implies its ancestors (§1): a group encloses the members of every group below.
-                let members: Vec<String> = d
-                    .groups
-                    .iter()
-                    .filter(|g| {
-                        let mut at = Some(*g);
-                        let mut walked = 0usize;
-                        while let Some(current) = at {
-                            if current.id == group.id {
-                                return true;
-                            }
-                            walked += 1;
-                            if walked > d.groups.len() {
-                                return false;
-                            }
-                            at = current
-                                .parent
-                                .as_deref()
-                                .and_then(|p| d.groups.iter().find(|q| q.id == p));
-                        }
-                        false
-                    })
-                    .flat_map(|g| g.members.iter().cloned())
-                    .collect();
+                let members: Vec<String> = enclosed.remove(group.id.as_str()).unwrap_or_default();
                 let label = if group.label.is_empty() {
                     group.id.clone()
                 } else {

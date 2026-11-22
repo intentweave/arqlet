@@ -498,3 +498,46 @@ fn malformed_memberships_and_conflicting_options_are_refused() {
         .contains("declares no group"));
     assert!(with(serde_json::json!([{"by": "z", "values": ["g"]}, {"by": "parent"}])).is_ok());
 }
+
+#[test]
+fn the_removed_membership_views_are_refused_wherever_they_arrive() {
+    // ADR 0022, M1 removed `membershipViews`. A host or a stored snapshot that still carries it must learn so, not have it
+    // dropped silently (LayoutOptions accepts unknown keys otherwise).
+    let removed = serde_json::json!({"zone": "overlay"});
+    let says = |error: String| {
+        assert!(
+            error.contains("membershipViews was removed") && error.contains("groupingPriority"),
+            "the error names the replacement: {error}"
+        );
+    };
+
+    // An import's options.
+    says(
+        arqlet_runtime::options_from_patch(&serde_json::json!({ "membershipViews": removed }))
+            .expect_err("refused at import"),
+    );
+
+    // A configure request.
+    let snapshot = import_graph_with(graph(THREE_DIMENSIONS), 500, &LayoutOptions::default())
+        .expect("imports");
+    says(
+        arqlet_runtime::configure_snapshot(
+            &snapshot,
+            snapshot.revision,
+            snapshot.layout_version,
+            &serde_json::json!({ "membershipViews": removed }),
+        )
+        .expect_err("refused by configure"),
+    );
+
+    // A snapshot stored by an earlier version.
+    let mut stored = serde_json::to_value(&snapshot).expect("serializes");
+    stored["options"] = serde_json::json!({ "membershipViews": removed });
+    let error = serde_json::from_value::<Snapshot>(stored).expect_err("refused when read");
+    says(error.to_string());
+
+    // And the field is never written.
+    assert!(!serde_json::to_string(&LayoutOptions::default())
+        .unwrap()
+        .contains("membershipViews"));
+}
