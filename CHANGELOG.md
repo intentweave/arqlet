@@ -7,6 +7,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- A grouping priority (provisional, ADR 0022 M1): `groupingPriority` ranks the structures a view shows — the parent
+  hierarchy (`parent`) and membership dimensions. The first criterion that assigns a node owns it, as its container in
+  the view (`membership:<dimension>/<group>`); `values` decide which group of a multi-valued dimension owns a node in
+  several; every later criterion is drawn as hulls, the parent hierarchy too once it is moved down. An organisation chart
+  can thus be read by project instead of by reporting line. Projection only, the canonical graph untouched; the default
+  (`parent` alone) is omitted, so default output is unchanged. `details` answers `groupings` per criterion; the scene's
+  `membershipReport` has one entry per criterion (owner or soft, nodes owned, decided by the value order, unassigned).
+  Playground: *Structure first*. **Replaces** the provisional `membershipViews` (`{"team": "overlay"}` is now
+  `[{"by": "parent"}, {"by": "team"}]`).
+- The shape of a membership hull (`membershipHull`, provisional): a padded rectangle (the default, as a box that may
+  overlap a container) or the padded convex polygon; a criterion's `hull` overrides it. Playground: *Hull shape*.
 - A change log in a resident session (provisional, ADR 0023 step R2): every change of the source, structure (`patch`)
   or content (`payload`), is a numbered group in one sequence; the new operation `change` applies a patch and a payload
   together as one group, all of it or nothing (`expectedSequence` refuses a stale one). `changesSince` answers the
@@ -15,7 +26,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   on the snapshot it started from gives the same snapshot byte for byte and the same content (tested over seeded
   sequences). Memberships change through `patch` (ADR 0022 §5b): `memberships` adds or replaces dimensions and groups,
   `removeMemberships` removes a dimension or a group with the groups nested in it (removals first); a patch that changes
-  memberships only moves nothing (boxes and routes stay, a new revision). JS: `session.change`,
+  memberships only moves nothing (boxes and routes stay, a new revision) unless a changed dimension owns nodes under the
+  grouping priority, which is projected again. JS: `session.change`,
   `session.changesSince`, `session.content`; session answers carry `sequence` and `contentRevision`.
 - Content in a resident session (provisional, ADR 0023 step R1): the operation `payload` sets, unsets or clears
   properties of nodes and edges (JSON values; an integer stays an integer) as one change with its own

@@ -47,7 +47,6 @@
       }
     ]
   },
-  "membershipViews": { "project": "overlay", "site": "overlay" },
   "groupingPriority": [
     { "by": "project", "values": ["zeus", "apollo", "hermes"] },
     { "by": "parent" },

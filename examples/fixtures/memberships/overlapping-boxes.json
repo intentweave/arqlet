@@ -26,6 +26,5 @@
       }
     ]
   },
-  "membershipViews": { "team": "overlay" },
   "groupingPriority": [{ "by": "parent" }, { "by": "team" }]
 }

@@ -6,12 +6,12 @@ import type { BusStyle } from "./BusStyle";
 import type { CommunityHubs } from "./CommunityHubs";
 import type { ContainerSizing } from "./ContainerSizing";
 import type { EdgeRouting } from "./EdgeRouting";
+import type { GroupingCriterion } from "./GroupingCriterion";
 import type { Hidden } from "./Hidden";
 import type { HullShape } from "./HullShape";
 import type { HybridCriterion } from "./HybridCriterion";
 import type { LabelSpec } from "./LabelSpec";
 import type { LevelOfDetail } from "./LevelOfDetail";
-import type { MembershipView } from "./MembershipView";
 import type { NodeSize } from "./NodeSize";
 import type { Objective } from "./Objective";
 import type { OrderHint } from "./OrderHint";
@@ -155,12 +155,12 @@ hubRefs?: number,
  */
 sharedTracks?: SharedTracks,
 /**
- * Provisional (ADR 0022): how each membership dimension of the graph is shown, by dimension id. A dimension that is
- * not named, or named `off`, is neither drawn nor read. Empty (the default) is omitted from serialized options, so a
- * default view stays byte-identical. The first slice draws `overlay`; `hierarchy` and `lanes` are accepted and
- * reported as not yet applied.
+ * Provisional (ADR 0022 §2): the structures the view shows, ranked. A criterion is the parent hierarchy (`parent`) or
+ * a membership dimension; the first criterion that assigns a node owns it in the view (its container), and every
+ * later one holds it softly (drawn as hulls). A dimension that is not listed is neither drawn nor read. Empty (the
+ * default, omitted) means `[parent]`: today's view, byte-identical. See `grouping::owners`.
  */
-membershipViews?: { [key in string]: MembershipView },
+groupingPriority?: Array<GroupingCriterion>,
 /**
  * Provisional (ADR 0022 §3): the shape of a membership hull. `rectangle` (the default, omitted) draws the padded
  * bounding box of the group's boxes, which looks like a container and may overlap one; `polygon` draws the padded

@@ -3,9 +3,11 @@
 //!
 //! 1. **Nothing moves.** With the option on, every node box and every route is identical to the drawing without it. The
 //!    hulls are the only addition, so no quality gate is needed to accept the step.
-//! 2. **A default view is untouched.** Without `membershipViews`, a graph carrying `memberships` serializes and draws
+//! 2. **A default view is untouched.** Without `groupingPriority`, a graph carrying `memberships` serializes and draws
 //!    exactly as the same graph without them.
-use arqlet_model::{Graph, HullShape, LayoutOptions, MembershipView, Snapshot};
+use arqlet_model::{
+    Graph, GroupingCriterion, GroupingRendering, HullShape, LayoutOptions, Snapshot,
+};
 use arqlet_runtime::import_graph_with;
 use arqlet_scene::{build_scene, Scene};
 use std::collections::BTreeMap;
@@ -21,15 +23,31 @@ fn graph(text: &str) -> Graph {
     serde_json::from_str(text).expect("the fixture parses")
 }
 
-/// The options that show every dimension the graph declares as an overlay.
+/// A criterion of the grouping priority.
+fn by(name: &str) -> GroupingCriterion {
+    GroupingCriterion {
+        by: name.into(),
+        ..GroupingCriterion::default()
+    }
+}
+
+/// The options that keep the parent hierarchy first and hold every dimension the graph declares softly, as hulls.
 fn overlay_all(graph: &Graph) -> LayoutOptions {
     let mut options = LayoutOptions::default();
+    options.grouping_priority.push(by("parent"));
     for dimension in &graph.memberships.dimensions {
-        options
-            .membership_views
-            .insert(dimension.id.clone(), MembershipView::Overlay);
+        options.grouping_priority.push(by(&dimension.id));
     }
     options
+}
+
+/// The report entry of one criterion.
+fn report<'a>(scene: &'a Scene, criterion: &str) -> &'a arqlet_scene::SceneMembershipReport {
+    scene
+        .membership_report
+        .iter()
+        .find(|r| r.dimension == criterion)
+        .unwrap_or_else(|| panic!("no report for {criterion}"))
 }
 
 fn laid_out(text: &str, options: &LayoutOptions) -> (Snapshot, Scene) {
@@ -189,13 +207,24 @@ fn the_three_dimensions_are_all_drawn_and_reported() {
         .collect();
     assert_eq!(
         dimensions,
-        ["zone", "team", "layer"],
-        "the report follows the declared order of the dimensions"
+        ["parent", "zone", "team", "layer"],
+        "the report follows the ranks of the priority"
     );
-    for report in &scene.membership_report {
+    let owner = &scene.membership_report[0];
+    assert_eq!(owner.mode, "owner");
+    assert_eq!(
+        owner.owned,
+        g.nodes.len(),
+        "the parent hierarchy owns every node"
+    );
+    assert_eq!(
+        owner.drawn, 0,
+        "the owning criterion draws boxes, not hulls"
+    );
+    for report in scene.membership_report.iter().filter(|r| r.mode == "soft") {
         assert!(
             report.applied,
-            "{}: an overlay is applied",
+            "{}: a soft criterion is applied",
             report.dimension
         );
         assert_eq!(
@@ -250,7 +279,7 @@ fn the_three_dimensions_are_all_drawn_and_reported() {
 fn an_unknown_member_is_counted_and_not_refused() {
     let g = graph(ONE_GROUP_PER_NODE);
     let (_, scene) = laid_out(ONE_GROUP_PER_NODE, &overlay_all(&g));
-    let report = &scene.membership_report[0];
+    let report = report(&scene, "zone");
     assert_eq!(
         report.unknown_members, 1,
         "the fixture names one id the graph does not have, which is ignored and counted"
@@ -262,7 +291,7 @@ fn an_unknown_member_is_counted_and_not_refused() {
 fn two_groups_sharing_a_node_overlap_and_say_so() {
     let g = graph(ONE_GROUP_PER_NODE);
     let (_, scene) = laid_out(ONE_GROUP_PER_NODE, &overlay_all(&g));
-    let report = &scene.membership_report[0];
+    let report = report(&scene, "zone");
     assert_eq!(
         report.overlapping_pairs, 1,
         "north and south share the node `shared`, so their hulls must meet"
@@ -298,32 +327,29 @@ fn a_group_across_a_container_border_is_drawn_as_one_hull() {
 }
 
 #[test]
-fn a_dimension_set_to_a_mode_that_is_not_built_yet_says_so_and_draws_nothing() {
-    let g = graph(THREE_DIMENSIONS);
+fn lanes_are_accepted_and_reported_as_not_applied_yet() {
     let mut options = LayoutOptions::default();
-    options
-        .membership_views
-        .insert("zone".into(), MembershipView::Lanes);
-    options
-        .membership_views
-        .insert("team".into(), MembershipView::Hierarchy);
+    options.grouping_priority = vec![
+        by("parent"),
+        GroupingCriterion {
+            render: GroupingRendering::Lanes,
+            ..by("zone")
+        },
+    ];
     let (_, scene) = laid_out(THREE_DIMENSIONS, &options);
+    let zone = report(&scene, "zone");
+    assert!(!zone.applied, "lanes arrive with M4");
     assert!(
-        scene.membership_hulls.is_empty(),
-        "neither lanes nor hierarchy draws a hull"
+        zone.summary.contains("not applied yet"),
+        "a host must learn that it asked for something the engine does not do yet: {}",
+        zone.summary
     );
-    assert_eq!(scene.membership_report.len(), 2);
-    for report in &scene.membership_report {
-        assert!(!report.applied, "{}", report.dimension);
-        assert_eq!(report.drawn, 0);
-        assert!(
-            report.summary.contains("not applied yet"),
-            "a host must learn that it asked for something the engine does not do yet: {}",
-            report.summary
-        );
-    }
+    assert!(
+        zone.drawn > 0,
+        "until then the zone is held softly, as hulls"
+    );
 
-    // And the drawing is the plain one.
+    // With the parent hierarchy first nothing is projected, so the drawing is the plain one.
     let (_, plain) = laid_out(THREE_DIMENSIONS, &LayoutOptions::default());
     assert_eq!(geometry(&plain), geometry(&scene));
 }
@@ -410,6 +436,11 @@ fn malformed_memberships_and_conflicting_options_are_refused() {
             "parent": "h"}, {"id": "h", "members": ["b"], "parent": "g"}]}]}),
             "parent cycle",
         ),
+        (
+            "a dimension called parent",
+            serde_json::json!({"dimensions": [{"id": "parent", "groups": [{"id": "g", "members": ["a"]}]}]}),
+            "may not be called `parent`",
+        ),
     ];
     for (what, memberships, message) in cases {
         let error = import(base(memberships)).expect_err(what);
@@ -421,12 +452,49 @@ fn malformed_memberships_and_conflicting_options_are_refused() {
         "members": ["a", "nobody"]}]}]})
     ))
     .is_ok());
-    // `groups` together with a hierarchy dimension.
-    let options = arqlet_runtime::options_from_patch(&serde_json::json!({
-        "groups": {"a": ["G"]}, "membershipViews": {"z": "hierarchy"}}));
-    assert!(options.unwrap_err().contains("cannot be used together"));
+    // The refusals of the options alone (ADR 0022 §5).
+    let refused = |patch: serde_json::Value, message: &str| {
+        let error = arqlet_runtime::options_from_patch(&patch).expect_err(message);
+        assert!(error.contains(message), "{patch}: {error}");
+    };
+    refused(
+        serde_json::json!({"groups": {"a": ["G"]}, "groupingPriority": [{"by": "z"}, {"by": "parent"}]}),
+        "cannot be used together",
+    );
+    refused(
+        serde_json::json!({"groupingPriority": [{"by": "z"}, {"by": "z"}]}),
+        "twice",
+    );
+    refused(
+        serde_json::json!({"groupingPriority": [{"by": "parent", "values": ["x"]}]}),
+        "not to parent",
+    );
+    refused(
+        serde_json::json!({"groupingPriority": [{"by": "a", "as": "lanes"}, {"by": "b", "as": "lanes"},
+        {"by": "c", "as": "lanes"}]}),
+        "two at most",
+    );
+    // `groups` with the default priority is today's view, and a priority without `groups` is fine.
     assert!(arqlet_runtime::options_from_patch(
-        &serde_json::json!({"membershipViews": {"z": "hierarchy"}})
+        &serde_json::json!({"groups": {"a": ["G"]}, "groupingPriority": [{"by": "parent"}]})
     )
     .is_ok());
+
+    // The refusals that need the graph: an undeclared dimension or value, at import.
+    let graph: Graph = serde_json::from_value(base(serde_json::json!({"dimensions": [{"id": "z",
+        "groups": [{"id": "g", "members": ["a"]}]}]})))
+    .unwrap();
+    let with = |priority: serde_json::Value| {
+        let options =
+            arqlet_runtime::options_from_patch(&serde_json::json!({"groupingPriority": priority}))
+                .expect("the options alone are valid");
+        import_graph_with(graph.clone(), 100, &options)
+    };
+    assert!(with(serde_json::json!([{"by": "team"}]))
+        .unwrap_err()
+        .contains("neither parent nor a declared dimension"));
+    assert!(with(serde_json::json!([{"by": "z", "values": ["nope"]}]))
+        .unwrap_err()
+        .contains("declares no group"));
+    assert!(with(serde_json::json!([{"by": "z", "values": ["g"]}, {"by": "parent"}])).is_ok());
 }

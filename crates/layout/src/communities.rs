@@ -15,6 +15,114 @@ pub const GROUP_KIND: &str = "group";
 /// The prefix of their ids: `group:<container>:<path>` (the container `#` for the top level, the path joined by `/`).
 pub const GROUP_PREFIX: &str = "group:";
 
+/// The node kind of the containers a grouping priority adds for the groups that own nodes (`with_grouping_priority`).
+pub const MEMBERSHIP_KIND: &str = "membership";
+
+/// The prefix of their ids: `membership:<dimension>/<group>`.
+pub const MEMBERSHIP_PREFIX: &str = arqlet_model::grouping::CONTAINER_PREFIX;
+
+/// Provisional (ADR 0022 §2, M1): `graph` as a grouping priority projects it. Every node moves to its owner
+/// (`arqlet_model::grouping::owners`): a node owned by the parent hierarchy keeps its container; a node owned by a group
+/// of a dimension moves into a container `membership:<dimension>/<group>` of kind `membership`, labelled with the group's
+/// label, nested along the dimension's `parent` links and placed at the top level; a node no criterion assigns moves to
+/// the top level. A container of the source that the projection empties — no child left, no edge of its own — is left
+/// out of the view: its structure is then a soft one, drawn as hulls. The default priority returns the graph as it is.
+/// Only the view sees the result; the canonical graph and its `parentId` never change.
+pub fn with_grouping_priority(
+    graph: &Graph,
+    priority: &[arqlet_model::GroupingCriterion],
+) -> Result<Graph, String> {
+    use arqlet_model::grouping::{self, Owner};
+    if grouping::is_default(priority) {
+        return Ok(graph.clone());
+    }
+    let ownership = grouping::owners(graph, priority);
+    let taken: std::collections::BTreeSet<&str> =
+        graph.nodes.iter().map(|n| n.id.as_str()).collect();
+    let container_id = grouping::container_id;
+
+    // The groups that own a node, with their ancestors in the dimension: they become containers.
+    let mut needed: std::collections::BTreeSet<(String, String)> = Default::default();
+    for owner in ownership.owners.values() {
+        if let Owner::Group { dimension, group } = owner {
+            let Some(d) = graph.memberships.dimension(dimension) else {
+                continue;
+            };
+            let mut at = Some(group.as_str());
+            let mut walked = 0usize;
+            while let Some(g) = at {
+                if !needed.insert((dimension.clone(), g.to_string())) || walked > d.groups.len() {
+                    break;
+                }
+                walked += 1;
+                at = d
+                    .groups
+                    .iter()
+                    .find(|x| x.id == g)
+                    .and_then(|x| x.parent.as_deref());
+            }
+        }
+    }
+    // In the declared order of dimensions and groups, so the view is deterministic.
+    let mut added = Vec::new();
+    for d in &graph.memberships.dimensions {
+        for g in &d.groups {
+            if !needed.contains(&(d.id.clone(), g.id.clone())) {
+                continue;
+            }
+            let id = container_id(&d.id, &g.id);
+            if taken.contains(id.as_str()) {
+                return Err(format!(
+                    "A node of the graph has the id of a membership group: {id}"
+                ));
+            }
+            added.push(Node {
+                id,
+                kind: MEMBERSHIP_KIND.into(),
+                label: if g.label.is_empty() {
+                    g.id.clone()
+                } else {
+                    g.label.clone()
+                },
+                parent_id: g.parent.as_deref().map(|p| container_id(&d.id, p)),
+                shape: Default::default(),
+            });
+        }
+    }
+
+    let mut out = graph.clone();
+    for node in &mut out.nodes {
+        node.parent_id = match ownership.owners.get(&node.id) {
+            Some(Owner::Parent(parent)) => parent.clone(),
+            Some(Owner::Group { dimension, group }) => Some(container_id(dimension, group)),
+            Some(Owner::Unassigned) | None => None,
+        };
+    }
+    // A source container the projection emptied, and that no edge names, is not a box of this view.
+    let was_container: std::collections::BTreeSet<&str> = graph
+        .nodes
+        .iter()
+        .filter_map(|n| n.parent_id.as_deref())
+        .collect();
+    let has_child: std::collections::BTreeSet<String> = out
+        .nodes
+        .iter()
+        .filter_map(|n| n.parent_id.clone())
+        .collect();
+    let in_edges: std::collections::BTreeSet<&str> = graph
+        .edges
+        .iter()
+        .flat_map(|e| std::iter::once(e.source.as_str()).chain(e.target.as_deref()))
+        .collect();
+    out.nodes.retain(|n| {
+        !(was_container.contains(n.id.as_str())
+            && !has_child.contains(&n.id)
+            && !in_edges.contains(n.id.as_str()))
+    });
+    out.nodes.extend(added);
+    Ok(out)
+}
+
 /// The node kind of the containers that gather the children a partly shown container does not show (`with_partial`).
 pub const REST_KIND: &str = "rest";
 
