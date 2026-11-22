@@ -33,6 +33,7 @@ export * from './GraphPatch';
 export * from './GraphTrace';
 export * from './Hidden';
 export * from './HubRef';
+export * from './HullShape';
 export * from './HybridCriterion';
 export * from './Integrity';
 export * from './Intent';
