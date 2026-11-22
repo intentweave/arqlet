@@ -40,8 +40,9 @@ are reported, not silently ignored (`diagnostics`). Two things differ in what yo
   the edge spacings) only when the graph names them; otherwise Arqlet's own defaults apply, which are wider than ELK's
   (20 between nodes and between layers). If your drawings should look like ELK's, set those spacings on the root
   explicitly. On flat graphs this alone brings the area from about 1.2–1.4 to 1.16–1.28 times elk-rs's
-  ([results](../benchmarks/results/elk-flat-components-20261121.md)). Whether the adapter takes ELK's defaults itself is
-  open (a visual comparison is planned first).
+  ([results](../benchmarks/results/elk-flat-components-20261121.md)). The adapter does not take ELK's defaults itself:
+  on the 39 benchmark datasets they cost two lines through nodes, 2.9 % more crossings and 8.6 % more bends for about
+  9 % less area ([results](../benchmarks/results/elk-spacing-20261122.md)). Name them when compactness matters more.
 - **Components.** As ELK does by default (`separateConnectedComponents`), components are packed as boxes in rows towards
   `elk.aspectRatio` (default 1.6) when the top level has several components with edges and none of them dominates;
   `separateConnectedComponents: false` turns it off.

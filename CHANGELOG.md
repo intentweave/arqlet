@@ -151,6 +151,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- Decided: `elkLayout` keeps applying only the spacings a graph names. ELK's default spacings as the adapter's own were
+  compared on 39 datasets and not adopted (two lines through nodes, crossings +2.9 %, bends +8.6 % for about 9 % less
+  area; `benchmarks/eval/elk-spacing.mjs`, `benchmarks/results/elk-spacing-20261122.md`).
 - `elkLayout` passes on the diagnostic of `sharedTracks` when the layout was computed again without shared tracks (lane
   orders cyclic for many edges), as it already did for a single pass that was not used.
 - Membership hulls are rectangles by default (provisional, ADR 0022 §3): the padded bounding box of a group's boxes,
