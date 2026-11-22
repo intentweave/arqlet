@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {orbitPoint, orbitDepth, overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES, pathOf, revealPathDecisions, viewOfNodes} from './overview.js';
+import {orbitPoint, orbitDepth, overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, sceneViewOf, overviewViewOf, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES, pathOf, revealPathDecisions, viewOfNodes} from './overview.js';
 
 // Two clusters: c (with leaves a, b) and d (with leaf e); edges a→b, b→a (a cycle) and a→e.
 const overview = {
@@ -565,4 +565,19 @@ test('structured as the scene view (O3): the cluster\'s content from sceneBuffer
   assert.deepEqual([...styled.routes.slice(2, 5)], [1, 0, 0]);
   // The cluster look stays the default.
   assert.equal(overviewBuffers(m, expanded).count.front, 2 * 6);
+});
+
+test('the scene view of a structured cluster shows it where the overview does, and back (O4)', () => {
+  const m = overviewModel(overview);
+  const view = {centreX: -18, centreY: 2, scale: 37};
+  const sv = sceneViewOf(m, 0, scene, view), place = placeScene(m, 0, scene);
+  // A scene point on screen in the overview and in the scene view (pixels from the canvas centre).
+  for (const p of [[15, 20], [85, 20], [0, 0]]) {
+    const w = place.apply(p);
+    const overviewPixel = [(w[0] - view.centreX) * view.scale, (w[1] - view.centreY) * view.scale];
+    const scenePixel = [(p[0] - sv.centreX) * sv.scale, (p[1] - sv.centreY) * sv.scale];
+    assert.ok(Math.abs(overviewPixel[0] - scenePixel[0]) < 1e-9 && Math.abs(overviewPixel[1] - scenePixel[1]) < 1e-9);
+  }
+  const back = overviewViewOf(m, 0, scene, sv);
+  for (const k of ['centreX', 'centreY', 'scale']) assert.ok(Math.abs(back[k] - view[k]) < 1e-9);
 });

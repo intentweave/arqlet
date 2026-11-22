@@ -243,3 +243,8 @@ export function structuredExcerpt(
 export type FlowDirection = 'lr' | 'rl' | 'tb' | 'bt';
 /** The flow for a structured cluster that faces its neighbours, or null when there is no clear side. */
 export function flowDirectionOf(model: OverviewModel, i: number): FlowDirection | null;
+
+/** Provisional (ADR 0025 O4): the scene view's view that shows a structured cluster's scene where the overview's `view` shows it. */
+export function sceneViewOf(model: OverviewModel, i: number, scene: import('@arqlet/contracts').Scene, view: OverviewView): {centreX: number; centreY: number; scale: number};
+/** Provisional (ADR 0025 O4): the overview's view that shows the cluster's scene where the scene view's `view` shows it. */
+export function overviewViewOf(model: OverviewModel, i: number, scene: import('@arqlet/contracts').Scene, view: {centreX: number; centreY: number; scale: number}): OverviewView;

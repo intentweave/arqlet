@@ -261,7 +261,7 @@ function makeViewStyle(){
  viewStyle=createStyle({...preset,theme:{...(preset.theme??{}),...themeFromCss($('canvas'))}});
  return viewStyle;
 }
-let farChoice=null,sceneView=null,sceneViewOpening=null,farNext=null,farHandlers={},unbindFar=null;
+let farChoice=null,sceneView=null,sceneViewOpening=null,farNext=null,farHandlers={},unbindFar=null,farLayout=null;
 const farWanted=scene=>!curation&&!dragPreview&&(farChoice??(scene.nodes.length+scene.routes.length>=FAR_AUTO));
 // An SVG element has no `hidden` property; the attribute hides it (CSS [hidden]).
 const setHidden=(el,on)=>{if(on)el.setAttribute('hidden','');else el.removeAttribute?.('hidden');el.hidden=on;};
@@ -273,7 +273,9 @@ function syncFarInfo(){
 }
 function showFar(scene,fit){
  setHidden($('graph'),true);setHidden($('scene-view'),false);$('canvas').classList.add('far');
- if(sceneView){sceneView.setScene(scene,{keepView:!fit});sceneView.setState(farState());syncFarInfo();return;}
+ // A new layout (revision or layout version) morphs from the drawing now, as the SVG view animates its edits.
+ const layout=`${snapshot?.revision}:${snapshot?.layoutVersion??0}`,changed=farLayout!==null&&farLayout!==layout;farLayout=layout;
+ if(sceneView){sceneView.setScene(scene,{keepView:!fit,animate:changed&&!fit?400:0});sceneView.setState(farState());syncFarInfo();return;}
  farNext={scene,fit};
  if(sceneViewOpening)return;
  const host=$('scene-view');

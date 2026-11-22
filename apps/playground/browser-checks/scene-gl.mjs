@@ -256,6 +256,54 @@ try {
   check(`V2 ${b} near layer: elements in view within budget × hysteresis`, switching.overBudget === 0, `${switching.overBudget} steps over`);
   if (process.env.DEBUG) console.log(switching.steps);
   }
+  // O4: a morph of the far layer, with the clock held still: half way a moved box stands half way (both backends alike),
+  // and at the end the drawing is the new scene's.
+  const morphs = await evaluate(`(async () => {
+    const {createSceneRenderer} = await import('/packages/viewer/scene-gl.js');
+    const {createSceneGpuRenderer} = await import('/packages/viewer/scene-gpu.js');
+    const {sceneBackend} = await import('/packages/viewer/scene-renderer.js');
+    const gpu = await sceneBackend();
+    const scene = await (await fetch('/packages/viewer/fixtures/bpmn-pools.scene.json')).json();
+    const leaf = scene.nodes.find(n => !n.container && n.shape !== 'circle');
+    const shift = 120;
+    const moved = {...scene, nodes: scene.nodes.map(n => n.id === leaf.id ? {...n, bounds: {...n.bounds, x: n.bounds.x + shift}} : n)};
+    const W = 1200, H = 700, b = scene.bounds, scale = Math.min(W / b.width, H / b.height) * 0.95;
+    const view = {centreX: b.x + b.width / 2, centreY: b.y + b.height / 2, scale};
+    const realNow = performance.now.bind(performance);
+    let fixed = null;
+    performance.now = () => fixed ?? realNow();
+    const grab = gl => { const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d', {willReadFrequently: true}); x.fillStyle = '#0e1520'; x.fillRect(0, 0, W, H); x.drawImage(gl, 0, 0); return x.getImageData(0, 0, W, H).data; };
+    const make = (kind, s) => { const gl = document.createElement('canvas'); gl.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px'; document.body.append(gl);
+      const r = kind === 'webgpu' ? createSceneGpuRenderer(gl, s, {view, device: gpu.device, text: false}) : createSceneRenderer(gl, s, {view, preserveDrawingBuffer: true, text: false}); r.resize(); return {gl, r}; };
+    const off = (p, q) => { let n = 0; for (let i = 0; i < p.length; i += 4) if (Math.max(Math.abs(p[i] - q[i]), Math.abs(p[i + 1] - q[i + 1]), Math.abs(p[i + 2] - q[i + 2])) > 48) n++; return n / (W * H); };
+    // The left border of the leaf on the row through its middle: the first pixel from the left that differs from what
+    // is left of it, near where it should be.
+    const border = (pixels, x) => { const y = Math.round(H / 2 + (leaf.bounds.y + leaf.bounds.height / 2 - view.centreY) * scale), at = i => (y * W + i) * 4;
+      const base = pixels[at(Math.round(x) - 10)] + pixels[at(Math.round(x) - 10) + 1] + pixels[at(Math.round(x) - 10) + 2];
+      for (let i = Math.round(x) - 8; i <= Math.round(x) + 8; i++) if (Math.abs(pixels[at(i)] + pixels[at(i) + 1] + pixels[at(i) + 2] - base) > 12) return i + 0.5; return NaN; };
+    const startX = W / 2 + (leaf.bounds.x - view.centreX) * scale, midX = startX + shift / 2 * scale;
+    const out = {};
+    for (const kind of [gpu.kind === 'webgpu' ? 'webgpu' : null, 'webgl2'].filter(Boolean)) {
+      const {gl, r} = make(kind, scene);
+      fixed = 1000; r.setScene(moved, {animate: 1000}); fixed = 1500; r.draw();
+      const mid = grab(gl);
+      fixed = 2100; r.draw();
+      const end = grab(gl);
+      const animating = r.animating;
+      r.destroy(); gl.remove(); fixed = null;
+      const plain = make(kind, moved); const still = grab(plain.gl); plain.r.destroy(); plain.gl.remove();
+      out[kind] = {mid, midBorder: border(mid, midX), expected: midX, endOff: off(end, still), animating};
+    }
+    performance.now = realNow;
+    const kinds = Object.keys(out);
+    return {kinds: kinds.map(k => ({kind: k, midBorder: out[k].midBorder, expected: out[k].expected, endOff: out[k].endOff, animating: out[k].animating})),
+      between: kinds.length > 1 ? off(out[kinds[0]].mid, out[kinds[1]].mid) : 0};
+  })()`);
+  for (const m of morphs.kinds) {
+    check(`O4 ${m.kind} morph: half way the moved box stands half way`, Math.abs(m.midBorder - m.expected) <= 1, `border at ${m.midBorder.toFixed(1)}, expected ${m.expected.toFixed(1)}`);
+    check(`O4 ${m.kind} morph: at the end the new scene, and the morph is over`, m.endOff < 0.001 && !m.animating, `${(m.endOff * 100).toFixed(3)} % off the new scene drawn still`);
+  }
+  if (morphs.kinds.length > 1) check('O4 morph: half way WebGPU and WebGL 2 draw alike', morphs.between < 0.01, `${(morphs.between * 100).toFixed(2)} % of pixels off`);
   console.log(`pictures in ${out}`);
   failed = page.checks?.some?.(c => !c.ok) ?? false;
 } finally {

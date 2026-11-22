@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {sceneBuffers, hoverBuffers, sceneIndex, sceneExcerpt, nearPolicy, medianBoxPixels, triangulate, arrowCorners, viewRect, BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE, LAYERS} from './scene-buffers.js';
+import {sceneBuffers, hoverBuffers, morphStarts, sceneIndex, sceneExcerpt, nearPolicy, medianBoxPixels, triangulate, arrowCorners, viewRect, BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE, LAYERS} from './scene-buffers.js';
 
 const fixture = name => JSON.parse(readFileSync(new URL(`./fixtures/${name}.scene.json`, import.meta.url)));
 
@@ -147,4 +147,18 @@ test('a pinned leaf gets renderSvg\'s dot; the hover outline is its own small la
   assert.equal(hover.boxes.length / BOX_STRIDE, 1);
   assert.deepEqual([...hover.boxes.slice(0, 4)], [200, 40, 60, 40]);
   assert.equal(hoverBuffers(tiny(), null).boxes.length, 0);
+});
+
+test('a morph starts every box where the same id was, a new one in place', () => {
+  const before = tiny();
+  const after = tiny();
+  after.nodes[1] = {...after.nodes[1], bounds: {x: 120, y: 100, width: 60, height: 40}};
+  after.nodes.push(box('c', 10, 150, 30, 20, {parentId: 'g'}));
+  const a = sceneBuffers(before), b = sceneBuffers(after);
+  assert.deepEqual(b.layers[3].ids, ['a', 'b', 'c']);
+  const starts = morphStarts(a, b);
+  assert.deepEqual([...starts[3].slice(0, 4)], [20, 40, 60, 40], 'a starts where it was');
+  assert.deepEqual([...starts[3].slice(8, 12)], [10, 150, 30, 20], 'c is new: it starts in place');
+  assert.deepEqual([...starts[1]], [0, 0, 300, 200], 'the container did not move');
+  assert.equal(starts.length, b.layers.length);
 });

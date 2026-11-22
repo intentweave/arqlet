@@ -169,7 +169,7 @@ export function sceneBuffers(input, state = {}) {
     if (onTraceRoute.has(id)) return {colour: COLOURS.trace, width: width + 1.5};
     return {colour: withAlpha(colour, trace.fade ? 0.08 : 0.25), width};
   };
-  const layers = LAYERS.map(() => ({boxes: new Floats(), segments: new Floats(), triangles: new Floats()}));
+  const layers = LAYERS.map(() => ({boxes: new Floats(), segments: new Floats(), triangles: new Floats(), ids: []}));
   const [hullLayer, containerLayer, routeLayer, leafLayer, markLayer] = layers;
   const texts = [];
   const nodes = new Map(scene.nodes.map(n => [n.id, n]));
@@ -178,8 +178,11 @@ export function sceneBuffers(input, state = {}) {
   for (const c of scene.conflicts ?? []) { for (const id of c.nodes ?? []) conflicted.add(id); for (const id of c.routes ?? []) conflictedRoutes.add(id); }
   const invalid = id => conflicted.has(id) || nodes.get(id)?.invalid;
   const depthOf = n => { let d = 0; while (n.parentId && nodes.has(n.parentId)) { d++; n = nodes.get(n.parentId); } return d; };
-  const box = (layer, r, radius, kind, strokeWidth, fill, stroke, dash = 0) =>
+  // Every box instance with the id of what it draws (null for none), so that a morph finds where it was.
+  const box = (layer, id, r, radius, kind, strokeWidth, fill, stroke, dash = 0) => {
     layer.boxes.push(r.x, r.y, r.width, r.height, radius, kind, strokeWidth, dash, ...fill, ...stroke);
+    layer.ids.push(id);
+  };
   const text = t => texts.push(t);
 
   // Hulls (ADR 0022): filled, dashed outline, the name at the topmost point; one hue per dimension.
@@ -208,10 +211,10 @@ export function sceneBuffers(input, state = {}) {
     const title = look.text ?? COLOURS.title;
     if (round) {
       const rad = Math.min(r.width, r.height) / 2, mx = r.x + r.width / 2, my = r.y + r.height / 2;
-      box(containerLayer, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, width, fill, stroke, dash);
+      box(containerLayer, n.id, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, width, fill, stroke, dash);
       text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: fadeCss(title, a), align: 'center'});
     } else {
-      box(containerLayer, r, radiusOf(look, r, 10), 0, width, fill, stroke, dash);
+      box(containerLayer, n.id, r, radiusOf(look, r, 10), 0, width, fill, stroke, dash);
       text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: fadeCss(title, a)});
     }
     if (n.kind === 'entity') containerLayer.segments.push(r.x, r.y + 34, r.x + r.width, r.y + 34, 1, 0, 0, 0, 0, ...COLOURS.frameStroke);
@@ -256,17 +259,17 @@ export function sceneBuffers(input, state = {}) {
   });
   for (const bus of scene.busLines ?? []) {
     const r = bus.bounds, on = bus.id === selected, a = faint(bus.id), lit = onPath.has(bus.id);
-    box(routeLayer, r, Math.min(r.width, r.height) / 2, 0, lit ? 2.5 : 1, withAlpha(on ? COLOURS.busSelected : COLOURS.bus, a), withAlpha(lit ? COLOURS.trace : on ? COLOURS.busSelected : COLOURS.leafStroke, a));
+    box(routeLayer, bus.id, r, Math.min(r.width, r.height) / 2, 0, lit ? 2.5 : 1, withAlpha(on ? COLOURS.busSelected : COLOURS.bus, a), withAlpha(lit ? COLOURS.trace : on ? COLOURS.busSelected : COLOURS.leafStroke, a));
     const flat = r.width >= r.height, at = busLabelAt(bus, flat);
     text(flat ? {x: at, y: r.y - 6, text: bus.label.slice(0, 40), size: 12, colour: COLOURS.busText, align: 'center'}
       : {x: r.x + r.width + 14, y: at, text: bus.label.slice(0, 40), size: 12, colour: COLOURS.busText, align: 'center', angle: -Math.PI / 2});
   }
   for (const ref of scene.hubRefs ?? []) {
     const r = ref.label;
-    box(routeLayer, r, 3, 0, 0.8, COLOURS.hubFill, COLOURS.hubStroke);
+    box(routeLayer, 'hub:' + ref.edge, r, 3, 0, 0.8, COLOURS.hubFill, COLOURS.hubStroke);
     text({x: r.x + 4, y: r.y + r.height / 2, text: (ref.outgoing ? '→ ' : '← ') + ref.text.slice(0, 32), size: 10.5, colour: COLOURS.busText, baseline: 'middle'});
   }
-  for (const j of scene.junctions ?? []) box(routeLayer, {x: j.x - 3.5, y: j.y - 3.5, width: 7, height: 7}, 3.5, 1, 1, COLOURS.junctionFill, COLOURS.junctionStroke);
+  for (const j of scene.junctions ?? []) box(routeLayer, null, {x: j.x - 3.5, y: j.y - 3.5, width: 7, height: 7}, 3.5, 1, 1, COLOURS.junctionFill, COLOURS.junctionStroke);
 
   // Leaves.
   for (const n of scene.nodes.filter(n => !parents.has(n.id))) {
@@ -278,13 +281,13 @@ export function sceneBuffers(input, state = {}) {
     const dash = n.kind === 'rest' || look.dash ? 1 : 0;
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     if (!attribute) {
-      if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, strokeWidth, fill, stroke, dash); }
-      else box(leafLayer, r, radiusOf(look, r, 7), 0, strokeWidth, fill, stroke, dash);
+      if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, n.id, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, strokeWidth, fill, stroke, dash); }
+      else box(leafLayer, n.id, r, radiusOf(look, r, 7), 0, strokeWidth, fill, stroke, dash);
     }
     // A pinned leaf: renderSvg's dot (drawn there when the host has no pin control, which the far layer never has).
     if (pinned.has(n.id) && !attribute) {
       const rad = Math.min(r.width, r.height) / 2, px = round ? cx + rad * 0.62 : r.x + r.width - 10, py = round ? cy - rad * 0.62 : r.y + 10;
-      box(leafLayer, {x: px - 4, y: py - 4, width: 8, height: 8}, 4, 1, 0, withAlpha(COLOURS.pin, faded), NONE);
+      box(leafLayer, 'pin:' + n.id, {x: px - 4, y: py - 4, width: 8, height: 8}, 4, 1, 0, withAlpha(COLOURS.pin, faded), NONE);
     }
     const own = look.text ?? COLOURS.text, colour = faded < 1 ? fadeCss(own, faded) : own;
     if (!n.rows?.length) {
@@ -300,12 +303,12 @@ export function sceneBuffers(input, state = {}) {
   // Marks: ports, crossings, edge labels.
   for (const port of scene.showPorts ? scene.ports : []) {
     const p = port.position;
-    box(markLayer, {x: p.x - 3, y: p.y - 3, width: 6, height: 6}, 3, 1, 1, port.endpoint === 'source' ? COLOURS.portSource : COLOURS.portTarget, COLOURS.frame);
+    box(markLayer, 'port:' + port.id, {x: p.x - 3, y: p.y - 3, width: 6, height: 6}, 3, 1, 1, port.endpoint === 'source' ? COLOURS.portSource : COLOURS.portTarget, COLOURS.frame);
   }
-  for (const c of scene.crossings ?? []) box(markLayer, {x: c.position.x - 3, y: c.position.y - 3, width: 6, height: 6}, 0, 0, 0, COLOURS.crossing, NONE);
+  for (const c of scene.crossings ?? []) box(markLayer, null, {x: c.position.x - 3, y: c.position.y - 3, width: 6, height: 6}, 0, 0, 0, COLOURS.crossing, NONE);
   for (const label of scene.labels ?? []) {
     const r = label.bounds;
-    box(markLayer, r, 3, 0, 0, COLOURS.label, NONE);
+    box(markLayer, 'label:' + label.id, r, 3, 0, 0, COLOURS.label, NONE);
     text({x: r.x + 4, y: r.y + r.height / 2, text: label.text, size: 12, colour: COLOURS.labelText, baseline: 'middle'});
   }
 
@@ -313,10 +316,29 @@ export function sceneBuffers(input, state = {}) {
     scene,
     state: {...state},
     bounds: scene.bounds,
-    layers: layers.map(l => ({boxes: l.boxes.done(), segments: l.segments.done(), triangles: l.triangles.done()})),
+    layers: layers.map(l => ({boxes: l.boxes.done(), segments: l.segments.done(), triangles: l.triangles.done(), ids: l.ids})),
     texts,
     index: sceneIndex(scene),
   };
+}
+
+/**
+ * Where each box of `next` starts a morph from `previous` (two `sceneBuffers` results): per layer x, y, width, height of
+ * every instance: its rectangle in `previous` when the same id is in the same layer there, else its own (it appears in
+ * place).
+ */
+export function morphStarts(previous, next) {
+  return next.layers.map((layer, k) => {
+    const before = new Map();
+    const old = previous?.layers[k];
+    if (old) old.ids.forEach((id, i) => { if (id !== null && !before.has(id)) before.set(id, i); });
+    const out = new Float32Array(layer.ids.length * 4);
+    layer.ids.forEach((id, i) => {
+      const j = id === null ? undefined : before.get(id), src = j === undefined ? layer.boxes : old.boxes, at = (j ?? i) * BOX_STRIDE;
+      out.set(src.subarray(at, at + 4), i * 4);
+    });
+    return out;
+  });
 }
 
 /**
@@ -335,7 +357,7 @@ export function hoverBuffers(scene, id, styleSheet) {
       out.boxes.push(r.x, r.y, r.width, r.height, radius, 0, 2, 0, ...NONE, ...COLOURS.hover);
     }
   }
-  return {boxes: out.boxes.done(), segments: out.segments.done(), triangles: out.triangles.done()};
+  return {boxes: out.boxes.done(), segments: out.segments.done(), triangles: out.triangles.done(), ids: out.boxes.length ? [id] : []};
 }
 
 const fadeCss = (css, a) => {
