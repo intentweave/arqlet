@@ -79,6 +79,7 @@ h2{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#b8c6d6;ma
 #stage{position:relative;display:grid;grid-template-rows:minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
 #canvas{overflow:auto;touch-action:none;scrollbar-gutter:stable;min-height:0}
 #canvas.far{overflow:hidden;position:relative}
+#canvas.light{background:#f7f9fc}
 #scene-view{position:absolute;inset:0}
 .layer-info{color:var(--muted);font-size:12px;align-self:center;padding:0 4px}
 svg{display:block}
@@ -297,6 +298,7 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  </div></details>
  <details><summary>Display</summary><div class="group">
   <label class="check"><input id="show-ports" type="checkbox" checked> Port markers</label>
+  <label class="tool" title="Provisional: the appearance of the drawing, the same in the SVG view, the GPU far layer and React Flow (@arqlet/viewer style.js). By kind: routes and arrowheads coloured by the edge's kind, leaf outlines by the node's kind. Light: a light theme. A page may also set the theme's colours as CSS custom properties (--arqlet-leaf-fill, --arqlet-route, …).">Style <select id="style-preset"><option value="default">Default</option><option value="byKind">By kind</option><option value="light">Light</option></select></label>
   <label class="check"><input id="edge-labels" type="checkbox"> Edge labels</label>
   <label class="check"><input id="port-labels" type="checkbox"> Port labels</label>
   <label class="check"><input id="measure" type="checkbox"> Size nodes to their labels</label>

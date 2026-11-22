@@ -32,6 +32,8 @@ export interface SceneDrawState {
   pinned?: Iterable<string> | null;
   /** The path in amber, the rest receding (renderSvg's `trace`). */
   trace?: {nodes?: string[]; routes?: string[]; distance?: Record<string, number> | Map<string, number>; fade?: boolean} | null;
+  /** The appearance (style.js). */
+  style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null;
 }
 export interface SceneBuffers {
   scene: Scene;
@@ -48,7 +50,9 @@ export function sceneOf(scene: Scene | SceneColumnsLike): Scene;
 /** Provisional (ADR 0025, V1): what the WebGL renderer draws, in renderSvg's order, colours and outlines. */
 export function sceneBuffers(scene: Scene | SceneColumnsLike, state?: SceneDrawState): SceneBuffers;
 /** The overlay layer with renderSvg's hover outline on the node `id` (leaf, container or bus bar); empty for null. */
-export function hoverBuffers(scene: Scene, id: string | null): SceneLayerBuffers;
+export function hoverBuffers(scene: Scene, id: string | null, style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null): SceneLayerBuffers;
+/** A CSS colour (hex, rgb(), hsl(), or a name where a canvas resolves it) as RGBA in 0..1. */
+export function parseColour(css: string, alpha?: number): [number, number, number, number];
 /** A uniform grid over the scene's elements, for picking and the elements in view. */
 export function sceneIndex(scene: Scene): SceneIndex;
 /** Ear clipping of a simple polygon: triangles as index triples. */

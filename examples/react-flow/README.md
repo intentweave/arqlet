@@ -29,6 +29,9 @@ scene view: from afar on the GPU (WebGPU, else WebGL 2), up close React Flow wit
 from the view (`reactFlowViewport`), so nothing moves at the switch (ADR 0025). `ARQLET_BACKEND` points the development
 proxy at another port than 8765.
 
+The *Style* select shows the shared appearance (`@arqlet/viewer/style.js`): `toReactFlow(scene, {style})` puts each
+node's and edge's resolved colours in `data.look`, which the node and edge types draw.
+
 This is a reference viewer, not an editor. Node dragging and edge reconnection
 are disabled. Both viewers use `@arqlet/viewer/scene.js`; supplied routes are never
 recomputed by React Flow. See [scene contract](../../docs/scene-viewers.md).

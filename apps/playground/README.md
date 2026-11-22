@@ -204,6 +204,8 @@ Drag the diagram to move it; the mouse wheel zooms at the pointer. Fit, zoom in 
 available. The advanced JSON field passes layout and routing options to `configure`; e.g.
 `{"routingClearance":16,"trackSpacing":12}`.
 
+The field *Style* switches the appearance (ADR 0026: default, by kind, light) in the SVG view and the GPU view alike.
+
 Large views (ADR 0025): the button *GPU* (key G) draws the view with the scene view, from afar on the GPU (WebGPU, else
 WebGL 2) and up close with the SVG viewer; it is on by itself from 1 500 nodes and routes. Selection, collapse and
 expand, and pins work there; dragging, resizing, ports, labels and curation use the plain SVG view (press G).

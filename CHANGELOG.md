@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Appearance (ADR 0026, provisional): one style for every renderer in `@arqlet/viewer/style.js`: a theme of named
+  colours (also from CSS custom properties, `--arqlet-…`) and rules with selectors over the data (`edge[kind=import]`,
+  `leaf`, `#id`; colours as CSS, `$token` or `auto` by kind). `renderSvg`, the GPU far layer and `toReactFlow`
+  (`data.look`) draw the same colours; presets `default`, `byKind` and `light`. Without a style the drawing is unchanged.
+
 - Scene renderer for large views (ADR 0025 V1–V2, provisional) in `@arqlet/viewer`: a far layer on the GPU, WebGPU
   first and WebGL 2 as the fallback (`createSceneGpuRenderer`, `createSceneRenderer`, `sceneBackend`), drawing the
   same boxes, routes, arrowheads, hulls and marks as `renderSvg`, with texts on a 2D canvas and picking; and a scene

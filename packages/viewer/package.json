@@ -78,6 +78,10 @@
     "./scene-view.js": {
       "types": "./scene-view.d.ts",
       "default": "./scene-view.js"
+    },
+    "./style.js": {
+      "types": "./style.d.ts",
+      "default": "./style.js"
     }
   },
   "files": [
@@ -107,6 +111,8 @@
     "scene-gpu.d.ts",
     "scene-view.js",
     "scene-view.d.ts",
+    "style.js",
+    "style.d.ts",
     "README.md",
     "LICENSE-APACHE",
     "LICENSE-MIT"

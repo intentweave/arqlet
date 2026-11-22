@@ -17,6 +17,8 @@ export interface SceneRendererOptions {
   selected?: string | null;
   selectedRoute?: string | null;
   pinned?: Iterable<string> | null;
+  /** The appearance (style.js). */
+  style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null;
   trace?: import('./scene-buffers.js').SceneDrawState['trace'];
   /** Keeps the drawing readable after the frame (for pixel checks). */
   preserveDrawingBuffer?: boolean;

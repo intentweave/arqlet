@@ -1,5 +1,10 @@
 import type {BoundaryCrossing, PlacedLabel, Point, Scene, SceneBusLine, SceneHubRef, SceneHull, SceneNode, SceneRoute} from '@arqlet/contracts';
 
+/** A node's appearance resolved from a style, the theme filled in; the state colours for the host to use. */
+export interface ArqletNodeLook { fill: string; stroke: string; text: string; strokeWidth: number; dash?: string; selectedFill: string; selectedStroke: string; invalid: string }
+/** An edge's appearance resolved from a style. */
+export interface ArqletEdgeLook { stroke: string; arrow: string; width?: number; opacity?: number; dash?: string; invalid: string }
+
 export interface ArqletFlowHandle {
   id: string;
   type: 'source' | 'target';
@@ -21,7 +26,8 @@ export interface ArqletFlowNode {
   connectable: false;
   deletable: false;
   zIndex: number;
-  data: SceneNode & {handles: ArqletFlowHandle[]; showPorts: boolean};
+  /** `look`: with the `style` option, the node's resolved appearance. */
+  data: SceneNode & {handles: ArqletFlowHandle[]; showPorts: boolean; look?: ArqletNodeLook};
 }
 
 export interface ArqletFlowEdge {
@@ -33,7 +39,8 @@ export interface ArqletFlowEdge {
   type: 'arqlet';
   zIndex: number;
   deletable: false;
-  data: SceneRoute;
+  /** `look`: with the `style` option, the edge's resolved appearance. */
+  data: SceneRoute & {look?: ArqletEdgeLook};
 }
 
 /** What a scene draws besides nodes and edges between nodes, in flow coordinates (the scene's own). */
@@ -67,6 +74,8 @@ export interface ArqletFlowOverlayNode {
 }
 
 export interface ToReactFlowOptions {
+  /** Provisional: a style (style.js); every node and edge then carries its resolved look in `data.look`. */
+  style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle;
   /** Add an `arqletOverlay` node that carries the overlays (only when the scene has any). Default false. */
   overlayNode?: boolean;
   /**

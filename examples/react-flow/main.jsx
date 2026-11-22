@@ -10,16 +10,22 @@ import {toReactFlow} from '@arqlet/viewer/react-flow.js';
 import {applyPreset} from '@arqlet/engine-client/presets.js';
 import {openSceneView,reactFlowViewport} from '@arqlet/viewer/scene-view.js';
 import {bindSceneNavigation} from '@arqlet/viewer/scene-renderer.js';
+import {createStyle,STYLE_PRESETS} from '@arqlet/viewer/style.js';
 
 const sides={left:Position.Left,right:Position.Right,top:Position.Top,bottom:Position.Bottom};
+// With a style (`toReactFlow(…, {style})`), the node's resolved look (style.js) sets its colours, as in the SVG and GPU views.
 function DiagramNode({data,selected}){
- return <div className={`lw-node ${data.container?'container':''} ${selected?'selected':''} ${data.invalid?'invalid':''}`}>
+ const look=data.look,colours=look?{background:selected?look.selectedFill:look.fill,borderColor:data.invalid?look.invalid:selected?look.selectedStroke:look.stroke,color:look.text,borderWidth:look.strokeWidth,borderStyle:look.dash?'dashed':'solid'}:undefined;
+ return <div className={`lw-node ${data.container?'container':''} ${selected?'selected':''} ${data.invalid?'invalid':''}`} style={colours}>
   <div className="title">{data.container?'▾ ':data.collapsed?'▸ ':''}{data.label}</div>
   {data.handles.map(h=><Handle key={h.id} id={h.id} type={h.type} position={sides[h.side]} isConnectable={false} style={{left:h.x,top:h.y,right:'auto',bottom:'auto',transform:'translate(-50%,-50%)',opacity:data.showPorts?1:0,background:h.type==='source'?'#7ee1bc':'#9dbaff'}}/>)}
  </div>;
 }
+// An arrowhead marker per colour (the theme's and any a style sets), as renderSvg makes them.
+const markerId=colour=>colour?`lw-rf-arrow-${colour.replace(/[^a-z0-9]/gi,'')}`:'lw-rf-arrow';
 function DiagramEdge({id,data}){
- return <BaseEdge id={id} path={routePath(data.points)} markerEnd="url(#lw-rf-arrow)" style={{stroke:data.invalid?'#f08f80':'#73bba7',strokeWidth:Math.min(4,1.6+.4*(data.weight-1))}}/>;
+ const look=data.look;
+ return <BaseEdge id={id} path={routePath(data.points)} markerEnd={`url(#${markerId(look?.arrow)})`} style={{stroke:data.invalid?(look?.invalid??'#f08f80'):(look?.stroke??'#73bba7'),strokeWidth:look?.width??Math.min(4,1.6+.4*(data.weight-1)),strokeOpacity:look?.opacity,strokeDasharray:look?.dash}}/>;
 }
 // What is neither node nor edge (toReactFlow's overlays, with `overlayNode`): membership hulls behind everything, bus bars
 // with their taps, junction dots and hub-reference stubs, in renderSvg's colours, inside one inert node over the scene.
@@ -38,14 +44,15 @@ function OverlayNode({data}){
 const nodeTypes={arqlet:DiagramNode,arqletOverlay:OverlayNode},edgeTypes={arqlet:DiagramEdge};
 function FitScene({bounds}){const {fitBounds}=useReactFlow();useEffect(()=>{fitBounds(bounds,{padding:.1});},[bounds,fitBounds]);return null;}
 
-const Arrow=()=><svg style={{position:'absolute',width:0,height:0}}><defs><marker id="lw-rf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#73bba7"/></marker></defs></svg>;
+const Arrow=({edges=[]})=>{const colours=[...new Set(edges.map(e=>e.data.look?.arrow).filter(Boolean))];return <svg style={{position:'absolute',width:0,height:0}}><defs>
+ {[null,...colours].map(c=><marker key={c??''} id={markerId(c)} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill={c??'#73bba7'}/></marker>)}</defs></svg>;};
 
 // Large views (ADR 0025, V4): the scene view draws from afar on the GPU (WebGPU, else WebGL 2), and React Flow takes the
 // near layer's place: it gets the excerpt in view (plus a margin) and a viewport set from the view, so both layers show
 // the same geometry and the switch moves nothing. The scene view navigates (wheel, drag); React Flow's own panning and
 // zooming are off. Views from FAR_AUTO elements open this way.
 const FAR_AUTO=1500;
-function FarSceneView({scene,selected,onSelect}){
+function FarSceneView({scene,selected,onSelect,style}){
  const host=useRef(null),view=useRef(null),select=useRef(onSelect);select.current=onSelect;
  const [layer]=useState(()=>{const d=document.createElement('div');d.style.width='100%';d.style.height='100%';return d;});
  const [near,setNear]=useState(null),[viewport,setViewport]=useState({x:0,y:0,zoom:1}),[info,setInfo]=useState('');
@@ -53,7 +60,7 @@ function FarSceneView({scene,selected,onSelect}){
   let alive=true,unbind=null;
   const describe=v=>setInfo(`${v.backend==='webgpu'?'WebGPU':v.backend==='webgl2'?'WebGL 2':'no GPU'} · ${v.layer==='near'?'near (React Flow)':'far'}`);
   const nearLayer={element:layer,draw:(excerpt,f)=>{setNear(excerpt);setViewport(reactFlowViewport(f.view,f.width,f.height));},move:f=>setViewport(reactFlowViewport(f.view,f.width,f.height)),clear:()=>setNear(null)};
-  openSceneView(host.current,scene,{near:nearLayer,state:{selected},onLayer:()=>view.current&&describe(view.current)}).then(v=>{
+  openSceneView(host.current,scene,{near:nearLayer,style,state:{selected},onLayer:()=>view.current&&describe(view.current)}).then(v=>{
    if(!alive){v.destroy();return;}
    view.current=v;describe(v);
    unbind=bindSceneNavigation(host.current,v,{onClick:(x,y)=>{if(v.layer!=='far')return;const hit=v.pick(x,y);if(hit?.kind==='node')select.current(hit.id);}});
@@ -62,11 +69,12 @@ function FarSceneView({scene,selected,onSelect}){
  },[]);
  useEffect(()=>{view.current?.setScene(scene);},[scene]);
  useEffect(()=>{view.current?.setState({selected});},[selected]);
- const mapped=useMemo(()=>near?toReactFlow(near,{overlayNode:true}):null,[near]);
+ useEffect(()=>{view.current?.setState({style});},[style]);
+ const mapped=useMemo(()=>near?toReactFlow(near,{overlayNode:true,style}):null,[near,style]);
  const nodes=useMemo(()=>mapped?mapped.nodes.map(n=>({...n,selected:n.id===selected})):[],[mapped,selected]);
  return <div className="far-host" ref={host}><span className="far-info">{info}</span>{createPortal(mapped&&<ReactFlow nodes={nodes} edges={mapped.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} viewport={viewport} onNodeClick={(_,node)=>select.current(node.id)}
   nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false} preventScrolling={false} deleteKeyCode={null} proOptions={{hideAttribution:true}}>
-  <Arrow/><ViewportPortal>{mapped.labels.map(l=><div className="scene-label" key={`${l.kind}:${l.id}`} style={{left:l.bounds.x,top:l.bounds.y,width:l.bounds.width,height:l.bounds.height}}>{l.text}</div>)}</ViewportPortal>
+  <Arrow edges={mapped.edges}/><ViewportPortal>{mapped.labels.map(l=><div className="scene-label" key={`${l.kind}:${l.id}`} style={{left:l.bounds.x,top:l.bounds.y,width:l.bounds.width,height:l.bounds.height}}>{l.text}</div>)}</ViewportPortal>
  </ReactFlow>,layer)}</div>;
 }
 
@@ -74,13 +82,15 @@ async function getJson(url){const response=await fetch(url,{cache:'no-store'});i
 
 function App(){
  const [snapshot,setSnapshot]=useState(null),[error,setError]=useState(''),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[nodes,setNodes]=useState([]);
- const [engine,setEngine]=useState(null),[profiles,setProfilees]=useState([]),[farChoice,setFarChoice]=useState(null);
+ const [engine,setEngine]=useState(null),[profiles,setProfilees]=useState([]),[farChoice,setFarChoice]=useState(null),[stylePreset,setStylePreset]=useState('default');
+ // One resolved style (style.js) for React Flow and the GPU far layer.
+ const style=useMemo(()=>createStyle(STYLE_PRESETS[stylePreset]),[stylePreset]);
  const epoch=useRef(0),fileInput=useRef(null);
  // The engine computes scene geometry; this host only maps and renders it.
  const built=useMemo(()=>{if(!snapshot||!engine)return null;try{return {scene:sceneOf(engine,snapshot)};}catch(e){return {error:e.message};}},[snapshot,engine]);
  const scene=built?.scene??null;
  const sceneError=built?.error??'';
- const mapped=useMemo(()=>scene?toReactFlow(scene,{overlayNode:true}):null,[scene]);
+ const mapped=useMemo(()=>scene?toReactFlow(scene,{overlayNode:true,style}):null,[scene,style]);
  useEffect(()=>{if(mapped)setNodes(mapped.nodes);},[mapped]);
  useEffect(()=>{setError(sceneError);},[sceneError]);
 
@@ -121,11 +131,11 @@ function App(){
  const far=!!scene&&(farChoice??(scene.nodes.length+scene.routes.length>=FAR_AUTO));
  return <main><header><strong>Arqlet · React Flow</strong><button onClick={load}>Initial snapshot</button><button onClick={()=>fileInput.current.click()}>Open snapshot</button><input ref={fileInput} type="file" accept=".json" hidden onChange={openFile}/>
   <select aria-label="Profile" disabled={busy||!profiles.length} value="" onChange={e=>applyProfilee(e.target.value)}><option value="" disabled>Choose profile …</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.title??p.id}</option>)}</select>
-  <button disabled={busy||!active?.aggregate} onClick={toggle}>{active?.collapsed?'Expand':'Collapse'}</button><label><input type="checkbox" checked={far} disabled={!scene} onChange={e=>setFarChoice(e.target.checked)}/> GPU far layer</label><span>{selected??'Select a node'} · {scene?.nodes.length??0} nodes</span></header>
+  <button disabled={busy||!active?.aggregate} onClick={toggle}>{active?.collapsed?'Expand':'Collapse'}</button><select aria-label="Style" value={stylePreset} onChange={e=>setStylePreset(e.target.value)}><option value="default">Default style</option><option value="byKind">By kind</option></select><label><input type="checkbox" checked={far} disabled={!scene} onChange={e=>setFarChoice(e.target.checked)}/> GPU far layer</label><span>{selected??'Select a node'} · {scene?.nodes.length??0} nodes</span></header>
  {error&&<p role="alert">{error}</p>}
- {scene&&far&&<FarSceneView scene={scene} selected={selected} onSelect={setSelected}/>}
+ {scene&&far&&<FarSceneView scene={scene} selected={selected} onSelect={setSelected} style={style}/>}
  {scene&&!far&&<ReactFlow nodes={nodes} edges={mapped.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={changes=>setNodes(ns=>applyNodeChanges(changes,ns))} onNodeClick={(_,node)=>setSelected(node.id)} nodesDraggable={false} nodesConnectable={false} deleteKeyCode={null} elevateEdgesOnSelect={false} elevateNodesOnSelect={false} minZoom={.02} fitView>
-  <svg style={{position:'absolute',width:0,height:0}}><defs><marker id="lw-rf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#73bba7"/></marker></defs></svg>
+  <Arrow edges={mapped.edges}/>
   <ViewportPortal>{mapped.labels.map(l=><div className="scene-label" key={`${l.kind}:${l.id}`} style={{left:l.bounds.x,top:l.bounds.y,width:l.bounds.width,height:l.bounds.height}}>{l.text}</div>)}{mapped.crossings.map((c,i)=><div className="crossing" key={i} style={{left:c.position.x-3,top:c.position.y-3}}/>)}</ViewportPortal>
   <FitScene bounds={scene.bounds}/><Controls showInteractive={false}/>
  </ReactFlow>}
