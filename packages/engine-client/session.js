@@ -115,14 +115,16 @@ export function httpRun(base = '/api', {fetchImpl = globalThis.fetch} = {}) {
  */
 let dragCounter = 0;
 
-export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
+export function createSession(engine, {onChange, resident: wanted = 'auto'} = {}) {
+  // The engine and, when resident, its session: replaced by `recycle` (a new worker, ADR 0023 R7).
+  let run = engine;
   let snapshot = null;
   let generation = 0;
   let queue = Promise.resolve();
   const scenes = new WeakMap();
   if (wanted === true && !run.openSession) throw Error('This engine has no resident sessions');
   const resident = wanted === true || (wanted === 'auto' && typeof run.openSession === 'function');
-  const opened = resident ? Promise.resolve(run.openSession()) : null;
+  let opened = resident ? Promise.resolve(run.openSession()) : null;
   // The engine call: with a resident session, the request goes to it and its answer is turned into the shape of an
   // answer with a snapshot (the state), its scene remembered for that state.
   const call = async request => {
@@ -462,6 +464,39 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
 
     /** Whether the snapshot stays in the engine (see `createSession`). */
     get resident() { return resident; },
+
+    /**
+     * Provisional (ADR 0023, R7): moves a resident session to another engine (`newEngine`, typically a new worker), so that
+     * the old one can be ended and its memory comes back: WebAssembly never shrinks its linear memory, a new worker starts
+     * small. The snapshot, the content (with its revision) and the change log's number move; the log's groups do not, so
+     * a replica behind that number resyncs. The engines give identical results, so the view does not change. Runs after
+     * the changes queued before it; on a refusal the session stays on the old engine. The host ends the old worker after.
+     */
+    recycle(newEngine) {
+      if (!resident) return Promise.resolve({ok: false, error: 'recycle needs a resident session'});
+      if (typeof newEngine?.openSession !== 'function') {
+        return Promise.resolve({ok: false, error: 'recycle needs an engine with resident sessions'});
+      }
+      return enqueue(async () => {
+        const old = await opened;
+        const exported = await old.run({op: 'export'});
+        if (!exported.ok) return exported;
+        const content = await old.run({op: 'content'});
+        if (!content.ok) return content;
+        const fresh = await newEngine.openSession();
+        // No scene in the answer: the host has it already, and writing it would grow the new engine's memory.
+        const loaded = await fresh.run({op: 'load', scene: false, snapshot: exported.snapshot, sequence: content.sequence,
+          content: {contentRevision: content.contentRevision, nodes: content.nodes, edges: content.edges}});
+        if (!loaded.ok) {
+          await fresh.close?.();
+          return loaded;
+        }
+        await old.close?.();
+        run = newEngine;
+        opened = Promise.resolve(fresh);
+        return {ok: true, unchanged: true, sequence: content.sequence, contentRevision: content.contentRevision};
+      });
+    },
 
     /** Ends a resident session in the engine (frees its snapshot). The session object is not usable afterwards. */
     async close() {

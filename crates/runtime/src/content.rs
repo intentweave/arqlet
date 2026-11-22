@@ -26,6 +26,25 @@ pub struct Content {
 }
 
 impl Content {
+    /// The content as a `content` request answers it (`contentRevision`, `nodes`, `edges`), for a recycled engine.
+    pub fn from_answer(v: &Value) -> Result<Content, String> {
+        let table = |part: &str| -> Result<Properties, String> {
+            match v.get(part) {
+                None | Some(Value::Null) => Ok(Properties::new()),
+                Some(t) => serde_json::from_value(t.clone())
+                    .map_err(|e| format!("load content.{part}: {e}")),
+            }
+        };
+        Ok(Content {
+            revision: v
+                .get("contentRevision")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+            nodes: table("nodes")?,
+            edges: table("edges")?,
+        })
+    }
+
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.edges.is_empty()
     }

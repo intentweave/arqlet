@@ -44,3 +44,18 @@ it cannot see cheaply. A host can treat it as a lower bound within 15 %.
 Content (all of it, or named keys, which goes into the change log as `dropKeys`), the change log, the columns and the
 overview. The snapshot stays: releasing never changes the view (tested). Freed room goes back to the allocator; in WASM
 the linear memory stays at its high-water mark (`linearMemoryBytes`), which only a new worker gives back.
+
+## Moving a session to a new engine (`session.recycle`)
+
+A graph of 20 containers with 150 functions each (3 020 nodes, 3 019 edges), imported with `limit` 3 100 (laid out in
+full) into a resident session of the WASM engine in Node 24, then moved to a fresh engine instance:
+
+| | Linear memory | Live heap (counted) | `memory` estimate |
+|---|---|---|---|
+| Old engine after the import | 39.9 MB | 3.7 MB | 3.5 MB |
+| New engine after `recycle` | 9.8 MB | 3.9 MB | 3.6 MB |
+| A fresh engine, nothing loaded | 1.3 MB | 0.03 MB | |
+
+The new engine holds the session's heap plus what reading the snapshot's text (3.2 MB of JSON) left as its high-water
+mark. Two things had to change for this: `load` reads the snapshot in one pass from text (no JSON value of it), and the
+recycle loads without a scene in the answer (writing the scene of 3 000 nodes had grown the new engine to 27.6 MB).

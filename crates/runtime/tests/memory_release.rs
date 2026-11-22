@@ -114,3 +114,45 @@ fn memory_names_the_parts_and_release_gives_them_back() {
         .unwrap()
         .contains("resident session"));
 }
+
+/// A recycled engine: `load` with the content and the change log's number, read in one pass from text, gives the same
+/// session as the general way.
+#[test]
+fn load_takes_the_content_and_the_number_and_reads_in_one_pass() {
+    let mut a = EngineSession::new();
+    ok(a.run_value(&json!({"op": "import", "graph": graph(), "limit": 100, "scene": false})));
+    ok(a.run_value(&json!({"op": "payload", "set": {"nodes": {"n1": {"owner": "Ann"}}}})));
+    ok(a.run_value(&json!({"op": "payload", "set": {"nodes": {"n1": {"owner": "Bob"}}}})));
+    let snapshot = ok(a.run_value(&json!({"op": "export"})))["snapshot"].clone();
+    let content = ok(a.run_value(&json!({"op": "content"})));
+    let request = json!({"op": "load", "snapshot": snapshot, "sequence": content["sequence"],
+        "content": {"contentRevision": content["contentRevision"], "nodes": content["nodes"], "edges": content["edges"]}});
+    let mut by_text = EngineSession::new();
+    let mut by_value = EngineSession::new();
+    let text: Value = serde_json::from_str(&by_text.run(&request.to_string())).unwrap();
+    assert_eq!(ok(text), ok(by_value.run_value(&request)));
+    for s in [&mut by_text, &mut by_value] {
+        assert_eq!(
+            ok(s.run_value(&json!({"op": "export"})))["snapshot"],
+            snapshot
+        );
+        let n1 = ok(s.run_value(&json!({"op": "details", "nodeId": "n1"})));
+        assert_eq!(
+            (
+                n1["node"]["properties"]["owner"].clone(),
+                n1["contentRevision"].clone()
+            ),
+            (json!("Bob"), json!(2))
+        );
+        let log = ok(s.run_value(&json!({"op": "changesSince", "sequence": 1})));
+        assert_eq!(
+            (log["resync"].clone(), log["sequence"].clone()),
+            (json!(true), json!(2))
+        );
+        assert_eq!(
+            ok(s.run_value(&json!({"op": "payload", "set": {"nodes": {"n2": {"x": 1}}}})))
+                ["sequence"],
+            3
+        );
+    }
+}

@@ -157,6 +157,11 @@ export interface Session {
   change(group: ChangeGroup): Promise<SessionResult & {sequence?: number; contentRevision?: number}>;
   /** Provisional (ADR 0023, R2): the change groups after `sequence`, or `resync` when the log no longer has them. */
   changesSince(sequence: number): Promise<{ok: true; sequence: number; changes?: Array<ChangeGroup & {sequence: number}>; resync?: true} | {ok: false; error?: string}>;
+  /**
+   * Provisional (ADR 0023, R7): moves a resident session to another engine (a new worker) so that the old one can be
+   * ended and its memory comes back; the view, the content and the change log's number move with it.
+   */
+  recycle(newEngine: Run): Promise<{ok: true; unchanged: true; sequence: number; contentRevision: number} | {ok: false; error?: string; stale?: true}>;
   /** Provisional (ADR 0023, R7): what the session holds, part by part (estimated), and from WASM the module's heap. */
   memory(): Promise<SessionMemory | {ok: false; error?: string}>;
   /** Provisional (ADR 0023, R7): gives parts back; the snapshot stays. */

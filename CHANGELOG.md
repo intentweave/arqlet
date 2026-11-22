@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Moving a resident session to a new engine (provisional, ADR 0023 step R7): `session.recycle(newEngine)` exports the
+  snapshot and the content from the old engine, loads them into a session of the new one and closes the old, so that
+  the host can end the old worker and its memory comes back (WebAssembly never shrinks its linear memory). The view,
+  the content with its revision and the change log's number move; the log's groups stay behind, so a replica resyncs.
+  `load` takes `content` and `sequence` for it and reads a snapshot in one pass from text. A 3 000-node session laid out
+  in full: linear memory 39.9 MB in the old engine, 9.8 MB in the new one, heap 3.9 MB.
 - What a session holds, and giving it back (provisional, ADR 0023 step R7): `memory` answers the session's parts in
   estimated heap bytes (source graph, the structure's view and index, the view graph, boxes, routes, layered plans, the
   rest of the snapshot, content, change log, columns, overview), within 15 % below the counted heap; the WASM engine adds
