@@ -43,5 +43,9 @@
       }
     ]
   },
-  "membershipViews": { "pool": "lanes", "phase": "lanes" }
+  "membershipViews": { "pool": "lanes", "phase": "lanes" },
+  "groupingPriority": [
+    { "by": "pool", "as": "lanes" },
+    { "by": "phase", "as": "lanes" }
+  ]
 }
