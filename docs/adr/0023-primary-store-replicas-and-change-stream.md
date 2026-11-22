@@ -3,7 +3,8 @@
 Date: 2026-11-21.
 Status: proposed. Steps R1 (content in the engine session, operation `payload`, 2026-11-22,
 `benchmarks/results/content-memory-20261122.md`) and R2 (the change log: `change`, `changesSince`, `content`; replay
-tested byte for byte) are implemented, provisional, behind their own operations; the other steps are not.
+tested byte for byte) are implemented, provisional, behind their own operations; of R7, `memory` and `release`
+(2026-11-22, `benchmarks/results/memory-release-20261122.md`). The other steps are not.
 
 Related: [ADR 0019](0019-engine-interface.md) (protocol, sessions, state stays where it is computed, the columnar data
 path, prepared source and lean snapshots), [ADR 0021](https://github.com/intentweave/arqlet/pull/70) (proposed: a Cypher
@@ -175,7 +176,30 @@ give a different answer without any sign of it: the same class of failure as a p
 All three keep working with one code path: the difference is where the primary is and what the replica covers. Any new
 operation still goes through `dispatch`.
 
-### 8. What stays as it is
+### 8. Memory and release
+
+A session holds the structure, its index, the content, the change log, and caches (the scene's columns, the cluster
+overview's graph). Each of them can grow, and a host needs to see what it holds and give parts back:
+
+- **What is held** (`memory`, read only): the session answers its parts with their heap bytes (source graph, the
+  structure's view and index, the view graph with boxes and routes, content, change log, columns, overview), estimated
+  from their sizes and lengths, never by walking the heap of another part. An adapter adds what only it can know: the WASM
+  adapter the live heap and the size of the linear memory.
+- **Giving parts back** (`release`): content (all of it, or named keys), the change log (a replica then gets `resync`),
+  the columns and the overview. The snapshot stays: releasing never changes the view. Releasing content is a change of
+  the content and goes into the change log like any other (a replica forgets the same keys).
+- **WASM keeps its high-water mark.** Linear memory grows to the peak and is never returned, also not after `release`
+  or closing a session. Only a new worker gives memory back: export the snapshot and the content, end the worker, start
+  a new one, load them. Since native and WASM give bit-identical results, the hand-over is exact, and the new worker
+  holds what the session keeps instead of the old peak (`engine-client`, a step of its own).
+- **A backend** keeps its sessions in one process: a limit in bytes over all sessions (ADR 0019 left it open) and the
+  least recently used session dropped first, answered as unknown afterwards, as after a restart today.
+
+Smaller representations lower what is held for good: typed columns for content per key (`content-memory-20261122.md`)
+and interned ids (ADR 0019 §4). The peak of a layout is the layout's own concern; recycling the worker keeps it from
+staying.
+
+### 9. What stays as it is
 
 - `dispatch`, the typed protocol, sessions and their revision checks (ADR 0019).
 - Snapshot operations for hosts that hold the state themselves.
@@ -200,6 +224,12 @@ Each step is useful on its own, behind an option or a new operation, and measure
 - **R4 — the query executor** (ADR 0021 M1 to M4) over structure and content through the store seam.
 - **R5 — placement.** Local when covered, else the primary; the same answer both ways for the whole fixture corpus.
 - **R6 — columns, interned ids and a binary frame** (ADR 0019 §4) when the measurements of R1 to R3 ask for them.
+- **R7 — memory and release** (item 8): `memory` with the parts of a session and, from the WASM adapter, the live heap
+  and the linear memory; `release` of content (all or by key), the change log, the columns and the overview; then a
+  worker that is recycled in `engine-client` (export, end, start, load) and a byte limit with least-recently-used eviction
+  for the backend's sessions. *Exit:* the estimate of each part within a stated margin of the counted heap
+  (`benchmarks/session-memory`); `release` changes no snapshot; after a recycle the worker's linear memory is what the
+  session holds plus the engine, not the old peak; an evicted backend session is answered as unknown.
 - **H1 — scene first, engine on demand** (item 5), independent of R1 to R5 (it may move into an ADR of its own; neither
   blocks the other): the backend sends the scene and the lean
   layout state; the playground's split mode renders before the WASM engine has loaded and starts it at the first local

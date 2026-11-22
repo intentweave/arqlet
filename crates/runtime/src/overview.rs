@@ -420,6 +420,18 @@ pub struct OverviewSession {
 }
 
 impl OverviewSession {
+    /// The heap the overview session holds: its graph, the graph with its groups and the last answer (estimated, see
+    /// `crate::memory`).
+    pub fn heap_estimate(&self) -> usize {
+        self.graph.as_ref().map_or(0, crate::memory::graph)
+            + self.hierarchy.as_ref().map_or(0, |(options, graph, _)| {
+                crate::memory::value(options) + crate::memory::graph(graph)
+            })
+            + self.last.as_ref().map_or(0, |(a, b)| {
+                crate::memory::value(a) + crate::memory::value(b)
+            })
+    }
+
     /// Whether the session has a graph for an overview.
     pub fn is_open(&self) -> bool {
         self.graph.is_some()

@@ -98,7 +98,7 @@ pub unsafe extern "C" fn lw_session_run(id: u32, ptr: *const u8, len: usize) -> 
     let bytes = std::slice::from_raw_parts(ptr, len);
     let result = match std::str::from_utf8(bytes) {
         Ok(text) => SESSIONS.with(|s| match s.borrow_mut().1.get_mut(&id) {
-            Some(session) => session.run(text),
+            Some(session) => with_heap(text, session.run(text)),
             None => "{\"ok\":false,\"error\":\"Unknown session\"}".into(),
         }),
         Err(_) => "{\"ok\":false,\"error\":\"Invalid UTF-8\"}".into(),
@@ -147,4 +147,60 @@ pub extern "C" fn lw_session_overview_column(id: u32, index: u32) -> u64 {
         let (ptr, _) = column.raw();
         ((column.bytes() as u64) << 32) | (ptr as u64 & 0xffffffff)
     })
+}
+
+/// Provisional (ADR 0023, R7): the heap bytes the module has allocated and not freed, counted by a wrapper around the
+/// system allocator (one addition per allocation; it changes no result).
+struct Counting;
+static LIVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+unsafe impl std::alloc::GlobalAlloc for Counting {
+    unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
+        let p = std::alloc::System.alloc(layout);
+        if !p.is_null() {
+            LIVE.fetch_add(layout.size(), std::sync::atomic::Ordering::Relaxed);
+        }
+        p
+    }
+    unsafe fn dealloc(&self, p: *mut u8, layout: std::alloc::Layout) {
+        std::alloc::System.dealloc(p, layout);
+        LIVE.fetch_sub(layout.size(), std::sync::atomic::Ordering::Relaxed);
+    }
+    unsafe fn realloc(&self, p: *mut u8, layout: std::alloc::Layout, size: usize) -> *mut u8 {
+        let q = std::alloc::System.realloc(p, layout, size);
+        if !q.is_null() {
+            if size >= layout.size() {
+                LIVE.fetch_add(size - layout.size(), std::sync::atomic::Ordering::Relaxed);
+            } else {
+                LIVE.fetch_sub(layout.size() - size, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+        q
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: Counting = Counting;
+
+/// The answer to a session's `memory` or `release` with what only the module knows: the live heap of the whole module
+/// (every session and the answer being written) and the size of its linear memory, which WebAssembly never gives back.
+fn with_heap(request: &str, answer: String) -> String {
+    if !(request.contains("\"memory\"") || request.contains("\"release\""))
+        || !answer.contains("\"estimated\":true")
+        || !answer.ends_with('}')
+    {
+        return answer;
+    }
+    let live = LIVE.load(std::sync::atomic::Ordering::Relaxed);
+    #[cfg(target_arch = "wasm32")]
+    let linear = format!(
+        ",\"linearMemoryBytes\":{}",
+        core::arch::wasm32::memory_size(0) as u64 * 65_536
+    );
+    #[cfg(not(target_arch = "wasm32"))]
+    let linear = String::new();
+    let mut out = answer;
+    out.pop();
+    out.push_str(&format!(",\"heapBytes\":{live}{linear}}}"));
+    out
 }

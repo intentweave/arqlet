@@ -275,6 +275,25 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
       return call({op: 'changesSince', sequence});
     },
 
+    /**
+     * Provisional (ADR 0023, R7, read only): what the session holds, part by part, in estimated heap bytes (`parts`,
+     * `total`, `perNode`); from the WASM engine also the module's live heap (`heapBytes`) and its linear memory
+     * (`linearMemoryBytes`), which WebAssembly never gives back (only a new worker does).
+     */
+    async memory() {
+      if (!resident) return {ok: false, error: 'memory needs a resident session'};
+      return call({op: 'memory'});
+    },
+
+    /**
+     * Provisional (ADR 0023, R7): gives parts back: `content` (all, or only `keys`), `changeLog` (a replica behind it then
+     * resyncs), `columns`, `overview`. The snapshot stays; the answer is `memory` after it, with `released`.
+     */
+    release(parts, {keys} = {}) {
+      if (!resident) return Promise.resolve({ok: false, error: 'release needs a resident session'});
+      return enqueue(() => call({op: 'release', parts, ...(keys ? {keys} : {})}));
+    },
+
     /** Provisional (ADR 0023, R2, read only): the whole content and the log's sequence, for a replica that resyncs. */
     async content() {
       if (!resident) return {ok: false, error: 'content needs a resident session'};

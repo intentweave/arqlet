@@ -70,6 +70,8 @@ mod local_edit_large;
 mod membership_hulls;
 #[path = "memberships.rs"]
 mod memberships;
+#[path = "memory_release.rs"]
+mod memory_release;
 #[path = "move_gesture.rs"]
 mod move_gesture;
 #[path = "move_only.rs"]
