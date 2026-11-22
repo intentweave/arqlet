@@ -71,3 +71,29 @@ A dhat profile of the import from a typed graph (release with line tables, `--fe
 Single blocks of 26 to 28 MB point to tables that grow with the square of the segments of a channel, and two of them
 are alive twice at the same time (through `chains` and through `completion`); the plan is cloned. These are the
 candidates for a layout change that lowers the peak; none of them is changed here.
+
+## First layout changes against the peak (2026-11-22)
+
+Two changes that leave the output byte-identical (refinement fingerprints of the 15 views at limit 100, threads 1 and
+4, identical to `main` on the same inputs):
+
+- The joint coordination's bends and the continuity lanes are given the room they need at once (`reserve_exact`)
+  instead of growing by doubling; several such summaries are alive at a time.
+- A channel's ordering preferences (`dependencies`, which grow with the square of a channel's assignments) and its broken
+  ones are shared (`Arc<[_]>`) instead of copied: the planning caches a channel and hands it out again, so the cache and
+  the plan held two copies of the largest list.
+
+| Graph | Peak before | Peak after |
+|---|---|---|
+| 22 819 nodes (38 boxes, 701 routes) | 68.8 MB | 67.1 MB |
+| 114 196 nodes (100 boxes, 4 160 routes) | 864.2 MB | 776.6 MB (−10 %) |
+
+Measured with `benchmarks/session-memory` (counted heap, so not affected by the machine's load) on the revision of
+`main` with the byte limit for backend sessions (e120c23) and with these changes.
+
+The remaining peak by module (dhat, 114k graph, before these changes): `abstract_routing` 145 MB, `layered_plan` 118 MB,
+`continuity` 108 MB, `placement_geometry` 104 MB, `joint` 87 MB, `placement_structure` 56 MB. The same pattern recurs in
+the memos of placement (`placement_geometry::Memo`, `placement_order::Memo`, `placement_structure`) and of the planning
+(`ordinal`): each keeps a copy of its inputs as the key and a copy of its result beside the one handed out. Sharing them
+needs the consumers to hold shared values too (the placement moves the parts of a cross plan into cells of its own), so it
+is a refactor of its own, measured the same way.

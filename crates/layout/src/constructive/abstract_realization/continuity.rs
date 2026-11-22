@@ -300,6 +300,9 @@ pub(super) fn assign(
         return Err("Nonfinite longitudinal capacity witness".into());
     }
     summary.capacity_witnesses = witnesses;
+    // One lane per reservation: the room for all of them at once instead of growing by doubling (a large view holds
+    // several of these summaries at a time).
+    summary.lanes.reserve_exact(reservations.len());
     for (i, r) in reservations.iter().enumerate() {
         summary.lanes.push(LaneReservation {
             edge: r.edge.clone(),
