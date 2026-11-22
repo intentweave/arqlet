@@ -80,6 +80,38 @@ pub fn group_hull(boxes: &[Rect], padding: f64) -> Vec<Point> {
     convex_hull(&corners)
 }
 
+/// The rectangle of a group: the bounding box of its members' boxes grown by `padding`, as a counter-clockwise polygon of
+/// four points, so every query here (containment, overlap) treats it like any other hull. Empty when the group has no box.
+pub fn group_rectangle(boxes: &[Rect], padding: f64) -> Vec<Point> {
+    let Some(first) = boxes.first() else {
+        return Vec::new();
+    };
+    let (mut x0, mut y0) = (first.x, first.y);
+    let (mut x1, mut y1) = (first.x + first.width, first.y + first.height);
+    for r in &boxes[1..] {
+        x0 = x0.min(r.x);
+        y0 = y0.min(r.y);
+        x1 = x1.max(r.x + r.width);
+        y1 = y1.max(r.y + r.height);
+    }
+    let bounds = Rect {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+    };
+    // Through the convex hull, so the orientation and the order of the corners are those of every other hull.
+    convex_hull(&padded_corners(&bounds, padding))
+}
+
+/// The hull of a group in the given shape.
+pub fn group_shape(boxes: &[Rect], padding: f64, shape: arqlet_model::HullShape) -> Vec<Point> {
+    match shape {
+        arqlet_model::HullShape::Rectangle => group_rectangle(boxes, padding),
+        arqlet_model::HullShape::Polygon => group_hull(boxes, padding),
+    }
+}
+
 /// Whether `point` lies inside the polygon `hull` (ray casting; a point on the border counts as inside). A hull of fewer
 /// than three points encloses nothing.
 pub fn contains(hull: &[Point], point: &Point) -> bool {
@@ -150,6 +182,34 @@ mod tests {
             width: 10.,
             height: 10.,
         }
+    }
+
+    #[test]
+    fn the_rectangle_is_the_padded_bounding_box_and_turns_like_every_hull() {
+        let boxes = [rect(0., 0.), rect(100., 30.), rect(40., 80.)];
+        let r = group_rectangle(&boxes, 5.);
+        assert_eq!(r.len(), 4, "a rectangle has four corners: {r:?}");
+        let xs: Vec<f64> = r.iter().map(|p| p.x).collect();
+        let ys: Vec<f64> = r.iter().map(|p| p.y).collect();
+        assert_eq!(xs.iter().cloned().fold(f64::MAX, f64::min), -5.);
+        assert_eq!(xs.iter().cloned().fold(f64::MIN, f64::max), 115.);
+        assert_eq!(ys.iter().cloned().fold(f64::MAX, f64::min), -5.);
+        assert_eq!(ys.iter().cloned().fold(f64::MIN, f64::max), 95.);
+        // Every edge is axis-parallel.
+        for i in 0..4 {
+            let (a, b) = (&r[i], &r[(i + 1) % 4]);
+            assert!(
+                a.x == b.x || a.y == b.y,
+                "edge {a:?} → {b:?} is not axis-parallel"
+            );
+        }
+        // The same orientation as the convex hull, so containment and overlap work on it unchanged.
+        let polygon = group_hull(&boxes, 5.);
+        assert!(contains(&r, &centre(&rect(40., 80.))));
+        assert!(overlap(&r, &polygon));
+        // The rectangle encloses the convex hull: it is never the tighter of the two.
+        assert!(polygon.iter().all(|p| contains(&r, p)));
+        assert!(group_rectangle(&[], 5.).is_empty());
     }
 
     #[test]

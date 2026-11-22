@@ -23,7 +23,7 @@ path = "tests/all.rs"
 benchmark-timings = ["arqlet-layout/benchmark-timings"]
 # The operation `query` (ADR 0021, M5b; provisional). Off by default. The query crates are `publish = false` for now, so
 # this crate cannot be published with the feature declared until they are published (a release step, docs/releasing.md).
-query = ["dep:arqlet-query", "dep:arqlet-query-cypher", "dep:arqlet-query-model"]
+query = ["dep:arqlet-query", "dep:arqlet-query-model", "dep:arqlet-query-json"]
 
 [dependencies]
 arqlet-model = { workspace = true }
@@ -35,8 +35,8 @@ arqlet-view = { workspace = true }
 arqlet-reference = { workspace = true }
 arqlet-elk = { workspace = true }
 arqlet-query = { workspace = true, optional = true }
-arqlet-query-cypher = { workspace = true, optional = true }
 arqlet-query-model = { workspace = true, optional = true }
+arqlet-query-json = { workspace = true, optional = true }
 
 [dev-dependencies]
 arqlet-routing = { workspace = true }
