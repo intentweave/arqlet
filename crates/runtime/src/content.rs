@@ -58,6 +58,23 @@ impl Content {
             next.nodes.clear();
             next.edges.clear();
         }
+        // Keys forgotten on every node and edge (ADR 0023 R7, `release` of content by key).
+        if let Some(keys) = v.get("dropKeys") {
+            let keys = keys
+                .as_array()
+                .ok_or("payload dropKeys must be a list of keys")?
+                .iter()
+                .map(|k| k.as_str().ok_or("payload keys are strings"))
+                .collect::<Result<Vec<&str>, _>>()?;
+            for table in [&mut next.nodes, &mut next.edges] {
+                for properties in table.values_mut() {
+                    for key in &keys {
+                        changed |= properties.remove(*key).is_some();
+                    }
+                }
+                table.retain(|_, properties| !properties.is_empty());
+            }
+        }
         for (part, table) in [("nodes", &mut next.nodes), ("edges", &mut next.edges)] {
             if let Some(set) = v.get("set").and_then(|s| s.get(part)) {
                 let set = set

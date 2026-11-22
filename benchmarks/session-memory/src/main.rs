@@ -110,6 +110,15 @@ fn main() {
     let request_bytes = request.len();
     drop(request);
 
+    // The session's own estimate (`memory`, ADR 0023 R7) against the counted heap it keeps.
+    let estimate = |session: &mut arqlet_runtime::engine_session::EngineSession| {
+        let m = session.run_value(&serde_json::json!({"op": "memory"}));
+        m["total"].as_u64().unwrap_or(0) as usize
+    };
+    let estimated_after_import = estimate(&mut session);
+    if std::env::var_os("SESSION_MEMORY_PARTS").is_some() {
+        println!("memory parts: {}", session.run_value(&serde_json::json!({"op": "memory"}))["parts"]);
+    }
     // Content (ADR 0023, R1): with SESSION_MEMORY_KEYS=n, n properties per node (a string, an integer, a float, …) set in
     // one payload; the heap the session keeps for them.
     let keys: usize = std::env::var("SESSION_MEMORY_KEYS").ok().and_then(|k| k.parse().ok()).unwrap_or(0);
@@ -142,6 +151,7 @@ fn main() {
     } else {
         None
     };
+    let estimated_now = estimate(&mut session);
     // The parts, each measured as the heap a copy of it takes (a shared Arc counted once).
     let s = session.snapshot().expect("a snapshot");
     let (_a, source) = kept(|| s.source_graph.as_deref().cloned());
@@ -156,6 +166,30 @@ fn main() {
     let (_f, structure_view) = kept(|| structure.map(|st| (*st.view).clone()));
     let (_g, index) = kept(|| structure.map(|st| (*st.index).clone()));
     let key = structure.map_or(0, |st| st.key.capacity());
+    if std::env::var_os("SESSION_MEMORY_PARTS").is_some() {
+        if let Some(st) = structure {
+            let i = &st.index;
+            let keys: usize = i.node.keys().map(|k| k.capacity()).sum();
+            println!(
+                "index: {} ids (key bytes {}), parent cap {}, container cap {}, ends cap {} (len {})",
+                i.node.len(), keys, i.parent.capacity(), i.container.capacity(), i.ends.capacity(), i.ends.len()
+            );
+            let (_m, map_only) = kept(|| i.node.clone());
+            let (_e, ends_only) = kept(|| i.ends.clone());
+            println!("index map copy {} · ends copy {}", mb(map_only), mb(ends_only));
+            let (_w, whole) = kept(|| (**i).clone());
+            println!("index whole copy {}", mb(whole));
+            if let Ok(serde_json::Value::Object(fields)) = serde_json::to_value(s) {
+                let mut sizes: Vec<(String, usize)> = fields
+                    .iter()
+                    .filter(|(k, _)| !matches!(k.as_str(), "sourceGraph" | "graph"))
+                    .map(|(k, v)| (k.clone(), v.to_string().len()))
+                    .collect();
+                sizes.sort_by(|a, b| b.1.cmp(&a.1));
+                println!("snapshot fields by JSON length: {:?}", &sizes[..sizes.len().min(8)]);
+            }
+        }
+    }
     let (_h, rest) = kept(|| {
         let mut copy = s.clone();
         copy.source_graph = None;
@@ -190,6 +224,20 @@ fn main() {
     println!("request text: {} ({})", mb(request_bytes), per(request_bytes));
     println!("the graph as a serde_json::Value (for comparison): {} ({})", mb(graph_bytes), per(graph_bytes));
     println!("session kept after the import: {} ({})", mb(session_kept), per(session_kept));
+    println!(
+        "the session's estimate (memory) after the import: {} ({:.0} % of the counted)",
+        mb(estimated_after_import),
+        100.0 * estimated_after_import as f64 / session_kept.max(1) as f64
+    );
+    if let Some(bytes) = content_kept {
+        let counted = session_kept + bytes;
+        println!(
+            "with the content: estimate {} against counted {} ({:.0} %)",
+            mb(estimated_now),
+            mb(counted),
+            100.0 * estimated_now as f64 / counted.max(1) as f64
+        );
+    }
     println!("peak during the import, above the request text: {} ({})", mb(peak), per(peak));
     println!("phase peaks: parse {} · validate {} · index {} · import (with a copy of the graph, {}) {}",
         mb(parse), mb(validate), mb(index), mb(graph_copy), mb(import));
