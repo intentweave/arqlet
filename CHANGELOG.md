@@ -7,6 +7,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- A query field in the playground (provisional, ADR 0021): an openCypher query over the source graph and its content,
+  run by the engine's `query` in every mode; the rows are listed, a row with a node focuses it, and "Select all" selects
+  the boxes that show the nodes the answer names. The engine in the published npm package is built without `query`.
 - A grouping priority (provisional, ADR 0022 M1): `groupingPriority` ranks the structures a view shows — the parent
   hierarchy (`parent`) and membership dimensions. The first criterion that assigns a node owns it, as its container in
   the view (`membership:<dimension>/<group>`); `values` decide which group of a multi-valued dimension owns a node in

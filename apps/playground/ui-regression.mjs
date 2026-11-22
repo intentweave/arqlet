@@ -166,6 +166,22 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
   assert.equal(opened.ok,true,JSON.stringify(opened));
   assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'the bookmark restores the view');
   console.log('Search, focus and bookmarks passed: a hidden node found, focused, and a kept view opened again.');
+  // Query (provisional, the engine's `query`): a node found by id lists its row, "Select all" selects the box that shows
+  // it, and a click on the row focuses it.
+  get('query-text').value=`MATCH (n) WHERE n.id = ${JSON.stringify(leaf).replace(/"/g,"'")} RETURN n.label, n`;
+  await get('query-run').onclick();await settle();
+  const answer=get('query-results');
+  assert.match(answer.children[0]?.textContent??'',/^1 row: n\.label · n/,answer.children.map(c=>c.textContent).join(' | '));
+  const selectAll=answer.children.find(b=>b.textContent.startsWith('Select all'));
+  assert.ok(selectAll,`the answer offers to select its boxes: ${answer.children.map(c=>c.textContent).join(' | ')}`);
+  await selectAll.onclick();
+  const row=answer.children.find(b=>b.textContent.startsWith(label));
+  assert.ok(row&&!row.disabled,`the row names the node: ${answer.children.map(c=>c.textContent).join(' | ')}`);
+  await row.onclick();await settle();
+  assert.equal(runInNewContext('selected',context),leaf,'a click on the row focuses the node');
+  get('query-text').value='MATCH (n RETURN n';await get('query-run').onclick();await settle();
+  assert.match(get('query-results').textContent,/^Not run: query syntax/,get('query-results').textContent);
+  console.log('Query passed: a node found by id, its box selected and focused; a syntax error reported.');
   // Keyboard navigation: from the focused node Shift+Up goes to its container, Shift+Down back to a child.
   const keys=listeners.keydown??[];
   const press=async(key,shiftKey=false)=>{for(const l of keys)await l({key,shiftKey,target:{tagName:'DIV'},preventDefault(){}});await settle();};

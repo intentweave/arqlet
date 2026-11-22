@@ -197,6 +197,9 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
  <label for="search-query">Find</label>
  <div class="row"><input id="search-query" type="search" placeholder="name or id, also hidden ones"><button id="search">Find</button></div>
  <div id="search-results" class="search-results" role="list"></div>
+ <label for="query-text">Query <small>(openCypher, experimental)</small></label>
+ <div class="row"><input id="query-text" type="search" placeholder="MATCH (a)-[r]->(b) RETURN a, b LIMIT 20"><button id="query-run">Run</button></div>
+ <div id="query-results" class="search-results" role="list"></div>
 </div></details>
 
 <details class="section" open><summary>Filter</summary><div class="body">
