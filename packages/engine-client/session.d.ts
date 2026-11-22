@@ -45,6 +45,20 @@ export interface PayloadChange {
   expectedContentRevision?: number;
 }
 
+/** Provisional (ADR 0023, R7): what a session holds, in estimated heap bytes per part. */
+export interface SessionMemory {
+  ok: true;
+  estimated: true;
+  parts: Record<string, number>;
+  total: number;
+  nodes: number;
+  perNode: number;
+  /** From the WASM engine: the module's live heap, counted. */
+  heapBytes?: number;
+  /** From the WASM engine: the size of its linear memory, which is never given back. */
+  linearMemoryBytes?: number;
+}
+
 /** Provisional (ADR 0023, R2): one change group: a patch of the structure, a payload of the content, or both. */
 export interface ChangeGroup {
   patch?: GraphPatch;
@@ -77,6 +91,41 @@ export interface PeekAnswer {
 export type DetailTarget = {nodeId: string; edgeId?: never} | {edgeId: string; nodeId?: never};
 
 /** The answer of a read-only request (`trace`, `neighbourhood`): its fields beside `ok: true`, or the error. */
+/** Provisional (ADR 0021, M5b): what a query is given besides its text. */
+export interface QueryInit {
+  /** The values of the `$name` parameters (JSON values; a map is refused). */
+  params?: Record<string, unknown>;
+  /** Also map the answer onto the current view (`shown`); costs a few milliseconds on a large view. */
+  view?: boolean;
+  /** Execution limits (steps of work, rows held, hops of an unbounded `*`). */
+  maxSteps?: number;
+  maxRows?: number;
+  maxHops?: number;
+}
+
+/** A value in a row of a query answer: a JSON value, a node as `{node: id}`, an edge as `{edge: id}`, or a list. */
+export type QueryValue = null | boolean | number | string | {node: string} | {edge: string} | QueryValue[];
+
+/** Provisional (ADR 0021, M5b): the answer of a query. */
+export interface QueryAnswer {
+  columns: string[];
+  rows: QueryValue[][];
+  rowCount: number;
+  /** The ids of the nodes and edges in the rows, once each, in the order they first appear. */
+  nodes: string[];
+  edges: string[];
+  /** What the query could see: the session's source graph (resolved edges only). */
+  graph: {nodes: number; edges: number};
+  /** The content's revision, when the session has content. */
+  contentRevision?: number;
+  /** Content for ids the graph does not have (kept, ignored by the query). */
+  ignoredContent?: number;
+  /** Content values the query layer has no type for (a map), read as null. */
+  skippedValues?: number;
+  /** With `view: true`: the box that shows each node and the drawn line that carries each edge (null when none). */
+  shown?: {nodes: Record<string, string | null>; edges: Record<string, string | null>};
+}
+
 export type ReadAnswer<T> = ({ok: true} & T) | {ok: false; error: string};
 
 /** Provisional: one graph, its current snapshot, and changes applied in order with revision checks. */
@@ -135,6 +184,11 @@ export interface Session {
    */
   find(query: string, init?: {limit?: number; nodeKinds?: string[]; key?: string}): Promise<ReadAnswer<FindAnswer>>;
   /**
+   * Provisional (ADR 0021, M5b; read only): an openCypher query over the session's source graph and its content. Needs an
+   * engine built with the cargo feature `query`; otherwise `{ok: false, error}` says so. See {@link QueryAnswer}.
+   */
+  query(text: string, init?: QueryInit): Promise<ReadAnswer<QueryAnswer>>;
+  /**
    * Provisional (ADR 0023, R1): sets, unsets or clears properties in the session's content (beside the snapshot, never in
    * it). Needs a resident session.
    */
@@ -143,6 +197,15 @@ export interface Session {
   change(group: ChangeGroup): Promise<SessionResult & {sequence?: number; contentRevision?: number}>;
   /** Provisional (ADR 0023, R2): the change groups after `sequence`, or `resync` when the log no longer has them. */
   changesSince(sequence: number): Promise<{ok: true; sequence: number; changes?: Array<ChangeGroup & {sequence: number}>; resync?: true} | {ok: false; error?: string}>;
+  /**
+   * Provisional (ADR 0023, R7): moves a resident session to another engine (a new worker) so that the old one can be
+   * ended and its memory comes back; the view, the content and the change log's number move with it.
+   */
+  recycle(newEngine: Run): Promise<{ok: true; unchanged: true; sequence: number; contentRevision: number} | {ok: false; error?: string; stale?: true}>;
+  /** Provisional (ADR 0023, R7): what the session holds, part by part (estimated), and from WASM the module's heap. */
+  memory(): Promise<SessionMemory | {ok: false; error?: string}>;
+  /** Provisional (ADR 0023, R7): gives parts back; the snapshot stays. */
+  release(parts: Array<'content' | 'changeLog' | 'columns' | 'overview'>, init?: {keys?: string[]}): Promise<(SessionMemory & {released: number}) | {ok: false; error?: string; stale?: true}>;
   /** Provisional (ADR 0023, R2): the whole content and the log's sequence (for a resync). */
   content(): Promise<{ok: true; contentRevision: number; sequence: number; nodes: Record<string, Record<string, unknown>>; edges: Record<string, Record<string, unknown>>} | {ok: false; error?: string}>;
   /** Provisional (read only): a look into a collapsed container without opening it. */

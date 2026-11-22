@@ -6,7 +6,7 @@
 use serde_json::{json, Value};
 use std::collections::VecDeque;
 
-/// How many groups and how many bytes (of their JSON) the log keeps at most.
+/// How many groups and how many bytes of heap (estimated, see `crate::memory`) the log keeps at most.
 pub const MAX_GROUPS: usize = 1_000;
 pub const MAX_BYTES: usize = 16 << 20;
 
@@ -36,7 +36,14 @@ impl ChangeLog {
             .sequence
             .checked_add(1)
             .ok_or("Change sequence overflow")?;
-        let bytes = change.to_string().len();
+        // Bounded by the heap the group holds (estimated), not by its JSON text: a value takes several times its text.
+        let bytes = crate::memory::value(&change);
+        // A group larger than the whole log (a bulk load of content) is not kept twice: the log forgets everything up to
+        // it, so a replica behind it resyncs (takes the snapshot and the content) instead.
+        if bytes > MAX_BYTES {
+            self.clear();
+            return Ok(self.sequence);
+        }
         self.groups.push_back(Group {
             sequence: self.sequence,
             change,
@@ -52,9 +59,30 @@ impl ChangeLog {
         Ok(self.sequence)
     }
 
+    /// The heap the log holds (estimated, see `crate::memory`).
+    pub fn heap_estimate(&self) -> usize {
+        self.groups.capacity() * std::mem::size_of::<Group>()
+            + self
+                .groups
+                .iter()
+                .map(|g| crate::memory::value(&g.change))
+                .sum::<usize>()
+    }
+
+    /// An empty log that goes on from `sequence` (a recycled engine): changes up to it are not in the log, so a replica
+    /// behind it resyncs.
+    pub fn starting_at(sequence: u64) -> Self {
+        ChangeLog {
+            sequence,
+            cleared_at: sequence,
+            ..Default::default()
+        }
+    }
+
     /// Forgets every group (a new graph: a replica has to resync); the sequence goes on.
     pub fn clear(&mut self) {
-        self.groups.clear();
+        // A new list, so that the room of the old one is given back too.
+        self.groups = VecDeque::new();
         self.bytes = 0;
         self.cleared_at = self.sequence;
     }

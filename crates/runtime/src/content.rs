@@ -26,6 +26,25 @@ pub struct Content {
 }
 
 impl Content {
+    /// The content as a `content` request answers it (`contentRevision`, `nodes`, `edges`), for a recycled engine.
+    pub fn from_answer(v: &Value) -> Result<Content, String> {
+        let table = |part: &str| -> Result<Properties, String> {
+            match v.get(part) {
+                None | Some(Value::Null) => Ok(Properties::new()),
+                Some(t) => serde_json::from_value(t.clone())
+                    .map_err(|e| format!("load content.{part}: {e}")),
+            }
+        };
+        Ok(Content {
+            revision: v
+                .get("contentRevision")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+            nodes: table("nodes")?,
+            edges: table("edges")?,
+        })
+    }
+
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.edges.is_empty()
     }
@@ -57,6 +76,23 @@ impl Content {
             changed |= !next.is_empty();
             next.nodes.clear();
             next.edges.clear();
+        }
+        // Keys forgotten on every node and edge (ADR 0023 R7, `release` of content by key).
+        if let Some(keys) = v.get("dropKeys") {
+            let keys = keys
+                .as_array()
+                .ok_or("payload dropKeys must be a list of keys")?
+                .iter()
+                .map(|k| k.as_str().ok_or("payload keys are strings"))
+                .collect::<Result<Vec<&str>, _>>()?;
+            for table in [&mut next.nodes, &mut next.edges] {
+                for properties in table.values_mut() {
+                    for key in &keys {
+                        changed |= properties.remove(*key).is_some();
+                    }
+                }
+                table.retain(|_, properties| !properties.is_empty());
+            }
         }
         for (part, table) in [("nodes", &mut next.nodes), ("edges", &mut next.edges)] {
             if let Some(set) = v.get("set").and_then(|s| s.get(part)) {

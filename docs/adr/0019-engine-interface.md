@@ -128,8 +128,9 @@ Each step keeps every existing test and the stored refinement fingerprints, and 
    snapshot as before). The backend keeps sessions too (2026-11-12): `layout-command --sessions`
    is one long-running process with one JSON message per line; the playground backend serves it at `/api/session` with
    random keys, one message at a time, a time limit per message (it restarts the process; the sessions are lost and
-   answered as unknown) and at most 32 sessions; `httpRun` is its `run` in JavaScript. Open: a size limit in bytes for
-   the sessions; deltas instead of whole scenes.
+   answered as unknown) and at most 32 sessions; `httpRun` is its `run` in JavaScript. A size limit in bytes for the
+   sessions with least-recently-used eviction followed with ADR 0023 R7 (`--session-bytes`). Open: deltas instead of whole
+   scenes.
    *Prepared source (2026-11-18):* the snapshot shares its source graph (`Arc<Graph>`) and keeps the view's structure
    (`Snapshot.structure`, not serialized: groups, communities and rests, keyed by the source and the options they depend
    on), so a session's toggle does not copy, structure and validate the whole source again; at 1 000 000 nodes 8.5 s →

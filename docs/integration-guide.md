@@ -166,7 +166,22 @@ step each, in every mode.
   (it cannot be interrupted from outside); its result is dropped if it no longer fits.
 - Output is identical for any thread count (`threads` on refinement) and on every platform.
 
-## 9. Checklist
+## 9. Memory
+
+A resident session answers what it holds (`session.memory()`: its parts in estimated heap bytes; from the WASM engine
+also the live heap and the linear memory) and gives parts back (`session.release(['content'], {keys})`, `changeLog`,
+`columns`, `overview`; the view stays). WebAssembly never shrinks its linear memory: after a large import or layout, the
+worker keeps that high-water mark until it ends. `session.recycle(newEngine)` moves the session to a new engine (the
+view, the content and the change log's number), after which the host ends the old worker; the engines give identical
+results, so nothing changes in the view (provisional, ADR 0023 step R7):
+
+```js
+const next = createEngineWorker();
+await session.recycle(workerRun(next));   // the session now lives in `next`
+oldWorker.terminate();                    // its high-water mark goes with it
+```
+
+## 10. Checklist
 
 - Every result you apply carries the revision it was computed for; you compare before applying.
 - Every operation goes through the engine (`dispatch` or a session), so it runs in all three modes.

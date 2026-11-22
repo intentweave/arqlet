@@ -8,10 +8,9 @@
 //! - `{"request": {…}}` → `dispatch`, without a session.
 //!
 //! The host serializes the messages, bounds their time and the number of sessions, and restarts the process if it has
-//! to (the sessions are lost then).
-use arqlet_runtime::engine_session::EngineSession;
+//! to (the sessions are lost then). With `--session-bytes N` the process drops the least recently used sessions while the
+//! sessions together weigh more than `N` bytes (estimated); a message to a dropped one is answered as an unknown session.
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
 use std::io::{self, BufRead, Read, Write};
 
 fn main() {
@@ -32,8 +31,15 @@ fn main() {
 }
 
 fn sessions() {
-    let mut open: BTreeMap<u64, EngineSession> = BTreeMap::new();
-    let mut next = 0u64;
+    // Provisional (ADR 0023, R7): `--session-bytes N` limits the sessions' weight together; the least recently used ones
+    // are dropped beyond it (and answered as unknown afterwards).
+    let args: Vec<String> = std::env::args().collect();
+    let limit = args
+        .iter()
+        .position(|a| a == "--session-bytes")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|n| n.parse::<usize>().ok());
+    let mut store = arqlet_runtime::session_store::SessionStore::with_limit(limit);
     let stdout = io::stdout();
     for line in io::stdin().lock().lines() {
         let Ok(line) = line else { break };
@@ -42,26 +48,7 @@ fn sessions() {
         }
         let answer = match serde_json::from_str::<Value>(&line) {
             Err(e) => json!({"ok": false, "error": e.to_string()}).to_string(),
-            Ok(message) => match &message["session"] {
-                Value::String(s) if s == "open" => {
-                    next += 1;
-                    open.insert(next, EngineSession::new());
-                    json!({"ok": true, "session": next}).to_string()
-                }
-                Value::Number(n) => match (n.as_u64(), message["close"].as_bool()) {
-                    (Some(id), Some(true)) => {
-                        open.remove(&id);
-                        json!({"ok": true}).to_string()
-                    }
-                    (Some(id), _) => match open.get_mut(&id) {
-                        Some(session) => session.run_value(&message["request"]).to_string(),
-                        None => json!({"ok": false, "error": "Unknown session"}).to_string(),
-                    },
-                    _ => json!({"ok": false, "error": "Invalid session"}).to_string(),
-                },
-                Value::Null => arqlet_runtime::dispatch(&message["request"].to_string()),
-                _ => json!({"ok": false, "error": "Invalid session"}).to_string(),
-            },
+            Ok(message) => store.handle(&message),
         };
         let mut out = stdout.lock();
         if writeln!(out, "{answer}").and_then(|_| out.flush()).is_err() {

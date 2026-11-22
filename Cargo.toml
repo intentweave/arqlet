@@ -16,6 +16,10 @@ members = [
     "crates/arqlet",
     "crates/query",
     "crates/query-cypher",
+    "crates/query-model",
+    "crates/query-cli",
+    "crates/query-json",
+    "crates/query-wasm",
 ]
 
 [workspace.package]
@@ -43,6 +47,8 @@ arqlet-runtime = { path = "crates/runtime", version = "=0.7.0" }
 # The query layer (ADR 0021): provisional, not published yet (`publish = false`).
 arqlet-query = { path = "crates/query", version = "=0.7.0" }
 arqlet-query-cypher = { path = "crates/query-cypher", version = "=0.7.0" }
+arqlet-query-model = { path = "crates/query-model", version = "=0.7.0" }
+arqlet-query-json = { path = "crates/query-json", version = "=0.7.0" }
 
 [profile.release]
 lto = "thin"

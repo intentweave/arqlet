@@ -78,10 +78,60 @@ impl EngineSession {
         if let Some(answer) = self.import_text(input) {
             return answer.to_string();
         }
+        if let Some(answer) = self.load_text(input) {
+            return answer.to_string();
+        }
         match serde_json::from_str::<Value>(input) {
             Ok(v) => self.run_value(&v).to_string(),
             Err(e) => json!({"ok": false, "error": e.to_string()}).to_string(),
         }
+    }
+
+    /// `run` for a well-formed `load`: the snapshot read straight into its type, without a JSON value of it (a recycled
+    /// engine receives a whole snapshot; the value would take several times its memory and stay as WASM's high-water
+    /// mark). The same as the general way; anything this reading refuses goes the general way.
+    fn load_text(&mut self, input: &str) -> Option<Value> {
+        #[derive(serde::Deserialize)]
+        struct LoadText {
+            op: String,
+            snapshot: Snapshot,
+            content: Option<Value>,
+            sequence: Option<u64>,
+            scene: Option<Value>,
+        }
+        if !input.contains("\"load\"") {
+            return None;
+        }
+        let mut load: LoadText = serde_json::from_str(input).ok()?;
+        if load.op != "load" {
+            return None;
+        }
+        let content = match load.content.as_ref().filter(|c| !c.is_null()) {
+            Some(c) => Some(crate::content::Content::from_answer(c).ok()?),
+            None => None,
+        };
+        // Read from text, lists grow by doubling; the snapshot is kept, so they are trimmed.
+        load.snapshot.graph.shrink_to_fit();
+        if let Some(source) = load.snapshot.source_graph.take() {
+            let mut source =
+                std::sync::Arc::try_unwrap(source).unwrap_or_else(|shared| (*shared).clone());
+            source.shrink_to_fit();
+            load.snapshot.source_graph = Some(std::sync::Arc::new(source));
+        }
+        self.snapshot = Some(load.snapshot);
+        self.columns = None;
+        if let Some(content) = content {
+            self.content = content;
+        }
+        match load.sequence {
+            Some(sequence) => self.log = crate::changes::ChangeLog::starting_at(sequence),
+            None => self.log.clear(),
+        }
+        let with_scene = load.scene.as_ref().and_then(Value::as_bool) != Some(false);
+        Some(match self.summary(with_scene) {
+            Ok(answer) => answer,
+            Err(error) => json!({"ok": false, "error": error}),
+        })
     }
 
     /// `run` for a well-formed `import` without `timings`: the request read straight into its types.
@@ -165,15 +215,30 @@ impl EngineSession {
                 let since = v["sequence"].as_u64().ok_or("Missing sequence")?;
                 Ok(self.log.since(since))
             }
+            // Provisional (ADR 0023, R7): what the session holds, part by part, and giving parts back.
+            Some("memory") => Ok(self.memory()),
+            Some("release") => self.release(v),
             // The whole content, for a replica that resyncs.
             Some("content") => Ok(json!({"ok": true, "contentRevision": self.content.revision,
                 "sequence": self.log.sequence, "nodes": self.content.nodes, "edges": self.content.edges})),
             Some("load") => {
                 let snapshot: Snapshot =
                     serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
+                // Provisional (ADR 0023, R7): a recycled engine takes over the content as it was (with its revision) and
+                // the change log's number; the log's groups stay behind, so a replica behind that number resyncs.
+                let content = match v.get("content").filter(|c| !c.is_null()) {
+                    Some(c) => Some(crate::content::Content::from_answer(c)?),
+                    None => None,
+                };
                 self.snapshot = Some(snapshot);
                 self.columns = None;
-                self.log.clear();
+                if let Some(content) = content {
+                    self.content = content;
+                }
+                match v.get("sequence").and_then(Value::as_u64) {
+                    Some(sequence) => self.log = crate::changes::ChangeLog::starting_at(sequence),
+                    None => self.log.clear(),
+                }
                 self.summary(with_scene)
             }
             // Provisional (ADR 0019, step 4): the scene as columns. The answer describes them (versions, id tables,
@@ -212,6 +277,8 @@ impl EngineSession {
             }
             Some("find") => crate::find::find_on_with(self.current()?, v, Some(&self.content)),
             Some("peek") => crate::peek::peek_on(self.current()?, v),
+            // Provisional (ADR 0021, M5b): a query over the source graph and the session's content.
+            Some("query") => crate::query::query_on(self.current()?, Some(&self.content), v),
             Some("digest") => Ok(crate::find::digest_on(self.current()?)),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))
@@ -224,6 +291,133 @@ impl EngineSession {
             // Everything that does not read the session's view.
             _ => serde_json::from_str(&crate::dispatch(&v.to_string())).map_err(|e| e.to_string()),
         }
+    }
+
+    /// What the session holds in heap bytes, estimated cheaply (no JSON text of any part): the source graph, the structure's
+    /// view and index, the view graph, boxes, routes, content, change log, columns and overview, without the layered plans
+    /// and the rest of the snapshot. For a store that weighs its sessions after every message (`SessionStore`).
+    pub fn heap_estimate(&self) -> usize {
+        use crate::memory;
+        let mut total = memory::properties(&self.content.nodes)
+            + memory::properties(&self.content.edges)
+            + self.log.heap_estimate()
+            + self.columns.as_ref().map_or(0, memory::columns)
+            + self.overview.heap_estimate();
+        if let Some(s) = &self.snapshot {
+            let source = s.source_graph.as_deref().unwrap_or(&s.graph);
+            total += memory::graph(source)
+                + memory::boxes(&s.boxes)
+                + memory::routes(&s.routes, s.routes.capacity());
+            if s.source_graph.is_some() {
+                total += memory::graph(&s.graph);
+            }
+            if let Some(structure) = &s.structure {
+                let shared = s
+                    .source_graph
+                    .as_ref()
+                    .is_some_and(|src| std::sync::Arc::ptr_eq(src, &structure.view));
+                if !shared {
+                    total += memory::graph(&structure.view);
+                }
+                total += memory::index(&structure.index);
+            }
+        }
+        total
+    }
+
+    /// What the session holds, part by part, in heap bytes estimated from sizes and lengths (`crate::memory`); a shared
+    /// part is counted once. `nodes` is the source graph's node count, `perNode` the total over it.
+    fn memory(&self) -> Value {
+        use crate::memory;
+        let mut parts = serde_json::Map::new();
+        let mut nodes = 0usize;
+        if let Some(s) = &self.snapshot {
+            let source = s.source_graph.as_deref().unwrap_or(&s.graph);
+            nodes = source.nodes.len();
+            parts.insert("sourceGraph".into(), json!(memory::graph(source)));
+            if s.source_graph.is_some() {
+                parts.insert("viewGraph".into(), json!(memory::graph(&s.graph)));
+            }
+            if let Some(structure) = &s.structure {
+                let shared = s
+                    .source_graph
+                    .as_ref()
+                    .is_some_and(|src| std::sync::Arc::ptr_eq(src, &structure.view));
+                if !shared {
+                    parts.insert(
+                        "structureView".into(),
+                        json!(memory::graph(&structure.view)),
+                    );
+                }
+                parts.insert(
+                    "structureIndex".into(),
+                    json!(memory::index(&structure.index)),
+                );
+            }
+            parts.insert("boxes".into(), json!(memory::boxes(&s.boxes)));
+            parts.insert(
+                "routes".into(),
+                json!(memory::routes(&s.routes, s.routes.capacity())),
+            );
+            parts.insert("layeredPlans".into(), json!(memory::layered_plans(s)));
+            parts.insert("snapshotRest".into(), json!(memory::snapshot_rest(s)));
+        }
+        parts.insert(
+            "content".into(),
+            json!(
+                memory::properties(&self.content.nodes) + memory::properties(&self.content.edges)
+            ),
+        );
+        parts.insert("changeLog".into(), json!(self.log.heap_estimate()));
+        parts.insert(
+            "columns".into(),
+            json!(self.columns.as_ref().map_or(0, memory::columns)),
+        );
+        parts.insert("overview".into(), json!(self.overview.heap_estimate()));
+        let total: u64 = parts.values().filter_map(Value::as_u64).sum();
+        json!({"ok": true, "estimated": true, "parts": parts, "total": total, "nodes": nodes,
+            "perNode": if nodes == 0 { 0 } else { total / nodes as u64 }})
+    }
+
+    /// `release`: gives parts back (`parts`: `content`, `changeLog`, `columns`, `overview`; `keys` with `content` forgets
+    /// only those keys). The snapshot stays. Releasing content is a change of the content and goes into the change log.
+    fn release(&mut self, v: &Value) -> Result<Value, String> {
+        let parts: Vec<&str> = v["parts"]
+            .as_array()
+            .ok_or("release needs parts: content, changeLog, columns, overview")?
+            .iter()
+            .map(|p| p.as_str().ok_or("release parts are strings"))
+            .collect::<Result<_, _>>()?;
+        if let Some(unknown) = parts
+            .iter()
+            .find(|p| !matches!(**p, "content" | "changeLog" | "columns" | "overview"))
+        {
+            return Err(format!("release does not know the part {unknown}"));
+        }
+        let before = self.memory()["total"].as_u64().unwrap_or(0);
+        if parts.contains(&"content") {
+            let change = match v.get("keys") {
+                Some(keys) => json!({"dropKeys": keys}),
+                None => json!({"clear": true}),
+            };
+            let revision = self.content.revision;
+            self.content.apply(&change, None)?;
+            if self.content.revision != revision {
+                self.log.push(json!({"payload": change}))?;
+            }
+        }
+        if parts.contains(&"changeLog") {
+            self.log.clear();
+        }
+        if parts.contains(&"columns") {
+            self.columns = None;
+        }
+        if parts.contains(&"overview") {
+            self.overview = Default::default();
+        }
+        let mut answer = self.memory();
+        answer["released"] = json!(before.saturating_sub(answer["total"].as_u64().unwrap_or(0)));
+        Ok(answer)
     }
 
     /// An operation on the session's snapshot, with the session's versions unless the request names its own (then a stale
@@ -253,7 +447,7 @@ impl EngineSession {
             }
         }
         let has_patch = v.get("patch").is_some_and(|p| !p.is_null());
-        let has_payload = ["set", "unset", "clear"]
+        let has_payload = ["set", "unset", "clear", "dropKeys"]
             .iter()
             .any(|k| v.get("payload").and_then(|p| p.get(k)).is_some());
         if !has_patch && !has_payload {
@@ -521,7 +715,7 @@ mod tests {
 /// The part of a `payload` request that a change log keeps and a replica applies: `set`, `unset`, `clear`.
 fn payload_part(v: &Value) -> Value {
     let mut part = json!({});
-    for key in ["set", "unset", "clear"] {
+    for key in ["set", "unset", "clear", "dropKeys"] {
         if let Some(x) = v.get(key) {
             part[key] = x.clone();
         }

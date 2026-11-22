@@ -37,8 +37,8 @@ jobs:
       - run: python benchmarks/generate.py --no-manifest
       - run: python benchmarks/overview/generate.py --nodes 10000 --seed 1 --out benchmarks/datasets/overview-10000.json
       - run: cargo +stable test --workspace --locked
-      - run: cargo +stable build --release -p arqlet-runtime --bin layout-command --locked
-      - run: cargo +stable build -p arqlet-wasm --target wasm32-unknown-unknown --release --locked
+      - run: cargo +stable build --release -p arqlet-runtime --bin layout-command --features query --locked
+      - run: cargo +stable build -p arqlet-wasm --target wasm32-unknown-unknown --release --features query --locked
       - run: node tools/platform-parity.mjs --digest | tee parity-${{ matrix.name }}.txt
       - uses: actions/upload-artifact@v4
         with:
