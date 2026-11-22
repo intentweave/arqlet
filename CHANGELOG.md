@@ -10,6 +10,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - Routing style `octilinear` (#129): the orthogonal route with its corners cut at 45° in the scene, clear of the nodes,
   drawn alike by SVG, both GPU backends, React Flow and the overview; selectable in the containment tree. With the
   metro style it gives a metro-map look.
+- Routing style `curve` (#130): the route pulled taut, then a smooth centripetal Catmull-Rom curve through its points,
+  sampled in the scene; a piece that would come too near a node stays straight. Drawn alike by every renderer;
+  selectable in the containment tree.
 - Appearance (ADR 0026, provisional): one style for every renderer in `@arqlet/viewer/style.js`: a theme of named
   colours (also from CSS custom properties, `--arqlet-…`) and rules with selectors over the data (`edge[kind=import]`,
   `leaf`, `#id`; colours as CSS, `$token` or `auto` by kind). `renderSvg`, the GPU far layer and `toReactFlow`

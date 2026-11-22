@@ -33,7 +33,7 @@ fn candidates(
     let straight_ok = refusal.is_none();
     match requirement {
         RoutingConstraint::Fixed(style) if !style.supported() => Err(format!(
-            "routing style {} is not drawn yet (for {who}); the drawn styles are straight, orthogonal, roundedOrthogonal, polyline, roundedPolyline and octilinear",
+            "routing style {} is not drawn yet (for {who}); the drawn styles are straight, orthogonal, roundedOrthogonal, polyline, roundedPolyline, octilinear and curve",
             style.name()
         )),
         RoutingConstraint::Fixed(RoutingStyle::Straight) => match refusal {
@@ -51,6 +51,7 @@ fn candidates(
                 RoutingStyle::Polyline,
                 RoutingStyle::RoundedPolyline,
                 RoutingStyle::Octilinear,
+                RoutingStyle::Curve,
                 RoutingStyle::Straight,
             ]
             .into_iter()
