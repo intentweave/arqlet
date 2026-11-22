@@ -86,9 +86,11 @@ pub struct Channel {
     pub rank: usize,
     pub assignments: Vec<Assignment>,
     /// Ordering preferences to avoid a departing segment meeting another arriving segment.
-    pub dependencies: Vec<(usize, usize)>,
+    /// Shared, not copied: a channel is cached and handed out again (`planning`), and on a wide channel this list grows
+    /// with the square of its assignments; nothing changes it after the channel is built.
+    pub dependencies: std::sync::Arc<[(usize, usize)]>,
     /// Preferences broken by deterministic cycle removal, not proven infeasibility.
-    pub broken_dependencies: Vec<(usize, usize)>,
+    pub broken_dependencies: std::sync::Arc<[(usize, usize)]>,
     pub order: Vec<usize>,
     /// Conservative abstract interval slots, not a physical width or a lower bound.
     pub tracks: usize,
@@ -471,8 +473,8 @@ pub(super) fn channel(area: String, rank: usize, mut assignments: Vec<Assignment
         area,
         rank,
         assignments,
-        dependencies,
-        broken_dependencies: broken,
+        dependencies: dependencies.into(),
+        broken_dependencies: broken.into(),
         order,
         tracks,
         crossings,
@@ -1062,7 +1064,7 @@ mod tests {
                 .enumerate()
                 .map(|(i, &v)| (v, i))
                 .collect();
-            for &(a, b) in &plan.dependencies {
+            for &(a, b) in plan.dependencies.iter() {
                 assert!(
                     positions[&a] < positions[&b] || plan.broken_dependencies.contains(&(a, b))
                 );

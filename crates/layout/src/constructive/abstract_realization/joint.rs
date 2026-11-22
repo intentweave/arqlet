@@ -996,6 +996,10 @@ pub(super) fn assign(
     let mut result = BTreeMap::new();
     channels.clear();
     let mut channel_of = BTreeMap::<String, BTreeMap<usize, usize>>::new();
+    // A bend per group and one per member: the room for all of them at once instead of growing by doubling.
+    summary
+        .bends
+        .reserve_exact(bends.iter().map(|b| 1 + b.members.len()).sum());
     for (i, b) in bends.iter_mut().enumerate() {
         if !failed.contains_key(&b.reservation.edge) {
             let at = values[i];
