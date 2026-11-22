@@ -199,7 +199,47 @@ Smaller representations lower what is held for good: typed columns for content p
 and interned ids (ADR 0019 §4). The peak of a layout is the layout's own concern; recycling the worker keeps it from
 staying.
 
-### 9. What stays as it is
+### 9. A stateless backend with sessions as a cache
+
+A backend that scales by adding instances should not depend on a session living in one of them. Sessions stay, but as a
+**cache**, not as the truth; the truth is the primary store (item 2) and the view state the client holds.
+
+- **The graph by its content.** A graph is addressed by its digest (`sourceDigest`, `digest`). It is immutable: a change
+  makes a new digest or goes through the change log (item 3). An instance looks the graph up in a local cache first,
+  then in a shared store (any key-value or object store the host runs), and keeps it with its index.
+- **The view state at the client.** The client keeps the lean snapshot of its view (positions, open groups, pages, pins,
+  revisions; no graph; bounded by the view limit) and can hand it in with a request. A bookmark (#79) is smaller but not
+  enough for an exact continuation: incremental layouts depend on where things were, so continuing exactly needs the
+  lean snapshot.
+- **Instances hold sessions as a cache.** The session store of a process (`SessionStore`, with its byte limit and
+  least-recently-used eviction, item 8) keeps the sessions it has; a request for one it does not have (evicted, or another
+  instance answered before) is answered as unknown.
+- **Recovery in the client.** On an unknown session, `engine-client` opens a new one, loads the last lean snapshot with
+  the graph by its digest (and the content, item 1, by the same means), and repeats the request once. With it, routing a
+  client to the same instance ("sticky") is an optimization, not a requirement.
+- **Determinism makes it exact.** Every instance computes the same answer from (graph digest, view state, request), on
+  every platform (`platform-parity`), so a rebuilt session continues exactly where the evicted one was, and answers can
+  be cached by a hash of that triple where a host wants to.
+- **In Node without a child process.** A native adapter (`crates/node`, napi-rs) wraps `dispatch`, the engine session
+  and the session store as the WASM adapter does; long calls run as asynchronous tasks on the thread pool, so the event
+  loop stays free. The answers are bit-identical to WASM and the native binaries.
+
+**Access control.** The scheme works behind authentication and authorization; three rules keep it so:
+
+- **A digest identifies, it never authorizes.** Before an instance serves or loads a graph by its digest, the host checks
+  that the caller may read that graph. Caches are scoped by tenant (the key is tenant and digest), so a digest learned
+  elsewhere opens nothing, and a byte limit per tenant keeps one tenant's sessions from evicting another's.
+- **Content is filtered by key before it reaches a session.** A session, a replica or a query (ADR 0021) loads only the
+  property keys the caller may see; `details`, `find` and queries answer from what was loaded, so they cannot show more.
+  The coverage rule of item 6 counts a key the caller may not see as not covered, and such a query is refused, not run
+  elsewhere.
+- **Client-held view state is untrusted input.** It is checked like any request (revisions; the source graph against its
+  digest, as lean snapshots already are) and it can only shape the caller's own view of a graph the caller may read; it
+  never grants anything. Where the view state is shared between users, the backend signs it (a keyed hash) and refuses
+  one that does not verify. Session keys stay random (as `/api/session` issues them) and are bound to the authenticated
+  user.
+
+### 10. What stays as it is
 
 - `dispatch`, the typed protocol, sessions and their revision checks (ADR 0019).
 - Snapshot operations for hosts that hold the state themselves.
@@ -230,6 +270,15 @@ Each step is useful on its own, behind an option or a new operation, and measure
   for the backend's sessions. *Exit:* the estimate of each part within a stated margin of the counted heap
   (`benchmarks/session-memory`); `release` changes no snapshot; after a recycle the worker's linear memory is what the
   session holds plus the engine, not the old peak; an evicted backend session is answered as unknown.
+- **S1 — a native Node adapter** (`crates/node`, napi-rs, item 9): `dispatch`, the engine session and the session store,
+  asynchronous on the thread pool. *Exit:* the same answers as the WASM engine for the platform-parity requests; a long
+  layout does not block the event loop (a timer fires during it).
+- **S2 — recovery in `engine-client`** (item 9): an unknown session is reopened from the last lean snapshot, the graph by
+  its digest and the content, and the request repeated once. *Exit:* a session evicted between two requests gives the
+  same answers as one that was never evicted (byte for byte); a second failure is reported, not retried forever.
+- **S3 — a graph cache by digest in a backend**, scoped by tenant, with a byte limit per tenant (the playground's server
+  as the example). *Exit:* a request with a digest the caller may not read is refused before any lookup; two tenants'
+  sessions do not evict each other.
 - **H1 — scene first, engine on demand** (item 5), independent of R1 to R5 (it may move into an ADR of its own; neither
   blocks the other): the backend sends the scene and the lean
   layout state; the playground's split mode renders before the WASM engine has loaded and starts it at the first local
@@ -281,5 +330,8 @@ Also measured:
 - A database as the primary, its schema and pushdown (ADR 0021, "Not decided").
 - Which functions update their projections incrementally and which recompute; each decides with the "incremental equals
   recompute" test.
-- Access control on content (which keys a replica may load): a host concern, but the coverage rule of item 6 must respect
-  it.
+- Access control: who may read which graph and which keys is the host's decision (item 9 fixes only how the engine
+  respects it: digests never authorize, content filtered by key before a session sees it, client-held view state
+  untrusted). Signing shared view state and the key it uses are host choices.
+- Whether answers are cached by (graph digest, view state, request) across instances, and where: a host choice that
+  determinism allows (item 9).
