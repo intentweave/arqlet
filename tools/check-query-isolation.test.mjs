@@ -50,6 +50,8 @@ test('the query crates of this workspace are isolated, for the host and for wasm
   assert.deepEqual(violations(), []);
 });
 
-test('the adapter and the tool are among the checked crates', () => {
-  assert.ok(QUERY_CRATES.includes('arqlet-query-model') && QUERY_CRATES.includes('arqlet-query-cli'));
+test('the adapter, the JSON layer, the tool and the module are among the checked crates', () => {
+  for (const crate of ['arqlet-query-model', 'arqlet-query-json', 'arqlet-query-cli', 'arqlet-query-wasm']) {
+    assert.ok(QUERY_CRATES.includes(crate), crate);
+  }
 });

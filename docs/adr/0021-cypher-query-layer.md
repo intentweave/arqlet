@@ -185,7 +185,7 @@ product.
     `arqlet-reference`, `arqlet-runtime`, `arqlet-wasm` and `arqlet`, and fails otherwise. The integration into the
     engine (item 10: `dispatch`, `ViewMap`) is a separate stage that depends on the runtime; the library and the tool do
     not. A query-only WASM and npm artifact does not exist yet: `arqlet-wasm` pulls in the whole runtime, so a query
-    in the browser without the layout engine needs its own crate; that is decided in M5c.
+    in the browser without the layout engine needs its own crate; M5c decided it (section *M5c: the query-only module*).
 
 ## Third-party code
 
@@ -242,7 +242,7 @@ Each stage ends with a check that can fail. M0 is this document and the preparat
 | M4 | Variable length, `OPTIONAL MATCH`, `WITH`, aggregation | the remaining supported spike cases pass |
 | M5a | The adapter `arqlet-query-model` over `arqlet-model` and a standalone tool (`arqlet-query GRAPH.json 'QUERY'`); no layout, no runtime (item 12); can start with M1 | the executable cases of `examples/cypher/` pass through the tool; the isolation guard of item 12 is green |
 | M5b | Engine integration: operation through `dispatch` with `ViewMap`, WASM feature, napi path, results in the platform parity run, size of the WASM engine before and after, the cost of `ViewMap` per query (item 10) | gates (a) and (d) of item 8; identical digests on all platforms; the size difference recorded |
-| M5c | Decision on a query-only WASM and npm artifact, a crate without the runtime (item 12) | its size measured against the engine's; the decision recorded |
+| M5c | Decision on a query-only WASM and npm artifact, a crate without the runtime (item 12) | its size measured against the engine's; the decision recorded (done: section *M5c: the query-only module*) |
 | M6 | Differential run against Grafeo 0.6.2 (pinned, tooling only), a TCK subset | gates (b) and (c) of item 8 |
 | After | `shortestPath`, quantified paths, `WHERE` inside patterns, `EXISTS { }` subqueries, the search operator, a SQL adapter | each its own decision |
 
@@ -342,6 +342,30 @@ What this means for the query layer:
   hypothesis that no measurement here tests.
 - Still open: the size of a realistic payload table, which none of these graphs has.
 
+## M5c: the query-only module
+
+**Decision (2026-11-22).** The crate `arqlet-query-wasm` stays: a WASM module that holds one graph with its payload and
+answers queries, built from the query crates and the graph part of `arqlet-model` only, with no layout engine. It shares
+the JSON request and answer with the engine's `query` operation through the crate `arqlet-query-json`, so the two cannot
+drift. It is `publish = false`, joins the isolation guard (host and wasm32), and is checked against the oracle through the
+real WASM file (`tools/query-wasm.test.mjs`, CI). **An npm package for it is not made yet.**
+
+**Why the crate.** Measured (`benchmarks/results/query-m5c-20261122.md`): the module is 1.02 MB (0.33 MB gzip) in the
+`wasm-size` profile, against 7.12 MB (1.84 MB gzip) for the engine with `query`; about one seventh of the bytes, a sixth
+of the gzip. A host that only filters a graph (a browser tab, a worker, a function) should not download a layout engine
+for it, and the cost of keeping the crate is small: about 120 lines, and no logic of its own.
+
+**Why not the package yet.** No host asks for it, and a package is more than a file: a loader and types (hand-written
+`.d.ts`), the third-party notices of decypher beside the module (`tools/third-party-notices.mjs`), a place in the release
+(`docs/releasing.md`: the query crates are not published yet), and a promise about the request format. The engine's own
+package keeps the feature off. **Revisit** when a host needs queries in a browser without layout, or when the query crates
+are published; then the package is the module, its loader and its types, built with the `wasm-size` profile.
+
+**What this does not settle.** The module sees the graph it was loaded with, whole: unlike a session (whose import keeps at
+most 10 000 nodes), it holds a large export if the host sends it, at the cost of the host's memory and one `load`. The time
+to load a large graph is not measured; neither is the share of `arqlet-model` in the module's size (item 12's graph-only
+crate would reduce it by that share).
+
 ## Not decided here
 
 - Syntax and scoring of search operators; hybrid ranking; embedding source.
@@ -350,6 +374,6 @@ What this means for the query layer:
 - Whether to propose the planner change to Grafeo upstream, and whether to fork.
 - Whether and when to contribute fixes for decypher #132 to #134 (item 9 sets the conditions).
 - The names of the traits and types (the crate names are fixed in M0).
-- A query-only WASM and npm artifact (M5c), and a smaller graph-only crate split from `arqlet-model` (item 12).
+- An npm package for the query-only module (M5c kept the crate and not the package), and a smaller graph-only crate split from `arqlet-model` (item 12).
 - How the graph is shared between functions, processes, backend and browser, and any coordination or replication
   between them (ADR 0023); the payload representation beyond the first table.
