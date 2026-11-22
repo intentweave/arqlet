@@ -64,7 +64,7 @@ path = 'apps/playground/generated/examples/index.json'
 index = [e for e in json.load(open(path)) if e['name'] != 'memberships']
 index.append({'name': 'memberships', 'title': 'Memberships (zone, team, layer)',
               'nodes': len(graph['nodes']),
-              'description': 'Nine services in three containers, each also in a zone, a team and a layer. Tick "Membership hulls" to draw a hull per group; the drawing does not move.',
+              'description': 'Nine services in three containers, each also in a zone, a team and a layer. Tick "Membership hulls" to draw a hull per group (the drawing does not move), or choose a dimension under "Structure first" to read the services by team, zone or layer.',
               'source': 'examples/fixtures/memberships/three-dimensions.json'})
 json.dump(index, open(path, 'w'), indent=1, ensure_ascii=False)
 PY

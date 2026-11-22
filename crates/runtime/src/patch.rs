@@ -24,9 +24,24 @@ pub fn patch_snapshot(
     if patch.is_empty() {
         return Ok(snapshot.clone());
     }
-    // A change of memberships only moves nothing (ADR 0022 §5b): no mode reads them for the layout (an overlay is drawn
-    // from the boxes the layout already has), so the view is answered from the layout it has, with the new revision.
-    if patch.memberships_only() {
+    // A change of memberships only moves nothing (ADR 0022 §5b) as long as no changed dimension can own nodes: a dimension
+    // held softly is drawn from the boxes the layout already has, so the view is answered from the layout it has, with the
+    // new revision. A dimension that owns nodes under the grouping priority (M1) shapes the view's tree, so a change of it
+    // takes the full path below and is projected again.
+    let touched = patch
+        .memberships
+        .iter()
+        .flat_map(|m| m.dimensions.iter().map(|d| d.id.as_str()))
+        .chain(
+            patch
+                .remove_memberships
+                .iter()
+                .map(|r| r.dimension.as_str()),
+        );
+    let shapes_the_tree = touched
+        .into_iter()
+        .any(|d| arqlet_model::grouping::can_own(&snapshot.options.grouping_priority, d));
+    if patch.memberships_only() && !shapes_the_tree {
         let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
         let mut graph = source.clone();
         graph.memberships = patched_memberships(&graph.memberships, patch)?;

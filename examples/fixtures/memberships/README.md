@@ -3,18 +3,12 @@
 Test data for [ADR 0022](../../../docs/adr/0022-memberships-across-the-hierarchy.md): a node belongs to several groupings at
 once (a zone, a team, a layer), which the single `parentId` hierarchy cannot show.
 
-The ADR is **proposed**, so no engine reads these fields yet. `GraphWire` ignores keys it does not know, so every fixture
-already imports and lays out today as a plain graph, with `memberships` and `membershipViews` dropped. That is deliberate:
-the fixtures can be loaded in the playground and in tests while the feature is being decided, and they cannot drift away
-from the graph format.
-
 - `memberships` is **graph data** (ADR 0022 §1): dimensions in a declared order, each with groups in a declared order.
-- `membershipViews` is a **view option** and belongs to `LayoutOptions`, not to the graph. It is the provisional switch
-  the engine implements today (one hull per group), written into the fixture files so each one says how it is meant to be
-  drawn; a host would pass it with the import request.
-- `groupingPriority` is the view option of the revised ADR (§2, 2026-11-22, not implemented yet): a ranked list of
-  criteria — `parent` or a dimension, with a value order and a rendering. Where a fixture carries one, it is the view the
-  fixture is meant for once M1 lands; the tests validate it and compute its owners already.
+  The engine reads it (M0).
+- `groupingPriority` is a **view option** (§2) and belongs to `LayoutOptions`, not to the graph: a ranked list of
+  criteria — `parent` or a dimension, with a value order, a rendering and a hull shape. Every fixture carries the view it
+  is meant for; a host passes it with the import request. Inside a graph file the engine ignores the key (`GraphWire`
+  ignores keys it does not know), so each fixture also imports as a plain graph — the tests do both.
 
 ## The fixtures
 

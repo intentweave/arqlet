@@ -43,7 +43,7 @@ pub struct Scene {
     /// Provisional (`hubRefs`): edges of hubs drawn as stubs at their other end, named after the hub. Omitted when none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hub_refs: Vec<SceneHubRef>,
-    /// Provisional (ADR 0022, `membershipViews` set to `overlay`): a hull per membership group, to be drawn behind the
+    /// Provisional (ADR 0022, the soft criteria of `groupingPriority`): a hull per membership group, to be drawn behind the
     /// nodes. In the declared order of the dimensions and of their groups. Omitted when there is none, so every drawing
     /// without the option is unchanged.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -100,6 +100,12 @@ pub struct SceneMembershipReport {
     pub unknown_members: usize,
     /// Members the view does not show and for which no box stands in (filtered out, or outside the view).
     pub hidden_members: usize,
+    /// Nodes this criterion owns: it is the first that assigns them (ADR 0022 §2, rule 1).
+    pub owned: usize,
+    /// Of those, the nodes in several of its groups that are not one path: the value order chose (rule 2).
+    pub multiple_owners: usize,
+    /// Nodes no listed criterion assigns (rule 3), placed at the root. Counted on the first criterion's entry only.
+    pub unassigned: usize,
     pub summary: String,
 }
 
@@ -610,114 +616,175 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
 /// How far a hull reaches beyond the boxes it encloses, in layout units.
 const HULL_PADDING: f64 = 10.;
 
-/// Provisional (ADR 0022, first slice): the hulls of every dimension the options show as an `overlay`, and the report of
-/// every dimension they name at all.
+/// Provisional (ADR 0022 §2–§3, M1): the hulls of the soft criteria of the grouping priority, and the report of every
+/// criterion it lists. The first criterion owns: its groups are the view's containers (`with_grouping_priority`), so it
+/// draws no hull. Every later criterion holds its members softly and draws a hull per group — the parent hierarchy too,
+/// once it is moved down, as a hull per source container around its descendants. A hull that would only trace a box the
+/// view already draws (every member owned by that very group) is left out.
 ///
 /// Everything here is derived from boxes that are already placed, so this function cannot move a node: a drawing with
 /// hulls has the same node boxes and the same routes as the same drawing without them.
 ///
-/// A member is resolved to the box that stands for it: its own box when the view shows it, otherwise the nearest
-/// ancestor the view does show (a collapsed container, as bus taps attach to one). A member with no such box is counted
-/// as hidden, and one the source graph does not have at all as unknown.
+/// A member is resolved to the box that stands for it: its own box when the view shows it, else the container its owner
+/// gives it in the view, else the nearest ancestor of the source the view shows (a collapsed container, as bus taps attach
+/// to one). A member with no such box is counted as hidden, and one the source graph does not have at all as unknown.
 fn membership_overlays(
     snapshot: &Snapshot,
     positions: &BTreeMap<&str, Rect>,
     containers: &BTreeSet<&str>,
 ) -> (Vec<SceneHull>, Vec<SceneMembershipReport>) {
-    let views = &snapshot.options.membership_views;
-    let memberships = &snapshot.graph.memberships;
-    if views.is_empty() || memberships.is_empty() {
+    use arqlet_model::grouping::{self, Owner, PARENT};
+    let priority = &snapshot.options.grouping_priority;
+    if grouping::is_default(priority) {
         return (Vec::new(), Vec::new());
     }
     let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let ownership = grouping::owners(source, priority);
     let parent_of: BTreeMap<&str, Option<&str>> = source
         .nodes
         .iter()
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
         .collect();
-    // The box that stands for `member`, by walking up the source graph until the view shows an ancestor.
+    let label_of: BTreeMap<&str, &str> = source
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.label.as_str()))
+        .collect();
+    let visible = |id: &str| positions.get_key_value(id).map(|(k, _)| *k);
+    // The box that stands for `member`.
     let box_for = |member: &str| -> Option<&str> {
-        if positions.contains_key(member) {
-            return Some(positions.get_key_value(member)?.0);
+        if let Some(k) = visible(member) {
+            return Some(k);
+        }
+        if let Some(Owner::Group { dimension, group }) = ownership.owners.get(member) {
+            let id = grouping::container_id(dimension, group);
+            if let Some(k) = visible(&id) {
+                return Some(k);
+            }
         }
         let mut at = *parent_of.get(member)?;
         while let Some(id) = at {
-            if let Some((key, _)) = positions.get_key_value(id) {
-                return Some(key);
+            if let Some(k) = visible(id) {
+                return Some(k);
             }
             at = parent_of.get(id).copied().flatten();
         }
         None
     };
+    // The descendants of every source container, for the parent hierarchy as a soft criterion.
+    let mut children: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for n in &source.nodes {
+        if let Some(p) = n.parent_id.as_deref() {
+            children.entry(p).or_default().push(n.id.as_str());
+        }
+    }
+    let descendants = |root: &str| -> Vec<String> {
+        let mut out = Vec::new();
+        let mut stack: Vec<&str> = children.get(root).cloned().unwrap_or_default();
+        stack.reverse();
+        while let Some(id) = stack.pop() {
+            out.push(id.to_string());
+            if let Some(more) = children.get(id) {
+                stack.extend(more.iter().rev());
+            }
+        }
+        out
+    };
 
     let mut hulls = Vec::new();
     let mut reports = Vec::new();
-    for dimension in &memberships.dimensions {
-        let mode = match views.get(&dimension.id) {
-            None | Some(MembershipView::Off) => continue,
-            Some(mode) => *mode,
-        };
-        let (name, applied) = match mode {
-            MembershipView::Overlay => ("overlay", true),
-            MembershipView::Hierarchy => ("hierarchy", false),
-            MembershipView::Lanes => ("lanes", false),
-            MembershipView::Off => unreachable!("skipped above"),
-        };
-        // Counted once per dimension over the members as they are declared, so a member of a nested group is not counted
-        // again for every ancestor that inherits it.
+    for (rank, criterion) in priority.iter().enumerate() {
+        let owning = rank == 0;
+        let lanes = criterion.render == GroupingRendering::Lanes;
+        let shape = criterion.hull.unwrap_or(snapshot.options.membership_hull);
+        let owned = ownership.rank.values().filter(|r| **r == rank).count();
+        let multiple = ownership
+            .multiple
+            .iter()
+            .filter(|n| ownership.rank.get(n.as_str()) == Some(&rank))
+            .count();
+        // The groups of the criterion: (id, label, members, whether a member owned by this group is already its box).
+        let mut groups: Vec<(String, String, Vec<String>)> = Vec::new();
         let mut unknown = 0usize;
-        let mut hidden = 0usize;
-        for group in &dimension.groups {
-            for member in &group.members {
-                if !parent_of.contains_key(member.as_str()) {
-                    unknown += 1;
-                } else if box_for(member).is_none() {
-                    hidden += 1;
+        let mut dimension_label = String::new();
+        if criterion.by == PARENT {
+            dimension_label = "Parent".into();
+            for n in &source.nodes {
+                if children.contains_key(n.id.as_str()) {
+                    groups.push((n.id.clone(), n.label.clone(), descendants(&n.id)));
                 }
             }
-        }
-        let first = hulls.len();
-        for group in &dimension.groups {
-            let mut boxes: Vec<&str> = Vec::new();
-            // Membership in a nested group implies membership in its ancestors (ADR 0022 §1), so a group encloses its own
-            // members and those of every group below it. A parent therefore does not list its children's members again,
-            // and a sub-zone is drawn inside its zone.
-            let members: Vec<&String> = dimension
+        } else if let Some(d) = source.memberships.dimension(&criterion.by) {
+            dimension_label = d.label.clone();
+            // Membership in a nested group implies its ancestors (§1): a group encloses the members of every group below.
+            // One walk up from each group, by a map of the parents, gives every group what it encloses; groups are taken in
+            // their declared order, so each list keeps the order of the groups its members come from.
+            let group_parent: BTreeMap<&str, Option<&str>> = d
                 .groups
                 .iter()
-                .filter(|g| {
-                    let mut at = Some(*g);
-                    let mut walked = 0usize;
-                    while let Some(current) = at {
-                        if current.id == group.id {
-                            return true;
-                        }
-                        walked += 1;
-                        if walked > dimension.groups.len() {
-                            return false; // a cycle, which M1's refusals reject; here it simply stops
-                        }
-                        at = current
-                            .parent
-                            .as_deref()
-                            .and_then(|p| dimension.groups.iter().find(|q| q.id == p));
-                    }
-                    false
-                })
-                .flat_map(|g| g.members.iter())
+                .map(|g| (g.id.as_str(), g.parent.as_deref()))
                 .collect();
-            for member in members {
-                if let Some(id) = box_for(member) {
-                    if !boxes.contains(&id) {
-                        boxes.push(id);
+            let mut enclosed: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+            for g in &d.groups {
+                let mut at = Some(g.id.as_str());
+                let mut walked = 0usize;
+                while let Some(a) = at {
+                    enclosed
+                        .entry(a)
+                        .or_default()
+                        .extend(g.members.iter().cloned());
+                    walked += 1;
+                    if walked > d.groups.len() {
+                        break; // a cycle, which validation refuses
                     }
+                    at = group_parent.get(a).copied().flatten();
                 }
             }
-            if !applied || boxes.is_empty() {
+            for group in &d.groups {
+                for m in &group.members {
+                    if !parent_of.contains_key(m.as_str()) {
+                        unknown += 1;
+                    }
+                }
+                let members: Vec<String> = enclosed.remove(group.id.as_str()).unwrap_or_default();
+                let label = if group.label.is_empty() {
+                    group.id.clone()
+                } else {
+                    group.label.clone()
+                };
+                groups.push((group.id.clone(), label, members));
+            }
+        }
+        let mut hidden = 0usize;
+        let first = hulls.len();
+        for (group, label, members) in &groups {
+            let mut boxes: Vec<&str> = Vec::new();
+            let mut all_owned_here = !members.is_empty();
+            for member in members {
+                if !parent_of.contains_key(member.as_str()) {
+                    continue;
+                }
+                let here = match ownership.owners.get(member) {
+                    Some(Owner::Parent(Some(p))) => criterion.by == PARENT && p == group,
+                    Some(Owner::Group {
+                        dimension,
+                        group: g,
+                    }) => *dimension == criterion.by && g == group,
+                    _ => false,
+                };
+                all_owned_here &= here;
+                match box_for(member) {
+                    Some(id) if !boxes.contains(&id) => boxes.push(id),
+                    Some(_) => {}
+                    None => hidden += 1,
+                }
+            }
+            // The owning criterion draws boxes, not hulls; a soft group whose members all sit in its own box needs none.
+            if owning || all_owned_here || boxes.is_empty() {
                 continue;
             }
             let rects: Vec<Rect> = boxes.iter().map(|id| positions[*id].clone()).collect();
-            let points =
-                crate::hull::group_shape(&rects, HULL_PADDING, snapshot.options.membership_hull);
+            let points = crate::hull::group_shape(&rects, HULL_PADDING, shape);
             if points.len() < 3 {
                 continue;
             }
@@ -730,13 +797,16 @@ fn membership_overlays(
                 .map(|(id, _)| id.to_string())
                 .collect();
             hulls.push(SceneHull {
-                dimension: dimension.id.clone(),
-                dimension_label: dimension.label.clone(),
-                group: group.id.clone(),
-                label: if group.label.is_empty() {
-                    group.id.clone()
+                dimension: criterion.by.clone(),
+                dimension_label: dimension_label.clone(),
+                group: group.clone(),
+                label: if criterion.by == PARENT {
+                    label_of
+                        .get(group.as_str())
+                        .map(|l| l.to_string())
+                        .unwrap_or_else(|| label.clone())
                 } else {
-                    group.label.clone()
+                    label.clone()
                 },
                 points,
                 boxes: boxes.iter().map(|id| id.to_string()).collect(),
@@ -753,28 +823,48 @@ fn membership_overlays(
                 }
             }
         }
-        let summary = if applied {
+        let unassigned = if owning {
+            ownership.unassigned.len()
+        } else {
+            0
+        };
+        let mut summary = if owning {
             format!(
-                "{}: {drawn} of {} groups drawn, {intruders} foreign boxes inside a hull, {overlapping} overlapping pairs",
-                dimension.id,
-                dimension.groups.len()
+                "{}: owns {owned} nodes in {} groups",
+                criterion.by,
+                groups.len()
             )
         } else {
             format!(
-                "{}: {name} is accepted but not applied yet (ADR 0022)",
-                dimension.id
+                "{}: holds softly, {drawn} of {} groups drawn, {intruders} foreign boxes inside a hull, {overlapping} overlapping pairs",
+                criterion.by,
+                groups.len()
             )
         };
+        if multiple > 0 {
+            summary.push_str(&format!(
+                ", {multiple} in several groups (value order chose)"
+            ));
+        }
+        if unassigned > 0 {
+            summary.push_str(&format!(", {unassigned} nodes no criterion assigns"));
+        }
+        if lanes {
+            summary.push_str(", lanes not applied yet (ADR 0022, M4)");
+        }
         reports.push(SceneMembershipReport {
-            dimension: dimension.id.clone(),
-            mode: name.to_string(),
-            applied,
-            groups: dimension.groups.len(),
+            dimension: criterion.by.clone(),
+            mode: if owning { "owner" } else { "soft" }.to_string(),
+            applied: !lanes,
+            groups: groups.len(),
             drawn,
             intruders,
             overlapping_pairs: overlapping,
             unknown_members: unknown,
             hidden_members: hidden,
+            owned,
+            multiple_owners: multiple,
+            unassigned,
             summary,
         });
     }

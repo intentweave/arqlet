@@ -64,9 +64,10 @@ that belongs to a zone, a team and a security domain at once cannot be shown. De
   one is a containment that may be broken: held, else split into hulls, else marked. An organisation chart can thus be
   read by project and a process by responsibility lanes. Multi-valued dimensions order their values (a person on two
   projects).
-- Done: the model and its refusals, a hull per group drawn without moving anything (M0, M2), changes through `patch`.
-  Next without layout risk: the display stages (one hull per owner, marks), then `groupingPriority` as a projection
-  (M2b, M1). With layout risk and the quality gate: holding (M3), lanes (M4).
+- Done: the model and its refusals, a hull per group drawn without moving anything, as a rectangle or a polygon (M0,
+  M2), changes through `patch`, and `groupingPriority` as a projection with `details` per criterion and *Structure
+  first* in the playground (M1). Next without layout risk: the display stages (split, marked; M2b). With layout risk and
+  the quality gate: holding (M3), lanes (M4).
 - Hard parts: contiguity is not always possible in one order (Euler diagrams); hulls cross container borders and must
   not obstruct the routing; where holding is switched off (its cost in crossings and bends, a budget per rank, a marking
   threshold) is measured in M3, not chosen.

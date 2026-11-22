@@ -1,14 +1,13 @@
 # ADR 0022: Memberships across the hierarchy
 
 Date: 2026-11-21; revised 2026-11-22 (grouping priority, §2–§4).
-Status: accepted for the first slice (2026-11-21): **M0 and a narrowed M2 are implemented** behind `membershipViews`, off
-by default — the model, the validation (the refusals of §5: duplicate dimension or group ids, an unknown or cyclic
-`parent`, `groups` together with a `hierarchy` view), the hull as scene geometry (a rectangle or a convex polygon, `membershipHull`), the typed report, the SVG
-viewer and the playground checkbox. Memberships through `patch` (§5b) are implemented too (2026-11-22, with the change log
-of ADR 0023 R2). **The revision of 2026-11-22 is proposed:** a view orders its structures by a priority the user chooses
-(§2), every structure after the first is a containment that may be broken (§3), and what cannot be held falls back to split
-hulls and then to marks. It replaces the display modes of the first version; `membershipViews` stays the provisional switch
-until M1 replaces it.
+Status: accepted and implemented through M1 (2026-11-22), off by default. Implemented: the model and its refusals (M0),
+the hull drawn from boxes already placed, as a rectangle or a convex polygon (M2, `membershipHull`), memberships through
+`patch` (§5b, with the change log of ADR 0023 R2), and **the grouping priority as a projection** (M1): `groupingPriority`
+ranks the parent hierarchy and the dimensions, the first criterion that assigns a node owns it (its container in the view),
+the value order decides among several groups, every later criterion is drawn as hulls, `details` names the groups per
+criterion, and the playground offers *Structure first*. `membershipViews` is gone. Proposed still: the display stages
+split and marked (M2b), holding with a measured switch (M3), lanes (M4) and the later display options (M5).
 
 Related: [ADR 0003](0003-container-direction-constraints.md) (direction and strategy per area), [ADR 0005](0005-routing-constraints.md)
 (routing per container, the outline contract), [ADR 0007](0007-recursive-strategy-orchestration.md) (containment, optimization
@@ -158,11 +157,11 @@ view's copy); the canonical graph and its `parentId` are untouched, so ADR 0010 
 become independently solvable containers: two soft groups that share members cannot both be held as containers; the
 higher rank holds as a container, and the lower is held as a region across it or split (§3).
 
-**Replaces `membershipViews`.** The first version's `{ "team": "overlay" }` is `[{ "by": "parent" }, { "by": "team" }]` with
-holding switched off — only the last stages of §3 drawn. `membershipViews` stays the provisional switch until M1 lands
-`groupingPriority`, and is removed then (both are provisional; no compatibility promise). `groups` stays as the short form
-of "parent, then a structure held as nested containers without a cost check"; together with a non-default
-`groupingPriority` it is refused.
+**Replaced `membershipViews`.** The first version's `{ "team": "overlay" }` is `[{ "by": "parent" }, { "by": "team" }]` with
+holding switched off — only the last stages of §3 drawn. M1 removed `membershipViews` (both were provisional; no
+compatibility promise). `groups` stays its own mechanism — sub-containers nested inside each node's container — and is
+refused together with a non-default `groupingPriority`; whether it becomes a criterion held as nested containers is a
+question for M3, where holding exists.
 
 ### 3. Soft criteria are containments that may be broken
 
@@ -246,8 +245,10 @@ own right. Version 1 reports and does not duplicate:
 thousands of lines on a real graph, and a host would have to parse them back. So the counts live in a structured report
 (per criterion, and per group within it: the measures of §6, the stage it reached and which diagnostics it raised), and
 `layoutDiagnostics` carries **one summary line per criterion** — "project: 3 of 14 groups split, 1 marked" — so a host that
-only prints diagnostics still learns that something is wrong, and a host that acts on them reads the typed field. The first
-slice's `membershipReport` is this report for the display stages; M1 renames its diagnostics as above.
+only prints diagnostics still learns that something is wrong, and a host that acts on them reads the typed field. As built
+in M1, the report is the scene's `membershipReport`, one entry per criterion with its `mode` (`owner` or `soft`) and
+`summary`: `owned`, `multipleOwners` (rule 2) and `unassigned` (rule 3, on the first entry) carry `grouping-multiple-owners`
+and `grouping-unassigned`; `grouping-split` and `grouping-marked` arrive with the stages of M2b.
 
 Refused outright (an error, not a diagnostic): a `parent` cycle, a duplicate dimension or group id, a dimension named
 `parent`; in `groupingPriority`, a criterion listed twice, a dimension or value that is not declared, `values` on `parent`,
@@ -261,9 +262,11 @@ a new import and not through an operation of their own, which would be a second 
 dimension, or by group within one), applied under the same revision checks, with removals first. A membership change
 advances the revision and the layout version like any other graph change.
 
-One consequence worth stating: a change to a dimension that no listed criterion reads changes no geometry. The view is then
-answered from the layout it already has, with the new revision — the result must not be a re-layout, or editing a
-membership would move the drawing for no reason.
+One consequence worth stating: a change to a dimension that **cannot own nodes** changes no geometry — a dimension that is
+not listed, or one listed after `parent`, which assigns every node first. The view is then answered from the layout it
+already has, with the new revision; a re-layout would move the drawing for no reason. A dimension listed before `parent`
+(or with `parent` absent) owns nodes and shapes the view's tree, so a change of it is projected again
+(`grouping::can_own`; test `m1_a_membership_patch_projects_again_where_the_dimension_owns_…`).
 
 ### 6. Measurement, and where the switches lie
 
@@ -347,10 +350,24 @@ Each step is behind an option and measured before the next. Nothing becomes a de
 - **M1 — `groupingPriority` as a projection.** Ranked criteria, ownership, value priority, `parent` as a criterion that can
   be moved down, the refusals and diagnostics of §5, `details` per criterion; `membershipViews` removed. No change to the
   layout algorithm: a non-default priority hands the engine a different container tree. *Exit:* the default view
-  byte-identical; `[parent, <dimension> held without cost check]` gives the same scene as the equivalent `groups` mapping;
-  on `org-chart-projects.json` the person on two projects is owned by the project the value priority names first, and the
-  person on none by the next criterion that assigns them — their department, or their site when `parent` is not listed —
-  and is reported as unassigned only when no listed criterion does.
+  byte-identical; on `org-chart-projects.json` the person on two projects is owned by the project the value priority
+  names first, and the person on none by the next criterion that assigns them — their department, or their site when
+  `parent` is not listed — and is reported as unassigned only when no listed criterion does.
+  **Done** (2026-11-22). `arqlet_model::grouping` computes the owners (one reverse index per dimension; unit tests), and
+  `arqlet_layout::communities::with_grouping_priority` projects them as the first step of `structured`: a node owned by a
+  dimension moves into a container `membership:<dimension>/<group>` (kind `membership`, nested along the dimension's
+  `parent`), and a source container the projection empties is left out of the view and drawn as a hull instead. Every
+  later criterion is drawn as hulls, `parent` too (one hull per source container); the report names per criterion what it
+  owns, how many nodes the value order decided and how many no criterion assigns. `details` answers `groupings` per
+  criterion (optional, omitted under the default). A criterion's `hull` overrides `membershipHull`; `as: lanes` is
+  accepted and reported as not applied yet. The playground offers *Structure first*. Tests: the projection agrees with
+  the oracle of `memberships.rs` node by node, the canonical graph and every edge's direction stay as they were, a change
+  of priority projects again and back, `[]` and `[parent]` give today's view, the refusals of §5.
+  Two faults the tests found on the way, both silent otherwise: the kept view structure was keyed without the priority
+  (a change of priority would have reused the old tree), and an import that neither abstracts nor has a node budget never
+  projected at all. And one decision taken: a membership patch moves nothing only when no changed dimension can own nodes
+  (§5b). The first draft's exit "`[parent, <dimension> held without cost check]` gives the same scene as `groups`" was
+  dropped: it needs a holding mode, which is M3.
 - **M3 — holding.** Soft criteria as breakable containers within an owner and as regions across owners (members at the
   facing border), the switch per piece, and the measurement of §6 that places it. *Exit:* the gate of §6, the budgets and
   the threshold recorded with their run, and `overlapping-boxes.json` drawn as the target picture of §3.

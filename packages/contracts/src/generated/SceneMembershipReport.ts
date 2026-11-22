@@ -33,4 +33,16 @@ unknownMembers: number,
 /**
  * Members the view does not show and for which no box stands in (filtered out, or outside the view).
  */
-hiddenMembers: number, summary: string, };
+hiddenMembers: number,
+/**
+ * Nodes this criterion owns: it is the first that assigns them (ADR 0022 §2, rule 1).
+ */
+owned: number,
+/**
+ * Of those, the nodes in several of its groups that are not one path: the value order chose (rule 2).
+ */
+multipleOwners: number,
+/**
+ * Nodes no listed criterion assigns (rule 3), placed at the root. Counted on the first criterion's entry only.
+ */
+unassigned: number, summary: string, };
