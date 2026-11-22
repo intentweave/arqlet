@@ -151,6 +151,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- `elkLayout` passes on the diagnostic of `sharedTracks` when the layout was computed again without shared tracks (lane
+  orders cyclic for many edges), as it already did for a single pass that was not used.
 - Membership hulls are rectangles by default (provisional, ADR 0022 §3): the padded bounding box of a group's boxes,
   instead of the padded convex polygon drawn so far. `LayoutOptions.membershipHull: "polygon"` gives the previous
   outline. A rectangle encloses at least as much as the polygon, so a view with overlays may report more intruders.
