@@ -1,8 +1,11 @@
-# ADR 0025: A scene renderer with WebGL from afar and SVG up close
+# ADR 0025: A scene renderer with the GPU from afar (WebGPU, WebGL 2) and SVG up close
 
 Date: 2026-11-22.
-Status: proposed. Nothing implemented. Today the scene is drawn by `renderSvg` (SVG) or handed to React Flow
-(`toReactFlow`); the cluster overview has its own WebGL renderer (`overview-gl.js`, ADR 0018).
+Status: accepted, V1 and V2 implemented (provisional, `@arqlet/viewer`: `scene-buffers.js`, `scene-renderer.js`,
+`scene-gpu.js`, `scene-gl.js`, `scene-view.js`); V3 and V4 open. Before, the scene was drawn by `renderSvg` (SVG) or
+handed to React Flow (`toReactFlow`); the cluster overview has its own WebGL renderer (`overview-gl.js`, ADR 0018).
+Amended on the same day: the far layer draws with WebGPU where the browser offers it and with WebGL 2 as the fallback
+(section 7).
 
 Related: [ADR 0008](0008-engine-client-viewer-boundaries.md) (the viewer paints accepted geometry and computes none;
 "SVG first, replaceable Canvas/GPU backends later"; feature detection and a fallback before a new backend),
@@ -34,7 +37,7 @@ a rule for when which layer draws.
 
 ### 1. Two layers over one scene
 
-- **Far: WebGL.** One canvas draws everything in the scene: container and node boxes (instanced quads with the outline
+- **Far: GPU (WebGPU, WebGL 2 as the fallback).** One canvas draws everything in the scene: container and node boxes (instanced quads with the outline
   in the fragment shader, as the overview's shapes), routes as line strips with a width in pixels, arrowheads, membership
   hulls (triangulated polygons), bus bars. Text only above a size on screen, on the overlaid 2D canvas, as the overview
   does.
@@ -96,8 +99,17 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
 
 ### 7. Fallback and boundaries
 
-- Without WebGL (feature detection), or below a scene size where SVG is fluid anyway, the SVG renderer draws alone, as
-  today. WebGL 1 is enough (as the overview); WebGL 2 and WebGPU are later choices behind the same interface.
+- **Backends.** WebGPU first, WebGL 2 as the fallback, SVG alone without either (feature detection,
+  `sceneBackend`). Both GPU backends are written here, without a library: they draw the same buffers
+  (`sceneBuffers`: instanced boxes and segments, triangles) with the same shaders in WGSL and GLSL ES 3.00, behind one
+  shell (`rendererShell`: view, texts, picking, frames), so a backend is about 200 lines. WebGPU is the choice for new
+  GPU work in browsers (compute, less driver overhead) but is not yet everywhere (older Android devices, Linux desktops
+  without current drivers, managed machines with older browsers), so WebGL 2 stays. A library was weighed: a Rust
+  renderer with `wgpu` would cover both from one code base, but needs `wasm-bindgen` and `web-sys` (the engine's ABI
+  has neither), adds megabytes of WASM and an asynchronous start, and the texts and the SVG near layer stay in
+  JavaScript anyway; JavaScript libraries (PixiJS, luma.gl) add a dependency of several hundred kilobytes to a viewer
+  without dependencies for drawing that is three kinds of instanced quads. To be weighed again if the far layer needs
+  more than that (text atlases, meshes, compute).
 - Optional: the far layer in a worker with `OffscreenCanvas` where available; nothing may require it, and no
   `SharedArrayBuffer` is needed (ADR 0019).
 - The renderer stays in `@arqlet/viewer`, without dependencies, and computes no layout: no routing, no contour, no
@@ -105,11 +117,11 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
 
 ## Steps
 
-- **V1 — WebGL scene renderer from columns:** boxes, containers, routes, arrowheads, hulls, picking; same geometry as
+- **V1 — GPU scene renderer from columns (done):** boxes, containers, routes, arrowheads, hulls, picking; same geometry as
   `renderSvg` on the golden fixtures (pixel comparison within a tolerance at the same transform). *Exit:* the golden
   scenes drawn by both renderers agree; a scene of the reference set pans and zooms with a measured frame time recorded
   against SVG on the same machine.
-- **V2 — near layer and switch:** the policy (pure, tested), the SVG layer for the elements in view, fading, hysteresis.
+- **V2 — near layer and switch (done):** the policy (pure, tested), the SVG layer for the elements in view, fading, hysteresis.
   *Exit:* zooming in and out across the threshold moves no element (positions of both layers compared), and the near
   layer never holds more than the budget plus the margin.
 - **V3 — stable indices and scene changes:** stable per-session indices in `SceneColumns`, D1 changes by index, buffer
@@ -117,6 +129,24 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
   byte); a change across a renumbering is refused.
 - **V4 — playground and React Flow:** the playground draws large views with the far layer; a React Flow host takes the
   near layer's place. *Exit:* `ui-regression.mjs` covers the switch; the React Flow example keeps working.
+
+### What V1 and V2 built
+
+- `sceneBuffers` turns a scene (or its columns) into per-layer instances in `renderSvg`'s order, colours, widths and
+  outlines (hulls, containers, routes with arrowheads, bus bars, hub stubs, junctions, leaves, ports, crossings, edge
+  labels) and the texts for the 2D canvas; a translucent route blends once at its corners through one depth per line.
+  Rows, the entity rule, rests (dashed) and the selection colours are drawn; the controls (pins, toggles, resize) are
+  the near layer's only.
+- `sceneIndex` (a uniform grid) answers the elements in a rectangle and picking in `renderSvg`'s hit order.
+- `createSceneView` holds both layers. The near layer is `renderSvg` on `sceneExcerpt` of the view plus a margin of
+  half its size on every side; panning only moves it until the view leaves that rectangle; a change of scale draws it
+  again. `nearPolicy` (budget 400 elements, median leaf 24 px, hysteresis 1.25: provisional values) decides per view;
+  from afar it decides without a query (the median leaf of the scene is too small). The switch fades over 150 ms
+  (none under reduced motion), then the canvas is hidden.
+- Checks: Node tests of the pure part (`scene-buffers.test.mjs`); in Chrome (`browser-checks/scene-gl.mjs`) the golden
+  scenes drawn by both backends differ from `renderSvg` in 0.01 % of the pixels without text, and over a zoom sweep in
+  and out the near layer's boxes stand exactly where the view puts them, the far layer's within a pixel, with the
+  hysteresis visible. Frame times: `benchmarks/results/scene-frames-20261122.md`.
 
 ## Measurements before defaults
 

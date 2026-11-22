@@ -1,7 +1,7 @@
 {
   "name": "@arqlet/viewer",
   "version": "0.8.0",
-  "description": "Rendering helpers for Arqlet scenes: an SVG renderer, pan and zoom, route details, a React Flow mapping and a WebGL cluster overview. No layout of its own. Provisional.",
+  "description": "Rendering helpers for Arqlet scenes: an SVG renderer, pan and zoom, route details, a React Flow mapping and a WebGL cluster overview and a scene renderer with a WebGPU or WebGL 2 far layer and an SVG near layer. No layout of its own. Provisional.",
   "keywords": [
     "graph",
     "layout",
@@ -9,7 +9,9 @@
     "diagram",
     "wasm",
     "svg",
-    "react-flow"
+    "react-flow",
+    "webgl",
+    "webgpu"
   ],
   "license": "(MIT OR Apache-2.0)",
   "author": "Benjamin Becker",
@@ -56,6 +58,26 @@
     "./overview-gl.js": {
       "types": "./overview-gl.d.ts",
       "default": "./overview-gl.js"
+    },
+    "./scene-buffers.js": {
+      "types": "./scene-buffers.d.ts",
+      "default": "./scene-buffers.js"
+    },
+    "./scene-renderer.js": {
+      "types": "./scene-renderer.d.ts",
+      "default": "./scene-renderer.js"
+    },
+    "./scene-gl.js": {
+      "types": "./scene-gl.d.ts",
+      "default": "./scene-gl.js"
+    },
+    "./scene-gpu.js": {
+      "types": "./scene-gpu.d.ts",
+      "default": "./scene-gpu.js"
+    },
+    "./scene-view.js": {
+      "types": "./scene-view.d.ts",
+      "default": "./scene-view.js"
     }
   },
   "files": [
@@ -75,6 +97,16 @@
     "overview.d.ts",
     "overview-gl.js",
     "overview-gl.d.ts",
+    "scene-buffers.js",
+    "scene-buffers.d.ts",
+    "scene-renderer.js",
+    "scene-renderer.d.ts",
+    "scene-gl.js",
+    "scene-gl.d.ts",
+    "scene-gpu.js",
+    "scene-gpu.d.ts",
+    "scene-view.js",
+    "scene-view.d.ts",
     "README.md",
     "LICENSE-APACHE",
     "LICENSE-MIT"
