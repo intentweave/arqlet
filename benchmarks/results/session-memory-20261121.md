@@ -97,3 +97,19 @@ the memos of placement (`placement_geometry::Memo`, `placement_order::Memo`, `pl
 (`ordinal`): each keeps a copy of its inputs as the key and a copy of its result beside the one handed out. Sharing them
 needs the consumers to hold shared values too (the placement moves the parts of a cross plan into cells of its own), so it
 is a refactor of its own, measured the same way.
+
+## The placement's memos released before the completion (2026-11-22)
+
+The placement keeps memos (orders, cross plans, structures, regions), each with a copy of its inputs and of its result.
+They are pure caches, and the completion, where a large view peaks, does not use them. `placement_order::Memo::
+release_caches` empties them right before the completion (the state that is not a cache stays); a placement after it
+computes what it needs again.
+
+| Graph | Peak before | Peak after |
+|---|---|---|
+| 22 819 nodes | 67.1 MB | 58.8 MB |
+| 114 196 nodes | 776.6 MB | 656.0 MB |
+
+Since the start of this work on the 114k graph: 864.2 → 656.0 MB (−24 %). Output byte-identical: the refinement
+fingerprints of the 15 views (limit 100, threads 1 and 4) are identical to `main` on the same inputs. The import times
+of that run (one repetition each, machine under load, so no performance figure) show no slowdown.

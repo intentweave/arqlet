@@ -34,6 +34,17 @@ pub(crate) struct Memo {
 }
 
 impl Memo {
+    /// Forgets everything the placement keeps for reuse (the orders, the cross plans, the structures, the regions), keeping
+    /// the state that is not a cache (`reversals`, `order_only`). Every memo is a pure cache, so a later placement computes
+    /// the same again and the output does not change; called before the completion, where a large view peaks, so that
+    /// the copies these memos keep of their inputs and results are not alive then.
+    pub fn release_caches(&mut self) {
+        self.areas = BTreeMap::new();
+        self.coordinates.get_mut().clear();
+        self.structure.clear();
+        self.regions.clear();
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn order(
         &mut self,
