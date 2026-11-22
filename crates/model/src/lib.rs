@@ -2048,6 +2048,11 @@ pub struct LayoutOptions {
     /// reported as not yet applied.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub membership_views: BTreeMap<String, MembershipView>,
+    /// Provisional (ADR 0022 §3): the shape of a membership hull. `rectangle` (the default, omitted) draws the padded
+    /// bounding box of the group's boxes, which looks like a container and may overlap one; `polygon` draws the padded
+    /// convex hull. A criterion of `groupingPriority` may override it (M1).
+    #[serde(default, skip_serializing_if = "HullShape::is_default")]
+    pub membership_hull: HullShape,
     /// Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
     /// (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -2474,6 +2479,24 @@ pub struct MembershipGroup {
     pub members: Vec<String>,
 }
 
+/// Provisional (ADR 0022 §3): the outline of a membership hull. Both are comparison geometry, no trigonometry.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum HullShape {
+    /// The padded bounding box of the group's boxes: a box that looks like a container and may overlap one.
+    #[default]
+    Rectangle,
+    /// The padded convex hull of the group's boxes: tighter around scattered members, with diagonal edges.
+    Polygon,
+}
+
+impl HullShape {
+    pub fn is_default(&self) -> bool {
+        *self == HullShape::Rectangle
+    }
+}
+
 /// Provisional (ADR 0022): how one membership dimension is shown. `Off` is the default and is omitted from serialized
 /// options, so a default view is unchanged. Only `Overlay` is implemented (the first slice); `Hierarchy` and `Lanes` are
 /// accepted and reported as not yet applied, so a host can declare them before the engine draws them.
@@ -2626,6 +2649,7 @@ impl Default for LayoutOptions {
             hub_refs: None,
             shared_tracks: None,
             membership_views: BTreeMap::new(),
+            membership_hull: HullShape::Rectangle,
             hub_ref_room: 0.,
             isolated_grid_areas: BTreeSet::new(),
             bus_roots: Vec::new(),
