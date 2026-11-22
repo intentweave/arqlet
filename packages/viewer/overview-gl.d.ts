@@ -1,6 +1,10 @@
 import type {Expanded, OverviewLens, OverviewModel, OverviewView, pickExpanded} from './overview.js';
 
 export interface OverviewRendererOptions {
+  /** Provisional (ADR 0025 O2): a WebGPU device (from `sceneBackend`): the overview is drawn with WebGPU; without one WebGL 2, else WebGL 1. */
+  device?: GPUDevice;
+  /** `'webgl'` keeps WebGL even with a device; `'webgl1'` forces WebGL 1. */
+  backend?: 'webgl' | 'webgl1';
   /** A 2D canvas laid over the WebGL canvas, for cluster names and the labels of structured clusters. */
   labels?: HTMLCanvasElement;
   /** Called after every view change. */
@@ -34,6 +38,8 @@ export interface OverviewRenderer {
   /** Provisional: whether the galaxy style is on (glows and stars instead of discs and rings, faint lines, added light). */
   readonly galaxy: boolean;
   setGalaxy(on: boolean): void;
+  /** The backend drawing it. */
+  readonly backend: 'webgpu' | 'webgl2' | 'webgl';
   /** Provisional: sets the appearance (null: the overview's own colours). */
   setStyle(style: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null): void;
   /** Provisional: the orbit (pseudo-3D): turned by `yaw` and `pitch` (radians) around the view's centre, points at depths
@@ -78,7 +84,7 @@ export interface OverviewRenderer {
   destroy(): void;
 }
 
-/** Draws an overview with WebGL 1 (no dependency). Throws if WebGL is not available. */
+/** Draws an overview with WebGPU (with `options.device`), WebGL 2 or WebGL 1 (no dependency). Throws if none is available. */
 export function createOverviewRenderer(
   canvas: HTMLCanvasElement,
   model: OverviewModel,

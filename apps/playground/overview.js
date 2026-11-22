@@ -6,6 +6,11 @@
 // Stale replies are dropped.
 import {overviewModel, viewOf, viewOfNodes, pathOf, revealPathDecisions, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES} from '@arqlet/viewer/overview.js';
 import {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
+import {sceneBackend} from '@arqlet/viewer/scene-renderer.js';
+// The renderer's backend (ADR 0025 O2): WebGPU where the browser offers it, else WebGL 2, else WebGL 1; `?backend=webgl`
+// keeps WebGL.
+const gpu = new URLSearchParams(globalThis.location?.search ?? '').get('backend') === 'webgl' ? null : await sceneBackend().catch(() => null);
+const gpuOptions = gpu?.kind === 'webgpu' ? {device: gpu.device} : {};
 import {coarseGraph, bloomStart} from './progressive.js';
 import {createEngineWorker} from '@arqlet/engine-client/engine.js';
 import {createOverviewSession, workerRun, httpRun} from '@arqlet/engine-client/session.js';
@@ -209,7 +214,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   }
   unbind?.(); renderer?.destroy();
   model = next;
-  renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: schedule, shapes, galaxy: $('galaxy').checked});
+  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: schedule, shapes, galaxy: $('galaxy').checked});
   unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   if ($('orbit').checked) renderer.setOrbit({yaw: 0.35, pitch: 0.25});
   renderer.setNames({nodes: $('node-names').checked, details: $('node-details').checked});
@@ -224,7 +229,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
 function showRough(overview, roughGraph, cut) {
   unbind?.(); renderer?.destroy();
   model = overviewModel(overview, resolvedEdgeIds(roughGraph));
-  renderer = createOverviewRenderer($('canvas'), model, {labels: $('labels'), onView: () => {}, shapes, galaxy: $('galaxy').checked, edgeAlpha: 0.5});
+  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: () => {}, shapes, galaxy: $('galaxy').checked, edgeAlpha: 0.5});
   unbind = bindOverviewNavigation($('canvas'), renderer, {});
   // The view that holds every disc (the extent of the places, not the root's radius: the radii a host set for the cut
   // containers can reach past it).

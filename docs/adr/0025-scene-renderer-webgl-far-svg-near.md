@@ -194,9 +194,15 @@ keeping every overview feature:
 
 - **O1 — the style (done):** the overview reads the appearance (ADR 0026): theme colours for the trace, the routes in
   structured clusters, the lines between clusters and the buses; the clusters from a sheet's palette.
-- **O2 — the overview on the shared backends:** its programs ported into the shell of `scene-renderer.js` as further
-  pipelines (GLSL ES 3.00 and WGSL), WebGPU first and WebGL 2 as the fallback; checked against the WebGL 1 renderer
-  pixel by pixel in every mode (discs, galaxy, orbit, lens, a frame of breathing and of a morph) before it goes.
+- **O2 — the overview on WebGPU and WebGL 2 (done):** the overview renderer draws through a backend: WebGPU with
+  `options.device` (its two programs in WGSL, with the lens, the cosmic motion, the orbit, breathing and the morph;
+  4× multisampling; one uniform block per draw), else WebGL 2 (the GLSL ES 1.00 programs run as they are), else WebGL 1.
+  The renderer computes the uniform values once for every backend. Checked in Chrome
+  (`browser-checks/overview-backends.mjs`) against the earlier WebGL 1 renderer kept beside it for the run: plain,
+  galaxy, orbit, lens, a path, a frame of breathing and a frame of a morph (the clock held still) on 414 nodes, every
+  backend under 0.15 % of the pixels off (WebGL 2 and WebGL 1 identical). The playground's overview page asks for WebGPU
+  (`?backend=webgl` keeps WebGL). It shares the backend choice (`sceneBackend`) with the scene view, not yet the shell:
+  that comes with O3, when the structured clusters are drawn by `sceneBuffers`.
 - **O3 — one drawing of structured clusters:** the boxes and routes inside a disc come from `sceneBuffers` with the
   disc's transform, so they look as in the scene view.
 - **O4 — one morph and the continuous zoom:** the morph of O2 serves the scene (section 6); zooming into a structured
