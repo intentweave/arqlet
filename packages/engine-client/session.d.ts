@@ -45,6 +45,20 @@ export interface PayloadChange {
   expectedContentRevision?: number;
 }
 
+/** Provisional (ADR 0023, R7): what a session holds, in estimated heap bytes per part. */
+export interface SessionMemory {
+  ok: true;
+  estimated: true;
+  parts: Record<string, number>;
+  total: number;
+  nodes: number;
+  perNode: number;
+  /** From the WASM engine: the module's live heap, counted. */
+  heapBytes?: number;
+  /** From the WASM engine: the size of its linear memory, which is never given back. */
+  linearMemoryBytes?: number;
+}
+
 /** Provisional (ADR 0023, R2): one change group: a patch of the structure, a payload of the content, or both. */
 export interface ChangeGroup {
   patch?: GraphPatch;
@@ -183,6 +197,10 @@ export interface Session {
   change(group: ChangeGroup): Promise<SessionResult & {sequence?: number; contentRevision?: number}>;
   /** Provisional (ADR 0023, R2): the change groups after `sequence`, or `resync` when the log no longer has them. */
   changesSince(sequence: number): Promise<{ok: true; sequence: number; changes?: Array<ChangeGroup & {sequence: number}>; resync?: true} | {ok: false; error?: string}>;
+  /** Provisional (ADR 0023, R7): what the session holds, part by part (estimated), and from WASM the module's heap. */
+  memory(): Promise<SessionMemory | {ok: false; error?: string}>;
+  /** Provisional (ADR 0023, R7): gives parts back; the snapshot stays. */
+  release(parts: Array<'content' | 'changeLog' | 'columns' | 'overview'>, init?: {keys?: string[]}): Promise<(SessionMemory & {released: number}) | {ok: false; error?: string; stale?: true}>;
   /** Provisional (ADR 0023, R2): the whole content and the log's sequence (for a resync). */
   content(): Promise<{ok: true; contentRevision: number; sequence: number; nodes: Record<string, Record<string, unknown>>; edges: Record<string, Record<string, unknown>>} | {ok: false; error?: string}>;
   /** Provisional (read only): a look into a collapsed container without opening it. */

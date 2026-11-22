@@ -165,6 +165,9 @@ impl EngineSession {
                 let since = v["sequence"].as_u64().ok_or("Missing sequence")?;
                 Ok(self.log.since(since))
             }
+            // Provisional (ADR 0023, R7): what the session holds, part by part, and giving parts back.
+            Some("memory") => Ok(self.memory()),
+            Some("release") => self.release(v),
             // The whole content, for a replica that resyncs.
             Some("content") => Ok(json!({"ok": true, "contentRevision": self.content.revision,
                 "sequence": self.log.sequence, "nodes": self.content.nodes, "edges": self.content.edges})),
@@ -228,6 +231,101 @@ impl EngineSession {
         }
     }
 
+    /// What the session holds, part by part, in heap bytes estimated from sizes and lengths (`crate::memory`); a shared
+    /// part is counted once. `nodes` is the source graph's node count, `perNode` the total over it.
+    fn memory(&self) -> Value {
+        use crate::memory;
+        let mut parts = serde_json::Map::new();
+        let mut nodes = 0usize;
+        if let Some(s) = &self.snapshot {
+            let source = s.source_graph.as_deref().unwrap_or(&s.graph);
+            nodes = source.nodes.len();
+            parts.insert("sourceGraph".into(), json!(memory::graph(source)));
+            if s.source_graph.is_some() {
+                parts.insert("viewGraph".into(), json!(memory::graph(&s.graph)));
+            }
+            if let Some(structure) = &s.structure {
+                let shared = s
+                    .source_graph
+                    .as_ref()
+                    .is_some_and(|src| std::sync::Arc::ptr_eq(src, &structure.view));
+                if !shared {
+                    parts.insert(
+                        "structureView".into(),
+                        json!(memory::graph(&structure.view)),
+                    );
+                }
+                parts.insert(
+                    "structureIndex".into(),
+                    json!(memory::index(&structure.index)),
+                );
+            }
+            parts.insert("boxes".into(), json!(memory::boxes(&s.boxes)));
+            parts.insert(
+                "routes".into(),
+                json!(memory::routes(&s.routes, s.routes.capacity())),
+            );
+            parts.insert("layeredPlans".into(), json!(memory::layered_plans(s)));
+            parts.insert("snapshotRest".into(), json!(memory::snapshot_rest(s)));
+        }
+        parts.insert(
+            "content".into(),
+            json!(
+                memory::properties(&self.content.nodes) + memory::properties(&self.content.edges)
+            ),
+        );
+        parts.insert("changeLog".into(), json!(self.log.heap_estimate()));
+        parts.insert(
+            "columns".into(),
+            json!(self.columns.as_ref().map_or(0, memory::columns)),
+        );
+        parts.insert("overview".into(), json!(self.overview.heap_estimate()));
+        let total: u64 = parts.values().filter_map(Value::as_u64).sum();
+        json!({"ok": true, "estimated": true, "parts": parts, "total": total, "nodes": nodes,
+            "perNode": if nodes == 0 { 0 } else { total / nodes as u64 }})
+    }
+
+    /// `release`: gives parts back (`parts`: `content`, `changeLog`, `columns`, `overview`; `keys` with `content` forgets
+    /// only those keys). The snapshot stays. Releasing content is a change of the content and goes into the change log.
+    fn release(&mut self, v: &Value) -> Result<Value, String> {
+        let parts: Vec<&str> = v["parts"]
+            .as_array()
+            .ok_or("release needs parts: content, changeLog, columns, overview")?
+            .iter()
+            .map(|p| p.as_str().ok_or("release parts are strings"))
+            .collect::<Result<_, _>>()?;
+        if let Some(unknown) = parts
+            .iter()
+            .find(|p| !matches!(**p, "content" | "changeLog" | "columns" | "overview"))
+        {
+            return Err(format!("release does not know the part {unknown}"));
+        }
+        let before = self.memory()["total"].as_u64().unwrap_or(0);
+        if parts.contains(&"content") {
+            let change = match v.get("keys") {
+                Some(keys) => json!({"dropKeys": keys}),
+                None => json!({"clear": true}),
+            };
+            let revision = self.content.revision;
+            self.content.apply(&change, None)?;
+            if self.content.revision != revision {
+                self.log.push(json!({"payload": change}))?;
+            }
+        }
+        if parts.contains(&"changeLog") {
+            self.log.clear();
+        }
+        if parts.contains(&"columns") {
+            self.columns = None;
+        }
+        if parts.contains(&"overview") {
+            self.overview = Default::default();
+        }
+        let mut answer = self.memory();
+        answer["released"] = json!(before.saturating_sub(answer["total"].as_u64().unwrap_or(0)));
+        Ok(answer)
+    }
+
     /// An operation on the session's snapshot, with the session's versions unless the request names its own (then a stale
     /// request is refused as always).
     fn edit(&mut self, v: &Value, with_scene: bool) -> Result<Value, String> {
@@ -255,7 +353,7 @@ impl EngineSession {
             }
         }
         let has_patch = v.get("patch").is_some_and(|p| !p.is_null());
-        let has_payload = ["set", "unset", "clear"]
+        let has_payload = ["set", "unset", "clear", "dropKeys"]
             .iter()
             .any(|k| v.get("payload").and_then(|p| p.get(k)).is_some());
         if !has_patch && !has_payload {
@@ -523,7 +621,7 @@ mod tests {
 /// The part of a `payload` request that a change log keeps and a replica applies: `set`, `unset`, `clear`.
 fn payload_part(v: &Value) -> Value {
     let mut part = json!({});
-    for key in ["set", "unset", "clear"] {
+    for key in ["set", "unset", "clear", "dropKeys"] {
         if let Some(x) = v.get(key) {
             part[key] = x.clone();
         }
