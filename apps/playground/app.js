@@ -1598,6 +1598,34 @@ async function search(){
 }
 $('search').onclick=search;
 $('search-query').onkeydown=e=>{if(e.key==='Enter')search();};
+// Query (provisional, ADR 0021 M5b; the engine's `query`, read only): an openCypher query over the source graph and its
+// content. Each row is listed with its values; a node in a row focuses it, and "Select all" selects the boxes that show the
+// nodes the answer names (`view: true` maps them onto the view).
+async function runQuery(){
+ const text=$('query-text').value.trim(),box=$('query-results');
+ if(!text||!snapshot)return;
+ const r=await layoutSession.query(text,{view:true,maxRows:200});
+ box.replaceChildren();
+ if(!r.ok){box.textContent=`Not run: ${r.error}`;return;}
+ if(!r.rowCount){box.textContent=`No rows (${r.graph.nodes} nodes, ${r.graph.edges} edges searched).`;return;}
+ const label=id=>(snapshot.sourceGraph??snapshot.graph).nodes.find(n=>n.id===id)?.label??id;
+ const show=v=>v&&typeof v==='object'?(v.node!==undefined?label(v.node):v.edge!==undefined?`edge ${v.edge}`:Array.isArray(v)?`[${v.map(show).join(', ')}]`:JSON.stringify(v)):String(v);
+ const head=document.createElement('span');head.textContent=`${r.rowCount} row${r.rowCount===1?'':'s'}: ${r.columns.join(' · ')}`;box.append(head);
+ const shownBoxes=[...new Set(Object.values(r.shown?.nodes??{}).filter(Boolean))];
+ if(shownBoxes.length){
+  const all=document.createElement('button');all.textContent=`Select all (${shownBoxes.length} box${shownBoxes.length===1?'':'es'})`;
+  all.onclick=()=>{selectNode(shownBoxes[0]);for(const id of shownBoxes.slice(1))selection.toggleNode(id);draw();};box.append(all);
+ }
+ for(const row of r.rows.slice(0,20)){
+  const b=document.createElement('button');b.setAttribute('role','listitem');b.textContent=row.map(show).join(' · ');
+  const node=row.find(v=>v&&typeof v==='object'&&v.node!==undefined)?.node;
+  if(node!==undefined)b.onclick=()=>focusNode(node);else b.disabled=true;
+  box.append(b);
+ }
+ if(r.rowCount>20){const more=document.createElement('span');more.textContent=`${r.rowCount-20} more rows.`;box.append(more);}
+}
+$('query-run').onclick=runQuery;
+$('query-text').onkeydown=e=>{if(e.key==='Enter')runQuery();};
 // A link to the view (the view controller's bookmark): the decisions, the highlight and the selection in the address
 // (#view=…); opening the page with it opens that view again (one undo step).
 $('view-link').onclick=async()=>{

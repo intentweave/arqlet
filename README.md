@@ -10,9 +10,9 @@ Arqlet is an incremental graph-layout engine in Rust. It lays out nested graphs
 with ports, routes their edges and keeps the layout up to date as the graph
 changes. The same engine runs natively and in the browser via WebAssembly.
 
-> **Status: prototype (engine `0.7.0`).** Arqlet works end to end and is
+> **Status: prototype (engine `0.8.0`).** Arqlet works end to end and is
 > tested, but every API, the JSON protocol and the snapshot format are
-> provisional and may change in any release. Version 0.7.0 is on
+> provisional and may change in any release. Version 0.8.0 is on
 > [crates.io](https://crates.io/crates/arqlet) and [npm](https://www.npmjs.com/package/arqlet). Large graphs (100K+ nodes) are a goal, not a measured result.
 
 Arqlet was developed under the working name Layerweave. Measurement records in
@@ -32,6 +32,20 @@ Drawn by Arqlet with the default options and painted by the SVG viewer of `@arql
 <tr>
 <td width="50%"><a href="docs/assets/examples/petri-net-shapes.svg"><img src="docs/assets/examples/petri-net-shapes.svg" alt="A Petri net laid out organically: circle places and box transitions connected by straight arcs"></a><br><sub>An organic layout with circles and boxes; edges end on each node's outline.</sub></td>
 <td width="50%"><a href="docs/assets/examples/state-tcp.svg"><img src="docs/assets/examples/state-tcp.svg" alt="The TCP state machine laid out left to right, with cycles drawn as orthogonal back edges"></a><br><sub>A state machine with cycles, laid out left to right.</sub></td>
+</tr>
+</table>
+
+### Cluster overview
+
+A whole graph at once, before any box is laid out: containers and found communities as nested clusters, drawn with
+WebGL by `@arqlet/viewer` (engine operation `overview`, [ADR 0018](docs/adr/0018-cluster-overview.md)). A cluster opens
+into the layered layout when you drill down. Synthetic graphs from `benchmarks/overview/generate.py` (seed 1), as the
+playground's overview page draws them (`apps/playground/overview.html`).
+
+<table>
+<tr>
+<td width="50%"><a href="docs/assets/examples/overview-code-50000.jpg"><img src="docs/assets/examples/overview-code-50000.jpg" alt="The cluster overview of a synthetic code index of about 51 000 nodes: directories as nested coloured clusters, edges as faint lines between them"></a><br><sub>A synthetic code index: about 51 000 nodes and 75 000 edges in nested clusters.</sub></td>
+<td width="50%"><a href="docs/assets/examples/overview-calls-flat.jpg"><img src="docs/assets/examples/overview-calls-flat.jpg" alt="The cluster overview of a flat synthetic call graph of about 6 000 nodes, grouped into communities marked with an approximately sign"></a><br><sub>A flat call graph without containers: about 6 000 nodes grouped into found communities (≈).</sub></td>
 </tr>
 </table>
 
@@ -101,7 +115,7 @@ depend on the Git repository instead):
 
 ```toml
 [dependencies]
-arqlet = "0.7"
+arqlet = "0.8"
 ```
 
 ```rust

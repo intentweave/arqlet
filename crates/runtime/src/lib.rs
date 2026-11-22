@@ -3798,6 +3798,13 @@ fn reference_response(op: &str, v: &serde_json::Value) -> String {
     }
 }
 
+/// The layout diagnostics an `elkLayout` answer passes on beside the translation's: those a caller of an ELK-style call
+/// can act on (single pass not used, shared tracks given up); the rest stay in the snapshot.
+fn elk_reports(diagnostic: &str) -> bool {
+    diagnostic.starts_with("Single pass was not used")
+        || diagnostic == arqlet_layout::SHARED_TRACKS_FALLBACK
+}
+
 /// Provisional: lays out a graph given in the JSON form ELK uses (`arqlet_elk`) and returns it with the layout written in,
 /// as ELK returns it, with the diagnostics of what had no counterpart and of the layout (a fallback, for example). The request
 /// may add Arqlet `options` (they win over the translated ones), `refine: true` to refine the layout, `threads`, and
@@ -3850,7 +3857,7 @@ fn elk_response(v: &serde_json::Value) -> String {
                 snapshot
                     .layout_diagnostics
                     .iter()
-                    .filter(|d| d.starts_with("Single pass was not used"))
+                    .filter(|d| elk_reports(d))
                     .cloned(),
             )
             .chain(snapshot.geometry_issues.iter().map(|i| i.message.clone()))
@@ -4506,6 +4513,17 @@ pub(crate) fn dispatch_legacy(input: &str) -> String {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn elk_layout_passes_on_the_shared_tracks_fallback() {
+        // The fallback of `sharedTracks` (laid out again without them) reaches an ELK-style caller, as a single pass that
+        // was not used does; other layout diagnostics stay in the snapshot.
+        assert!(super::elk_reports(arqlet_layout::SHARED_TRACKS_FALLBACK));
+        assert!(super::elk_reports("Single pass was not used: organic area"));
+        assert!(!super::elk_reports(
+            "First view: 3 boxes, 1 over the node budget of 2"
+        ));
+    }
+
     use super::*;
 
     /// The pipeline before single pass became the default (ADR 0016). These tests exercise its refinement portfolio, its

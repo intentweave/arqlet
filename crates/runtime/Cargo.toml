@@ -21,8 +21,7 @@ path = "tests/all.rs"
 
 [features]
 benchmark-timings = ["arqlet-layout/benchmark-timings"]
-# The operation `query` (ADR 0021, M5b; provisional). Off by default. The query crates are `publish = false` for now, so
-# this crate cannot be published with the feature declared until they are published (a release step, docs/releasing.md).
+# The operation `query` (ADR 0021, M5b; provisional). Off by default; the query crates are published as provisional.
 query = ["dep:arqlet-query", "dep:arqlet-query-model", "dep:arqlet-query-json"]
 
 [dependencies]
