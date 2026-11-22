@@ -16,6 +16,8 @@ export interface OverviewRendererOptions {
   /** Provisional: the names of nodes (`setNames`) and their details. */
   names?: boolean;
   details?: boolean;
+  /** Provisional: the appearance (style.js, ADR 0026): trace, route, line and bus colours from its theme, cluster colours from its palette. */
+  style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null;
   /** Dim the edges by how many overlap on a pixel (default true). */
   edgeDimming?: boolean;
 }
@@ -32,6 +34,8 @@ export interface OverviewRenderer {
   /** Provisional: whether the galaxy style is on (glows and stars instead of discs and rings, faint lines, added light). */
   readonly galaxy: boolean;
   setGalaxy(on: boolean): void;
+  /** Provisional: sets the appearance (null: the overview's own colours). */
+  setStyle(style: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null): void;
   /** Provisional: the orbit (pseudo-3D): turned by `yaw` and `pitch` (radians) around the view's centre, points at depths
    * of up to `depth` world units; null is flat. Under the orbit a drag turns the drawing and Shift-drag pans. */
   readonly orbit: {yaw: number; pitch: number; depth: number} | null;

@@ -1,3 +1,5 @@
+import {createStyle} from './style.js';
+import {parseColour} from './scene-buffers.js';
 // Cluster overview (ADR 0018), the part without DOM or WebGL: the hierarchy of an `overview` result, the vertex buffers
 // a renderer draws, picking and the excerpt of a drill-down. Pure; the engine computes every position.
 
@@ -239,10 +241,15 @@ export function representationsOf(model, view, width, height, {
  * scene), and per structured cluster its `back` boxes (containers), `routes` (lines), `arrows` (triangles at each route's
  * target, so the logical direction shows) and `front` boxes (leaves).
  */
-export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null, galaxy = false} = {}) {
+export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null, galaxy = false, style = null} = {}) {
   const {overview: o, n, children, depth, cluster, tops} = model;
+  // The appearance (style.js, ADR 0026): with a style that is not the default, the trace, the routes inside structured
+  // clusters, the lines between clusters and the buses take its theme's colours, and the clusters its palette when it
+  // brings one; without one the overview's own colours.
+  const look = style ? createStyle(style) : null, themed = !!look && !look.isDefault, rgb = c => parseColour(c).slice(0, 3);
   // A path (`pathOf`): its discs and lines are drawn in amber; with `fade` everything else is dimmed.
-  const AMBER = [1, 0.78, 0.38];
+  const AMBER = themed ? rgb(look.theme.trace) : [1, 0.78, 0.38];
+  const NEUTRAL = themed ? rgb(look.theme.row) : [0.62, 0.7, 0.82], ROUTE = themed ? rgb(look.theme.route) : [0.6, 0.85, 0.75];
   const onPath = i => !!trace && (trace.nodes.has(i) || trace.clusters.has(i));
   const dim = (rgb, i) => (trace?.fade && !onPath(i) ? rgb.map(v => v * 0.35) : rgb);
   // The outline of a node by its kind, as a tenth added to the shape kind (the shader reads it back).
@@ -252,7 +259,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     return k > 0 ? outlineCode[k] : 0;
   };
   const ordinal = new Map(tops.map((r, k) => [r, k]));
-  const colour = i => clusterColour(ordinal.get(cluster[i]));
+  const colour = look?.hasOwnPalette ? i => rgb(look.palette[ordinal.get(cluster[i]) % look.palette.length]) : i => clusterColour(ordinal.get(cluster[i]));
   const owner = ownersOf(model, expanded, collapsed);
   // A container inside a chain shares its top's disc: only the top's ring is drawn.
   const folded = i => model.chainTop && model.chainTop[i] !== i && children[i].length > 0;
@@ -320,7 +327,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
       }
       const points = inner.map(place.apply);
       const litRoute = trace && [route.id, ...(route.members ?? [])].some(id => trace.edgeIds.has(id));
-      const [rr, rg, rb, ra] = litRoute ? [...AMBER, 1] : trace?.fade ? [0.6, 0.85, 0.75, 0.25] : [0.6, 0.85, 0.75, 0.9];
+      const [rr, rg, rb, ra] = litRoute ? [...AMBER, 1] : [...ROUTE, trace?.fade ? 0.25 : 0.9];
       for (let k = 1; k < points.length; k++) routes.push(...points[k - 1], rr, rg, rb, ra, ...points[k], rr, rg, rb, ra);
       if (points.length >= 2 && !outward) arrowHead(arrows, points.at(-2), points.at(-1), Math.max(4 * place.scale, 0.6));
     }
@@ -350,7 +357,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     };
     const from = end(a), to = end(b);
     // In the galaxy style every edge takes its source's colour: where a cluster's edges run, its light runs.
-    const [red, green, blue] = galaxy || cluster[a] === cluster[b] ? colour(a) : [0.62, 0.7, 0.82];
+    const [red, green, blue] = galaxy || cluster[a] === cluster[b] ? colour(a) : NEUTRAL;
     // An edge that leaves a structured cluster is drawn stronger: it is one of few. It ends in an arrow at a disc outside.
     const leg = owner[a] >= 0 || owner[b] >= 0;
     const lit = trace?.edges.has(k);
@@ -370,14 +377,14 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     const [ra, rb] = key.split('>').map(Number);
     if (ra === rb) continue;
     const lit = litBundles.has(key);
-    const [red, green, blue] = lit ? AMBER : cluster[ra] === cluster[rb] ? colour(ra) : [0.62, 0.7, 0.82];
+    const [red, green, blue] = lit ? AMBER : cluster[ra] === cluster[rb] ? colour(ra) : NEUTRAL;
     const alpha = lit ? 0.95 : Math.min(0.55, 0.06 + 0.04 * Math.sqrt(count)) * (trace?.fade ? 0.3 : 1);
     edges.push(o.x[ra], o.y[ra], red, green, blue, alpha, o.x[rb], o.y[rb], red, green, blue, alpha);
   }
   // The bus lines as thick orthogonal connectors: the line, and from each member (or the cluster that shows it) a tap that
   // leaves its disc at the rim (the stub), runs at a right angle to the line and, for a member beyond the line's ends,
   // along it to the end; a square junction where it meets the line. All as triangles, so they keep their width.
-  const BUS = [0.44, 0.58, 0.72], buses = [];
+  const BUS = themed ? rgb(look.theme.bus) : [0.44, 0.58, 0.72], buses = [];
   for (const [i, l] of lines) {
     const lit = !!trace && trace.nodes.has(i);
     const [red, green, blue] = i === selected ? [1, 1, 1] : lit ? AMBER : dim(BUS, i);

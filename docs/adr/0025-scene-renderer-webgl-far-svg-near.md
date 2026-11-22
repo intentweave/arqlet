@@ -184,6 +184,24 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
 - React Flow as the near layer draws bus bars, taps, junctions, hub references and membership hulls through
   `toReactFlow(scene, {overlayNode: true})` (hulls are new among its overlays).
 
+### Consolidating the cluster overview (planned)
+
+The cluster overview (ADR 0018, `overview-gl.js`) is a second GPU renderer: WebGL 1, its own programs for discs, lines,
+the lens, the orbit, the galaxy style, breathing and morphing, and its own drawing of the structured clusters' boxes and
+routes. One GPU stack for both gives WebGPU to the overview, one appearance, one morph for both (the scene's animation,
+section 6) and later a continuous zoom from the overview into a cluster and on into the SVG near layer. Steps, each
+keeping every overview feature:
+
+- **O1 — the style (done):** the overview reads the appearance (ADR 0026): theme colours for the trace, the routes in
+  structured clusters, the lines between clusters and the buses; the clusters from a sheet's palette.
+- **O2 — the overview on the shared backends:** its programs ported into the shell of `scene-renderer.js` as further
+  pipelines (GLSL ES 3.00 and WGSL), WebGPU first and WebGL 2 as the fallback; checked against the WebGL 1 renderer
+  pixel by pixel in every mode (discs, galaxy, orbit, lens, a frame of breathing and of a morph) before it goes.
+- **O3 — one drawing of structured clusters:** the boxes and routes inside a disc come from `sceneBuffers` with the
+  disc's transform, so they look as in the scene view.
+- **O4 — one morph and the continuous zoom:** the morph of O2 serves the scene (section 6); zooming into a structured
+  cluster hands over to the scene view of that cluster.
+
 ## Measurements before defaults
 
 The budget of the near layer, the size threshold, the hysteresis and the compaction ratio are set by measurement on the
