@@ -1174,6 +1174,9 @@ pub enum RoutingStyle {
     /// The polyline, with its corners drawn as arcs (see `RoundedOrthogonal`). The scene keeps a larger distance to
     /// the nodes, so the arcs do not cut into them.
     RoundedPolyline,
+    /// The orthogonal route with its corners cut at 45° (a diagonal of at most `realize::CHAMFER` per corner, shorter
+    /// where a segment is short, none where it would touch a node). The layout keeps the orthogonal route; the scene
+    /// carries the cut one.
     Octilinear,
     Curve,
     Bus,
@@ -1189,6 +1192,7 @@ impl RoutingStyle {
                 | Self::RoundedOrthogonal
                 | Self::Polyline
                 | Self::RoundedPolyline
+                | Self::Octilinear
         )
     }
 
@@ -1271,6 +1275,10 @@ impl RoutingConstraint {
     /// Whether the non-straight edges of the area are drawn with rounded corners (see `picks`).
     pub fn rounds(&self) -> bool {
         self.picks(RoutingStyle::RoundedOrthogonal) || self.picks(RoutingStyle::RoundedPolyline)
+    }
+    /// Whether the routes under this constraint are drawn octilinear (corners cut at 45°).
+    pub fn chamfers(&self) -> bool {
+        self.picks(RoutingStyle::Octilinear)
     }
 }
 
