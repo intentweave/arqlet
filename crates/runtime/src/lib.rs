@@ -24,6 +24,7 @@ pub mod peek;
 pub mod port_edit;
 pub mod protocol;
 pub mod session;
+pub mod session_store;
 pub mod settle;
 pub mod trace;
 

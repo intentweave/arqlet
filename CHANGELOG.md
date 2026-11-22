@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- A byte limit for a backend's sessions (provisional, ADR 0023 step R7): the sessions of a long-running
+  `layout-command --sessions` process live in `arqlet_runtime::session_store::SessionStore`; with `--session-bytes N`
+  the session that ran a message is weighed again (`EngineSession::heap_estimate`, cheap, no JSON text) and, while the
+  sessions together weigh more than `N`, the least recently used one that holds something is dropped (never the one that
+  just ran, never an empty one just opened); its next message is answered as an unknown session, and the answer of the
+  message that caused it says `evictedSessions`. `{"sessions": "list"}` names the open ones. The playground backend sets
+  2 GiB (`ARQLET_SESSION_BYTES`) and forgets the keys of dropped sessions.
 - Moving a resident session to a new engine (provisional, ADR 0023 step R7): `session.recycle(newEngine)` exports the
   snapshot and the content from the old engine, loads them into a session of the new one and closes the old, so that
   the host can end the old worker and its memory comes back (WebAssembly never shrinks its linear memory). The view,

@@ -4,7 +4,9 @@ Date: 2026-11-21.
 Status: proposed. Steps R1 (content in the engine session, operation `payload`, 2026-11-22,
 `benchmarks/results/content-memory-20261122.md`) and R2 (the change log: `change`, `changesSince`, `content`; replay
 tested byte for byte) are implemented, provisional, behind their own operations; of R7, `memory`, `release` and
-moving a session to a new engine (`session.recycle`; 2026-11-22, `benchmarks/results/memory-release-20261122.md`). The other steps are not.
+moving a session to a new engine (`session.recycle`) and the byte limit with least-recently-used eviction for a
+backend's sessions (`SessionStore`, `--session-bytes`; 2026-11-22, `benchmarks/results/memory-release-20261122.md`), so R7 is
+complete. The other steps are not.
 
 Related: [ADR 0019](0019-engine-interface.md) (protocol, sessions, state stays where it is computed, the columnar data
 path, prepared source and lean snapshots), [ADR 0021](https://github.com/intentweave/arqlet/pull/70) (proposed: a Cypher
