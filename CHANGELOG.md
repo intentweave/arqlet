@@ -5,6 +5,38 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+## 0.8.0 — 2026-11-22
+
+A view controller for hosts and less memory. `@arqlet/engine-client` gains a headless view controller (selection,
+details, search and focus, bookmarks, keyboard navigation, a look into a collapsed container, refinement on a second
+engine), and the playground runs on it. Memberships cross the hierarchy (ADR 0022): groups of nodes in dimensions of
+their own, drawn as hulls, and a grouping priority that lets a dimension own the view's structure. A resident session
+keeps content beside the layout, logs every change in one sequence, reports and gives back its memory, moves to a new
+engine, and a backend limits its sessions by bytes (ADR 0023). The import peak of a large view fell by about 40 %
+(byte-identical output). The Cypher query layer (ADR 0021) is published as provisional crates and runs in the
+playground; the npm engine is built without it.
+
+### Upgrading from 0.7
+
+- **`membershipViews` is removed** (it was provisional): use `groupingPriority` (`{"team": "overlay"}` is
+  `[{"by": "parent"}, {"by": "team"}]`). Options, `configure` requests and stored snapshots that still carry it are
+  refused with a message.
+- **Membership hulls are rectangles by default**: `membershipHull: "polygon"` gives 0.7's outline. Drawing only.
+- **The engine version is `0.8.0`**: edits of a snapshot from an earlier engine are refused, so import the graph again.
+  Default layouts are unchanged; the reference fingerprints are
+  `fingerprints-20261122-default-0.8.0.jsonl` (they differ from the 0.7.0 file only in metadata).
+- **The minimum supported Rust version is 1.94** (was 1.88).
+- **New crates on crates.io** (provisional): `arqlet-query`, `arqlet-query-cypher`, `arqlet-query-model`,
+  `arqlet-query-json`, reached through the cargo feature `query` of `arqlet-runtime` (off by default).
+
+### Performance
+
+- The import peak of a large view is about 40 % lower with byte-identical output (a synthetic 114k-node graph, first
+  view of 100 boxes: 864 → 512 MB; 20k: 68.8 → 49.8 MB; counted heap, `benchmarks/session-memory`): large summaries get
+  their room at once, a channel's ordering preferences are shared and stored as `u32` pairs, the placement's memos are
+  released before the completion, and the placement works on shared ids (`arqlet_layout::id::Id`) instead of copied
+  strings. Measurements: `benchmarks/results/session-memory-20261121.md`.
+
 ### Added
 
 - A query field in the playground (provisional, ADR 0021): an openCypher query over the source graph and its content,

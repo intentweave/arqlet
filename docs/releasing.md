@@ -7,14 +7,14 @@ Provisional. Arqlet is a prototype; releases are `0.x` and may break any API.
 | Registry | Package | Contents |
 |---|---|---|
 | crates.io | `arqlet` | facade: re-exports the engine crates, `dispatch` and `dispatch_streaming` |
-| crates.io | `arqlet-model`, `arqlet-topology`, `arqlet-routing`, `arqlet-scene`, `arqlet-view`, `arqlet-layout`, `arqlet-reference`, `arqlet-elk`, `arqlet-runtime` | the engine crates, exact internal versions (`=x.y.z`) |
+| crates.io | `arqlet-model`, `arqlet-topology`, `arqlet-routing`, `arqlet-scene`, `arqlet-view`, `arqlet-layout`, `arqlet-reference`, `arqlet-elk`, `arqlet-runtime`, and (provisional, since 0.8.0) `arqlet-query`, `arqlet-query-cypher`, `arqlet-query-model`, `arqlet-query-json` | the engine crates, exact internal versions (`=x.y.z`) |
 | npm | `arqlet` | entry point: re-exports engine client and viewer, types from contracts |
 | npm | `@arqlet/engine-client` | `arqlet.wasm` (built by `prepack`), loader, worker, ELK-style call, presets |
 | npm | `@arqlet/viewer` | SVG renderer, navigation, route helpers, React Flow mapping |
 | npm | `@arqlet/contracts` | bundled TypeScript types (`dist/index.d.ts`, built by `prepack`) |
 
 Not published: `arqlet-wasm` (its output ships in `@arqlet/engine-client`), `arqlet-contracts` (tooling), `arqlet-node`
-(placeholder), `@arqlet/containment-tree`, `@arqlet/playground`, the examples and the Intentweave exporter.
+(placeholder), `arqlet-query-cli` and `arqlet-query-wasm` (provisional tools of the query layer), `@arqlet/containment-tree`, `@arqlet/playground`, the examples and the Intentweave exporter.
 
 ## Version bump
 
@@ -36,7 +36,8 @@ and the WASM adapter with exactly that version. A change of edition is a separat
 ## Dry run
 
 ```sh
-cargo publish --dry-run --workspace --exclude arqlet-wasm --exclude arqlet-contracts --exclude arqlet-node
+cargo publish --dry-run --workspace --exclude arqlet-wasm --exclude arqlet-contracts --exclude arqlet-node \
+  --exclude arqlet-query-cli --exclude arqlet-query-wasm
 for p in contracts engine-client viewer arqlet; do (cd packages/$p && pnpm pack --pack-destination /tmp/arqlet-pack); done
 ```
 
@@ -52,7 +53,8 @@ Publishing cannot be undone (crates.io only allows yanking; npm unpublish is lim
 
 ```sh
 cargo login                       # token from crates.io
-cargo publish --workspace --exclude arqlet-wasm --exclude arqlet-contracts --exclude arqlet-node
+cargo publish --workspace --exclude arqlet-wasm --exclude arqlet-contracts --exclude arqlet-node \
+  --exclude arqlet-query-cli --exclude arqlet-query-wasm
 npm login                         # the account that owns the @arqlet organisation
 pnpm -r --filter @arqlet/contracts --filter @arqlet/engine-client --filter @arqlet/viewer --filter arqlet publish --access public
 git tag -a vx.y.z -m x.y.z && git push origin vx.y.z
@@ -63,12 +65,12 @@ skips versions that already exist.
 
 ## The `query` feature
 
-`arqlet-runtime` has an optional feature `query` (the operation `query`, ADR 0021 M5b) that depends on the query crates,
-which are `publish = false` for now. `cargo publish` needs every dependency, optional ones too, to exist on the registry,
-so `arqlet-runtime` and `arqlet-wasm` cannot be published with the feature declared until `arqlet-query`,
-`arqlet-query-cypher` and `arqlet-query-model` are published first (they need the publish metadata, a README and the
-licenses of the other crates, and `decypher`'s notice in the npm package). Until then, release from a revision that does
-not declare the feature, or publish the query crates in the same release. The npm artifact is built without the feature.
+`arqlet-runtime` has an optional feature `query` (the operation `query`, ADR 0021 M5b) that depends on the query crates.
+`cargo publish` needs every dependency, optional ones too, to exist on the registry, so since 0.8.0 `arqlet-query`,
+`arqlet-query-cypher`, `arqlet-query-model` and `arqlet-query-json` are published (provisional, with the publish metadata,
+a README and the licenses of the other crates); `cargo publish --workspace` publishes them before `arqlet-runtime`. Their
+one third-party dependency, `decypher`, is recorded in `docs/architecture.md`. The npm artifact is built without the
+feature, so `decypher` is not in the engine package and its notices need no entry there.
 
 ## Later
 
