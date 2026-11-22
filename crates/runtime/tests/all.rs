@@ -102,6 +102,8 @@ mod pin_search;
 mod pinned_overlap;
 #[path = "pins.rs"]
 mod pins;
+#[path = "query.rs"]
+mod query;
 #[path = "reference.rs"]
 mod reference;
 #[path = "reference_corpus.rs"]

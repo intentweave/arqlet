@@ -271,6 +271,22 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
     },
 
     /**
+     * Provisional (ADR 0021, M5b; read only, needs an engine built with the cargo feature `query`): an openCypher query over
+     * the session's source graph and its content (`payload`): `{ok, columns, rows, rowCount, nodes, edges, graph, ...}`.
+     * Nodes and edges in `rows` are `{node: id}` and `{edge: id}`; `nodes` and `edges` list the ids once each. `params`
+     * are the `$name` values; `maxSteps`, `maxRows` and `maxHops` lower or raise the execution limits; with `view: true`
+     * the answer also has `shown`, the box that shows each node and the line that carries each edge. A failure is
+     * `{ok: false, error: 'query <class>: ...'}` with the class `syntax`, `unsupported`, `runtime` or `limit`. A query
+     * sees the source graph the engine kept (for a bounded import the selection; `graph` gives its size).
+     */
+    async query(text, {params, view, maxSteps, maxRows, maxHops} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'query', snapshot, query: text, ...(params ? {params} : {}), ...(view ? {view: true} : {}),
+        ...(maxSteps !== undefined ? {maxSteps} : {}), ...(maxRows !== undefined ? {maxRows} : {}),
+        ...(maxHops !== undefined ? {maxHops} : {})});
+    },
+
+    /**
      * Provisional (view details, read only): what the engine knows about a node (`{nodeId}`) or an edge (`{edgeId}`, a
      * drawn line or an edge of the source graph): the containers above a node and the box that shows it, what a collapsed
      * box holds, the edges a line stands for in either direction (at most `limit` ids each, counts complete).

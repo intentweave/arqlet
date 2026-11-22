@@ -192,6 +192,11 @@ pub enum Request {
         #[serde(flatten)]
         body: Map<String, Value>,
     },
+    /// An openCypher query over the source graph and the content (read only, provisional; cargo feature `query`).
+    Query {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
     /// A look into a collapsed container without opening it (read only, provisional).
     Peek {
         #[serde(flatten)]
@@ -582,6 +587,7 @@ impl Request {
             Some("find") => return Ok(Request::Find { body: body() }),
             Some("digest") => return Ok(Request::Digest { body: body() }),
             Some("peek") => return Ok(Request::Peek { body: body() }),
+            Some("query") => return Ok(Request::Query { body: body() }),
             Some("payload") => {
                 return Err(
                     "payload needs a resident session (the content is kept by the session)".into(),
@@ -1070,6 +1076,9 @@ fn handle_request(request: Request) -> Response {
             crate::details::details_answer(&with_op("details", body)),
             |a| Response::Details(Box::new(a)),
         ),
+        Request::Query { body } => {
+            Response::Encoded(crate::query::query_response(&with_op("query", body)).to_string())
+        }
         Request::Peek { body } => {
             Response::Encoded(crate::peek::peek_response(&with_op("peek", body)).to_string())
         }

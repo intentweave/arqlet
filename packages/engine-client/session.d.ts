@@ -70,6 +70,41 @@ export interface PeekAnswer {
 export type DetailTarget = {nodeId: string; edgeId?: never} | {edgeId: string; nodeId?: never};
 
 /** The answer of a read-only request (`trace`, `neighbourhood`): its fields beside `ok: true`, or the error. */
+/** Provisional (ADR 0021, M5b): what a query is given besides its text. */
+export interface QueryInit {
+  /** The values of the `$name` parameters (JSON values; a map is refused). */
+  params?: Record<string, unknown>;
+  /** Also map the answer onto the current view (`shown`); costs a few milliseconds on a large view. */
+  view?: boolean;
+  /** Execution limits (steps of work, rows held, hops of an unbounded `*`). */
+  maxSteps?: number;
+  maxRows?: number;
+  maxHops?: number;
+}
+
+/** A value in a row of a query answer: a JSON value, a node as `{node: id}`, an edge as `{edge: id}`, or a list. */
+export type QueryValue = null | boolean | number | string | {node: string} | {edge: string} | QueryValue[];
+
+/** Provisional (ADR 0021, M5b): the answer of a query. */
+export interface QueryAnswer {
+  columns: string[];
+  rows: QueryValue[][];
+  rowCount: number;
+  /** The ids of the nodes and edges in the rows, once each, in the order they first appear. */
+  nodes: string[];
+  edges: string[];
+  /** What the query could see: the session's source graph (resolved edges only). */
+  graph: {nodes: number; edges: number};
+  /** The content's revision, when the session has content. */
+  contentRevision?: number;
+  /** Content for ids the graph does not have (kept, ignored by the query). */
+  ignoredContent?: number;
+  /** Content values the query layer has no type for (a map), read as null. */
+  skippedValues?: number;
+  /** With `view: true`: the box that shows each node and the drawn line that carries each edge (null when none). */
+  shown?: {nodes: Record<string, string | null>; edges: Record<string, string | null>};
+}
+
 export type ReadAnswer<T> = ({ok: true} & T) | {ok: false; error: string};
 
 /** Provisional: one graph, its current snapshot, and changes applied in order with revision checks. */
@@ -127,6 +162,11 @@ export interface Session {
    * shows each; at most `limit` (default 20), only `nodeKinds` if given.
    */
   find(query: string, init?: {limit?: number; nodeKinds?: string[]; key?: string}): Promise<ReadAnswer<FindAnswer>>;
+  /**
+   * Provisional (ADR 0021, M5b; read only): an openCypher query over the session's source graph and its content. Needs an
+   * engine built with the cargo feature `query`; otherwise `{ok: false, error}` says so. See {@link QueryAnswer}.
+   */
+  query(text: string, init?: QueryInit): Promise<ReadAnswer<QueryAnswer>>;
   /**
    * Provisional (ADR 0023, R1): sets, unsets or clears properties in the session's content (beside the snapshot, never in
    * it). Needs a resident session.

@@ -21,6 +21,7 @@ pub mod patch;
 pub mod peek;
 pub mod port_edit;
 pub mod protocol;
+pub mod query;
 pub mod session;
 pub mod settle;
 pub mod trace;

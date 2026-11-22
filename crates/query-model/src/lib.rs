@@ -65,6 +65,38 @@ fn table(
     Ok(out)
 }
 
+/// Where the properties of nodes and edges come from. A host that keeps them in its own form (a session keeps JSON) reads
+/// them through this trait instead of copying them into a [`Payload`] for every query.
+pub trait PayloadSource {
+    /// The property `key` of the node `id`; null when there is none.
+    fn node_property(&self, id: &str, key: &str) -> Value;
+    /// The property `key` of the edge `id`; null when there is none.
+    fn edge_property(&self, id: &str, key: &str) -> Value;
+    /// How many ids it holds properties for that `known_node` and `known_edge` do not accept.
+    fn unknown(
+        &self,
+        known_node: &dyn Fn(&str) -> bool,
+        known_edge: &dyn Fn(&str) -> bool,
+    ) -> usize;
+}
+
+impl PayloadSource for Payload {
+    fn node_property(&self, id: &str, key: &str) -> Value {
+        payload_value(self.nodes.get(id), key)
+    }
+    fn edge_property(&self, id: &str, key: &str) -> Value {
+        payload_value(self.edges.get(id), key)
+    }
+    fn unknown(
+        &self,
+        known_node: &dyn Fn(&str) -> bool,
+        known_edge: &dyn Fn(&str) -> bool,
+    ) -> usize {
+        self.nodes.keys().filter(|id| !known_node(id)).count()
+            + self.edges.keys().filter(|id| !known_edge(id)).count()
+    }
+}
+
 /// A JSON value as a query value. A map, and an integer beyond `i64`, are refused instead of being changed.
 pub fn value_of(json: &serde_json::Value) -> Result<Value, String> {
     use serde_json::Value as J;
@@ -85,19 +117,18 @@ pub fn value_of(json: &serde_json::Value) -> Result<Value, String> {
 /// A graph and its payload as a [`GraphStore`].
 pub struct ModelStore<'a> {
     graph: &'a Graph,
+    payload: &'a dyn PayloadSource,
     /// For each resolved edge, in graph order: its index in `graph.edges`, its source and its target (node indices).
     edges: Vec<(usize, u32, u32)>,
     /// For each node, the resolved edges that start and that end at it, ascending.
     out: Vec<Vec<u32>>,
     incoming: Vec<Vec<u32>>,
-    node_payload: Vec<Option<&'a BTreeMap<String, Value>>>,
-    edge_payload: Vec<Option<&'a BTreeMap<String, Value>>>,
     ignored: usize,
 }
 
 impl<'a> ModelStore<'a> {
     /// Indexes the graph. Cost: one pass over the nodes and the edges.
-    pub fn new(graph: &'a Graph, payload: &'a Payload) -> ModelStore<'a> {
+    pub fn new(graph: &'a Graph, payload: &'a dyn PayloadSource) -> ModelStore<'a> {
         let index: HashMap<&str, u32> = graph
             .nodes
             .iter()
@@ -107,6 +138,7 @@ impl<'a> ModelStore<'a> {
         let mut edges = Vec::new();
         let mut out = vec![Vec::new(); graph.nodes.len()];
         let mut incoming = vec![Vec::new(); graph.nodes.len()];
+        let mut resolved: HashMap<&str, ()> = HashMap::new(); // only to find an edge by id; never iterated
         for (i, edge) in graph.edges.iter().enumerate() {
             let source = index.get(edge.source.as_str());
             let target = edge.target.as_deref().and_then(|t| index.get(t));
@@ -115,28 +147,19 @@ impl<'a> ModelStore<'a> {
             };
             let id = edges.len() as u32;
             edges.push((i, source, target));
+            resolved.insert(edge.id.as_str(), ());
             out[source as usize].push(id);
             incoming[target as usize].push(id);
         }
-        let node_payload: Vec<_> = graph
-            .nodes
-            .iter()
-            .map(|n| payload.nodes.get(&n.id))
-            .collect();
-        let edge_payload: Vec<_> = edges
-            .iter()
-            .map(|(i, _, _)| payload.edges.get(&graph.edges[*i].id))
-            .collect();
-        let known_nodes = node_payload.iter().flatten().count();
-        let known_edges = edge_payload.iter().flatten().count();
-        let ignored = (payload.nodes.len() - known_nodes) + (payload.edges.len() - known_edges);
+        let ignored = payload.unknown(&|id| index.contains_key(id), &|id| {
+            resolved.contains_key(id)
+        });
         ModelStore {
             graph,
+            payload,
             edges,
             out,
             incoming,
-            node_payload,
-            edge_payload,
             ignored,
         }
     }
@@ -177,7 +200,7 @@ impl GraphStore for ModelStore<'_> {
             "kind" => Value::String(n.kind.clone()),
             "label" => Value::String(n.label.clone()),
             "parentId" => n.parent_id.clone().map_or(Value::Null, Value::String),
-            _ => payload_value(self.node_payload[node.0 as usize], key),
+            _ => self.payload.node_property(&n.id, key),
         }
     }
 
@@ -195,7 +218,7 @@ impl GraphStore for ModelStore<'_> {
             "id" => Value::String(e.id.clone()),
             "kind" => Value::String(e.kind.clone()),
             "weight" => Value::Int(e.count() as i64),
-            _ => payload_value(self.edge_payload[edge.0 as usize], key),
+            _ => self.payload.edge_property(&e.id, key),
         }
     }
 
