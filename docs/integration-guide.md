@@ -142,6 +142,11 @@ A resident session can also keep them as **content** (provisional, ADR 0023 step
 `contentRevision`; `details` then answers `properties`, and `find(query, {key: 'owner'})` searches one property. Layout
 never reads content, so it changes no drawing. The query layer of ADR 0021 will read the same content.
 
+Every change of the source in a resident session, structure (`patch`) or content (`payload`), is a numbered group in the
+session's change log (provisional, ADR 0023 step R2). `session.change({patch, payload})` applies both as one group, all
+or nothing; `session.changesSince(n)` answers the groups after `n` (or `resync` when they are gone), so a second session
+that holds the snapshot at `n` can apply them and arrive at the same state, byte for byte.
+
 ## 7. Keeping and sharing a view
 
 `controller.bookmark()` returns the view as a value: the engine's intent (open groups, pages, filter, options), the

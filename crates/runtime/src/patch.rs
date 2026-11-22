@@ -24,6 +24,28 @@ pub fn patch_snapshot(
     if patch.is_empty() {
         return Ok(snapshot.clone());
     }
+    // A change of memberships only moves nothing (ADR 0022 §5b): no mode reads them for the layout (an overlay is drawn
+    // from the boxes the layout already has), so the view is answered from the layout it has, with the new revision.
+    if patch.memberships_only() {
+        let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+        let mut graph = source.clone();
+        graph.memberships = patched_memberships(&graph.memberships, patch)?;
+        validate(&graph)?;
+        let mut result = snapshot.clone();
+        result.graph.memberships = graph.memberships.clone();
+        if snapshot.source_graph.is_some() {
+            result.source_graph = Some(graph.into());
+        }
+        // The kept structure names the earlier source graph; the next projection builds it again.
+        result.structure = None;
+        result.revision = snapshot.revision + 1;
+        result.base_revision = Some(snapshot.revision);
+        result.layout_version = snapshot
+            .layout_version
+            .checked_add(1)
+            .ok_or("Layout version overflow")?;
+        return Ok(result);
+    }
     let mut graph = snapshot
         .source_graph
         .as_deref()
@@ -101,6 +123,8 @@ pub fn patch_snapshot(
         bus.edges.retain(|e| kept_edges.contains(e));
     }
     graph.buses.retain(|b| !b.edges.is_empty());
+    // Provisional (ADR 0022 §5b): the memberships changed by dimension and group; validated with the graph below.
+    graph.memberships = patched_memberships(&graph.memberships, patch)?;
     validate(&graph)?;
     // The view state that names removed nodes forgets them.
     let mut options = snapshot.options.clone();
@@ -159,4 +183,76 @@ pub fn patch_snapshot(
     result.collapsed_ids = collapsed.into_iter().collect();
     result.omitted_unresolved_edges = omitted;
     Ok(result)
+}
+
+/// The memberships after a patch: `removeMemberships` first (a whole dimension, or a group with the groups nested in it;
+/// unknown ones refused), then `memberships` (a dimension of the same id takes the groups given, replacing a group of the
+/// same id and appending new ones, and a label if one is given; a new dimension is appended).
+fn patched_memberships(
+    old: &arqlet_model::Memberships,
+    patch: &GraphPatch,
+) -> Result<arqlet_model::Memberships, String> {
+    let mut out = old.clone();
+    for removal in &patch.remove_memberships {
+        let at = out
+            .dimensions
+            .iter()
+            .position(|d| d.id == removal.dimension)
+            .ok_or_else(|| format!("Unknown membership dimension: {}", removal.dimension))?;
+        match &removal.group {
+            None => {
+                out.dimensions.remove(at);
+            }
+            Some(group) => {
+                let dimension = &mut out.dimensions[at];
+                if !dimension.groups.iter().any(|g| &g.id == group) {
+                    return Err(format!(
+                        "Unknown membership group: {}/{group}",
+                        removal.dimension
+                    ));
+                }
+                // The group and every group nested in it, by walking up each group's parents.
+                let parent: BTreeMap<String, Option<String>> = dimension
+                    .groups
+                    .iter()
+                    .map(|g| (g.id.clone(), g.parent.clone()))
+                    .collect();
+                let inside = |id: &str| {
+                    let mut at = Some(id.to_string());
+                    let mut steps = 0usize;
+                    while let Some(current) = at {
+                        if &current == group {
+                            return true;
+                        }
+                        steps += 1;
+                        if steps > parent.len() {
+                            return false;
+                        }
+                        at = parent.get(&current).cloned().flatten();
+                    }
+                    false
+                };
+                dimension.groups.retain(|g| !inside(&g.id));
+            }
+        }
+    }
+    if let Some(added) = &patch.memberships {
+        for dimension in &added.dimensions {
+            match out.dimensions.iter_mut().find(|d| d.id == dimension.id) {
+                Some(existing) => {
+                    if !dimension.label.is_empty() {
+                        existing.label = dimension.label.clone();
+                    }
+                    for group in &dimension.groups {
+                        match existing.groups.iter_mut().find(|g| g.id == group.id) {
+                            Some(g) => *g = group.clone(),
+                            None => existing.groups.push(group.clone()),
+                        }
+                    }
+                }
+                None => out.dimensions.push(dimension.clone()),
+            }
+        }
+    }
+    Ok(out)
 }
