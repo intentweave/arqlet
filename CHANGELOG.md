@@ -5,6 +5,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- Scene renderer for large views (ADR 0025 V1–V2, provisional) in `@arqlet/viewer`: a far layer on the GPU, WebGPU
+  first and WebGL 2 as the fallback (`createSceneGpuRenderer`, `createSceneRenderer`, `sceneBackend`), drawing the
+  same boxes, routes, arrowheads, hulls and marks as `renderSvg`, with texts on a 2D canvas and picking; and a scene
+  view with both layers (`createSceneView`, `openSceneView`) that switches to SVG up close (`nearPolicy`, with
+  hysteresis) without moving anything. Frame times while panning and zooming: `benchmarks/results/scene-frames-20261122.md`.
+
 ## 0.8.0 — 2026-11-22
 
 A view controller for hosts and less memory. `@arqlet/engine-client` gains a headless view controller (selection,
