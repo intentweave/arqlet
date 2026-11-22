@@ -13,6 +13,10 @@ Rendering helpers for Arqlet scenes. The engine computes all geometry; these mod
   by the elements in view and their size on screen; `bindSceneNavigation(element, view)` adds wheel zoom and panning;
   `scene-buffers.js` is its pure part (buffers, index, picking, the switch rule); a host may replace the SVG near layer
   with its own (`near`; `reactFlowViewport` for React Flow, see `examples/react-flow`);
+- `style.js`: the appearance for every renderer (provisional, ADR 0026): `createStyle({theme, rules})`, for example
+  `{rules: [{selector: 'edge[kind=import]', style: {stroke: '#e6a560', dash: '4 2'}}, {selector: 'leaf', style: {stroke: 'auto'}}]}`;
+  pass it as `style` to `renderSvg`, the scene view or `toReactFlow`; theme colours may come from CSS custom properties
+  (`--arqlet-leaf-fill`, `themeFromCss`);
 - `overview.js`, `overview-gl.js`: the cluster overview of a whole graph (engine operation `overview`), drawn with WebGL, with picking and the excerpt for a drill-down.
 
 > **Status: prototype.** The API, the JSON protocol and the snapshot format are

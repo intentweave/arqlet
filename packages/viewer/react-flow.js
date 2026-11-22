@@ -1,5 +1,12 @@
+import {createStyle} from './style.js';
 /** Pure adapter: no React dependency and no secondary routing. */
-export function toReactFlow(scene,{overlayNode=false,draggable=false}={}){
+export function toReactFlow(scene,{overlayNode=false,draggable=false,style:sheet}={}){
+ // With a style (style.js), every node and edge carries its resolved look (`data.look`), the theme filled in, so a host's
+ // node and edge types draw what renderSvg and the GPU layer draw.
+ const style=sheet?createStyle(sheet):null,T=style?.theme;
+ const nodeLook=n=>{const o=style.node(n);return {fill:o.fill??(n.container?T.frameFill:T.leafFill),stroke:o.stroke??(n.container?T.frameStroke:T.leafStroke),text:o.text??(n.container?T.title:T.text),
+  strokeWidth:o.strokeWidth??1,...(o.dash?{dash:o.dash}:{}),selectedFill:T.selectedFill,selectedStroke:T.selectedStroke,invalid:T.invalid};};
+ const edgeLook=r=>{const o=style.edge(r);return {stroke:o.stroke??T.route,arrow:o.arrow??T.arrow,...(o.width!==undefined?{width:o.width}:{}),...(o.opacity!==undefined?{opacity:o.opacity}:{}),...(o.dash?{dash:o.dash}:{}),invalid:T.invalid};};
  if(scene.schemaVersion!==1)throw Error('Unsupported scene schema');
  const byId=new Map(scene.nodes.map(n=>[n.id,n])),handles=new Map(scene.nodes.map(n=>[n.id,[]]));
  for(const route of scene.routes){
@@ -16,9 +23,9 @@ export function toReactFlow(scene,{overlayNode=false,draggable=false}={}){
     width:n.bounds.width,height:n.bounds.height,style:{width:n.bounds.width,height:n.bounds.height},
     // With `draggable`, leaves can be dragged (a host passes the drag to `session.drag`); containers stay fixed.
     draggable:draggable&&!n.container,connectable:false,deletable:false,zIndex:n.container?0:2,
-    data:{...n,handles:handles.get(n.id),showPorts:scene.showPorts}};
+    data:{...n,handles:handles.get(n.id),showPorts:scene.showPorts,...(style?{look:nodeLook(n)}:{})}};
  });
- const edges=scene.routes.filter(r=>r.points.length>=2).map(r=>({id:r.id,source:r.source,target:r.target,sourceHandle:`source:${r.id}`,targetHandle:`target:${r.id}`,type:'arqlet',zIndex:1,deletable:false,data:r}));
+ const edges=scene.routes.filter(r=>r.points.length>=2).map(r=>({id:r.id,source:r.source,target:r.target,sourceHandle:`source:${r.id}`,targetHandle:`target:${r.id}`,type:'arqlet',zIndex:1,deletable:false,data:style?{...r,look:edgeLook(r)}:r}));
  // What is neither a node nor an edge between two nodes, in flow coordinates (the scene's): bus bars with their taps, the
  // junction dots where shared lines branch, the stubs of hub references and the membership hulls.
  // Membership hulls (ADR 0022) too: polygons behind the nodes, one hue per dimension as renderSvg draws them.

@@ -91,14 +91,28 @@ try {
     for (const backend of [gpu.kind === 'webgpu' ? 'webgpu' : null, 'webgl2'].filter(Boolean)) {
     // The states both layers draw (renderSvg's options): a trace with fading, pins, a selected node, a selected route.
     const stated = [];
+    // A scene by name: one of the examples taken above, or a golden fixture; null when neither (EXAMPLES left it out).
+    const named = async n => window.__scenes?.[n] ?? (['state-tcp', 'bpmn-pools'].includes(n) ? await (await fetch('/packages/viewer/fixtures/' + n + '.scene.json')).json() : null);
     for (const base of ['workflow-dag', 'bpmn-pools']) {
-      const scene = window.__scenes?.[base] ?? await (await fetch('/packages/viewer/fixtures/' + base + '.scene.json')).json();
+      const scene = await named(base);
+      if (!scene) continue;
       const leaves = scene.nodes.filter(n => !n.container), route = scene.routes.find(r => r.points.length > 2) ?? scene.routes[0];
       const distance = Object.fromEntries(scene.nodes.map((n, i) => [n.id, i % 4]));
       stated.push([base + ' trace', scene, {trace: {nodes: [route.source, route.target], routes: [route.id], distance, fade: true}}]);
       stated.push([base + ' pins and selection', scene, {pinned: new Set(leaves.slice(0, 3).map(n => n.id)), selected: leaves[1].id}]);
       stated.push([base + ' selected route', scene, {selectedRoute: route.id}]);
     }
+    // Styles (style.js): routes and leaves by kind, the light theme, and a sheet with tokens, widths, opacity and dashes.
+    const {STYLE_PRESETS} = await import('/packages/viewer/style.js');
+    for (const base of ['uml-class', 'vehicle-buses', 'bpmn-pools']) {
+      const scene = await named(base);
+      if (!scene) continue;
+      stated.push([base + ' style byKind', scene, {style: STYLE_PRESETS.byKind}]);
+      stated.push([base + ' style light', scene, {style: STYLE_PRESETS.light}]);
+    }
+    const custom = {theme: {route: 'rgb(220, 120, 60)', leafFill: '#203040'}, rules: [{selector: 'edge', style: {width: 2.5, opacity: 0.9, dash: '8 4'}}, {selector: 'container', style: {stroke: '$trace', strokeWidth: 2}}, {selector: 'leaf', style: {fill: 'auto'}}]};
+    const customScene = (await named('uml-class')) ?? (await named('bpmn-pools'));
+    stated.push(['custom style', customScene, {style: custom}]);
     const all = [];
     for (const name of ['state-tcp', 'bpmn-pools', ...Object.keys(window.__scenes ?? {})]) all.push([name, window.__scenes?.[name] ?? await (await fetch('/packages/viewer/fixtures/' + name + '.scene.json')).json(), {}]);
     all.push(...stated);

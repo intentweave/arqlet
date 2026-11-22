@@ -8,6 +8,7 @@
 //   hysteresis.
 // - `sceneExcerpt`: the part of a scene in a rectangle, which the near layer hands to `renderSvg`.
 import {isSceneColumns, sceneOfColumns} from './scene-columns.js';
+import {createStyle} from './style.js';
 
 /** Floats per box instance: x, y, width, height, corner radius, kind (0 rect, 1 circle), stroke width, dash (0/1),
  * fill RGBA, stroke RGBA (premultiplied later in the shader). */
@@ -19,10 +20,34 @@ export const TRIANGLE_STRIDE = 7;
 /** The layers in drawing order. */
 export const LAYERS = ['hulls', 'containers', 'routes', 'leaves', 'marks', 'overlay'];
 
-const hex = (h, alpha = 1) => {
-  const v = parseInt(h.slice(1), 16);
-  return [(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255, alpha];
-};
+// A CSS colour as RGBA in 0..1: hex (3, 4, 6 or 8 digits), rgb()/rgba(), hsl()/hsla(); anything else (a named colour)
+// through a canvas where there is one, else opaque black.
+const canvasColours = new Map();
+export function parseColour(css, alpha = 1) {
+  const text = String(css).trim();
+  let m = /^#([0-9a-f]{3,8})$/i.exec(text);
+  if (m) {
+    let h = m[1];
+    if (h.length <= 4) h = [...h].map(c => c + c).join('');
+    const v = n => parseInt(h.slice(n, n + 2), 16) / 255;
+    return [v(0), v(2), v(4), (h.length === 8 ? v(6) : 1) * alpha];
+  }
+  m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/i.exec(text);
+  if (m) return [m[1] / 255, m[2] / 255, m[3] / 255, (m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4]) * alpha];
+  m = /^hsla?\(\s*([\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/i.exec(text);
+  if (m) return hsl(+m[1], +m[2], +m[3], (m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : +m[4]) * alpha);
+  if (!canvasColours.has(text)) {
+    let out = [0, 0, 0, 1];
+    try {
+      const ctx = (globalThis.OffscreenCanvas ? new OffscreenCanvas(1, 1) : globalThis.document?.createElement('canvas'))?.getContext('2d');
+      if (ctx) { ctx.fillStyle = '#000'; ctx.fillStyle = text; const n = ctx.fillStyle; if (n !== text) out = parseColour(n); }
+    } catch { /* black */ }
+    canvasColours.set(text, out);
+  }
+  const c = canvasColours.get(text);
+  return [c[0], c[1], c[2], c[3] * alpha];
+}
+const hex = parseColour;
 // hsl(h s% l% / a) as renderSvg writes it for hulls.
 function hsl(h, s, l, a = 1) {
   s /= 100; l /= 100;
@@ -31,16 +56,29 @@ function hsl(h, s, l, a = 1) {
 }
 const NONE = [0, 0, 0, 0];
 
-// The colours of renderSvg (svg.js).
-export const COLOURS = {
-  frame: hex('#142133'), frameStroke: hex('#344961'), invalid: hex('#f08f80'),
-  leaf: hex('#24364b'), leafStroke: hex('#4c6682'), selectedFill: hex('#245e50'), selectedStroke: hex('#90e4c3'),
-  route: hex('#73bba7'), activeRoute: hex('#c8f5e4'), arrow: hex('#73bba7'),
-  bus: hex('#6f93b8'), busSelected: hex('#90e4c3'), hubFill: hex('#142133'), hubStroke: hex('#3b5068'),
-  portSource: hex('#7ee1bc'), portTarget: hex('#9dbaff'), crossing: hex('#edc477'), label: hex('#142133'),
-  pin: hex('#edc477'), trace: hex('#ffc861'), hover: hex('#7fb4ff'),
-  text: '#edf5ff', title: '#9eb8d1', row: '#c4d6e8', busText: '#9fc3e6',
-};
+// The theme's colours (style.js) as the buffers need them: RGBA for shapes, CSS for the texts. Cached per style.
+const coloursOf = (() => {
+  const cache = new WeakMap();
+  return style => {
+    if (cache.has(style)) return cache.get(style);
+    const t = style.theme;
+    const c = {
+      frame: hex(t.frameFill), frameStroke: hex(t.frameStroke), invalid: hex(t.invalid),
+      leaf: hex(t.leafFill), leafStroke: hex(t.leafStroke), selectedFill: hex(t.selectedFill), selectedStroke: hex(t.selectedStroke),
+      route: hex(t.route), activeRoute: hex(t.activeRoute), arrow: hex(t.arrow),
+      bus: hex(t.bus), busSelected: hex(t.selectedStroke), hubFill: hex(t.hubFill), hubStroke: hex(t.hubStroke),
+      portSource: hex(t.portSource), portTarget: hex(t.portTarget), crossing: hex(t.crossing), label: hex(t.labelFill),
+      pin: hex(t.pin), trace: hex(t.trace), hover: hex(t.hover),
+      text: t.text, title: t.title, row: t.row, busText: t.busText, labelText: t.labelText,
+    };
+    cache.set(style, c);
+    return c;
+  };
+})();
+/** The default theme's colours (RGBA and CSS), as renderSvg draws them without a style. */
+export const COLOURS = coloursOf(createStyle());
+// The first two numbers of a dash array ("6 4") as on and off lengths; none for none.
+const dashOf = dash => { const v = String(dash ?? '').split(/[\s,]+/).map(Number).filter(x => x > 0); return v.length ? [v[0], v[1] ?? v[0]] : [0, 0]; };
 
 const withAlpha = (c, a) => [c[0], c[1], c[2], c[3] * a];
 
@@ -109,10 +147,12 @@ export const sceneOf = scene => (isSceneColumns(scene) ? sceneOfColumns(scene) :
  * What the WebGL renderer draws for `scene` (a scene or its columns): per layer the box instances, segment instances
  * and triangle vertices, the texts, and the index. `state` as renderSvg's options: `selected` (node id), `selectedRoute`
  * (route id), `pinned` (ids; a dot on each pinned leaf), `trace` ({nodes, routes, distance, fade}: the path in amber,
- * the rest receding, as renderSvg's trace). The last layer (overlay) is left empty: `hoverBuffers` fills it.
+ * the rest receding, as renderSvg's trace), `style` (a sheet or a resolved style, style.js). The last layer (overlay) is
+ * left empty: `hoverBuffers` fills it.
  */
 export function sceneBuffers(input, state = {}) {
   const scene = sceneOf(input);
+  const style = createStyle(state.style), COLOURS = coloursOf(style);
   if (scene.schemaVersion !== 1) throw Error('Unsupported scene schema');
   const {selected = null, selectedRoute = null, trace = null} = state;
   const pinned = state.pinned instanceof Set ? state.pinned : new Set(state.pinned ?? []);
@@ -159,15 +199,17 @@ export function sceneBuffers(input, state = {}) {
 
   // Containers, outer first.
   for (const n of scene.nodes.filter(n => parents.has(n.id)).sort((a, b) => depthOf(a) - depthOf(b))) {
-    const r = n.bounds, round = n.shape === 'circle', a = faint(n.id), lit = onPath.has(n.id);
-    const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : COLOURS.frameStroke, a), fill = withAlpha(COLOURS.frame, a), width = lit ? 2.5 : 1;
+    const r = n.bounds, round = n.shape === 'circle', a = faint(n.id), lit = onPath.has(n.id), look = style.node(n);
+    const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : look.stroke ? hex(look.stroke) : COLOURS.frameStroke, a);
+    const fill = withAlpha(look.fill ? hex(look.fill) : COLOURS.frame, a), width = lit ? 2.5 : look.strokeWidth ?? 1, dash = look.dash ? 1 : 0;
+    const title = look.text ?? COLOURS.title;
     if (round) {
       const rad = Math.min(r.width, r.height) / 2, mx = r.x + r.width / 2, my = r.y + r.height / 2;
-      box(containerLayer, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, width, fill, stroke);
-      text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: fadeCss(COLOURS.title, a), align: 'center'});
+      box(containerLayer, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, width, fill, stroke, dash);
+      text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: fadeCss(title, a), align: 'center'});
     } else {
-      box(containerLayer, r, 10, 0, width, fill, stroke);
-      text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: fadeCss(COLOURS.title, a)});
+      box(containerLayer, r, 10, 0, width, fill, stroke, dash);
+      text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: fadeCss(title, a)});
     }
     if (n.kind === 'entity') containerLayer.segments.push(r.x, r.y + 34, r.x + r.width, r.y + 34, 1, 0, 0, 0, 0, ...COLOURS.frameStroke);
   }
@@ -177,12 +219,12 @@ export function sceneBuffers(input, state = {}) {
   const endpoints = new Set(active ? [active.source, active.target] : []);
   const lines = [];
   for (const route of scene.routes) {
-    const weight = route.weight ?? 1, isActive = route === active, dim = !!active && !isActive;
+    const weight = route.weight ?? 1, isActive = route === active, dim = !!active && !isActive, look = style.edge(route);
     const aggregated = route.backWeight !== undefined && route.backWeight !== null, back = aggregated ? route.backWeight : 0, total = weight + back;
-    const width = (aggregated ? Math.min(7, 1 + 1.2 * Math.log2(total + 1)) : Math.min(4, 1.6 + 0.4 * (weight - 1))) + (isActive ? 1.5 : 0);
-    const opacity = dim ? 0.2 : isActive ? 1 : aggregated ? 0.3 + 0.55 * Math.min(1, Math.log2(total + 1) / 6) : 0.75;
-    const colour = route.invalid || conflictedRoutes.has(route.id) ? COLOURS.invalid : isActive ? COLOURS.activeRoute : COLOURS.route;
-    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0});
+    const width = (look.width ?? (aggregated ? Math.min(7, 1 + 1.2 * Math.log2(total + 1)) : Math.min(4, 1.6 + 0.4 * (weight - 1)))) + (isActive ? 1.5 : 0);
+    const opacity = dim ? 0.2 : isActive ? 1 : look.opacity ?? (aggregated ? 0.3 + 0.55 * Math.min(1, Math.log2(total + 1) / 6) : 0.75);
+    const colour = route.invalid || conflictedRoutes.has(route.id) ? COLOURS.invalid : isActive ? COLOURS.activeRoute : look.stroke ? hex(look.stroke) : COLOURS.route;
+    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0, arrow: look.arrow ? hex(look.arrow) : COLOURS.arrow, dash: dashOf(look.dash)});
     if ((aggregated && total > 1) || weight > 1) {
       const mid = route.points[Math.floor(route.points.length / 2)];
       text({x: mid.x + 6, y: mid.y - 6, text: aggregated && back ? `${weight} ⇄ ${back}` : String(weight), size: 12, colour: COLOURS.text});
@@ -194,9 +236,15 @@ export function sceneBuffers(input, state = {}) {
     // Later lines nearer (smaller depth), as later SVG elements cover earlier ones.
     const depth = 1 - (i + 1) / (lines.length + 2);
     const p = line.points;
-    for (let k = 0; k + 1 < p.length; k++) routeLayer.segments.push(p[k].x, p[k].y, p[k + 1].x, p[k + 1].y, line.width, depth, 0, 0, 0, ...line.colour);
+    const [on, off] = line.dash ?? [0, 0];
+    let along = 0;
+    for (let k = 0; k + 1 < p.length; k++) {
+      routeLayer.segments.push(p[k].x, p[k].y, p[k + 1].x, p[k + 1].y, line.width, depth, on, off, along, ...line.colour);
+      along += Math.hypot(p[k + 1].x - p[k].x, p[k + 1].y - p[k].y);
+    }
     if (p.length >= 2) {
-      const arrow = (end, from) => { for (const [x, y] of arrowCorners(end, end.x - from.x, end.y - from.y)) routeLayer.triangles.push(x, y, depth, ...COLOURS.arrow); };
+      const arrowColour = line.arrow ?? COLOURS.arrow;
+      const arrow = (end, from) => { for (const [x, y] of arrowCorners(end, end.x - from.x, end.y - from.y)) routeLayer.triangles.push(x, y, depth, ...arrowColour); };
       const last = p.length - 1;
       let j = last - 1; while (j > 0 && p[j].x === p[last].x && p[j].y === p[last].y) j--;
       arrow(p[last], p[j]);
@@ -219,12 +267,12 @@ export function sceneBuffers(input, state = {}) {
 
   // Leaves.
   for (const n of scene.nodes.filter(n => !parents.has(n.id))) {
-    const r = n.bounds, faded = (active && !endpoints.has(n.id) ? 0.4 : 1) * faint(n.id), lit = onPath.has(n.id);
-    const fill = withAlpha(n.id === selected ? COLOURS.selectedFill : COLOURS.leaf, faded);
-    const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : n.id === selected ? COLOURS.selectedStroke : COLOURS.leafStroke, faded);
-    const strokeWidth = lit ? 2.5 : 1;
+    const r = n.bounds, faded = (active && !endpoints.has(n.id) ? 0.4 : 1) * faint(n.id), lit = onPath.has(n.id), look = style.node(n);
+    const fill = withAlpha(n.id === selected ? COLOURS.selectedFill : look.fill ? hex(look.fill) : COLOURS.leaf, faded);
+    const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : n.id === selected ? COLOURS.selectedStroke : look.stroke ? hex(look.stroke) : COLOURS.leafStroke, faded);
+    const strokeWidth = lit ? 2.5 : look.strokeWidth ?? 1;
     const attribute = n.kind === 'attribute', round = n.shape === 'circle' && !attribute && !n.rows?.length;
-    const dash = n.kind === 'rest' ? 1 : 0;
+    const dash = n.kind === 'rest' || look.dash ? 1 : 0;
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     if (!attribute) {
       if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, strokeWidth, fill, stroke, dash); }
@@ -235,7 +283,7 @@ export function sceneBuffers(input, state = {}) {
       const rad = Math.min(r.width, r.height) / 2, px = round ? cx + rad * 0.62 : r.x + r.width - 10, py = round ? cy - rad * 0.62 : r.y + 10;
       box(leafLayer, {x: px - 4, y: py - 4, width: 8, height: 8}, 4, 1, 0, withAlpha(COLOURS.pin, faded), NONE);
     }
-    const colour = faded < 1 ? fadeCss(COLOURS.text, faded) : COLOURS.text;
+    const own = look.text ?? COLOURS.text, colour = faded < 1 ? fadeCss(own, faded) : own;
     if (!n.rows?.length) {
       const label = (n.collapsed ? '▸ ' : '') + n.label.slice(0, 23);
       text(round ? {x: cx, y: cy + 5, text: label, size: 13, colour, align: 'center'} : {x: r.x + 10, y: attribute ? r.y + r.height / 2 + 5 : r.y + 32, text: label, size: 13, colour});
@@ -255,7 +303,7 @@ export function sceneBuffers(input, state = {}) {
   for (const label of scene.labels ?? []) {
     const r = label.bounds;
     box(markLayer, r, 3, 0, 0, COLOURS.label, NONE);
-    text({x: r.x + 4, y: r.y + r.height / 2, text: label.text, size: 12, colour: COLOURS.text, baseline: 'middle'});
+    text({x: r.x + 4, y: r.y + r.height / 2, text: label.text, size: 12, colour: COLOURS.labelText, baseline: 'middle'});
   }
 
   return {
@@ -272,7 +320,8 @@ export function sceneBuffers(input, state = {}) {
  * The overlay layer for the element under the pointer: renderSvg's hover outline (#7fb4ff) on a leaf, a container or a
  * bus bar; empty for none. Small, so that a hover never rebuilds the scene's buffers.
  */
-export function hoverBuffers(scene, id) {
+export function hoverBuffers(scene, id, styleSheet) {
+  const COLOURS = coloursOf(createStyle(styleSheet));
   const out = {boxes: new Floats(), segments: new Floats(), triangles: new Floats()};
   const n = id == null ? null : scene.nodes.find(m => m.id === id) ?? scene.busLines?.find(b => b.id === id);
   if (n && n.kind !== 'attribute') {
@@ -284,9 +333,9 @@ export function hoverBuffers(scene, id) {
 }
 
 const fadeCss = (css, a) => {
-  if (a >= 1 || !css.startsWith('#')) return css;
+  if (a >= 1) return css;
   const c = hex(css);
-  return `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
+  return `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${+(c[3] * a).toFixed(4)})`;
 };
 
 // As svg.js: where along a bus bar its name goes.

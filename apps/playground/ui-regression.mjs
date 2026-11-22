@@ -4,6 +4,7 @@ import {withAggregatedWeights} from './aggregation.js';
 import {presetState,applyPreset} from '@arqlet/engine-client/presets.js';
 import {routeDetails,routeConflictsOf} from '@arqlet/viewer/routes.js';
 import {renderSvg} from '@arqlet/viewer/svg.js';
+import {createStyle,themeFromCss,STYLE_PRESETS} from '@arqlet/viewer/style.js';
 import {sceneOf} from '@arqlet/engine-client/engine.js';
 import {Selection,describeSelection} from './generated/editor/index.js';
 // App-level regression with a minimal DOM and actual WASM. Not a visual browser test.
@@ -67,7 +68,7 @@ const listeners={};
 const sceneViews=[];let sceneNavigation=null;
 const fakeSceneView=async(host,scene,options)=>{const v={backend:'webgl2',layer:'far',host,options,scenes:[scene],states:[options.state],destroyed:false,view:{centreX:0,centreY:0,scale:1},
  setScene(next){this.scenes.push(next);},setState(state){this.states.push(state);},fit(){this.fitted=true;},resize(){},setView(view){this.view=view;},pick:()=>v.nextPick,destroy(){this.destroyed=true;}};sceneViews.push(v);return v;};
-const context={openSceneView:fakeSceneView,bindSceneNavigation:(host,view,handlers)=>{sceneNavigation=handlers;return()=>{sceneNavigation=null;};},GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{addEventListener:(type,fn)=>{(listeners[type]??=[]).push(fn);},getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
+const context={createStyle,themeFromCss,STYLE_PRESETS,openSceneView:fakeSceneView,bindSceneNavigation:(host,view,handlers)=>{sceneNavigation=handlers;return()=>{sceneNavigation=null;};},GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{addEventListener:(type,fn)=>{(listeners[type]??=[]).push(fn);},getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
  setTimeout:fn=>{timers.set(++tid,fn);return tid;},clearTimeout:id=>timers.delete(id),
  fetch:async(url,options)=>{
    if(url.includes('snapshot.json')){latest=structuredClone(initial);return {ok:true,json:async()=>structuredClone(initial)};}
@@ -573,4 +574,24 @@ console.log('Port visibility changes appearance without moving routes.');
   assert.equal(runInNewContext('farWanted({nodes:Array(1000),routes:Array(500)})',context),false,'the user\'s choice wins over the size');
   runInNewContext('farChoice=null',context);
   console.log('Large-view mode passed: the switch, selection from both layers, redraws and Fit reach the scene view.');
+}
+
+// Appearance: a style preset reaches the SVG view's routes, and the scene view gets the same style.
+{
+  const strokes=()=>get('graph').children.filter(e=>e.points!==undefined&&e['data-route-id']&&e.class!=='route-hit').map(e=>e.stroke);
+  const before=strokes();
+  // A route selected by an earlier check keeps the active colour; the others take the theme's route colour.
+  const colours=list=>new Set(list);
+  assert.ok(colours(before).has('#73bba7'),'default route colour');
+  get('style-preset').value='light';get('style-preset').onchange();await settle();
+  assert.ok(colours(strokes()).has('#4f8f7e')&&!colours(strokes()).has('#73bba7'),'the light theme recolours the routes');
+  assert.ok(get('canvas').classList.contains('light'));
+  get('far-view').click();await settle();
+  const view=sceneViews.at(-1);
+  assert.equal(view.states.at(-1).style.theme.route,'#4f8f7e','the scene view draws with the same style');
+  get('far-view').click();await settle();
+  get('style-preset').value='default';get('style-preset').onchange();await settle();
+  assert.deepEqual(colours(strokes()),colours(before),'back to the default');
+  runInNewContext('farChoice=null',context);
+  console.log('Appearance passed: a style preset reaches the SVG view and the scene view.');
 }

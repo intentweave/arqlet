@@ -47,6 +47,8 @@ export interface SceneViewOptions {
   view?: SceneViewTransform;
   background?: [number, number, number, number];
   preserveDrawingBuffer?: boolean;
+  /** The appearance of both layers (style.js); change it with `setState({style})`. */
+  style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle;
   /** false: no hover outline from afar (default on). */
   hover?: boolean;
   onLayer?: (layer: 'far' | 'near') => void;

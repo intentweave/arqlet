@@ -56,9 +56,10 @@ export function createSceneView(host, input, options = {}) {
   };
   let view = options.view ?? fitView();
   // What the host changes between drawings: the selection for both layers, anything else (pins, sizes) for the near one.
-  let state = {selected: options.svg?.selected ?? options.state?.selected ?? null, selectedRoute: options.svg?.selectedRoute ?? options.state?.selectedRoute ?? null, ...options.state};
+  // The style (style.js) goes to both layers with the state; `options.style` is its first value.
+  let state = {selected: options.svg?.selected ?? options.state?.selected ?? null, selectedRoute: options.svg?.selectedRoute ?? options.state?.selectedRoute ?? null, ...(options.style ? {style: options.style} : {}), ...options.state};
   // The part of the state the far layer draws too.
-  const farState = () => ({selected: state.selected, selectedRoute: state.selectedRoute, pinned: state.pinned ?? null, trace: state.trace ?? null});
+  const farState = () => ({selected: state.selected, selectedRoute: state.selectedRoute, pinned: state.pinned ?? null, trace: state.trace ?? null, style: state.style ?? null});
   if (gl) {
     const farOptions = {labels, view, background: options.background, preserveDrawingBuffer: options.preserveDrawingBuffer, ...farState()};
     far = backend.kind === 'webgpu' ? createSceneGpuRenderer(canvas, scene, {...farOptions, device: backend.device}) : createSceneRenderer(canvas, scene, farOptions);

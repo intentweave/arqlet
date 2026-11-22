@@ -2,6 +2,8 @@ import type {PlacedLabel, ResolvedPort, Scene, SceneNode} from '@arqlet/contract
 import type {SceneColumnsLike} from './scene-columns.js';
 
 export interface RenderSvgOptions {
+  /** Provisional: the appearance (style.js): a sheet or a resolved style; default the dark theme's colours. */
+  style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle;
   /** Compare with the previous drawing and keep unchanged elements (needs a real DOM). Default `false`. */
   keyed?: boolean;
   /** Document used to create elements; default `host.ownerDocument`. */

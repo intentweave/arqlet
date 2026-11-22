@@ -48,10 +48,11 @@ export function rendererShell(canvas, scene, options, backend, kind) {
   const labels = options.labels ?? null;
   const ctx = labels?.getContext('2d') ?? null;
   const textOptions = {minTextPixels: options.minTextPixels ?? 6, font: options.fontFamily ?? 'system-ui, -apple-system, Segoe UI, sans-serif', text: options.text};
-  // What the far layer draws besides the scene: the selection, pins and a trace (`sceneBuffers`), and the hover outline.
-  let state = {selected: options.selected ?? null, selectedRoute: options.selectedRoute ?? null, pinned: options.pinned ?? null, trace: options.trace ?? null};
+  // What the far layer draws besides the scene: the selection, pins, a trace and the style (`sceneBuffers`), and the
+  // hover outline.
+  let state = {selected: options.selected ?? null, selectedRoute: options.selectedRoute ?? null, pinned: options.pinned ?? null, trace: options.trace ?? null, style: options.style ?? null};
   let current = scene, built = null, frame = 0, hovered = null;
-  const build = () => { built = sceneBuffers(current, state); if (hovered != null) built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered); backend.upload(built); };
+  const build = () => { built = sceneBuffers(current, state); if (hovered != null) built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered, state.style); backend.upload(built); };
   build();
   const ratio = () => globalThis.devicePixelRatio || 1;
   const fit = () => {
@@ -82,7 +83,7 @@ export function rendererShell(canvas, scene, options, backend, kind) {
     setHover(id) {
       if ((id ?? null) === hovered) return;
       hovered = id ?? null;
-      built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered);
+      built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered, state.style);
       backend.upload(built);
       schedule();
     },

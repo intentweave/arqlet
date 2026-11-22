@@ -2,6 +2,7 @@ import {bindNavigation} from '@arqlet/viewer/navigation.js';
 import {loadEngine,sceneOf,createEngineWorker} from '@arqlet/engine-client/engine.js';
 import {renderSvg} from '@arqlet/viewer/svg.js';
 import {openSceneView} from '@arqlet/viewer/scene-view.js';
+import {createStyle,themeFromCss,STYLE_PRESETS} from '@arqlet/viewer/style.js';
 import {bindSceneNavigation} from '@arqlet/viewer/scene-renderer.js';
 import {containmentRows} from '@arqlet/containment-tree/model.js';
 import {settingsOf,rootSettingsOf} from '@arqlet/containment-tree/settings.js';
@@ -250,11 +251,20 @@ function applyContainerSizing(id,entry){
 // (button GPU, key G); the editing gestures (drags, resize, ports, labels, curation) stay in the plain SVG view, which a
 // curation draft or a drag preview always uses.
 const FAR_AUTO=1500;
+// The appearance (style.js): a preset, with any theme colours the page sets as CSS custom properties (--arqlet-*) on the
+// canvas; one resolved style for the SVG view and both layers of the scene view.
+let viewStyle=null;
+function makeViewStyle(){
+ const preset=STYLE_PRESETS[$('style-preset').value]??{};
+ $('canvas').classList.toggle('light',$('style-preset').value==='light');
+ viewStyle=createStyle({...preset,theme:{...(preset.theme??{}),...themeFromCss($('canvas'))}});
+ return viewStyle;
+}
 let farChoice=null,sceneView=null,sceneViewOpening=null,farNext=null,farHandlers={},unbindFar=null;
 const farWanted=scene=>!curation&&!dragPreview&&(farChoice??(scene.nodes.length+scene.routes.length>=FAR_AUTO));
 // An SVG element has no `hidden` property; the attribute hides it (CSS [hidden]).
 const setHidden=(el,on)=>{if(on)el.setAttribute('hidden','');else el.removeAttribute?.('hidden');el.hidden=on;};
-const farState=()=>({selected,selectedRoute,pinned:new Set(Object.keys(effectiveOptions().pins)),trace:traceView()??null});
+const farState=()=>({selected,selectedRoute,pinned:new Set(Object.keys(effectiveOptions().pins)),trace:traceView()??null,style:viewStyle??makeViewStyle()});
 function syncFarInfo(){
  const on=!!sceneView||!!sceneViewOpening;
  $('far-view').setAttribute('aria-pressed',String(on));
@@ -307,7 +317,7 @@ function draw(fit=false){
  const onPin=(id,on)=>{if(performance.now()<pinClickGuard)return;setPin(id,on);};
  farHandlers={onSelect,onSelectRoute,onPin};
  if(farWanted(shown))showFar(shown,fit);
- else{hideFar();renderSvg($('graph'),shown,{document,trace:traceView(),onPortDragStart:(port,e)=>startPortDrag(port,e),onLabelDragStart:(label,e)=>startLabelDrag(label,e),onNodeDragStart:(n,e,opts)=>startDrag(n,e,opts),onToggle:toggleContainer,onPin,onReset:resetSize,onResize:startResize,sized:sizedAxes(),selected,selectedRoute,scale,pinned:new Set(Object.keys(effectiveOptions().pins)),onSelect,onSelectRoute});}
+ else{hideFar();renderSvg($('graph'),shown,{document,style:viewStyle??makeViewStyle(),trace:traceView(),onPortDragStart:(port,e)=>startPortDrag(port,e),onLabelDragStart:(label,e)=>startLabelDrag(label,e),onNodeDragStart:(n,e,opts)=>startDrag(n,e,opts),onToggle:toggleContainer,onPin,onReset:resetSize,onResize:startResize,sized:sizedAxes(),selected,selectedRoute,scale,pinned:new Set(Object.keys(effectiveOptions().pins)),onSelect,onSelectRoute});}
  renderTreeView(scene);
   if(curation){markPending();bindCurationGestures($('graph'),curation,scene,{changed:()=>draw(),status,growContainers:()=>true,selectedNodes:()=>selection.nodes});}
  renderInspector();
@@ -1485,6 +1495,7 @@ $('port-labels').onchange=()=>{
  setOption({portLabels},'Port labels');
 };
 
+$('style-preset').onchange=()=>{makeViewStyle();if(snapshot)draw();};
 $('show-ports').onchange=()=>setOption({appearance:{...effectiveOptions().appearance,showPorts:$('show-ports').checked}},'port markers');
 
 bindNavigation($('canvas'),()=>scale,value=>{autoFit=false;scale=value;if(snapshot)draw();});
