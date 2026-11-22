@@ -26,5 +26,8 @@
       }
     ]
   },
-  "membershipViews": { "zone": "overlay" }
+  "groupingPriority": [
+    { "by": "parent" },
+    { "by": "zone" }
+  ]
 }

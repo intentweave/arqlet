@@ -75,5 +75,10 @@
       }
     ]
   },
-  "membershipViews": { "zone": "lanes", "team": "overlay", "layer": "overlay" }
+  "groupingPriority": [
+    { "by": "parent" },
+    { "by": "zone", "as": "lanes" },
+    { "by": "team" },
+    { "by": "layer" }
+  ]
 }

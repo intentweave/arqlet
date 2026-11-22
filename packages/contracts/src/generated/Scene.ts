@@ -38,7 +38,7 @@ busLines?: Array<SceneBusLine>,
  */
 hubRefs?: Array<SceneHubRef>,
 /**
- * Provisional (ADR 0022, `membershipViews` set to `overlay`): a hull per membership group, to be drawn behind the
+ * Provisional (ADR 0022, the soft criteria of `groupingPriority`): a hull per membership group, to be drawn behind the
  * nodes. In the declared order of the dimensions and of their groups. Omitted when there is none, so every drawing
  * without the option is unchanged.
  */

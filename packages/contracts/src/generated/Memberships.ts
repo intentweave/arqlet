@@ -5,7 +5,7 @@ import type { MembershipDimension } from "./MembershipDimension";
  * Provisional (ADR 0022): the membership dimensions of a graph. A node has one container (`Node::parent_id`); a
  * membership says that it also belongs to a zone, a team or a layer, and several of those at once. Memberships are
  * authored domain data, like `Graph::buses`: the engine never derives them, and they never change the containment tree.
- * How a dimension is shown is a view option (`LayoutOptions::membership_views`), not data. Omitted when empty, so a
+ * How a dimension is shown is a view option (`LayoutOptions::grouping_priority`), not data. Omitted when empty, so a
  * graph without memberships serializes exactly as before.
  */
 export type Memberships = {

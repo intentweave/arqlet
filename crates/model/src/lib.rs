@@ -1,5 +1,6 @@
 //! Portable graph and resumable scene contract for the first prototype.
 pub mod clock;
+pub mod grouping;
 pub mod math;
 pub mod outline;
 
@@ -2042,12 +2043,28 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub shared_tracks: Option<SharedTracks>,
-    /// Provisional (ADR 0022): how each membership dimension of the graph is shown, by dimension id. A dimension that is
-    /// not named, or named `off`, is neither drawn nor read. Empty (the default) is omitted from serialized options, so a
-    /// default view stays byte-identical. The first slice draws `overlay`; `hierarchy` and `lanes` are accepted and
-    /// reported as not yet applied.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub membership_views: BTreeMap<String, MembershipView>,
+    /// Provisional (ADR 0022 §2): the structures the view shows, ranked. A criterion is the parent hierarchy (`parent`) or
+    /// a membership dimension; the first criterion that assigns a node owns it in the view (its container), and every
+    /// later one holds it softly (drawn as hulls). A dimension that is not listed is neither drawn nor read. Empty (the
+    /// default, omitted) means `[parent]`: today's view, byte-identical. See `grouping::owners`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub grouping_priority: Vec<GroupingCriterion>,
+    /// Removed (ADR 0022, M1): `membershipViews` was replaced by `groupingPriority`. The options never serialize it, and a
+    /// snapshot or a request that still carries it is refused with that message instead of having it ignored silently.
+    #[doc(hidden)]
+    #[serde(
+        default,
+        rename = "membershipViews",
+        deserialize_with = "refuse_membership_views",
+        skip_serializing
+    )]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub removed_membership_views: (),
+    /// Provisional (ADR 0022 §3): the shape of a membership hull. `rectangle` (the default, omitted) draws the padded
+    /// bounding box of the group's boxes, which looks like a container and may overlap one; `polygon` draws the padded
+    /// convex hull. A criterion of `groupingPriority` may override it (M1).
+    #[serde(default, skip_serializing_if = "HullShape::is_default")]
+    pub membership_hull: HullShape,
     /// Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
     /// (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -2373,7 +2390,7 @@ pub struct LayoutOptions {
 /// Provisional (ADR 0022): the membership dimensions of a graph. A node has one container (`Node::parent_id`); a
 /// membership says that it also belongs to a zone, a team or a layer, and several of those at once. Memberships are
 /// authored domain data, like `Graph::buses`: the engine never derives them, and they never change the containment tree.
-/// How a dimension is shown is a view option (`LayoutOptions::membership_views`), not data. Omitted when empty, so a
+/// How a dimension is shown is a view option (`LayoutOptions::grouping_priority`), not data. Omitted when empty, so a
 /// graph without memberships serializes exactly as before.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2400,6 +2417,11 @@ impl Memberships {
     pub fn validate(&self) -> Result<(), String> {
         let mut dimensions = BTreeSet::new();
         for d in &self.dimensions {
+            if d.id == grouping::PARENT {
+                return Err(
+                    "A membership dimension may not be called `parent`: the name is the parent hierarchy's".into(),
+                );
+            }
             if d.id.is_empty() || !dimensions.insert(d.id.as_str()) {
                 return Err(format!("Empty or duplicate membership dimension: {}", d.id));
             }
@@ -2474,22 +2496,75 @@ pub struct MembershipGroup {
     pub members: Vec<String>,
 }
 
-/// Provisional (ADR 0022): how one membership dimension is shown. `Off` is the default and is omitted from serialized
-/// options, so a default view is unchanged. Only `Overlay` is implemented (the first slice); `Hierarchy` and `Lanes` are
-/// accepted and reported as not yet applied, so a host can declare them before the engine draws them.
+/// Provisional (ADR 0022 §3): the outline of a membership hull. Both are comparison geometry, no trigonometry.
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
-pub enum MembershipView {
-    /// Nothing is drawn and nothing is read.
+pub enum HullShape {
+    /// The padded bounding box of the group's boxes: a box that looks like a container and may overlap one.
     #[default]
-    Off,
-    /// The dimension becomes containers in the view only (ADR 0022, M1).
-    Hierarchy,
-    /// The dimension partitions the order of one area's children (ADR 0022, M4).
+    Rectangle,
+    /// The padded convex hull of the group's boxes: tighter around scattered members, with diagonal edges.
+    Polygon,
+}
+
+impl HullShape {
+    pub fn is_default(&self) -> bool {
+        *self == HullShape::Rectangle
+    }
+}
+
+/// Refuses the removed option `membershipViews` (ADR 0022, M1) with the way to say the same with `groupingPriority`.
+fn refuse_membership_views<'de, D: serde::Deserializer<'de>>(_: D) -> Result<(), D::Error> {
+    Err(serde::de::Error::custom(
+        "membershipViews was removed (ADR 0022, M1): use groupingPriority, e.g. \
+         [{\"by\": \"parent\"}, {\"by\": \"<dimension>\"}] to draw a dimension as hulls",
+    ))
+}
+
+/// Provisional (ADR 0022 §2): one criterion of `LayoutOptions::grouping_priority`.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GroupingCriterion {
+    /// `parent` (containment from `parentId`) or the id of a declared membership dimension.
+    pub by: String,
+    /// The value priority of a dimension: when a node is in several of its groups that are not one path, the first of
+    /// these that holds it owns it. Unlisted groups follow in their declared order. Not allowed on `parent`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub values: Vec<String>,
+    /// How the criterion's groups are rendered where it owns nodes. `lanes` is accepted and reported as not yet applied
+    /// (ADR 0022, M4); its groups are drawn as containers until then.
+    #[serde(
+        default,
+        rename = "as",
+        skip_serializing_if = "GroupingRendering::is_default"
+    )]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<GroupingRendering>"))]
+    pub render: GroupingRendering,
+    /// The shape of this criterion's hulls where it holds nodes softly; `LayoutOptions::membership_hull` without it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub hull: Option<HullShape>,
+}
+
+/// Provisional (ADR 0022 §3): how an owning criterion's groups are drawn.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum GroupingRendering {
+    /// Nested boxes.
+    #[default]
+    Containers,
+    /// Bands (ADR 0022, M4).
     Lanes,
-    /// A hull around the members, drawn behind them and invisible to the router.
-    Overlay,
+}
+
+impl GroupingRendering {
+    pub fn is_default(&self) -> bool {
+        *self == GroupingRendering::Containers
+    }
 }
 
 /// An explicit bus (`Graph::buses`): edges drawn with one shared trunk. The edges that share an end (all one source,
@@ -2625,7 +2700,9 @@ impl Default for LayoutOptions {
             isolated_grid_from: None,
             hub_refs: None,
             shared_tracks: None,
-            membership_views: BTreeMap::new(),
+            grouping_priority: Vec::new(),
+            removed_membership_views: (),
+            membership_hull: HullShape::Rectangle,
             hub_ref_room: 0.,
             isolated_grid_areas: BTreeSet::new(),
             bus_roots: Vec::new(),
@@ -2705,16 +2782,33 @@ impl LayoutOptions {
             .retain(|_, sizing| !sizing.is_content());
     }
 
-    /// The refusal of ADR 0022 §5 that concerns the options: `groups` together with a `hierarchy` membership view (both
-    /// would make the one grouping tree of the view). Too many `hierarchy` or `lanes` dimensions are reported, not refused.
-    pub fn validate_membership_views(&self) -> Result<(), String> {
-        if !self.groups.is_empty()
-            && self
-                .membership_views
-                .values()
-                .any(|m| *m == MembershipView::Hierarchy)
-        {
-            return Err("groups and a hierarchy membership view cannot be used together".into());
+    /// The refusals of ADR 0022 §5 that concern the options alone: a criterion listed twice, `values` on `parent`, more
+    /// than two criteria as lanes, and `groups` together with a non-default `groupingPriority` (both would build the
+    /// view's grouping tree). What needs the graph — an unknown dimension or value — is `grouping::validate`.
+    pub fn validate_grouping(&self) -> Result<(), String> {
+        let mut seen = BTreeSet::new();
+        for c in &self.grouping_priority {
+            if c.by.is_empty() || !seen.insert(c.by.as_str()) {
+                return Err(format!("groupingPriority lists {:?} twice or empty", c.by));
+            }
+            if c.by == grouping::PARENT && !c.values.is_empty() {
+                return Err("groupingPriority: values belong to a dimension, not to parent".into());
+            }
+        }
+        let lanes = self
+            .grouping_priority
+            .iter()
+            .filter(|c| c.render == GroupingRendering::Lanes)
+            .count();
+        if lanes > 2 {
+            return Err(format!(
+                "groupingPriority has {lanes} criteria as lanes; two at most (across and along the flow)"
+            ));
+        }
+        if !self.groups.is_empty() && !grouping::is_default(&self.grouping_priority) {
+            return Err(
+                "groups and a groupingPriority other than parent cannot be used together".into(),
+            );
         }
         Ok(())
     }
@@ -3458,6 +3552,19 @@ pub struct DetailsAnswer {
     pub content_revision: Option<u64>,
 }
 
+/// Provisional (ADR 0022 §7): one group of a node under one criterion of the grouping priority (`NodeDetails::groupings`).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NodeGrouping {
+    /// The criterion: `parent` or a dimension id.
+    pub by: String,
+    /// The group: a container id for `parent`, a group id for a dimension.
+    pub group: String,
+    /// Whether this group owns the node in the view (its container), rather than holding it softly.
+    pub owner: bool,
+}
+
 /// Provisional: a node of the source graph in the current view (`details`).
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -3489,6 +3596,13 @@ pub struct NodeDetails {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, type = "Record<string, unknown>"))]
     pub properties: BTreeMap<String, serde_json::Value>,
+    /// Provisional (ADR 0022 §7): the node's groups per criterion of a non-default `groupingPriority`, in the order of
+    /// the ranks: the one that owns it (`owner`) and those that hold it softly. Kept apart from `parents`, which is the
+    /// containment of the source. Omitted when empty — always under the default priority — so a typed host built before
+    /// it keeps deserializing the answer.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<NodeGrouping>>"))]
+    pub groupings: Vec<NodeGrouping>,
 }
 
 /// Provisional: an edge of the source graph (`details`).

@@ -392,3 +392,24 @@ for (const resident of [false, true]) {
     await session.close();
   });
 }
+
+test('query: rows over the source graph and the content, in a resident and a plain session', {skip: !engine}, async () => {
+  const resident = createSession(engine, {resident: engine.openSession ? true : false});
+  await resident.import(graph);
+  const first = await resident.query('MATCH (n) RETURN count(*)');
+  // An engine without the cargo feature `query` refuses it; an older shipped engine does not know the operation at all.
+  if (!first.ok && /not built into|expected struct Snapshot/.test(first.error)) return;
+  assert.equal(first.ok, true, first.error);
+  assert.equal(first.rows[0][0], first.graph.nodes);
+  if (engine.openSession) {
+    assert.equal((await resident.payload({set: {nodes: {a: {loc: 5}}}})).ok, true);
+    const q = await resident.query('MATCH (n) WHERE n.loc > $min RETURN n', {params: {min: 1}, view: true});
+    assert.deepEqual(q.rows, [[{node: 'a'}]]);
+    assert.equal(q.contentRevision, 1);
+    assert.deepEqual(Object.keys(q.shown.nodes), ['a']);
+  }
+  const bad = await resident.query('MATCH (n RETURN n');
+  assert.equal(bad.ok, false);
+  assert.match(bad.error, /^query syntax:/);
+  assert.equal((await createSession(engine).query('RETURN 1')).ok, false, 'nothing imported yet');
+});

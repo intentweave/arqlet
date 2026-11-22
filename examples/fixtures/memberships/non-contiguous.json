@@ -29,5 +29,8 @@
       }
     ]
   },
-  "membershipViews": { "concern": "overlay" }
+  "groupingPriority": [
+    { "by": "parent" },
+    { "by": "concern" }
+  ]
 }

@@ -1,0 +1,19 @@
+[package]
+name = "arqlet-query-json"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Provisional: the JSON request and answer of the Arqlet query operation (ADR 0021), shared by the engine and the query-only WASM module."
+publish = false
+
+# The query layer without the layout engine (ADR 0021, item 12; `tools/check-query-isolation.mjs`).
+[dependencies]
+arqlet-model = { workspace = true }
+arqlet-query = { workspace = true }
+arqlet-query-cypher = { workspace = true }
+arqlet-query-model = { workspace = true }
+serde_json = "1"

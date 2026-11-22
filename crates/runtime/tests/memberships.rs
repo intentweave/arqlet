@@ -2,7 +2,7 @@
 //! here, so the fixtures stay usable while the ADR is still a proposal:
 //!
 //! 1. Every fixture is a valid graph **today**: `GraphWire` ignores fields it does not know, so the extra `memberships` and
-//!    `membershipViews` keys are dropped and the graph imports and lays out as it would without them. That keeps the
+//!    `groupingPriority` keys are dropped and the graph imports and lays out as it would without them. That keeps the
 //!    fixtures from drifting away from the engine while the feature is being decided.
 //! 2. The `memberships` block of every fixture follows the shape the ADR decides (§1 and §2), checked by a validator that
 //!    reads the raw JSON. When the model learns the field, this validator is what `crates/model` has to implement; until
@@ -11,8 +11,8 @@
 //! The per-fixture expectations at the bottom pin what each fixture is *for* (the case it carries), so a later edit cannot
 //! quietly turn the Euler case into a satisfiable one.
 
-use arqlet_model::Graph;
-use arqlet_runtime::import_graph;
+use arqlet_model::{Graph, GroupingCriterion, LayoutOptions, Snapshot};
+use arqlet_runtime::{configure_snapshot, import_graph, import_graph_with};
 use std::collections::{BTreeMap, BTreeSet};
 
 const THREE_DIMENSIONS: &str =
@@ -25,6 +25,10 @@ const CROSSES_CONTAINERS: &str =
     include_str!("../../../examples/fixtures/memberships/crosses-containers.json");
 const ONE_GROUP_PER_NODE: &str =
     include_str!("../../../examples/fixtures/memberships/one-group-per-node.json");
+const ORG_CHART: &str =
+    include_str!("../../../examples/fixtures/memberships/org-chart-projects.json");
+const OVERLAPPING_BOXES: &str =
+    include_str!("../../../examples/fixtures/memberships/overlapping-boxes.json");
 
 fn fixtures() -> Vec<(&'static str, &'static str)> {
     vec![
@@ -33,6 +37,8 @@ fn fixtures() -> Vec<(&'static str, &'static str)> {
         ("non-contiguous", NON_CONTIGUOUS),
         ("crosses-containers", CROSSES_CONTAINERS),
         ("one-group-per-node", ONE_GROUP_PER_NODE),
+        ("org-chart-projects", ORG_CHART),
+        ("overlapping-boxes", OVERLAPPING_BOXES),
     ]
 }
 
@@ -52,17 +58,6 @@ impl Dimension {
             .filter(|g| self.members[*g].iter().any(|m| m == node))
             .map(String::as_str)
             .collect()
-    }
-
-    /// `group` and its ancestors, outermost last.
-    fn path(&self, group: &str) -> Vec<String> {
-        let mut path = vec![group.to_string()];
-        let mut at = group;
-        while let Some(Some(p)) = self.parent.get(at) {
-            path.push(p.clone());
-            at = p.as_str();
-        }
-        path
     }
 }
 
@@ -193,66 +188,6 @@ fn read_memberships(
     dimensions
 }
 
-/// Checks `membershipViews` against ADR 0022 §2: a known mode per declared dimension, at most one `hierarchy` and at most
-/// two `lanes`, and for those modes a node's groups must form one path (nesting implies the ancestors).
-fn check_views(
-    name: &str,
-    raw: &serde_json::Value,
-    dimensions: &[Dimension],
-    node_ids: &BTreeSet<String>,
-) {
-    let views = raw
-        .get("membershipViews")
-        .and_then(|v| v.as_object())
-        .unwrap_or_else(|| panic!("{name}: membershipViews must be an object"));
-    let mut hierarchies = 0;
-    let mut lanes = 0;
-    for (dimension, mode) in views {
-        assert!(
-            dimensions.iter().any(|d| &d.id == dimension),
-            "{name}: membershipViews names {dimension}, which memberships does not declare"
-        );
-        let mode = mode
-            .as_str()
-            .unwrap_or_else(|| panic!("{name}: the mode of {dimension} is not a string"));
-        match mode {
-            "off" => continue,
-            "hierarchy" => hierarchies += 1,
-            "lanes" => lanes += 1,
-            "overlay" => {}
-            other => panic!("{name}: {dimension} has the unknown mode {other}"),
-        }
-        if mode == "hierarchy" || mode == "lanes" {
-            let d = dimensions.iter().find(|d| &d.id == dimension).unwrap();
-            for node in node_ids {
-                let groups = d.groups_of(node);
-                if groups.len() < 2 {
-                    continue;
-                }
-                // Several groups are allowed only when they lie on one path, since a nested group implies its ancestors.
-                let deepest = groups
-                    .iter()
-                    .max_by_key(|g| d.path(g).len())
-                    .expect("a group");
-                let path = d.path(deepest);
-                assert!(
-                    groups.iter().all(|g| path.iter().any(|p| p == g)),
-                    "{name}: {node} is in several groups of {dimension} that are not one path ({groups:?}), \
-                     which a {mode} dimension cannot show (membership-multiple-groups)"
-                );
-            }
-        }
-    }
-    assert!(
-        hierarchies <= 1,
-        "{name}: {hierarchies} hierarchy dimensions; ADR 0022 §2 allows one"
-    );
-    assert!(
-        lanes <= 2,
-        "{name}: {lanes} lanes dimensions; ADR 0022 §2 allows two"
-    );
-}
-
 #[test]
 fn every_membership_fixture_follows_the_shape_the_adr_decides() {
     for (name, text) in fixtures() {
@@ -265,8 +200,121 @@ fn every_membership_fixture_follows_the_shape_the_adr_decides() {
             .map(|n| n["id"].as_str().expect("a node id").to_string())
             .collect();
         let dimensions = read_memberships(name, &raw, &node_ids);
-        check_views(name, &raw, &dimensions, &node_ids);
+        let priority = raw
+            .get("groupingPriority")
+            .unwrap_or_else(|| panic!("{name}: every fixture says the view it is meant for"));
+        read_priority(name, priority, &dimensions);
+        assert!(
+            raw.get("membershipViews").is_none(),
+            "{name}: membershipViews was replaced by groupingPriority (M1)"
+        );
     }
+}
+
+/// One criterion of a `groupingPriority` (ADR 0022 §2, revised 2026-11-22): `parent` or a dimension, with its value order
+/// (the listed groups first, then the rest in declared order) and its rendering.
+struct Criterion {
+    by: String,
+    values: Vec<String>,
+    lanes: bool,
+}
+
+/// Reads and checks a `groupingPriority` against §2 and the refusals of §5: each criterion is `parent` or a declared
+/// dimension and appears once, `values` only on dimensions and only declared groups, `as` is `containers` or `lanes`, at
+/// most two criteria as lanes, and no dimension may be called `parent`.
+fn read_priority(
+    name: &str,
+    priority: &serde_json::Value,
+    dimensions: &[Dimension],
+) -> Vec<Criterion> {
+    assert!(
+        dimensions.iter().all(|d| d.id != "parent"),
+        "{name}: `parent` is reserved and may not name a dimension"
+    );
+    let entries = priority
+        .as_array()
+        .unwrap_or_else(|| panic!("{name}: groupingPriority must be an array"));
+    assert!(
+        !entries.is_empty(),
+        "{name}: an empty priority has no owner for anything"
+    );
+    let mut criteria: Vec<Criterion> = Vec::new();
+    for entry in entries {
+        let by = entry["by"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{name}: a criterion without `by`"))
+            .to_string();
+        assert!(
+            !criteria.iter().any(|c| c.by == by),
+            "{name}: the criterion {by} is listed twice"
+        );
+        let dimension = dimensions.iter().find(|d| d.id == by);
+        assert!(
+            by == "parent" || dimension.is_some(),
+            "{name}: the criterion {by} is neither `parent` nor a declared dimension"
+        );
+        let values: Vec<String> = match entry.get("values") {
+            None => Vec::new(),
+            Some(v) => {
+                let d = dimension.unwrap_or_else(|| {
+                    panic!("{name}: `values` belong to a dimension, not to {by}")
+                });
+                v.as_array()
+                    .unwrap_or_else(|| panic!("{name}: values of {by} must be an array"))
+                    .iter()
+                    .map(|g| {
+                        let g = g.as_str().expect("a group id").to_string();
+                        assert!(d.order.contains(&g), "{name}: {by} declares no group {g}");
+                        g
+                    })
+                    .collect()
+            }
+        };
+        let lanes = match entry.get("as").and_then(|a| a.as_str()) {
+            None | Some("containers") => false,
+            Some("lanes") => true,
+            Some(other) => panic!("{name}: {by} is rendered as {other}, not containers or lanes"),
+        };
+        criteria.push(Criterion { by, values, lanes });
+    }
+    let lanes = criteria.iter().filter(|c| c.lanes).count();
+    assert!(
+        lanes <= 2,
+        "{name}: {lanes} criteria as lanes; §2 allows two"
+    );
+    criteria
+}
+
+/// The ownership rule of §2 as an oracle: a node is owned by its group in the first criterion, by rank, that assigns it
+/// one; `parent` assigns every node (its container, or the root); in a dimension, the value order picks among several
+/// groups. `None` is a node no criterion assigns. M1's projection must agree with this on every fixture.
+fn owner(
+    node: &str,
+    criteria: &[Criterion],
+    dimensions: &[Dimension],
+    parents: &BTreeMap<&str, Option<&str>>,
+) -> Option<(String, String)> {
+    for c in criteria {
+        if c.by == "parent" {
+            let container = parents[node].unwrap_or("<root>");
+            return Some(("parent".into(), container.into()));
+        }
+        let d = dimensions.iter().find(|d| d.id == c.by).expect("validated");
+        let groups = d.groups_of(node);
+        if groups.is_empty() {
+            continue;
+        }
+        let order = c
+            .values
+            .iter()
+            .chain(d.order.iter().filter(|g| !c.values.contains(g)));
+        let chosen = order
+            .into_iter()
+            .find(|g| groups.contains(&g.as_str()))
+            .expect("one of the node's groups");
+        return Some((c.by.clone(), chosen.clone()));
+    }
+    None
 }
 
 #[test]
@@ -525,17 +573,18 @@ fn the_overlapping_fixture_shares_a_node_and_names_one_unknown_member() {
     let dimensions = read_memberships("one-group-per-node", &raw, &node_ids);
     let zone = &dimensions[0];
 
-    // Several groups of one dimension: allowed as an overlay, which this fixture declares, and the conflict
-    // `membership-multiple-groups` as a hierarchy or lanes dimension (§3, §5).
+    // Several groups of one dimension. Held softly after the parent hierarchy, which this fixture declares, both hold the
+    // node; as the first criterion the value order would choose one owner (§2, rule 2).
     assert_eq!(
         zone.groups_of("shared"),
         ["north", "south"],
         "shared is the node in two groups of one dimension"
     );
+    let criteria = read_priority("one-group-per-node", &raw["groupingPriority"], &dimensions);
     assert_eq!(
-        raw["membershipViews"]["zone"].as_str(),
-        Some("overlay"),
-        "only an overlay can show this dimension"
+        criteria.iter().map(|c| c.by.as_str()).collect::<Vec<_>>(),
+        ["parent", "zone"],
+        "the zone is held softly, after the parent hierarchy"
     );
     assert!(
         zone.parent.values().all(|p| p.is_none()),
@@ -553,5 +602,425 @@ fn the_overlapping_fixture_shares_a_node_and_names_one_unknown_member() {
         unknown.len(),
         1,
         "the fixture carries exactly one unknown member id"
+    );
+}
+
+#[test]
+fn the_org_chart_is_owned_by_project_first_with_the_value_priority_deciding() {
+    let raw: serde_json::Value = serde_json::from_str(ORG_CHART).expect("json");
+    let parents: BTreeMap<&str, Option<&str>> = raw["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| (n["id"].as_str().unwrap(), n["parentId"].as_str()))
+        .collect();
+    let node_ids: BTreeSet<String> = parents.keys().map(|k| k.to_string()).collect();
+    let dimensions = read_memberships("org-chart-projects", &raw, &node_ids);
+    let criteria = read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions);
+    let owned = |node: &str, criteria: &[Criterion]| owner(node, criteria, &dimensions, &parents);
+    let pair = |a: &str, b: &str| Some((a.to_string(), b.to_string()));
+
+    // The case of the revision: projects cut across departments, so they cannot be the reporting line's containers.
+    let project = dimensions.iter().find(|d| d.id == "project").unwrap();
+    let departments: BTreeSet<Option<&str>> = project.members["apollo"]
+        .iter()
+        .map(|m| parents[m.as_str()])
+        .collect();
+    assert!(departments.len() > 1, "apollo spans departments");
+
+    // Dora is on two projects; the value priority names zeus first, so zeus owns her and apollo holds her softly.
+    assert_eq!(project.groups_of("dora"), ["apollo", "zeus"]);
+    assert_eq!(owned("dora", &criteria), pair("project", "zeus"));
+    assert_eq!(owned("anna", &criteria), pair("project", "apollo"));
+    assert_eq!(owned("ben", &criteria), pair("project", "hermes"));
+    // Gus is on no project, so the next criterion, the reporting line, owns him.
+    assert_eq!(owned("gus", &criteria), pair("parent", "ops"));
+
+    // The value priority matters: with apollo first, apollo owns Dora.
+    let mut apollo_first =
+        read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions);
+    apollo_first[0].values = vec!["apollo".into(), "zeus".into()];
+    assert_eq!(owned("dora", &apollo_first), pair("project", "apollo"));
+
+    // Without `parent`, the next criterion that assigns Gus owns him: he is on no project, but at the Munich site.
+    let without_parent: Vec<Criterion> =
+        read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions)
+            .into_iter()
+            .filter(|c| c.by != "parent")
+            .collect();
+    assert_eq!(owned("gus", &without_parent), pair("site", "munich"));
+    assert_eq!(owned("dora", &without_parent), pair("project", "zeus"));
+
+    // Only when no listed criterion assigns a node is it left without owner: placed at the root and reported (§2, rule 3).
+    let projects_only: Vec<Criterion> =
+        read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions)
+            .into_iter()
+            .filter(|c| c.by == "project")
+            .collect();
+    assert_eq!(owned("gus", &projects_only), None);
+    assert_eq!(owned("dora", &projects_only), pair("project", "zeus"));
+
+    // The default priority, `parent` alone, is today's view: everybody in their department.
+    let default = vec![Criterion {
+        by: "parent".into(),
+        values: Vec::new(),
+        lanes: false,
+    }];
+    assert_eq!(owned("dora", &default), pair("parent", "eng"));
+    assert_eq!(owned("gus", &default), pair("parent", "ops"));
+}
+
+#[test]
+fn the_target_picture_shares_exactly_one_node_between_a_container_and_a_soft_group() {
+    let raw: serde_json::Value = serde_json::from_str(OVERLAPPING_BOXES).expect("json");
+    let parents: BTreeMap<&str, Option<&str>> = raw["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| (n["id"].as_str().unwrap(), n["parentId"].as_str()))
+        .collect();
+    let node_ids: BTreeSet<String> = parents.keys().map(|k| k.to_string()).collect();
+    let dimensions = read_memberships("overlapping-boxes", &raw, &node_ids);
+    let criteria = read_priority("overlapping-boxes", &raw["groupingPriority"], &dimensions);
+
+    // The two groupings of the picture: the container A by containment, the group B by membership.
+    let in_a: BTreeSet<&str> = parents
+        .iter()
+        .filter(|(_, p)| **p == Some("A"))
+        .map(|(id, _)| *id)
+        .collect();
+    let team = dimensions.iter().find(|d| d.id == "team").unwrap();
+    let in_b: BTreeSet<&str> = team.members["B"].iter().map(String::as_str).collect();
+    let shared: Vec<&&str> = in_a.intersection(&in_b).collect();
+    assert_eq!(
+        shared,
+        [&"s"],
+        "exactly one node lies in both, which is the overlap of the picture"
+    );
+    assert!(
+        in_b.iter().any(|m| !in_a.contains(m)),
+        "B reaches outside A"
+    );
+    assert!(
+        in_a.iter().any(|m| !in_b.contains(m)),
+        "A holds nodes B does not"
+    );
+
+    // With the containment first, A owns s and B holds it softly: B can only be one box as a region across A's border.
+    assert_eq!(
+        owner("s", &criteria, &dimensions, &parents),
+        Some(("parent".to_string(), "A".to_string()))
+    );
+    assert_eq!(
+        owner("c", &criteria, &dimensions, &parents),
+        Some(("parent".to_string(), "<root>".to_string()))
+    );
+
+    // Edges run across both borders: from B outside A into A, and inside each.
+    let edges: Vec<(&str, &str)> = raw["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| (e["source"].as_str().unwrap(), e["target"].as_str().unwrap()))
+        .collect();
+    assert!(edges
+        .iter()
+        .any(|(s, t)| !in_a.contains(s) && in_a.contains(t) && !in_b.contains(t)));
+    assert!(edges
+        .iter()
+        .any(|(s, t)| in_b.contains(s) && in_b.contains(t)));
+}
+
+/// The container each node of the view sits in.
+fn view_parents(snapshot: &Snapshot) -> BTreeMap<String, Option<String>> {
+    snapshot
+        .graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.clone(), n.parent_id.clone()))
+        .collect()
+}
+
+/// The fixture's own priority as options.
+fn priority_of(raw: &serde_json::Value) -> LayoutOptions {
+    LayoutOptions {
+        grouping_priority: serde_json::from_value::<Vec<GroupingCriterion>>(
+            raw["groupingPriority"].clone(),
+        )
+        .expect("a valid priority"),
+        ..LayoutOptions::default()
+    }
+}
+
+#[test]
+fn m1_projects_every_node_into_the_owner_the_oracle_names() {
+    // ADR 0022, M1: the engine's projection must agree with the ownership rule of §2, node by node.
+    let raw: serde_json::Value = serde_json::from_str(ORG_CHART).expect("json");
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let parents: BTreeMap<&str, Option<&str>> = raw["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| (n["id"].as_str().unwrap(), n["parentId"].as_str()))
+        .collect();
+    let node_ids: BTreeSet<String> = parents.keys().map(|k| k.to_string()).collect();
+    let dimensions = read_memberships("org-chart-projects", &raw, &node_ids);
+    let criteria = read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions);
+
+    let snapshot = import_graph_with(graph, 500, &priority_of(&raw)).expect("imports");
+    let view = view_parents(&snapshot);
+    for person in ["anna", "ben", "carl", "dora", "emil", "fay", "gus"] {
+        let expected = match owner(person, &criteria, &dimensions, &parents) {
+            Some((by, group)) if by == "parent" => (group != "<root>").then_some(group),
+            Some((by, group)) => Some(format!("membership:{by}/{group}")),
+            None => None,
+        };
+        assert_eq!(
+            view[person], expected,
+            "{person} sits where the oracle puts it"
+        );
+    }
+    // Dora, on two projects, is in zeus; Gus, on none, stays in Operations, which therefore stays a box.
+    assert_eq!(view["dora"].as_deref(), Some("membership:project/zeus"));
+    assert_eq!(view["gus"].as_deref(), Some("ops"));
+    assert!(view.contains_key("ops"));
+    // Sales and Engineering lost every member to a project: not boxes of this view, but soft groups, drawn as hulls.
+    assert!(!view.contains_key("sales") && !view.contains_key("eng"));
+    // The project containers are labelled with their groups and hold what the oracle says.
+    let zeus = snapshot
+        .graph
+        .nodes
+        .iter()
+        .find(|n| n.id == "membership:project/zeus")
+        .expect("zeus is a container of the view");
+    assert_eq!(zeus.label, "Zeus");
+    // The canonical graph is untouched: the source keeps every department and every parentId.
+    let source = snapshot.source_graph.as_deref().expect("a source graph");
+    assert_eq!(
+        source
+            .nodes
+            .iter()
+            .find(|n| n.id == "dora")
+            .unwrap()
+            .parent_id
+            .as_deref(),
+        Some("eng")
+    );
+    // Every edge keeps its logical direction, the self-loop and the parallel pair included.
+    let edges: BTreeSet<(String, String, String)> = snapshot
+        .graph
+        .edges
+        .iter()
+        .map(|e| {
+            (
+                e.id.clone(),
+                e.source.clone(),
+                e.target.clone().unwrap_or_default(),
+            )
+        })
+        .collect();
+    assert!(edges.contains(&("c8".into(), "dora".into(), "dora".into())));
+    assert!(edges.contains(&("c1b".into(), "anna".into(), "carl".into())));
+}
+
+#[test]
+fn m1_reports_what_the_projection_decided() {
+    let raw: serde_json::Value = serde_json::from_str(ORG_CHART).expect("json");
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let snapshot = import_graph_with(graph, 500, &priority_of(&raw)).expect("imports");
+    let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
+    let entry = |by: &str| {
+        scene
+            .membership_report
+            .iter()
+            .find(|r| r.dimension == by)
+            .unwrap_or_else(|| panic!("no report for {by}"))
+    };
+    let project = entry("project");
+    assert_eq!(project.mode, "owner");
+    assert_eq!(project.owned, 6, "six people are on a project");
+    assert_eq!(project.multiple_owners, 1, "Dora is on two");
+    assert_eq!(
+        project.unassigned, 0,
+        "the parent hierarchy assigns the rest"
+    );
+    assert_eq!(project.drawn, 0, "the owner draws boxes, not hulls");
+    // The reporting line moved down: one hull per department whose members are not all in its own box.
+    let parent = entry("parent");
+    assert_eq!(parent.mode, "soft");
+    let departments: BTreeSet<&str> = scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.dimension == "parent")
+        .map(|h| h.label.as_str())
+        .collect();
+    assert_eq!(
+        departments,
+        ["Engineering", "Operations", "Sales"].into_iter().collect()
+    );
+    assert_eq!(entry("site").mode, "soft");
+
+    // Without `parent`, Gus is owned by his site; with projects alone he is reported as unassigned.
+    let mut projects_only = priority_of(&raw);
+    projects_only.grouping_priority.truncate(1);
+    let graph: Graph = serde_json::from_str(ORG_CHART).unwrap();
+    let alone = import_graph_with(graph, 500, &projects_only).expect("imports");
+    assert_eq!(view_parents(&alone)["gus"], None, "at the root");
+    let scene = arqlet_scene::build_scene(&alone).unwrap();
+    // Gus and the three departments: no criterion assigns them.
+    assert_eq!(scene.membership_report[0].unassigned, 4);
+    assert!(scene.membership_report[0]
+        .summary
+        .contains("no criterion assigns"));
+}
+
+#[test]
+fn m1_a_change_of_priority_projects_again_and_back() {
+    // The kept view structure is keyed by every option that shapes it; a change of priority must not reuse it.
+    let raw: serde_json::Value = serde_json::from_str(ORG_CHART).expect("json");
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let plain = import_graph(graph, 500).expect("imports");
+    let before = view_parents(&plain);
+    assert_eq!(before["dora"].as_deref(), Some("eng"));
+
+    let patch = serde_json::json!({ "groupingPriority": raw["groupingPriority"] });
+    let projected = configure_snapshot(&plain, plain.revision, plain.layout_version, &patch)
+        .expect("configures");
+    assert_eq!(
+        view_parents(&projected)["dora"].as_deref(),
+        Some("membership:project/zeus")
+    );
+
+    let back = configure_snapshot(
+        &projected,
+        projected.revision,
+        projected.layout_version,
+        &serde_json::json!({ "groupingPriority": [] }),
+    )
+    .expect("configures");
+    assert_eq!(
+        view_parents(&back),
+        before,
+        "the default priority is the source tree again"
+    );
+    assert!(
+        !serde_json::to_string(&back.options)
+            .unwrap()
+            .contains("groupingPriority"),
+        "and the default is omitted again"
+    );
+}
+
+#[test]
+fn m1_the_default_priority_is_the_view_of_today() {
+    // Empty and `[parent]` are both the default: the view is the source tree, and no report or hull appears.
+    for priority in [serde_json::json!([]), serde_json::json!([{"by": "parent"}])] {
+        let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+        let options = LayoutOptions {
+            grouping_priority: serde_json::from_value(priority.clone()).unwrap(),
+            ..LayoutOptions::default()
+        };
+        let snapshot = import_graph_with(graph.clone(), 500, &options).expect("imports");
+        let plain = import_graph(graph, 500).expect("imports");
+        assert_eq!(view_parents(&snapshot), view_parents(&plain), "{priority}");
+        let scene = arqlet_scene::build_scene(&snapshot).unwrap();
+        assert!(scene.membership_hulls.is_empty() && scene.membership_report.is_empty());
+    }
+}
+
+#[test]
+fn m1_details_name_the_owner_and_the_soft_groups_per_criterion() {
+    let raw: serde_json::Value = serde_json::from_str(ORG_CHART).expect("json");
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let snapshot = import_graph_with(graph.clone(), 500, &priority_of(&raw)).expect("imports");
+    let answer = arqlet_runtime::details::details_answer_on(
+        &snapshot,
+        &serde_json::json!({"nodeId": "dora"}),
+    )
+    .expect("details");
+    let node = answer.node.expect("a node");
+    let groupings: Vec<(&str, &str, bool)> = node
+        .groupings
+        .iter()
+        .map(|g| (g.by.as_str(), g.group.as_str(), g.owner))
+        .collect();
+    // In the order of the ranks: her projects (zeus owns her, apollo holds her softly), her department, her site.
+    assert_eq!(
+        groupings,
+        [
+            ("project", "apollo", false),
+            ("project", "zeus", true),
+            ("parent", "eng", false),
+            ("site", "munich", false),
+        ]
+    );
+    // The source containment stays apart: `parents` still names her department.
+    assert_eq!(node.parents, ["eng"]);
+
+    // Under the default priority the field is empty and left out of the answer.
+    let plain = import_graph(graph, 500).expect("imports");
+    let answer =
+        arqlet_runtime::details::details_answer_on(&plain, &serde_json::json!({"nodeId": "dora"}))
+            .expect("details");
+    assert!(answer.node.as_ref().unwrap().groupings.is_empty());
+    assert!(!serde_json::to_string(&answer)
+        .unwrap()
+        .contains("groupings"));
+}
+
+#[test]
+fn m1_a_membership_patch_projects_again_where_the_dimension_owns_and_moves_nothing_where_it_is_soft(
+) {
+    let raw: serde_json::Value = serde_json::from_str(ORG_CHART).expect("json");
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    // Gus joins hermes: a change of the project dimension.
+    let patch: arqlet_model::GraphPatch = serde_json::from_value(serde_json::json!({
+        "memberships": {"dimensions": [{"id": "project", "label": "Project", "groups": [
+            {"id": "apollo", "label": "Apollo", "members": ["anna", "carl", "dora"]},
+            {"id": "zeus", "label": "Zeus", "members": ["dora", "emil", "fay"]},
+            {"id": "hermes", "label": "Hermes", "members": ["ben", "gus"]}
+        ]}]}
+    }))
+    .expect("a patch");
+
+    // Projects first: they own nodes, so the change moves Gus into hermes, a new projection.
+    let owned = import_graph_with(graph.clone(), 500, &priority_of(&raw)).expect("imports");
+    assert_eq!(view_parents(&owned)["gus"].as_deref(), Some("ops"));
+    let after =
+        arqlet_runtime::patch::patch_snapshot(&owned, owned.revision, owned.layout_version, &patch)
+            .expect("patches");
+    assert_eq!(
+        view_parents(&after)["gus"].as_deref(),
+        Some("membership:project/hermes")
+    );
+    assert!(
+        !view_parents(&after).contains_key("ops"),
+        "Operations lost its last member to a project"
+    );
+
+    // Projects after the containment: held softly, drawn only, so the same change moves nothing.
+    let soft = LayoutOptions {
+        grouping_priority: serde_json::from_value(
+            serde_json::json!([{"by": "parent"}, {"by": "project"}]),
+        )
+        .unwrap(),
+        ..LayoutOptions::default()
+    };
+    let held = import_graph_with(graph, 500, &soft).expect("imports");
+    let after =
+        arqlet_runtime::patch::patch_snapshot(&held, held.revision, held.layout_version, &patch)
+            .expect("patches");
+    assert_eq!(view_parents(&after), view_parents(&held));
+    assert_eq!(after.boxes.len(), held.boxes.len());
+    assert!(
+        held.boxes
+            .iter()
+            .all(|(id, b)| after.boxes.get(id) == Some(b)),
+        "a soft change moves no box"
+    );
+    assert_eq!(
+        after.revision,
+        held.revision + 1,
+        "but it is a new revision"
     );
 }

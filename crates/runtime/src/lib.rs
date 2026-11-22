@@ -23,6 +23,7 @@ pub mod patch;
 pub mod peek;
 pub mod port_edit;
 pub mod protocol;
+pub mod query;
 pub mod session;
 pub mod session_store;
 pub mod settle;
@@ -131,7 +132,7 @@ pub fn options_from_patch(patch: &serde_json::Value) -> Result<LayoutOptions, St
     let mut options: LayoutOptions = serde_json::from_value(merged).map_err(|e| e.to_string())?;
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
-    options.validate_membership_views()?;
+    options.validate_grouping()?;
     Ok(options)
 }
 
@@ -156,7 +157,9 @@ pub fn structured<'a>(
     options: &LayoutOptions,
 ) -> Result<std::borrow::Cow<'a, Graph>, String> {
     let compact = options.hidden.compacts();
-    if !derives_groups(options) {
+    // The grouping priority first (ADR 0022 §2): a non-default one hands the rest of the projection another tree.
+    let prioritized = !arqlet_model::grouping::is_default(&options.grouping_priority);
+    if !derives_groups(options) && !prioritized {
         if !compact {
             return Ok(std::borrow::Cow::Borrowed(source));
         }
@@ -166,6 +169,14 @@ pub fn structured<'a>(
             &options.hidden,
         )));
     }
+    let owned;
+    let source: &Graph = if prioritized {
+        owned =
+            arqlet_layout::communities::with_grouping_priority(source, &options.grouping_priority)?;
+        &owned
+    } else {
+        source
+    };
     let given = arqlet_layout::communities::with_given_groups(source, &options.groups)?;
     let grouped = arqlet_layout::communities::with_community_containers_except(
         &given,
@@ -404,12 +415,15 @@ fn project_view_on(
 
 /// The key of the options `structured` depends on: a structured view is valid for the same source and the same key.
 fn structure_key(options: &LayoutOptions) -> String {
+    // Every option `structured` reads, the grouping priority included: a kept structure made under another priority
+    // would be another tree.
     serde_json::to_string(&(
         &options.groups,
         options.communities,
         &options.community_hubs,
         &options.partial,
         &options.hidden,
+        &options.grouping_priority,
     ))
     .expect("options serialize")
 }
@@ -714,6 +728,8 @@ pub fn import_graph_counted(
     let budgeted = budget_communities(options);
     let options = budgeted.as_ref().unwrap_or(options);
     validate(&graph)?;
+    options.validate_grouping()?;
+    arqlet_model::grouping::validate(&options.grouping_priority, &graph.memberships)?;
     let omitted = graph.edges.iter().filter(|e| e.target.is_none()).count();
     resolved_source(&mut graph);
     // With an abstracting view, the limit counts what the first view shows (`select_visible`); otherwise the most
@@ -757,8 +773,9 @@ pub fn import_graph_counted(
     // dropped (half of a 114k-node graph's lists after the selection), so it is trimmed.
     graph.shrink_to_fit();
     // Experimental (global layering, iteration 1): within a node budget the first view collapses containers, the
-    // outermost first, and a collapsed container takes the size estimated from its content.
-    if aggregates(options) {
+    // outermost first, and a collapsed container takes the size estimated from its content. A grouping priority other
+    // than the parent hierarchy (ADR 0022, M1) projects another tree, so it takes this path too.
+    if aggregates(options) || !arqlet_model::grouping::is_default(&options.grouping_priority) {
         // The source graph shared, and its structure kept with the snapshot for the next views (`structure_of`).
         let reuse = prepared.filter(|_| graph.nodes.len() == whole);
         let source = std::sync::Arc::new(graph);
@@ -1790,7 +1807,15 @@ pub fn configure_snapshot(
     }
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
-    options.validate_membership_views()?;
+    options.validate_grouping()?;
+    arqlet_model::grouping::validate(
+        &options.grouping_priority,
+        &snapshot
+            .source_graph
+            .as_deref()
+            .unwrap_or(&snapshot.graph)
+            .memberships,
+    )?;
     validate_pins(&snapshot.graph, &options.pins)?;
     validate_order_hints(&snapshot.graph, &options.order_hints)?;
     recompute_with(snapshot, &options)
