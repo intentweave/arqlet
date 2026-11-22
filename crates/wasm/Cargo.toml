@@ -9,5 +9,9 @@ description = "Browser ABI of the Arqlet engine (lw_alloc, lw_free, lw_run with 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# `query` adds the operation `query` (ADR 0021, M5b) to the engine; off by default (size: benchmarks/results/query-m5b-20261122.md).
+[features]
+query = ["arqlet-runtime/query"]
+
 [dependencies]
 arqlet-runtime = { workspace = true }

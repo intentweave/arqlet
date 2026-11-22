@@ -86,6 +86,15 @@ class BackendTest(unittest.TestCase):
         with self.request({"op":"add","snapshot":snapshot,"expectedRevision":snapshot["revision"],"sourceId":source,"label":"Backend node"}) as response:
             result=json.load(response)["snapshot"]
         self.assertEqual(result["revision"],snapshot["revision"]+1)
+    def test_query_runs_at_the_backend(self):
+        # ADR 0021, M5b: the operation `query` through the backend (the native binary built with the cargo feature `query`).
+        snapshot=json.loads((ROOT/"generated/snapshot.json").read_text())
+        with self.request({"op":"query","snapshot":snapshot,"query":"MATCH (n) RETURN count(*)"}) as response:
+            result=json.load(response)
+        if not result.get("ok") and "not built into" in result.get("error",""):
+            self.skipTest("the layout command was built without the feature `query`")
+        self.assertTrue(result["ok"],result)
+        self.assertEqual(result["rows"][0][0],len(snapshot.get("sourceGraph",snapshot["graph"])["nodes"]))
     def test_the_allowlist_covers_every_operation_the_dispatcher_knows(self):
         import re
         # The operations the typed protocol reads (ADR 0019): every op name its parser matches.

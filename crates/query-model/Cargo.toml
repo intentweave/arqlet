@@ -1,0 +1,20 @@
+[package]
+name = "arqlet-query-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Provisional: the adapter that lets the Arqlet query layer (ADR 0021) read an arqlet-model graph in place."
+publish = false
+
+# Only the graph part of the model and the neutral query crate (ADR 0021, item 12; `tools/check-query-isolation.mjs`).
+[dependencies]
+arqlet-model = { workspace = true }
+arqlet-query = { workspace = true }
+serde_json = "1"
+
+[dev-dependencies]
+arqlet-query-cypher = { workspace = true }

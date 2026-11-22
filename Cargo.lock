@@ -68,11 +68,32 @@ name = "arqlet-query"
 version = "0.7.0"
 
 [[package]]
+name = "arqlet-query-cli"
+version = "0.7.0"
+dependencies = [
+ "arqlet-model",
+ "arqlet-query",
+ "arqlet-query-cypher",
+ "arqlet-query-model",
+ "serde_json",
+]
+
+[[package]]
 name = "arqlet-query-cypher"
 version = "0.7.0"
 dependencies = [
  "arqlet-query",
  "decypher",
+ "serde_json",
+]
+
+[[package]]
+name = "arqlet-query-model"
+version = "0.7.0"
+dependencies = [
+ "arqlet-model",
+ "arqlet-query",
+ "arqlet-query-cypher",
  "serde_json",
 ]
 
@@ -103,6 +124,9 @@ dependencies = [
  "arqlet-elk",
  "arqlet-layout",
  "arqlet-model",
+ "arqlet-query",
+ "arqlet-query-cypher",
+ "arqlet-query-model",
  "arqlet-reference",
  "arqlet-routing",
  "arqlet-scene",
