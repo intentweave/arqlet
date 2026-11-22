@@ -78,10 +78,60 @@ impl EngineSession {
         if let Some(answer) = self.import_text(input) {
             return answer.to_string();
         }
+        if let Some(answer) = self.load_text(input) {
+            return answer.to_string();
+        }
         match serde_json::from_str::<Value>(input) {
             Ok(v) => self.run_value(&v).to_string(),
             Err(e) => json!({"ok": false, "error": e.to_string()}).to_string(),
         }
+    }
+
+    /// `run` for a well-formed `load`: the snapshot read straight into its type, without a JSON value of it (a recycled
+    /// engine receives a whole snapshot; the value would take several times its memory and stay as WASM's high-water
+    /// mark). The same as the general way; anything this reading refuses goes the general way.
+    fn load_text(&mut self, input: &str) -> Option<Value> {
+        #[derive(serde::Deserialize)]
+        struct LoadText {
+            op: String,
+            snapshot: Snapshot,
+            content: Option<Value>,
+            sequence: Option<u64>,
+            scene: Option<Value>,
+        }
+        if !input.contains("\"load\"") {
+            return None;
+        }
+        let mut load: LoadText = serde_json::from_str(input).ok()?;
+        if load.op != "load" {
+            return None;
+        }
+        let content = match load.content.as_ref().filter(|c| !c.is_null()) {
+            Some(c) => Some(crate::content::Content::from_answer(c).ok()?),
+            None => None,
+        };
+        // Read from text, lists grow by doubling; the snapshot is kept, so they are trimmed.
+        load.snapshot.graph.shrink_to_fit();
+        if let Some(source) = load.snapshot.source_graph.take() {
+            let mut source =
+                std::sync::Arc::try_unwrap(source).unwrap_or_else(|shared| (*shared).clone());
+            source.shrink_to_fit();
+            load.snapshot.source_graph = Some(std::sync::Arc::new(source));
+        }
+        self.snapshot = Some(load.snapshot);
+        self.columns = None;
+        if let Some(content) = content {
+            self.content = content;
+        }
+        match load.sequence {
+            Some(sequence) => self.log = crate::changes::ChangeLog::starting_at(sequence),
+            None => self.log.clear(),
+        }
+        let with_scene = load.scene.as_ref().and_then(Value::as_bool) != Some(false);
+        Some(match self.summary(with_scene) {
+            Ok(answer) => answer,
+            Err(error) => json!({"ok": false, "error": error}),
+        })
     }
 
     /// `run` for a well-formed `import` without `timings`: the request read straight into its types.
@@ -174,9 +224,21 @@ impl EngineSession {
             Some("load") => {
                 let snapshot: Snapshot =
                     serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
+                // Provisional (ADR 0023, R7): a recycled engine takes over the content as it was (with its revision) and
+                // the change log's number; the log's groups stay behind, so a replica behind that number resyncs.
+                let content = match v.get("content").filter(|c| !c.is_null()) {
+                    Some(c) => Some(crate::content::Content::from_answer(c)?),
+                    None => None,
+                };
                 self.snapshot = Some(snapshot);
                 self.columns = None;
-                self.log.clear();
+                if let Some(content) = content {
+                    self.content = content;
+                }
+                match v.get("sequence").and_then(Value::as_u64) {
+                    Some(sequence) => self.log = crate::changes::ChangeLog::starting_at(sequence),
+                    None => self.log.clear(),
+                }
                 self.summary(with_scene)
             }
             // Provisional (ADR 0019, step 4): the scene as columns. The answer describes them (versions, id tables,

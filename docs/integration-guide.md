@@ -171,9 +171,15 @@ step each, in every mode.
 A resident session answers what it holds (`session.memory()`: its parts in estimated heap bytes; from the WASM engine
 also the live heap and the linear memory) and gives parts back (`session.release(['content'], {keys})`, `changeLog`,
 `columns`, `overview`; the view stays). WebAssembly never shrinks its linear memory: after a large import or layout, the
-worker keeps that high-water mark until it ends. To give it back, export the snapshot (and the content), end the worker,
-start a new one and load them; the engines give identical results, so nothing changes in the view (provisional, ADR 0023
-step R7; a helper in `engine-client` is planned).
+worker keeps that high-water mark until it ends. `session.recycle(newEngine)` moves the session to a new engine (the
+view, the content and the change log's number), after which the host ends the old worker; the engines give identical
+results, so nothing changes in the view (provisional, ADR 0023 step R7):
+
+```js
+const next = createEngineWorker();
+await session.recycle(workerRun(next));   // the session now lives in `next`
+oldWorker.terminate();                    // its high-water mark goes with it
+```
 
 ## 10. Checklist
 

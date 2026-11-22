@@ -394,3 +394,41 @@ test('a resident session tells what it holds and gives parts back', {skip: !engi
   assert.deepEqual([all.parts.content, all.parts.changeLog], [0, 0]);
   assert.match((await createSession(engine, {resident: false}).memory()).error, /resident session/);
 });
+
+test('a resident session moves to a new engine and the memory of the old one can go', {skip: !engine || !engine.openSession}, async () => {
+  // A graph large enough to grow the old engine's memory: 20 containers of 150 functions in a chain each.
+  const nodes = [];
+  const edges = [];
+  for (let c = 0; c < 20; c++) {
+    nodes.push({id: `g${c}`, kind: 'group', label: `g${c}`});
+    for (let i = 0; i < 150; i++) {
+      nodes.push({id: `g${c}-${i}`, kind: 'fn', label: `f${i}`, parentId: `g${c}`});
+      if (i) edges.push({id: `e${c}-${i}`, kind: 'calls', source: `g${c}-${i - 1}`, target: `g${c}-${i}`});
+    }
+    if (c) edges.push({id: `x${c}`, kind: 'calls', source: `g${c - 1}-0`, target: `g${c}-0`});
+  }
+  const old = await createEngine(readFileSync(wasm));
+  const session = createSession(old, {resident: true});
+  // The whole graph laid out, so that the old engine's memory grows with the layout.
+  assert.equal((await session.import({nodes, edges}, {limit: 3100})).ok, true);
+  await session.payload({set: {nodes: {'g3-7': {owner: 'Ann'}}}});
+  await session.payload({set: {nodes: {'g3-7': {owner: 'Bob'}}}});
+  const before = await session.memory();
+  const state = session.snapshot;
+
+  const fresh = await createEngine(readFileSync(wasm));
+  const moved = await session.recycle(fresh);
+  assert.equal(moved.ok, true, JSON.stringify(moved));
+  assert.deepEqual([moved.contentRevision, moved.sequence], [2, 2]);
+  const after = await session.memory();
+  assert.ok(after.linearMemoryBytes < before.linearMemoryBytes,
+    `the new engine holds less: ${after.linearMemoryBytes} < ${before.linearMemoryBytes}`);
+  assert.equal(session.snapshot, state, 'the view did not change');
+  assert.equal((await session.details({nodeId: 'g3-7'})).node.properties.owner, 'Bob', 'the content moved');
+  assert.equal((await session.details({nodeId: 'g3-7'})).contentRevision, 2, 'with its revision');
+  assert.equal((await session.changesSince(1)).resync, true, 'the log stayed behind: a replica resyncs');
+  // The session goes on on the new engine.
+  assert.equal((await session.collapse('g3')).ok, true);
+  assert.equal((await session.payload({set: {nodes: {'g3-7': {owner: 'Cid'}}}})).sequence, 3, 'the numbers go on');
+  assert.match((await createSession(engine, {resident: false}).recycle(fresh)).error, /resident session/);
+});

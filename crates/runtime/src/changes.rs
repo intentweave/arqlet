@@ -69,6 +69,16 @@ impl ChangeLog {
                 .sum::<usize>()
     }
 
+    /// An empty log that goes on from `sequence` (a recycled engine): changes up to it are not in the log, so a replica
+    /// behind it resyncs.
+    pub fn starting_at(sequence: u64) -> Self {
+        ChangeLog {
+            sequence,
+            cleared_at: sequence,
+            ..Default::default()
+        }
+    }
+
     /// Forgets every group (a new graph: a replica has to resync); the sequence goes on.
     pub fn clear(&mut self) {
         // A new list, so that the room of the old one is given back too.
