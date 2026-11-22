@@ -166,6 +166,16 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
 - Found on the way: with only lines in view (no leaf), the switch takes the scene's typical leaf as the size on
   screen, else a zoom onto long edges would never hand over.
 
+### Labels from afar
+
+The far layer drew a text only at its own size, from 6 pixels up; the switch to the near layer comes when the median
+leaf is 24 pixels, so in between almost nothing was labelled. Now a text too small at its own size becomes a label of a
+fixed screen size (10 pixels for a node's name, 11 for a container's title), as engines with a WebGL mode do: drawn
+only where it does not overlap one drawn before (containers first, the larger before the smaller, then leaves), a
+container's title inside its box at the top left of the part in view (it follows the view inside a large container), a
+node's name over its box and up to 140 pixels past a small one, shortened with an ellipsis, with a halo in the
+contrasting tone. At most 3 000 per frame.
+
 ### Completeness of the far layer
 
 - Every kind of drawing is checked against `renderSvg` in both backends (`browser-checks/scene-gl.mjs`, pixels without
