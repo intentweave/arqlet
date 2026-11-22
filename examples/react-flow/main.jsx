@@ -15,7 +15,7 @@ import {createStyle,STYLE_PRESETS} from '@arqlet/viewer/style.js';
 const sides={left:Position.Left,right:Position.Right,top:Position.Top,bottom:Position.Bottom};
 // With a style (`toReactFlow(…, {style})`), the node's resolved look (style.js) sets its colours, as in the SVG and GPU views.
 function DiagramNode({data,selected}){
- const look=data.look,colours=look?{background:selected?look.selectedFill:look.fill,borderColor:data.invalid?look.invalid:selected?look.selectedStroke:look.stroke,color:look.text,borderWidth:look.strokeWidth,borderStyle:look.dash?'dashed':'solid'}:undefined;
+ const look=data.look,colours=look?{background:selected?look.selectedFill:look.fill,borderColor:data.invalid?look.invalid:selected?look.selectedStroke:look.stroke,color:look.text,borderWidth:look.strokeWidth,borderStyle:look.dash?'dashed':'solid',...(look.radius!==undefined?{borderRadius:look.radius==='pill'?9999:look.radius}:{})}:undefined;
  return <div className={`lw-node ${data.container?'container':''} ${selected?'selected':''} ${data.invalid?'invalid':''}`} style={colours}>
   <div className="title">{data.container?'▾ ':data.collapsed?'▸ ':''}{data.label}</div>
   {data.handles.map(h=><Handle key={h.id} id={h.id} type={h.type} position={sides[h.side]} isConnectable={false} style={{left:h.x,top:h.y,right:'auto',bottom:'auto',transform:'translate(-50%,-50%)',opacity:data.showPorts?1:0,background:h.type==='source'?'#7ee1bc':'#9dbaff'}}/>)}
@@ -25,7 +25,7 @@ function DiagramNode({data,selected}){
 const markerId=colour=>colour?`lw-rf-arrow-${colour.replace(/[^a-z0-9]/gi,'')}`:'lw-rf-arrow';
 function DiagramEdge({id,data}){
  const look=data.look;
- return <BaseEdge id={id} path={routePath(data.points)} markerEnd={`url(#${markerId(look?.arrow)})`} style={{stroke:data.invalid?(look?.invalid??'#f08f80'):(look?.stroke??'#73bba7'),strokeWidth:look?.width??Math.min(4,1.6+.4*(data.weight-1)),strokeOpacity:look?.opacity,strokeDasharray:look?.dash}}/>;
+ return <BaseEdge id={id} path={routePath(data.points)} markerEnd={look?.arrow==='none'?undefined:`url(#${markerId(look?.arrow)})`} style={{stroke:data.invalid?(look?.invalid??'#f08f80'):(look?.stroke??'#73bba7'),strokeWidth:look?.width??Math.min(4,1.6+.4*(data.weight-1)),strokeOpacity:look?.opacity,strokeDasharray:look?.dash}}/>;
 }
 // What is neither node nor edge (toReactFlow's overlays, with `overlayNode`): membership hulls behind everything, bus bars
 // with their taps, junction dots and hub-reference stubs, in renderSvg's colours, inside one inert node over the scene.
@@ -44,7 +44,7 @@ function OverlayNode({data}){
 const nodeTypes={arqlet:DiagramNode,arqletOverlay:OverlayNode},edgeTypes={arqlet:DiagramEdge};
 function FitScene({bounds}){const {fitBounds}=useReactFlow();useEffect(()=>{fitBounds(bounds,{padding:.1});},[bounds,fitBounds]);return null;}
 
-const Arrow=({edges=[]})=>{const colours=[...new Set(edges.map(e=>e.data.look?.arrow).filter(Boolean))];return <svg style={{position:'absolute',width:0,height:0}}><defs>
+const Arrow=({edges=[]})=>{const colours=[...new Set(edges.map(e=>e.data.look?.arrow).filter(c=>c&&c!=='none'))];return <svg style={{position:'absolute',width:0,height:0}}><defs>
  {[null,...colours].map(c=><marker key={c??''} id={markerId(c)} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill={c??'#73bba7'}/></marker>)}</defs></svg>;};
 
 // Large views (ADR 0025, V4): the scene view draws from afar on the GPU (WebGPU, else WebGL 2), and React Flow takes the
@@ -131,7 +131,7 @@ function App(){
  const far=!!scene&&(farChoice??(scene.nodes.length+scene.routes.length>=FAR_AUTO));
  return <main><header><strong>Arqlet · React Flow</strong><button onClick={load}>Initial snapshot</button><button onClick={()=>fileInput.current.click()}>Open snapshot</button><input ref={fileInput} type="file" accept=".json" hidden onChange={openFile}/>
   <select aria-label="Profile" disabled={busy||!profiles.length} value="" onChange={e=>applyProfilee(e.target.value)}><option value="" disabled>Choose profile …</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.title??p.id}</option>)}</select>
-  <button disabled={busy||!active?.aggregate} onClick={toggle}>{active?.collapsed?'Expand':'Collapse'}</button><select aria-label="Style" value={stylePreset} onChange={e=>setStylePreset(e.target.value)}><option value="default">Default style</option><option value="byKind">By kind</option></select><label><input type="checkbox" checked={far} disabled={!scene} onChange={e=>setFarChoice(e.target.checked)}/> GPU far layer</label><span>{selected??'Select a node'} · {scene?.nodes.length??0} nodes</span></header>
+  <button disabled={busy||!active?.aggregate} onClick={toggle}>{active?.collapsed?'Expand':'Collapse'}</button><select aria-label="Style" value={stylePreset} onChange={e=>setStylePreset(e.target.value)}><option value="default">Default style</option><option value="byKind">By kind</option><option value="metro">Metro</option></select><label><input type="checkbox" checked={far} disabled={!scene} onChange={e=>setFarChoice(e.target.checked)}/> GPU far layer</label><span>{selected??'Select a node'} · {scene?.nodes.length??0} nodes</span></header>
  {error&&<p role="alert">{error}</p>}
  {scene&&far&&<FarSceneView scene={scene} selected={selected} onSelect={setSelected} style={style}/>}
  {scene&&!far&&<ReactFlow nodes={nodes} edges={mapped.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={changes=>setNodes(ns=>applyNodeChanges(changes,ns))} onNodeClick={(_,node)=>setSelected(node.id)} nodesDraggable={false} nodesConnectable={false} deleteKeyCode={null} elevateEdgesOnSelect={false} elevateNodesOnSelect={false} minZoom={.02} fitView>

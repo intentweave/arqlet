@@ -47,7 +47,9 @@ export function renderSvg(host,scene,options={}){
 // and the arrow marker's identity.
 function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=null,selectedRoute=null,pinned=new Set(),sized=new Map(),onSelect,onSelectRoute,onNodeDragStart,onToggle,onPin,onReset,onResize,scale=1,document=host.ownerDocument,style}){
  if(scene.schemaVersion!==1)throw Error('Unsupported scene schema');
- const T=style.theme,HOVER_STROKE=T.hover;
+ const T=style.theme,HOVER_STROKE=T.hover,looks=style.bind(scene);
+ // A corner radius from the style: a number, or 'pill' (half the shorter side).
+ const radiusOf=(own,r,fallback)=>own.radius==='pill'?Math.min(r.width,r.height)/2:own.radius??fallback;
  const ns='http://www.w3.org/2000/svg';
  const element=(tag,attrs={},text)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!==undefined)e.textContent=text;return e;};
  let markerId=markerIds.get(host);if(!markerId){markerId=`lw-arrow-${++viewerId}`;markerIds.set(host,markerId);}
@@ -127,10 +129,10 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  const rings=[],top=[];
  for(const n of [...nodes.values()].filter(n=>parents.has(n.id)).sort((a,b)=>depth(a)-depth(b))){const r=absolute.get(n.id);
   // A circle container is a disc inscribed in its square box, like a circle leaf; its controls sit on the disc.
-  const round=n.shape==='circle',mx=r.x+r.width/2,my=r.y+r.height/2,rad=Math.min(r.width,r.height)/2,on45=rad*.62,look=style.node(n);
+  const round=n.shape==='circle',mx=r.x+r.width/2,my=r.y+r.height/2,rad=Math.min(r.width,r.height)/2,on45=rad*.62,look=looks.node(n);
   const frameStroke=invalid.has(n.id)?T.invalid:look.stroke??T.frameStroke,extra={...(look.strokeWidth!==undefined?{'stroke-width':look.strokeWidth}:{}),...(look.dash?{'stroke-dasharray':look.dash}:{})};
   const frame=round?element('circle',{cx:mx,cy:my,r:rad,fill:look.fill??T.frameFill,stroke:frameStroke,...extra,'data-container-id':n.id,...(onNodeDragStart?{'pointer-events':'none'}:{})})
-   :element('rect',{...r,rx:10,fill:look.fill??T.frameFill,stroke:frameStroke,...extra,'data-container-id':n.id,...(onNodeDragStart?{'pointer-events':'none'}:{})});if(pinned.has(n.id))frame.setAttribute('data-pinned-id',n.id);{const why=hint(n.id);if(why)frame.append(why);}svg.append(frame);if(n.kind==='entity')svg.append(element('line',{x1:r.x,y1:r.y+34,x2:r.x+r.width,y2:r.y+34,stroke:T.frameStroke,'pointer-events':'none'}));
+   :element('rect',{...r,rx:radiusOf(look,r,10),fill:look.fill??T.frameFill,stroke:frameStroke,...extra,'data-container-id':n.id,...(onNodeDragStart?{'pointer-events':'none'}:{})});if(pinned.has(n.id))frame.setAttribute('data-pinned-id',n.id);{const why=hint(n.id);if(why)frame.append(why);}svg.append(frame);if(n.kind==='entity')svg.append(element('line',{x1:r.x,y1:r.y+34,x2:r.x+r.width,y2:r.y+34,stroke:T.frameStroke,'pointer-events':'none'}));
   const size=controlSize(Math.min(24,r.width/4));
   // The inside of the frame, 18 screen pixels wide, is the handle of a container: a press there starts a move, as a press on
   // a leaf does (ADR 0009, section 4). Top-level containers move the same way; their pins are in the view's frame. Hovering
@@ -166,11 +168,11 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
   // more opaque with their number (logarithmically, so strong links stand out), and has an arrow at the start too when
   // some run back.
   const aggregated=route.backWeight!==undefined&&route.backWeight!==null,back=aggregated?route.backWeight:0,total=weight+back;
-  const look=style.edge(route);
+  const look=looks.edge(route);
   const width=look.width??(aggregated?Math.min(7,1+1.2*Math.log2(total+1)):Math.min(4,1.6+0.4*(weight-1)));
   const opacity=look.opacity??(aggregated?0.3+0.55*Math.min(1,Math.log2(total+1)/6):.75);
-  const arrow=markerFor(look.arrow);
-  const line=element('polyline',{'data-route-id':route.id,points,fill:'none',stroke:route.invalid||conflictedRoutes.has(route.id)?T.invalid:isActive?T.activeRoute:look.stroke??T.route,'stroke-width':width+(isActive?1.5:0),'stroke-opacity':dim?.2:isActive?1:opacity,...(look.dash?{'stroke-dasharray':look.dash}:{}),'marker-end':`url(#${arrow})`,...(back>0?{'marker-start':`url(#${arrow})`}:{}),'pointer-events':'none'});
+  const arrow=look.arrow==='none'?null:markerFor(look.arrow);
+  const line=element('polyline',{'data-route-id':route.id,points,fill:'none',stroke:route.invalid||conflictedRoutes.has(route.id)?T.invalid:isActive?T.activeRoute:look.stroke??T.route,'stroke-width':width+(isActive?1.5:0),'stroke-opacity':dim?.2:isActive?1:opacity,...(look.dash?{'stroke-dasharray':look.dash}:{}),...(arrow?{'marker-end':`url(#${arrow})`,...(back>0?{'marker-start':`url(#${arrow})`}:{})}:{}),'pointer-events':'none'});
   if(aggregated&&total>1){line.append(element('title',{},`${weight} edge${weight===1?'':'s'} ${route.source} → ${route.target}${back?`, ${back} back`:''}`));const mid=route.points[Math.floor(route.points.length/2)];svg.append(element('text',{x:mid.x+6,y:mid.y-6,fill:T.text,'font-size':12,'pointer-events':'none'},back?`${weight} ⇄ ${back}`:String(weight)));}
   else if(weight>1){line.append(element('title',{},`${weight} bundled edges${route.members?.length?': '+route.members.join(', '):''}`));const mid=route.points[Math.floor(route.points.length/2)];svg.append(element('text',{x:mid.x+6,y:mid.y-6,fill:T.text,'font-size':12,'pointer-events':'none'},String(weight)));}
   svg.append(line);
@@ -203,14 +205,14 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
    svg.append(element('text',{x:r.x+4,y:r.y+r.height/2,'dominant-baseline':'middle',fill:T.busText,'font-size':10.5,'pointer-events':'none'},(ref.outgoing?'→ ':'← ')+ref.text.slice(0,32)));
   }
   // Junctions of explicit buses: where the bus's lines branch (ADR 0005).
-  for(const j of scene.junctions??[])svg.append(element('circle',{cx:j.x,cy:j.y,r:3.5,fill:T.route,stroke:T.frameFill,'stroke-width':1,'pointer-events':'none',class:'lw-junction'}));
+  for(const j of scene.junctions??[])svg.append(element('circle',{cx:j.x,cy:j.y,r:3.5,fill:T.junctionFill,stroke:T.junctionStroke,'stroke-width':1,'pointer-events':'none',class:'lw-junction'}));
   // The rings and the controls of the containers are drawn above the routes, so a route crossing a container's border does
   // not take the press meant for the border; the routes stay selectable everywhere else.
   for(const el of [...rings,...top])svg.append(el);
  for(const n of [...nodes.values()].filter(n=>!parents.has(n.id))){const r=absolute.get(n.id),g=element('g',{class:'node',tabindex:0,role:'button','aria-label':n.label,'data-node-id':n.id});
  {const why=hint(n.id);if(why)g.append(why);}
  // The outline is the engine's: a circle is the disc inscribed in its box, a rectangle is its box.
- const own=style.node(n);
+ const own=looks.node(n);
  const look={fill:n.id===selected?T.selectedFill:own.fill??T.leafFill,stroke:invalid.has(n.id)?T.invalid:n.id===selected?T.selectedStroke:own.stroke??T.leafStroke,...(own.strokeWidth!==undefined?{'stroke-width':own.strokeWidth}:{}),...(own.dash?{'stroke-dasharray':own.dash}:{})};
  // The hit area is at least 18 screen pixels, so a small node is as easy to press as a container's ring (ADR 0009).
  const hitW=Math.max(r.width,18/scale),hitH=Math.max(r.height,18/scale),cx=r.x+r.width/2,cy=r.y+r.height/2;
@@ -220,7 +222,7 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  // Entity-relationship notation: an attribute is a row of text in its entity; relationships are labelled edges.
  const attribute=n.kind==='attribute';
  const shape=attribute?element('rect',{...r,rx:4,fill:'transparent',stroke:'transparent'})
-  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:7,...look});
+  :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:radiusOf(own,r,7),...look});
  g.append(shape);
  g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);
  g.onpointerleave=()=>shape.setAttribute('stroke',attribute?'transparent':look.stroke);if(pinned.has(n.id)){g.setAttribute('data-pinned-id',n.id);if(!onPin){const pin=element('circle',{cx:round?cx+rad*.62:r.x+r.width-10,cy:round?cy-rad*.62:r.y+10,r:4,fill:T.pin,'pointer-events':'none'});pin.append(element('title',{},'Pinned: layout keeps this position'));g.append(pin);}}

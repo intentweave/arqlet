@@ -11,6 +11,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   colours (also from CSS custom properties, `--arqlet-…`) and rules with selectors over the data (`edge[kind=import]`,
   `leaf`, `#id`; colours as CSS, `$token` or `auto` by kind). `renderSvg`, the GPU far layer and `toReactFlow`
   (`data.look`) draw the same colours; presets `default`, `byKind` and `light`. Without a style the drawing is unchanged.
+- Metro map style (preset `metro`): explicit buses as coloured lines without arrowheads, their nodes as stations, a node
+  on several buses as an interchange. The style model derives `bus`, `buses` and `interchange` from the scene's buses
+  (`bind`) and gains `[key]` selectors, `auto(field)`, the node property `radius` and `arrow: 'none'`.
 
 - Scene renderer for large views (ADR 0025 V1–V2, provisional) in `@arqlet/viewer`: a far layer on the GPU, WebGPU
   first and WebGL 2 as the fallback (`createSceneGpuRenderer`, `createSceneRenderer`, `sceneBackend`), drawing the

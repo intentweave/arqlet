@@ -77,3 +77,41 @@ test('one style, every renderer: renderSvg, the GPU buffers and React Flow draw 
   assert.deepEqual([flow.nodes.find(n => n.id === leaf.id).data.look.fill, flow.edges[0].data.look.stroke, flow.edges[0].data.look.arrow], ['#aa0000', '#112233', '#ccdd00']);
   assert.equal(toReactFlow(s).edges[0].data.look, undefined, 'no look without a style');
 });
+
+test('a scene\'s buses become data for the rules: a bus per route, stations and interchanges, auto by bus', () => {
+  const sc = {buses: [['e1', 'e2'], ['e3']], routes: [{id: 'e1', source: 'a', target: 'g'}, {id: 'e2', source: 'b', target: 'g'}, {id: 'e3', source: 'c', target: 'g'}, {id: 'x', source: 'a', target: 'c'}]};
+  const style = createStyle({palette: ['#100000', '#200000', '#300000'], rules: [
+    {selector: 'edge[bus]', style: {stroke: 'auto(bus)', arrow: 'none'}},
+    {selector: 'leaf[bus]', style: {stroke: 'auto(bus)', radius: 'pill'}},
+    {selector: 'leaf[interchange]', style: {stroke: '#000000'}},
+  ]});
+  const b = style.bind(sc);
+  assert.deepEqual(b.edge({id: 'e1'}), {stroke: '#100000', arrow: 'none'});
+  assert.deepEqual(b.edge({id: 'e3'}), {stroke: '#200000', arrow: 'none'}, 'bus 1 takes the second colour');
+  assert.deepEqual(b.edge({id: 'x'}), {}, 'a route on no bus matches no [bus] rule');
+  assert.deepEqual(b.node({id: 'a'}), {stroke: '#100000', radius: 'pill'});
+  assert.deepEqual(b.node({id: 'g'}), {stroke: '#000000'}, 'on two buses: an interchange, on no single bus');
+  assert.deepEqual(b.node({id: 'z'}), {});
+  assert.equal(style.bind(sc), b, 'bound once per scene');
+});
+
+test('metro: no arrowheads and pill corners in renderSvg, the GPU buffers and React Flow', () => {
+  const s = scene('bpmn-pools');
+  const routes = s.routes.slice(0, 2).map(r => r.id);
+  const withBus = {...s, buses: [routes]};
+  const host = new El('svg');
+  renderSvg(host, withBus, {document: {createElementNS: (_, t) => new El(t)}, style: STYLE_PRESETS.metro});
+  const lines = [];
+  walk(host, e => { if (e.tag === 'polyline' && routes.includes(e.attrs['data-route-id']) && e.attrs.class !== 'route-hit') lines.push(e); });
+  assert.ok(lines.length === 2 && lines.every(l => !l.attrs['marker-end'] && l.attrs['stroke-width'] === 5), 'bus routes: thick, no marker');
+  const station = s.routes.find(r => r.id === routes[0]).source;
+  let rx = null;
+  walk(host, e => { if (e.tag === 'g' && e.attrs['data-node-id'] === station) rx = e.children.find(c => c.tag === 'rect' && c.attrs.class !== 'lw-hit')?.attrs.rx; });
+  const box = s.nodes.find(n => n.id === station).bounds;
+  assert.equal(rx, Math.min(box.width, box.height) / 2, 'a station is a pill');
+  const plain = sceneBuffers(s, {style: STYLE_PRESETS.metro}), metro = sceneBuffers(withBus, {style: STYLE_PRESETS.metro});
+  assert.equal(plain.layers[2].triangles.length - metro.layers[2].triangles.length, 2 * 3 * TRIANGLE_STRIDE, 'two arrowheads fewer on the GPU');
+  const flow = toReactFlow(withBus, {style: STYLE_PRESETS.metro});
+  assert.equal(flow.edges.find(e => e.id === routes[0]).data.look.arrow, 'none');
+  assert.equal(flow.nodes.find(n => n.id === station).data.look.radius, 'pill');
+});
