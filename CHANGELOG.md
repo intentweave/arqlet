@@ -9,6 +9,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 - Playground example *Metro map (lines as buses)*: a made-up city's five metro lines as explicit buses, stations in
   order, interchanges where lines meet, routed octilinear; with *Style: Metro* it draws as a metro map.
+- Playground example *Vehicle buses as metro lines*: the physical buses of a made-up vehicle as explicit buses running
+  through their ECUs in the order of the wiring harness, the central gateway and the body controller as interchanges.
 - Routing style `octilinear` (#129): the orthogonal route with its corners cut at 45° in the scene, clear of the nodes,
   drawn alike by SVG, both GPU backends, React Flow and the overview; selectable in the containment tree. With the
   metro style it gives a metro-map look.
