@@ -71,7 +71,7 @@ fn replaying_the_log_on_the_old_snapshot_gives_the_same_state() {
         let at = ok(primary.run_value(&json!({"op": "changesSince", "sequence": 0})))["sequence"]
             .as_u64()
             .unwrap();
-        let mut rng = Rng(seed * 0x9E37_79B9_7F4A_7C15 + 1);
+        let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(1));
         let mut added = Vec::new();
         for step in 0..12 {
             let mut group = random_group(&mut rng, step, &mut added);
