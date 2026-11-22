@@ -1,8 +1,9 @@
 # ADR 0023: A primary store, replicas and a change stream between backend and browser
 
 Date: 2026-11-21.
-Status: proposed. Step R1 (content in the engine session) is implemented, provisional, behind its own operation
-`payload` (2026-11-22, `benchmarks/results/content-memory-20261122.md`); the other steps are not.
+Status: proposed. Steps R1 (content in the engine session, operation `payload`, 2026-11-22,
+`benchmarks/results/content-memory-20261122.md`) and R2 (the change log: `change`, `changesSince`, `content`; replay
+tested byte for byte) are implemented, provisional, behind their own operations; the other steps are not.
 
 Related: [ADR 0019](0019-engine-interface.md) (protocol, sessions, state stays where it is computed, the columnar data
 path, prepared source and lean snapshots), [ADR 0021](https://github.com/intentweave/arqlet/pull/70) (proposed: a Cypher

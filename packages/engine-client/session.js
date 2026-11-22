@@ -132,7 +132,9 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
     if (!answer.ok || answer.revision === undefined) return answer;
     const state = {revision: answer.revision, layoutVersion: answer.layoutVersion, collapsedIds: answer.collapsedIds};
     if (answer.scene) scenes.set(state, answer.scene);
-    return {ok: true, snapshot: state};
+    // The change log's number and the content's revision of a source change (ADR 0023, R1 and R2), when the answer has them.
+    return {ok: true, snapshot: state, ...(answer.sequence !== undefined ? {sequence: answer.sequence} : {}),
+      ...(answer.contentRevision !== undefined ? {contentRevision: answer.contentRevision} : {})};
   };
 
   // Runs `step` after every change before it; its answer counts only if no import or reset came in between.
@@ -252,6 +254,31 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
     payload(change = {}) {
       if (!resident) return Promise.resolve({ok: false, error: 'payload needs a resident session'});
       return enqueue(() => call({op: 'payload', ...change}));
+    },
+
+    /**
+     * Provisional (ADR 0023, R2): a change of structure and content as one group, all of it or nothing:
+     * `{patch: {nodes, edges, removeNodes, removeEdges, memberships}, payload: {set, unset, clear}, expectedSequence}`.
+     * The answer carries the group's `sequence` in the session's change log. Needs a resident session.
+     */
+    change(group = {}) {
+      if (!resident) return Promise.resolve({ok: false, error: 'change needs a resident session'});
+      return enqueue(() => call({op: 'change', ...group}));
+    },
+
+    /**
+     * Provisional (ADR 0023, R2, read only): the change groups after `sequence` (`{sequence, changes}`), or `{resync: true}`
+     * when some of them are no longer in the log (then take a new snapshot and the `content`).
+     */
+    async changesSince(sequence) {
+      if (!resident) return {ok: false, error: 'changesSince needs a resident session'};
+      return call({op: 'changesSince', sequence});
+    },
+
+    /** Provisional (ADR 0023, R2, read only): the whole content and the log's sequence, for a replica that resyncs. */
+    async content() {
+      if (!resident) return {ok: false, error: 'content needs a resident session'};
+      return call({op: 'content'});
     },
 
     /**

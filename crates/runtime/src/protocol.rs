@@ -582,10 +582,10 @@ impl Request {
             Some("find") => return Ok(Request::Find { body: body() }),
             Some("digest") => return Ok(Request::Digest { body: body() }),
             Some("peek") => return Ok(Request::Peek { body: body() }),
-            Some("payload") => {
-                return Err(
-                    "payload needs a resident session (the content is kept by the session)".into(),
-                )
+            Some(op @ ("payload" | "change" | "changesSince" | "content")) => {
+                return Err(format!(
+                    "{op} needs a resident session (the content and the change log are kept by the session)"
+                ))
             }
             Some("componentRefine") => return Ok(Request::ComponentRefine { body: body() }),
             Some("elkLayout") => return Ok(Request::ElkLayout { body: body() }),

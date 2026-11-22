@@ -7,6 +7,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- A change log in a resident session (provisional, ADR 0023 step R2): every change of the source, structure (`patch`)
+  or content (`payload`), is a numbered group in one sequence; the new operation `change` applies a patch and a payload
+  together as one group, all of it or nothing (`expectedSequence` refuses a stale one). `changesSince` answers the
+  groups after a number, or `resync` when the log (bounded to 1 000 groups and 16 MB) no longer has them; `content`
+  answers the whole content for a resync. A new import or `load` clears the log; the number goes on. Replaying the log
+  on the snapshot it started from gives the same snapshot byte for byte and the same content (tested over seeded
+  sequences). Memberships change through `patch` (ADR 0022 §5b): `memberships` adds or replaces dimensions and groups,
+  `removeMemberships` removes a dimension or a group with the groups nested in it (removals first); a patch that changes
+  memberships only moves nothing (boxes and routes stay, a new revision). JS: `session.change`,
+  `session.changesSince`, `session.content`; session answers carry `sequence` and `contentRevision`.
 - Content in a resident session (provisional, ADR 0023 step R1): the operation `payload` sets, unsets or clears
   properties of nodes and edges (JSON values; an integer stays an integer) as one change with its own
   `contentRevision` (`expectedContentRevision` refuses a stale change). The content is kept beside the snapshot, never

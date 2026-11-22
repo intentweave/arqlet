@@ -45,6 +45,7 @@ export * from './LineDetails';
 export * from './Measurement';
 export * from './MembershipDimension';
 export * from './MembershipGroup';
+export * from './MembershipRemoval';
 export * from './MembershipView';
 export * from './Memberships';
 export * from './Metrics';
