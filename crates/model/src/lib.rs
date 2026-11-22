@@ -1178,6 +1178,9 @@ pub enum RoutingStyle {
     /// where a segment is short, none where it would touch a node). The layout keeps the orthogonal route; the scene
     /// carries the cut one.
     Octilinear,
+    /// A smooth curve: the route pulled taut as `Polyline`, then a centripetal Catmull-Rom curve through its points,
+    /// sampled by the scene; a piece that would come too near a node stays the polyline's straight segment. The layout
+    /// keeps the orthogonal route.
     Curve,
     Bus,
 }
@@ -1193,6 +1196,7 @@ impl RoutingStyle {
                 | Self::Polyline
                 | Self::RoundedPolyline
                 | Self::Octilinear
+                | Self::Curve
         )
     }
 
@@ -1279,6 +1283,10 @@ impl RoutingConstraint {
     /// Whether the routes under this constraint are drawn octilinear (corners cut at 45°).
     pub fn chamfers(&self) -> bool {
         self.picks(RoutingStyle::Octilinear)
+    }
+    /// Whether the routes under this constraint are drawn as curves.
+    pub fn curves(&self) -> bool {
+        self.picks(RoutingStyle::Curve)
     }
 }
 

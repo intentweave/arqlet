@@ -7,6 +7,71 @@ use arqlet_model::Point;
 pub const CORNER_RADIUS: f64 = 12.;
 /// Points per rounded corner: the arc is a quadratic curve sampled at `ARC_STEPS + 1` points.
 pub const ARC_STEPS: usize = 6;
+/// Points per piece of a curve at most, and the length one point stands for (layout units).
+pub const CURVE_STEPS: usize = 16;
+const CURVE_STEP_LENGTH: f64 = 8.;
+
+/// A smooth curve through the points of a route (a centripetal Catmull-Rom spline: it passes through every point, does
+/// not loop or overshoot at uneven spacing), sampled into points: per piece between two route points as many as its
+/// length needs (at most `CURVE_STEPS`). A piece whose samples would enter an obstacle stays the straight segment, which
+/// the caller has kept clear. The ends and the route points stay where they are.
+pub fn smooth_curve(points: &[Point], obstacles: &[Rect]) -> Vec<Point> {
+    if points.len() < 3 {
+        return points.to_vec();
+    }
+    let n = points.len();
+    let at = |i: isize| -> &Point { &points[i.clamp(0, n as isize - 1) as usize] };
+    let mut out = vec![points[0].clone()];
+    for i in 0..n - 1 {
+        let (p0, p1, p2, p3) = (
+            at(i as isize - 1),
+            at(i as isize),
+            at(i as isize + 1),
+            at(i as isize + 2),
+        );
+        let length = geom::dist(p1, p2);
+        let steps = ((length / CURVE_STEP_LENGTH).ceil() as usize).clamp(2, CURVE_STEPS);
+        let piece: Vec<Point> = (1..=steps)
+            .map(|k| catmull_rom(p0, p1, p2, p3, k as f64 / steps as f64))
+            .collect();
+        let mut previous = p1.clone();
+        let clear = piece.iter().all(|q| {
+            let ok = !obstacles.iter().any(|o| geom::enters(&previous, q, o));
+            previous = q.clone();
+            ok
+        });
+        if clear {
+            out.extend(piece);
+        } else {
+            out.push(p2.clone());
+        }
+    }
+    out
+}
+
+// The centripetal Catmull-Rom point at `t` in 0..1 between p1 and p2 (Barry and Goldman's form, alpha 0.5). Equal
+// neighbours (the ends) are handled by the knot spacing's floor.
+fn catmull_rom(p0: &Point, p1: &Point, p2: &Point, p3: &Point, t: f64) -> Point {
+    let knot = |a: &Point, b: &Point| geom::dist(a, b).sqrt().max(1e-6);
+    let (t0, t1) = (0., knot(p0, p1));
+    let t2 = t1 + knot(p1, p2);
+    let t3 = t2 + knot(p2, p3);
+    let u = t1 + (t2 - t1) * t;
+    let lerp = |a: &Point, b: &Point, ta: f64, tb: f64| {
+        let w = (u - ta) / (tb - ta);
+        Point {
+            x: a.x + (b.x - a.x) * w,
+            y: a.y + (b.y - a.y) * w,
+        }
+    };
+    let a1 = lerp(p0, p1, t0, t1);
+    let a2 = lerp(p1, p2, t1, t2);
+    let a3 = lerp(p2, p3, t2, t3);
+    let b1 = lerp(&a1, &a2, t0, t2);
+    let b2 = lerp(&a2, &a3, t1, t3);
+    lerp(&b1, &b2, t1, t2)
+}
+
 /// The longest cut of an octilinear corner along each of its two segments (layout units): the diagonal is this times √2.
 pub const CHAMFER: f64 = 12.;
 
@@ -132,6 +197,45 @@ mod tests {
 
     fn p(x: f64, y: f64) -> Point {
         Point { x, y }
+    }
+
+    #[test]
+    fn a_curve_passes_through_the_route_points_and_keeps_the_ends() {
+        let route = [p(0., 0.), p(100., 0.), p(100., 100.), p(200., 100.)];
+        let out = smooth_curve(&route, &[]);
+        assert_eq!(out.first(), route.first());
+        assert_eq!(out.last(), route.last());
+        assert!(out.len() > route.len() * 3, "{}", out.len());
+        // It passes through every route point.
+        for q in &route {
+            assert!(out.iter().any(|o| geom::dist(o, q) < 1e-9), "{q:?}");
+        }
+        // It is smooth: no turn between two samples is sharper than 45°.
+        for w in out.windows(3) {
+            let (a, b, c) = (&w[0], &w[1], &w[2]);
+            let (u, v) = ((b.x - a.x, b.y - a.y), (c.x - b.x, c.y - b.y));
+            let cos = (u.0 * v.0 + u.1 * v.1) / ((u.0.hypot(u.1)) * (v.0.hypot(v.1))).max(1e-12);
+            assert!(cos > 0.70, "{cos} at {b:?}");
+        }
+    }
+
+    #[test]
+    fn a_piece_that_would_touch_a_node_stays_straight() {
+        let route = [p(0., 0.), p(100., 0.), p(100., 100.)];
+        let free = smooth_curve(&route, &[]);
+        // The free curve bulges out beyond (100, 0); a node there keeps that piece straight.
+        assert!(free.iter().any(|q| q.x > 100. + 1e-6 || q.y < -1e-6));
+        let block = Rect {
+            x0: 100.5,
+            y0: -20.,
+            x1: 130.,
+            y1: 60.,
+        };
+        let kept = smooth_curve(&route, &[block]);
+        for w in kept.windows(2) {
+            assert!(!geom::enters(&w[0], &w[1], &block));
+        }
+        assert!(kept.iter().any(|q| q == &p(100., 0.)));
     }
 
     #[test]

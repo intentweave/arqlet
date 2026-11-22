@@ -380,13 +380,18 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             .then(|| graph.routing_constraint(graph.edge_area(&edge.source, target).as_deref()))
             .flatten();
         let pulled = |c: &RoutingConstraint| {
-            [RoutingStyle::Polyline, RoutingStyle::RoundedPolyline]
-                .into_iter()
-                .find(|s| c.picks(*s))
+            [
+                RoutingStyle::Polyline,
+                RoutingStyle::RoundedPolyline,
+                RoutingStyle::Curve,
+            ]
+            .into_iter()
+            .find(|s| c.picks(*s))
         };
         let style = constraint.as_ref().and_then(pulled);
         let rounds = constraint.as_ref().is_some_and(|c| c.rounds());
         let chamfers = constraint.as_ref().is_some_and(|c| c.chamfers());
+        let curves = constraint.as_ref().is_some_and(|c| c.curves());
         // A container that holds an endpoint is traversable for the edge; every other node is an obstacle, except the two
         // endpoints, which the route may leave and reach along their border. A pulled route keeps a distance; a rounded
         // orthogonal route only must not run into a node.
@@ -419,7 +424,8 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
                 .collect()
         };
         let clearance = match style {
-            Some(RoutingStyle::RoundedPolyline) => ROUNDED_POLYLINE_CLEARANCE,
+            // A curve bulges past its route points: it keeps the larger distance of the rounded polyline.
+            Some(RoutingStyle::RoundedPolyline | RoutingStyle::Curve) => ROUNDED_POLYLINE_CLEARANCE,
             Some(_) => POLYLINE_CLEARANCE,
             None => 0.,
         };
@@ -437,6 +443,10 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             // the orthogonal route (`build_corner_scene`).
             if chamfers && arcs {
                 points = realize::chamfer_corners(&points, realize::CHAMFER, &blocks);
+            }
+            // A curve through the pulled route's points; the metrics count those points' corners.
+            if curves && arcs {
+                points = realize::smooth_curve(&points, &blocks);
             }
         }
         routes.push(SceneRoute {
@@ -1085,6 +1095,28 @@ mod tests {
         assert!(!route.rounded);
         // The corner scene, which the metrics measure, keeps the orthogonal corners.
         assert_eq!(build_corner_scene(&s).unwrap().routes[0].points.len(), 4);
+    }
+
+    #[test]
+    fn a_curve_route_is_the_pulled_route_smoothed_and_the_metrics_keep_its_corners() {
+        let bend = json!([{"x": 220, "y": 175}, {"x": 335, "y": 175}, {"x": 335, "y": 185}, {"x": 450, "y": 185}]);
+        let mut s = snapshot(json!({"routes": [{"id": "e", "points": bend}]}));
+        s.graph.default_routing = Some(RoutingConstraint::Fixed(RoutingStyle::Polyline));
+        let polyline = build_scene(&s).unwrap().routes[0].points.clone();
+        s.graph.default_routing = Some(RoutingConstraint::Fixed(RoutingStyle::Curve));
+        let curve = build_scene(&s).unwrap().routes[0].points.clone();
+        // The curve passes through the polyline's points and keeps its ends.
+        assert_eq!(curve.first(), polyline.first());
+        assert_eq!(curve.last(), polyline.last());
+        for q in &polyline {
+            assert!(
+                curve.iter().any(|c| (c.x - q.x).hypot(c.y - q.y) < 1e-9),
+                "{q:?}"
+            );
+        }
+        assert!(curve.len() >= polyline.len());
+        // The corner scene, which the metrics measure, has the polyline's corners.
+        assert_eq!(build_corner_scene(&s).unwrap().routes[0].points, polyline);
     }
 
     #[test]

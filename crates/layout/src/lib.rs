@@ -12028,13 +12028,13 @@ mod routing_declaration_tests {
     #[test]
     fn an_undrawn_style_is_refused() {
         let err = compute(
-            &pair("curve"),
+            &pair("bus"),
             None,
             &BTreeSet::new(),
             &LayoutOptions::default(),
         )
         .unwrap_err();
-        assert!(err.contains("curve is not drawn yet"), "{err}");
+        assert!(err.contains("bus is not drawn yet"), "{err}");
     }
 }
 
