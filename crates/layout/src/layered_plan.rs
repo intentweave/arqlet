@@ -171,18 +171,22 @@ pub fn plan_ends(
     None
 }
 
+/// An id the order helpers work on: `String`, or the layout's shared `Id`; compared and ordered as its text.
+pub trait OrderId: Clone + Ord + std::borrow::Borrow<str> {}
+impl<T: Clone + Ord + std::borrow::Borrow<str>> OrderId for T {}
+
 /// The crossings between neighbouring ranks of `ranks` (each in order) for the sections `links` (upper, lower). A section
 /// whose ends are not in neighbouring ranks is not counted. Two sections that share an end do not cross.
-pub fn order_crossings(ranks: &[Vec<String>], links: &[(String, String)]) -> usize {
+pub fn order_crossings<S: OrderId>(ranks: &[Vec<S>], links: &[(S, S)]) -> usize {
     let mut place: BTreeMap<&str, (usize, usize)> = BTreeMap::new();
     for (r, ids) in ranks.iter().enumerate() {
         for (i, id) in ids.iter().enumerate() {
-            place.insert(id.as_str(), (r, i));
+            place.insert(id.borrow(), (r, i));
         }
     }
     let mut by_rank: Vec<Vec<(usize, usize)>> = vec![Vec::new(); ranks.len()];
     for (a, b) in links {
-        let (Some(&(ra, ia)), Some(&(rb, ib))) = (place.get(a.as_str()), place.get(b.as_str()))
+        let (Some(&(ra, ia)), Some(&(rb, ib))) = (place.get(a.borrow()), place.get(b.borrow()))
         else {
             continue;
         };
@@ -237,29 +241,29 @@ fn inversions(pairs: &mut [(usize, usize)]) -> usize {
 /// The ranks `ranks` in the order of an earlier plan's ranks `previous` (reuse): every id that `previous` holds goes to its
 /// relative place in its earlier rank; an id it does not hold follows the id before it in `ranks`. `group` keeps the blocks
 /// of `improve_order`. Deterministic.
-pub fn follow_order(
-    ranks: &[Vec<String>],
-    previous: &[Vec<String>],
+pub fn follow_order<S: OrderId, P: OrderId>(
+    ranks: &[Vec<S>],
+    previous: &[Vec<P>],
     group: &dyn Fn(&str) -> usize,
-) -> Vec<Vec<String>> {
+) -> Vec<Vec<S>> {
     let mut place: BTreeMap<&str, f64> = BTreeMap::new();
     for ids in previous {
         for (i, id) in ids.iter().enumerate() {
-            place.insert(id.as_str(), (i as f64 + 0.5) / ids.len() as f64);
+            place.insert(id.borrow(), (i as f64 + 0.5) / ids.len() as f64);
         }
     }
     ranks
         .iter()
         .map(|ids| {
             let mut last = 0.;
-            let mut keyed: Vec<(usize, f64, usize, &String)> = ids
+            let mut keyed: Vec<(usize, f64, usize, &S)> = ids
                 .iter()
                 .enumerate()
                 .map(|(i, id)| {
-                    if let Some(&p) = place.get(id.as_str()) {
+                    if let Some(&p) = place.get(id.borrow()) {
                         last = p;
                     }
-                    (group(id), last, i, id)
+                    (group(id.borrow()), last, i, id)
                 })
                 .collect();
             keyed.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.cmp(&b.2)));
@@ -272,18 +276,18 @@ pub fn follow_order(
 /// above) and up (of the rank below) alternate, each followed by transpositions of neighbours that lower the crossings with
 /// both neighbouring ranks. The best order seen is kept; the search stops after four sweeps without improvement. `group`
 /// keeps nodes of different groups (components) in separate blocks of every rank. Deterministic.
-pub fn improve_order(
-    ranks: &mut [Vec<String>],
-    links: &[(String, String)],
+pub fn improve_order<S: OrderId>(
+    ranks: &mut [Vec<S>],
+    links: &[(S, S)],
     group: &dyn Fn(&str) -> usize,
 ) {
     improve_order_around(ranks, links, group, &[]);
 }
 
 /// `improve_order` that keeps the ranks marked in `frozen` (by rank index; missing marks are false) in their order.
-pub fn improve_order_around(
-    ranks: &mut [Vec<String>],
-    links: &[(String, String)],
+pub fn improve_order_around<S: OrderId>(
+    ranks: &mut [Vec<S>],
+    links: &[(S, S)],
     group: &dyn Fn(&str) -> usize,
     frozen: &[bool],
 ) {
@@ -293,8 +297,8 @@ pub fn improve_order_around(
     }
     // The ranks in numbers: elements by index, their rank and place, their neighbours above and below (in the order of the
     // links), their group.
-    let mut ids: Vec<String> = Vec::new();
-    let mut index: BTreeMap<String, u32> = BTreeMap::new();
+    let mut ids: Vec<S> = Vec::new();
+    let mut index: BTreeMap<S, u32> = BTreeMap::new();
     let mut order: Vec<Vec<u32>> = Vec::with_capacity(ranks.len());
     let (mut rank_of, mut pos) = (Vec::new(), Vec::new());
     for (r, rank) in ranks.iter().enumerate() {
@@ -312,7 +316,7 @@ pub fn improve_order_around(
     let n = ids.len();
     let (mut above, mut below) = (vec![Vec::new(); n], vec![Vec::new(); n]);
     for (a, b) in links {
-        let (Some(&ka), Some(&kb)) = (index.get(a.as_str()), index.get(b.as_str())) else {
+        let (Some(&ka), Some(&kb)) = (index.get(a.borrow()), index.get(b.borrow())) else {
             continue;
         };
         let (ra, rb) = (rank_of[ka as usize], rank_of[kb as usize]);
@@ -324,7 +328,7 @@ pub fn improve_order_around(
             above[ka as usize].push(kb);
         }
     }
-    let groups: Vec<usize> = ids.iter().map(|id| group(id)).collect();
+    let groups: Vec<usize> = ids.iter().map(|id| group(id.borrow())).collect();
     let rank_count = order.len();
     // The sections between neighbouring ranks, as (upper, lower) elements, for counting crossings.
     let sections: Vec<(u32, u32)> = (0..n as u32)

@@ -1,12 +1,13 @@
 //! Cross-flow lane planning, independent of flow-axis sizes and channel widths.
+use crate::id::Id;
 use arqlet_model::Rect;
 use std::collections::{BTreeMap, BTreeSet};
 
-type Levels = BTreeMap<usize, Vec<String>>;
-type Links = BTreeSet<(String, String)>;
-type Chains = BTreeMap<(String, String), Vec<String>>;
-type Lanes = BTreeMap<(String, String), f64>;
-type Across = BTreeMap<String, (f64, f64)>;
+type Levels = BTreeMap<usize, Vec<Id>>;
+type Links = BTreeSet<(Id, Id)>;
+type Chains = BTreeMap<(Id, Id), Vec<Id>>;
+type Lanes = BTreeMap<(Id, Id), f64>;
+type Across = BTreeMap<Id, (f64, f64)>;
 
 pub(crate) struct Input<'a> {
     pub levels: &'a Levels,
@@ -133,7 +134,7 @@ pub(crate) fn project(placed: &BTreeMap<String, Rect>, vertical: bool) -> Across
         .iter()
         .map(|(id, r)| {
             (
-                id.clone(),
+                Id::from(id),
                 if vertical {
                     (r.x, r.width)
                 } else {
@@ -147,7 +148,10 @@ pub(crate) fn project(placed: &BTreeMap<String, Rect>, vertical: bool) -> Across
 impl CrossPlan {
     pub fn apply(&self, placed: &mut BTreeMap<String, Rect>, vertical: bool) {
         for (id, r) in placed {
-            let &(start, size) = self.across.get(id).expect("same cross-plan elements");
+            let &(start, size) = self
+                .across
+                .get(id.as_str())
+                .expect("same cross-plan elements");
             if vertical {
                 r.x = start;
                 r.width = size;

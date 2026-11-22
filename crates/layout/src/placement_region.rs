@@ -1,4 +1,5 @@
 //! Exact reuse of a region's local coordinates after its children have been realized.
+use crate::id::Id;
 use crate::{layered_plan, placement_structure, CapacitySeed};
 use arqlet_model::{Node, Orientation, Rect};
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,7 +14,7 @@ struct Borders {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Input {
     structure: placement_structure::Input,
-    levels: BTreeMap<usize, Vec<String>>,
+    levels: BTreeMap<usize, Vec<Id>>,
     sizes: BTreeMap<String, [u64; 2]>,
     gaps: BTreeMap<(String, String), u64>,
     children: BTreeMap<String, Borders>,
@@ -26,14 +27,14 @@ impl Input {
     pub fn new(
         area: &str,
         structure: placement_structure::Input,
-        levels: &BTreeMap<usize, Vec<String>>,
+        levels: &BTreeMap<usize, Vec<Id>>,
         sizes: &BTreeMap<String, (f64, f64)>,
         gaps: &BTreeMap<(String, String), f64>,
         children: &[&Node],
         plans: &layered_plan::LayeredPlans,
         optimize: usize,
     ) -> Self {
-        let elements: BTreeSet<&str> = levels.values().flatten().map(String::as_str).collect();
+        let elements: BTreeSet<&str> = levels.values().flatten().map(Id::as_str).collect();
         Self {
             structure,
             levels: levels.clone(),
