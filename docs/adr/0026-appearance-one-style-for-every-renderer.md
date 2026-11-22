@@ -78,4 +78,7 @@ edges, so lines are numbered, not named) and a legend; and a profile that carrie
 - Not yet: rules by numeric ranges or mapped values (a width from `weight`), per-element text sizes and fonts, hull
   colours (still one hue per dimension), a style that travels in the snapshot or the configuration (a sheet is JSON,
   so this is possible later), and the GPU layer draws a dashed outline with its one dash pattern whatever `dash` says.
-- The cluster overview (ADR 0018) has its own colours and does not read the style yet.
+- The cluster overview (ADR 0018) reads a style too (`overviewBuffers(…, {style})`, `setStyle`): the trace, the routes
+  inside structured clusters, the lines between clusters and the buses take the theme's colours, the clusters the
+  sheet's palette when it brings one; without a style (or with the default) it keeps its own colours. Its consolidation
+  with the scene renderer is planned in ADR 0025.

@@ -91,6 +91,9 @@ export function createStyle(sheet = {}) {
   return {
     resolved: true,
     theme,
+    palette,
+    /** Whether the sheet brings its own palette (the cluster overview then colours its clusters from it). */
+    hasOwnPalette: Array.isArray(sheet?.palette),
     /** Whether the sheet only has the default theme and no rules (renderers may take their fast paths). */
     isDefault: plain && Object.keys(theme).every(k => theme[k] === DEFAULT_THEME[k]),
     node,

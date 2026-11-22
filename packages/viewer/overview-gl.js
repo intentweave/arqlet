@@ -226,6 +226,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   let outlines = options.shapes ?? {};
   // Provisional: the galaxy style (`setGalaxy`): glows and stars instead of discs and rings, faint lines, light added.
   let galaxy = !!options.galaxy;
+  // The appearance (style.js): the theme's trace, route, line and bus colours and a palette for the clusters.
+  let style = options.style ?? null;
   // Provisional: the orbit (pseudo-3D, `setOrbit`): {yaw, pitch, depth} in radians and world units, or null (flat).
   let orbit = null;
   // Provisional: names of nodes when they are large enough on the screen, and their details (`setNames`).
@@ -233,7 +235,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   // The edges' total length in world units, measured whenever the buffers are built (for the adaptive dimming).
   let edgeLength = 0;
   const data = () => {
-    const d = overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy});
+    const d = overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy, style});
     let sum = 0;
     for (let k = 0; k + 1 < d.count.edges; k += 2) {
       const a = k * LINE_STRIDE, b = (k + 1) * LINE_STRIDE;
@@ -434,6 +436,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     /** Provisional: draws in the galaxy style (glows, stars, faint lines, added light) or back in discs and rings. */
     get galaxy() { return galaxy; },
     setGalaxy(on) { if (galaxy !== !!on) { galaxy = !!on; renderer.setState({}); } },
+    /** Provisional: the appearance (style.js, ADR 0026); null for the overview's own colours. */
+    setStyle(next) { style = next ?? null; renderer.setState({}); },
     /**
      * Provisional: the orbit (pseudo-3D): `{yaw, pitch}` in radians turn the drawing around the view's centre, every point
      * at a depth of up to `depth` (default half the drawing's radius) from a smooth field, so clusters lie at

@@ -529,3 +529,17 @@ test('with names, a node large enough on the screen is named beside it, with det
   // Without names only the clusters as before.
   assert.ok(!labelsOf(m, new Map(), near, 800, 600).some(l => l.text === 'alpha'));
 });
+
+test('the overview takes a style: unchanged without one or with the default, the clusters from a palette, the theme\'s trace colour', async () => {
+  const {createStyle} = await import('./style.js');
+  const m = overviewModel(overview);
+  const plain = overviewBuffers(m);
+  assert.deepEqual([...overviewBuffers(m, new Map(), new Set(), -1, {style: createStyle()}).discs], [...plain.discs], 'the default style changes nothing');
+  const b = overviewBuffers(m, new Map(), new Set(), -1, {style: {palette: ['#ff0000']}});
+  const has = (array, rgb) => { for (let i = 0; i + 2 < array.length; i++) if (Math.abs(array[i] - rgb[0]) < 1e-6 && Math.abs(array[i + 1] - rgb[1]) < 1e-6 && Math.abs(array[i + 2] - rgb[2]) < 1e-6) return true; return false; };
+  assert.ok(has(b.discs, [1, 0, 0]), 'a cluster in the palette\'s red');
+  assert.ok(!has(plain.discs, [1, 0, 0]));
+  const path = pathOf(m, {nodes: [overview.ids[0]], edges: []});
+  const lit = overviewBuffers(m, new Map(), new Set(), -1, {trace: path, style: {theme: {trace: '#00ff00'}}});
+  assert.ok(has(lit.discs, [0, 1, 0]), 'the path in the theme\'s trace colour');
+});
