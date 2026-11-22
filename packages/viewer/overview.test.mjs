@@ -543,3 +543,26 @@ test('the overview takes a style: unchanged without one or with the default, the
   const lit = overviewBuffers(m, new Map(), new Set(), -1, {trace: path, style: {theme: {trace: '#00ff00'}}});
   assert.ok(has(lit.discs, [0, 1, 0]), 'the path in the theme\'s trace colour');
 });
+
+test('structured as the scene view (O3): the cluster\'s content from sceneBuffers, with the style, placed into its disc', async () => {
+  const {DEFAULT_THEME} = await import('./style.js');
+  const {parseColour} = await import('./scene-buffers.js');
+  const m = overviewModel(overview);
+  const expanded = new Map([[0, {scene}]]);
+  const b = overviewBuffers(m, expanded, new Set(), -1, {structured: 'scene'});
+  // Each leaf a fill and an outline (two quads); the two routes as one-pixel lines; their arrowheads and the one where
+  // the leaving edge meets e's disc.
+  assert.equal(b.count.front, 2 * 2 * 6);
+  assert.equal(b.count.routes, 4);
+  assert.equal(b.count.arrows, 9);
+  const fill = parseColour(DEFAULT_THEME.leafFill);
+  assert.deepEqual([...b.front.slice(6, 9)].map(v => +v.toFixed(4)), fill.slice(0, 3).map(v => +v.toFixed(4)), 'the scene view\'s leaf colour');
+  // Placed as the cluster colours were: the first box's centre is a's centre in the disc.
+  const [ax, ay] = placeScene(m, 0, scene).apply([15, 20]);
+  assert.ok(Math.abs(b.front[0] - ax) < 1e-4 && Math.abs(b.front[1] - ay) < 1e-4);
+  // A style reaches it: the routes take the theme's colour.
+  const styled = overviewBuffers(m, expanded, new Set(), -1, {structured: 'scene', style: {theme: {route: '#ff0000'}}});
+  assert.deepEqual([...styled.routes.slice(2, 5)], [1, 0, 0]);
+  // The cluster look stays the default.
+  assert.equal(overviewBuffers(m, expanded).count.front, 2 * 6);
+});

@@ -156,6 +156,8 @@ export function sceneBuffers(input, state = {}) {
   const radiusOf = (look, r, fallback) => (look.radius === 'pill' ? Math.min(r.width, r.height) / 2 : look.radius ?? fallback);
   if (scene.schemaVersion !== 1) throw Error('Unsupported scene schema');
   const {selected = null, selectedRoute = null, trace = null} = state;
+  // Routes drawn without an arrowhead (the cluster overview: a route that leaves a structured cluster ends at its rim).
+  const noArrow = state.noArrow instanceof Set ? state.noArrow : new Set(state.noArrow ?? []);
   const pinned = state.pinned instanceof Set ? state.pinned : new Set(state.pinned ?? []);
   // The trace (renderSvg's applyTrace): routes and nodes on the path in amber and stronger, the other routes receding;
   // with fade, every node the fainter the farther it is from the path.
@@ -225,7 +227,7 @@ export function sceneBuffers(input, state = {}) {
     const width = (look.width ?? (aggregated ? Math.min(7, 1 + 1.2 * Math.log2(total + 1)) : Math.min(4, 1.6 + 0.4 * (weight - 1)))) + (isActive ? 1.5 : 0);
     const opacity = dim ? 0.2 : isActive ? 1 : look.opacity ?? (aggregated ? 0.3 + 0.55 * Math.min(1, Math.log2(total + 1) / 6) : 0.75);
     const colour = route.invalid || conflictedRoutes.has(route.id) ? COLOURS.invalid : isActive ? COLOURS.activeRoute : look.stroke ? hex(look.stroke) : COLOURS.route;
-    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0, arrow: look.arrow === 'none' ? null : look.arrow ? hex(look.arrow) : COLOURS.arrow, dash: dashOf(look.dash)});
+    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0, arrow: look.arrow === 'none' || noArrow.has(route.id) ? null : look.arrow ? hex(look.arrow) : COLOURS.arrow, dash: dashOf(look.dash)});
     if ((aggregated && total > 1) || weight > 1) {
       const mid = route.points[Math.floor(route.points.length / 2)];
       text({x: mid.x + 6, y: mid.y - 6, text: aggregated && back ? `${weight} ⇄ ${back}` : String(weight), size: 12, colour: COLOURS.text});
