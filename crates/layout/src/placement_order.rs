@@ -1,10 +1,11 @@
 //! Placement's coordinate-free ordering phase. Reuse is local to one layout pass.
+use crate::id::Id;
 use crate::layered_plan::{self, AreaPlan};
 use arqlet_model::OrderHint;
 use std::collections::{BTreeMap, BTreeSet};
 
-type Levels = BTreeMap<usize, Vec<String>>;
-type Links = BTreeSet<(String, String)>;
+type Levels = BTreeMap<usize, Vec<Id>>;
+type Links = BTreeSet<(Id, Id)>;
 
 #[derive(Clone, PartialEq, Eq)]
 struct Input {
@@ -22,7 +23,7 @@ pub(crate) struct Memo {
     areas: BTreeMap<String, (Input, Levels)>,
     /// The links the cycle break reverses in every area, when they are known before the first placement (single pass):
     /// a crossing edge then takes the border sides of its final placement from the start.
-    pub reversals: std::rc::Rc<BTreeMap<String, Links>>,
+    pub reversals: std::rc::Rc<BTreeMap<String, BTreeSet<(String, String)>>>,
     /// A pass that only orders (single pass): every area records its plan from the structure and the order, without
     /// coordinates, for the hierarchical ordering that the one placement with coordinates follows.
     pub order_only: bool,
@@ -65,7 +66,7 @@ impl Memo {
         // Only the hints of this area's elements are part of its input.
         let hints: BTreeMap<String, OrderHint> = hints
             .iter()
-            .filter(|(id, _)| levels.values().any(|ids| ids.contains(id)))
+            .filter(|(id, _)| levels.values().any(|ids| ids.iter().any(|x| x == *id)))
             .map(|(id, hint)| (id.clone(), hint.clone()))
             .collect();
         if let Some((previous, ordered)) = self.areas.get(area) {
@@ -117,9 +118,9 @@ pub(crate) fn compute(
     hints: &BTreeMap<String, OrderHint>,
 ) {
     if optimize > 0 {
-        let mut before: BTreeMap<&String, Vec<&String>> = BTreeMap::new();
-        let mut after: BTreeMap<&String, Vec<&String>> = BTreeMap::new();
-        let ranks: BTreeMap<&String, usize> = levels
+        let mut before: BTreeMap<&Id, Vec<&Id>> = BTreeMap::new();
+        let mut after: BTreeMap<&Id, Vec<&Id>> = BTreeMap::new();
+        let ranks: BTreeMap<&Id, usize> = levels
             .iter()
             .flat_map(|(&rank, ids)| ids.iter().map(move |id| (id, rank)))
             .collect();
@@ -130,7 +131,7 @@ pub(crate) fn compute(
             }
         }
         for sweep in 0..4 {
-            let mut positions: BTreeMap<String, f64> = levels
+            let mut positions: BTreeMap<Id, f64> = levels
                 .values()
                 .flat_map(|ids| ids.iter().enumerate().map(|(i, id)| (id.clone(), i as f64)))
                 .collect();
@@ -142,12 +143,12 @@ pub(crate) fn compute(
             for rank in order {
                 let ids = levels.get_mut(&rank).unwrap();
                 let neighbours = if backward { &after } else { &before };
-                let score = |id: &String| {
+                let score = |id: &Id| {
                     let mut ns: Vec<f64> = neighbours
                         .get(id)
                         .into_iter()
                         .flatten()
-                        .filter_map(|n| positions.get(*n).copied())
+                        .filter_map(|n| positions.get(n.as_str()).copied())
                         .collect();
                     if ns.is_empty() {
                         positions[id]
@@ -162,7 +163,7 @@ pub(crate) fn compute(
                     .iter()
                     .map(|id| {
                         (
-                            components.get(id).copied().unwrap_or(0),
+                            components.get(id.as_str()).copied().unwrap_or(0),
                             score(id),
                             positions[id],
                         )
@@ -185,8 +186,8 @@ pub(crate) fn compute(
         }
     }
     if layered {
-        let mut ordered: Vec<Vec<String>> = levels.values().cloned().collect();
-        let sections: Vec<(String, String)> = links.iter().cloned().collect();
+        let mut ordered: Vec<Vec<Id>> = levels.values().cloned().collect();
+        let sections: Vec<(Id, Id)> = links.iter().cloned().collect();
         let group = |id: &str| components.get(id).copied().unwrap_or(0);
         let given = earlier
             .filter(|p| p.fixed)
@@ -198,10 +199,10 @@ pub(crate) fn compute(
         } else if let Some(earlier) = earlier.filter(|p| p.fixed_borders) {
             // Start from the given order and keep the ranks of border nodes, which agree with the plans outside.
             ordered = layered_plan::follow_order(&ordered, &earlier.ranks, &|_| 0);
-            let borders: BTreeSet<&String> = earlier.borders.values().collect();
+            let borders: BTreeSet<&str> = earlier.borders.values().map(String::as_str).collect();
             frozen = ordered
                 .iter()
-                .map(|ids| !ids.is_empty() && ids.iter().all(|id| borders.contains(id)))
+                .map(|ids| !ids.is_empty() && ids.iter().all(|id| borders.contains(id.as_str())))
                 .collect();
         } else if let Some(earlier) = earlier {
             let kept = layered_plan::follow_order(&ordered, &earlier.ranks, &group);
@@ -383,7 +384,7 @@ mod tests {
                 &hints,
             );
             assert_eq!(ordered[&0][0], first);
-            assert!(ordered[&0].contains(&"d".to_string()));
+            assert!(ordered[&0].iter().any(|x| x == "d"));
         }
     }
 

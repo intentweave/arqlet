@@ -11,6 +11,7 @@ pub mod constructive;
 mod engine_choice;
 mod global;
 pub mod hierarchy_order;
+mod id;
 mod labels;
 pub mod layered_plan;
 mod ports;
@@ -1533,7 +1534,7 @@ fn push_grown(
 /// changes and the margin from both ranks, moving the later ranks along the flow. Returns the total shift.
 fn widen_channels(
     placed: &mut BTreeMap<String, Rect>,
-    level_list: &[&Vec<String>],
+    level_list: &[&Vec<id::Id>],
     links: &BTreeSet<(String, String)>,
     vertical: bool,
     options: &LayoutOptions,
@@ -1561,17 +1562,17 @@ fn widen_channels(
         let (this, next) = (level_list[k], level_list[k + 1]);
         let far = this
             .iter()
-            .filter_map(|id| placed.get(id))
+            .filter_map(|id| placed.get(id.as_str()))
             .map(|r| main(r).0 + main(r).1)
             .fold(f64::MIN, f64::max);
         let near = next
             .iter()
-            .filter_map(|id| placed.get(id))
+            .filter_map(|id| placed.get(id.as_str()))
             .map(|r| main(r).0)
             .fold(f64::MAX, f64::min);
         let spans: Vec<(f64, f64)> = links
             .iter()
-            .filter(|(a, b)| this.contains(a) && next.contains(b))
+            .filter(|(a, b)| this.iter().any(|x| x == a) && next.iter().any(|x| x == b))
             .filter_map(|(a, b)| Some((centre(placed.get(a)?), centre(placed.get(b)?))))
             .filter(|(a, b)| (a - b).abs() > 0.5)
             .collect();
@@ -1588,7 +1589,7 @@ fn widen_channels(
     }
     for (k, ids) in level_list.iter().enumerate() {
         for id in ids.iter() {
-            if let Some(r) = placed.get_mut(id) {
+            if let Some(r) = placed.get_mut(id.as_str()) {
                 if vertical {
                     r.y += shifts[k];
                 } else {
@@ -1711,11 +1712,11 @@ fn through_edges_once(
 /// among the rank's elements other than side nodes, and drops its link; the side nodes of each rank then get their lengths
 /// along the flow again (a track per side node of a kind, as at their creation). A rank left empty is removed.
 fn lateral_sides(
-    levels: &mut BTreeMap<usize, Vec<String>>,
+    levels: &mut BTreeMap<usize, Vec<id::Id>>,
     (order_links, chains, link_edges): (
-        &mut BTreeSet<(String, String)>,
-        &mut BTreeMap<(String, String), Vec<String>>,
-        &mut BTreeMap<(String, String), Vec<String>>,
+        &mut BTreeSet<(id::Id, id::Id)>,
+        &mut BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+        &mut BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
     ),
     sizes: &mut BTreeMap<String, (f64, f64)>,
     sides: &BTreeMap<String, String>,
@@ -1723,12 +1724,13 @@ fn lateral_sides(
     (side, along_y): (f64, bool),
 ) {
     let is_side = |id: &str| id.starts_with(SIDE_IN_PREFIX) || id.starts_with(SIDE_OUT_PREFIX);
-    let rank_of: BTreeMap<String, usize> = levels
+    let rank_of: BTreeMap<id::Id, usize> = levels
         .iter()
         .flat_map(|(r, ids)| ids.iter().map(move |id| (id.clone(), *r)))
         .collect();
-    let mut moves: Vec<(String, String, bool)> = Vec::new();
+    let mut moves: Vec<(id::Id, id::Id, bool)> = Vec::new();
     for (edge, node) in sides {
+        let node = &id::Id::from(node);
         let leaving = node.starts_with(SIDE_OUT_PREFIX);
         let link = order_links
             .iter()
@@ -1750,7 +1752,7 @@ fn lateral_sides(
         let Some(&r) = rank_of.get(&child) else {
             continue;
         };
-        let inner: Vec<&String> = levels[&r].iter().filter(|id| !is_side(id)).collect();
+        let inner: Vec<&id::Id> = levels[&r].iter().filter(|id| !is_side(id)).collect();
         let outermost = if leaving { inner.last() } else { inner.first() };
         if outermost.map(|id| id.as_str()) == Some(child.as_str()) {
             moves.push((node.clone(), child, leaving));
@@ -1782,11 +1784,11 @@ fn lateral_sides(
     levels.retain(|_, ids| !ids.is_empty());
     for ids in levels.values() {
         for kind in [SIDE_IN_PREFIX, SIDE_OUT_PREFIX] {
-            let group: Vec<&String> = ids.iter().filter(|id| id.starts_with(kind)).collect();
+            let group: Vec<&id::Id> = ids.iter().filter(|id| id.starts_with(kind)).collect();
             let length = side * group.len() as f64;
             for id in group {
                 sizes.insert(
-                    id.clone(),
+                    id.to_string(),
                     if along_y {
                         (side, length)
                     } else {
@@ -1802,9 +1804,9 @@ fn plan_port_offsets(
     graph: &Graph,
     index: &GraphIndex<'_>,
     area: Option<&str>,
-    chains: &BTreeMap<(String, String), Vec<String>>,
+    chains: &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
     (borders, side_nodes): (&BTreeMap<String, String>, &BTreeMap<String, String>),
-    level_list: &[&Vec<String>],
+    level_list: &[&Vec<id::Id>],
     placed: &BTreeMap<String, Rect>,
     vertical: bool,
     plans: &layered_plan::LayeredPlans,
@@ -1886,12 +1888,12 @@ fn plan_port_offsets(
             }
             let (out, next) = match other_el.as_ref().and_then(|o| {
                 chains
-                    .get(&(end.to_string(), o.clone()))
-                    .map(|d| (true, d.first().unwrap_or(o).clone()))
+                    .get(&(id::Id::from(end), id::Id::from(o)))
+                    .map(|d| (true, d.first().map_or_else(|| o.clone(), |x| x.to_string())))
                     .or_else(|| {
                         chains
-                            .get(&(o.clone(), end.to_string()))
-                            .map(|d| (false, d.last().unwrap_or(o).clone()))
+                            .get(&(id::Id::from(o), id::Id::from(end)))
+                            .map(|d| (false, d.last().map_or_else(|| o.clone(), |x| x.to_string())))
                     })
             }) {
                 Some(found) => found,
@@ -1977,7 +1979,7 @@ fn channel_key(area: &str, rank: usize) -> (String, String) {
 
 fn record_capacity_seeds(
     area: &str,
-    levels: &[&Vec<String>],
+    levels: &[&Vec<id::Id>],
     placed: &BTreeMap<String, Rect>,
     vertical: bool,
     track_counts: &[usize],
@@ -1995,7 +1997,7 @@ fn record_capacity_seeds(
     for rank in 0..levels.len().saturating_sub(1) {
         let far = levels[rank]
             .iter()
-            .filter_map(|id| placed.get(id))
+            .filter_map(|id| placed.get(id.as_str()))
             .map(|rect| {
                 let (start, size) = main(rect);
                 start + size
@@ -2003,7 +2005,7 @@ fn record_capacity_seeds(
             .fold(f64::NEG_INFINITY, f64::max);
         let near = levels[rank + 1]
             .iter()
-            .filter_map(|id| placed.get(id))
+            .filter_map(|id| placed.get(id.as_str()))
             .map(|rect| main(rect).0)
             .fold(f64::INFINITY, f64::min);
         if far.is_finite() && near.is_finite() {
@@ -2031,10 +2033,10 @@ fn record_capacity_seeds(
 #[allow(clippy::too_many_arguments)]
 fn channel_tracks_by_edges(
     placed: &BTreeMap<String, Rect>,
-    level_list: &[&Vec<String>],
-    chains: &BTreeMap<(String, String), Vec<String>>,
-    link_edges: &BTreeMap<(String, String), Vec<String>>,
-    border_lanes: &BTreeMap<(String, String), f64>,
+    level_list: &[&Vec<id::Id>],
+    chains: &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+    link_edges: &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+    border_lanes: &BTreeMap<(id::Id, id::Id), f64>,
     vertical: bool,
     track: f64,
     shared: bool,
@@ -2075,7 +2077,7 @@ fn channel_tracks_by_edges(
         let Some(edges) = link_edges.get(&(a.clone(), b.clone())) else {
             continue;
         };
-        let mut edges: Vec<&String> = edges.iter().collect();
+        let mut edges: Vec<&id::Id> = edges.iter().collect();
         edges.sort_by(|x, y| {
             let key = |e: &str| border_lanes.get(&(a.as_str(), e)).copied();
             key(x)
@@ -2083,7 +2085,7 @@ fn channel_tracks_by_edges(
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then(x.cmp(y))
         });
-        let elements: Vec<&String> = std::iter::once(a)
+        let elements: Vec<&id::Id> = std::iter::once(a)
             .chain(dummies.iter())
             .chain(std::iter::once(b))
             .collect();
@@ -2124,7 +2126,7 @@ fn channel_tracks_by_edges(
 
 fn realize_channel_widths(
     placed: &mut BTreeMap<String, Rect>,
-    level_list: &[&Vec<String>],
+    level_list: &[&Vec<id::Id>],
     tracks: &[usize],
     vertical: bool,
     options: &LayoutOptions,
@@ -2146,12 +2148,12 @@ fn realize_channel_widths(
         let (this, next) = (level_list[k], level_list[k + 1]);
         let far = this
             .iter()
-            .filter_map(|id| placed.get(id))
+            .filter_map(|id| placed.get(id.as_str()))
             .map(|r| main(r).0 + main(r).1)
             .fold(f64::MIN, f64::max);
         let near = next
             .iter()
-            .filter_map(|id| placed.get(id))
+            .filter_map(|id| placed.get(id.as_str()))
             .map(|r| main(r).0)
             .fold(f64::MAX, f64::min);
         // What the construction found missing in this channel (`channel_key`), on top of the tracks counted here.
@@ -2176,7 +2178,7 @@ fn realize_channel_widths(
     }
     for (k, ids) in level_list.iter().enumerate() {
         for id in ids.iter() {
-            if let Some(r) = placed.get_mut(id) {
+            if let Some(r) = placed.get_mut(id.as_str()) {
                 if vertical {
                     r.y += shifts[k];
                 } else {
@@ -2306,15 +2308,15 @@ mod physical_channel_capacity_tests {
 /// grew (`gap` beside a node, one `track` between two dummies).
 fn chain_slots(
     placed: &mut BTreeMap<String, Rect>,
-    levels: &BTreeMap<usize, Vec<String>>,
+    levels: &BTreeMap<usize, Vec<id::Id>>,
     (chains, link_edges, lanes): (
-        &BTreeMap<(String, String), Vec<String>>,
-        &BTreeMap<(String, String), Vec<String>>,
-        &BTreeMap<(String, String), f64>,
+        &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+        &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+        &BTreeMap<(id::Id, id::Id), f64>,
     ),
     vertical: bool,
     (gap, track): (f64, f64),
-) -> BTreeMap<(String, String), f64> {
+) -> BTreeMap<(id::Id, id::Id), f64> {
     let mut out = BTreeMap::new();
     for ((a, b), dummies) in chains {
         if dummies.is_empty() {
@@ -2327,7 +2329,7 @@ fn chain_slots(
             .iter()
             .map(|e| lanes.get(&(a.clone(), e.clone())).copied())
             .collect();
-        let mut order: Vec<(f64, &String)> = if at_start.iter().all(Option::is_some) {
+        let mut order: Vec<(f64, &id::Id)> = if at_start.iter().all(Option::is_some) {
             edges
                 .iter()
                 .zip(&at_start)
@@ -2344,7 +2346,7 @@ fn chain_slots(
         let first = order.first().map_or(0., |o| o.0);
         let width = order.last().map_or(0., |o| o.0) - first + track;
         for d in dummies {
-            if let Some(r) = placed.get_mut(d) {
+            if let Some(r) = placed.get_mut(d.as_str()) {
                 if vertical {
                     r.width = width;
                 } else {
@@ -2366,7 +2368,9 @@ fn chain_slots(
     };
     for ids in levels.values() {
         for i in 1..ids.len() {
-            let (Some(prev), Some(cur)) = (placed.get(&ids[i - 1]), placed.get(&ids[i])) else {
+            let (Some(prev), Some(cur)) =
+                (placed.get(ids[i - 1].as_str()), placed.get(ids[i].as_str()))
+            else {
                 continue;
             };
             let end = if vertical {
@@ -2376,7 +2380,7 @@ fn chain_slots(
             } + space(&ids[i - 1], &ids[i]);
             let start = if vertical { cur.x } else { cur.y };
             if start < end {
-                let rect = placed.get_mut(&ids[i]).expect("placed element");
+                let rect = placed.get_mut(ids[i].as_str()).expect("placed element");
                 if vertical {
                     rect.x = end;
                 } else {
@@ -2524,19 +2528,19 @@ fn explicit_lanes(
 
 fn align_lanes(
     placed: &mut BTreeMap<String, Rect>,
-    levels: &BTreeMap<usize, Vec<String>>,
+    levels: &BTreeMap<usize, Vec<id::Id>>,
     (chains, link_edges, lanes): (
-        &BTreeMap<(String, String), Vec<String>>,
-        &BTreeMap<(String, String), Vec<String>>,
-        &BTreeMap<(String, String), f64>,
+        &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+        &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+        &BTreeMap<(id::Id, id::Id), f64>,
     ),
     vertical: bool,
     (gap, track): (f64, f64),
     blocks: bool,
-    room: &BTreeMap<String, (f64, f64)>,
+    room: &BTreeMap<id::Id, (f64, f64)>,
     shared: bool,
-    stacked: &BTreeMap<(String, String), f64>,
-) -> (f64, BTreeMap<usize, Vec<String>>) {
+    stacked: &BTreeMap<(id::Id, id::Id), f64>,
+) -> (f64, BTreeMap<usize, Vec<id::Id>>) {
     let across = |r: &Rect| {
         if vertical {
             (r.x, r.width)
@@ -2557,7 +2561,7 @@ fn align_lanes(
         let Some(edges) = link_edges.get(&(a.clone(), b.clone())) else {
             continue;
         };
-        let mut edges: Vec<&String> = edges.iter().collect();
+        let mut edges: Vec<&id::Id> = edges.iter().collect();
         edges.sort_by(|x, y| {
             let key = |e: &str| lanes.get(&(a.as_str(), e)).copied();
             key(x)
@@ -2572,7 +2576,7 @@ fn align_lanes(
                 Some(size * (k as f64 + 0.5) / m as f64)
             })
         };
-        let elements: Vec<&String> = std::iter::once(a)
+        let elements: Vec<&id::Id> = std::iter::once(a)
             .chain(dummies.iter())
             .chain(std::iter::once(b))
             .collect();
@@ -2614,7 +2618,7 @@ fn align_lanes(
     // The sweeps work on indices: every element of the ranks and the chains, with its place across the flow (when it is
     // placed) and its size; the places go back to `placed` after the sweeps.
     let mut slot: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-    for id in levels.values().flatten().map(String::as_str).chain(
+    for id in levels.values().flatten().map(id::Id::as_str).chain(
         meets
             .iter()
             .flat_map(|(id, list)| std::iter::once(*id).chain(list.iter().map(|(n, _, _)| *n))),
@@ -2807,9 +2811,9 @@ fn align_lanes(
             let (start, size) = across(r);
             reach = reach.max(start + size);
         }
-        let ranks: Vec<Vec<String>> = ranks
+        let ranks: Vec<Vec<id::Id>> = ranks
             .iter()
-            .map(|ids| ids.iter().map(|&i| names[i].to_string()).collect())
+            .map(|ids| ids.iter().map(|&i| id::Id::from(names[i])).collect())
             .collect();
         let reordered = levels
             .keys()
@@ -2828,9 +2832,9 @@ fn align_lanes(
             }
         }
     }
-    let ranks: Vec<Vec<String>> = ranks
+    let ranks: Vec<Vec<id::Id>> = ranks
         .iter()
-        .map(|ids| ids.iter().map(|&i| names[i].to_string()).collect())
+        .map(|ids| ids.iter().map(|&i| id::Id::from(names[i])).collect())
         .collect();
     let reach = placed
         .values()
@@ -6817,15 +6821,18 @@ fn place(
                 ids.sort_by_key(|id| component_of.get(id).copied().unwrap_or(0));
             }
         }
+        // Shared ids from here on: the plan is kept by the memo and copied for every pass, and each node, dummy and link
+        // end appears in several of its parts.
+        let mut interner = id::Interner::default();
         placement_structure::Plan {
-            links,
-            levels,
-            order_links,
-            chains,
-            reversed_links,
+            links: interner.pairs(links),
+            levels: interner.levels(levels),
+            order_links: interner.pairs(order_links),
+            chains: interner.chains(chains),
+            reversed_links: interner.pairs(reversed_links),
             borders,
             sides,
-            link_edges,
+            link_edges: interner.chains(link_edges),
             virtual_sizes,
             components: component_of,
         }
@@ -6887,8 +6894,8 @@ fn place(
         }
     }
     let port_offsets: std::cell::RefCell<BTreeMap<(String, bool), f64>> = Default::default();
-    let border_orders: std::cell::RefCell<BTreeMap<usize, Vec<String>>> = Default::default();
-    let lane_offsets: std::cell::RefCell<BTreeMap<(String, String), f64>> = Default::default();
+    let border_orders: std::cell::RefCell<BTreeMap<usize, Vec<id::Id>>> = Default::default();
+    let lane_offsets: std::cell::RefCell<BTreeMap<(id::Id, id::Id), f64>> = Default::default();
     let mut region_capacity_seeds = Vec::new();
     if flattening.is_empty() {
         let reused = ordering.order(
@@ -6909,11 +6916,11 @@ fn place(
         // child first across the flow reaches the deepest port. A leaving leg then crosses another only where their children
         // and their far ends are in opposite orders, which no order of the ports avoids.
         if !sides.is_empty() {
-            let place: BTreeMap<&String, usize> = levels
+            let place: BTreeMap<&id::Id, usize> = levels
                 .values()
                 .flat_map(|ids| ids.iter().enumerate().map(|(i, id)| (id, i)))
                 .collect();
-            let child_place = |node: &String| -> usize {
+            let child_place = |node: &id::Id| -> usize {
                 order_links
                     .iter()
                     .find_map(|(a, b)| {
@@ -6934,12 +6941,13 @@ fn place(
                 .and_then(|p| index.index_of(p))
                 .and_then(|i| index.parents[i])
                 .map_or("<root>", |i| index.nodes[i].id.as_str());
-            let node_edge: BTreeMap<&String, &String> = sides.iter().map(|(e, n)| (n, e)).collect();
+            let node_edge: BTreeMap<&str, &String> =
+                sides.iter().map(|(e, n)| (n.as_str(), e)).collect();
             let outer_plan = (area_name != "<root>")
                 .then(|| plans.get(outer_area))
                 .flatten();
-            let outside = |node: &String| -> f64 {
-                let (Some(plan), Some(edge)) = (outer_plan, node_edge.get(node)) else {
+            let outside = |node: &id::Id| -> f64 {
+                let (Some(plan), Some(edge)) = (outer_plan, node_edge.get(node.as_str())) else {
                     return 0.;
                 };
                 let Some(&e) = index.edge_by_id.get(edge.as_str()) else {
@@ -7011,7 +7019,7 @@ fn place(
             };
             let mut ordered = levels.clone();
             for ids in ordered.values_mut() {
-                let kind = |id: &String| {
+                let kind = |id: &id::Id| {
                     if id.starts_with(SIDE_IN_PREFIX) {
                         0
                     } else if id.starts_with(SIDE_OUT_PREFIX) {
@@ -7020,7 +7028,7 @@ fn place(
                         1
                     }
                 };
-                let mut keyed: Vec<(usize, usize, f64, String)> = ids
+                let mut keyed: Vec<(usize, usize, f64, id::Id)> = ids
                     .drain(..)
                     .enumerate()
                     .map(|(i, id)| {
@@ -7094,9 +7102,9 @@ fn place(
                 layered_plan::AreaPlan {
                     vertical: o.vertical(),
                     reversed: o.reversed(),
-                    ranks: levels.values().cloned().collect(),
-                    chains,
-                    reversed_links,
+                    ranks: id::rank_strings(levels.values()),
+                    chains: id::chain_strings(&chains),
+                    reversed_links: id::pair_strings(&reversed_links),
                     borders,
                     sides: sides.clone(),
                     fixed,
@@ -7151,7 +7159,7 @@ fn place(
                 .collect();
             p.push(format!("{DUMMY_PREFIX}chain:{a}->{b}"));
             for d in dummies {
-                dummy_path.insert(d.clone(), p.clone());
+                dummy_path.insert(d.to_string(), p.clone());
             }
         }
     }
@@ -7163,8 +7171,8 @@ fn place(
     };
     let mut hierarchy_keys = layered_plan::HierarchyKeys::default();
     if options.layered_construction && layered && !flattening.is_empty() {
-        let mut ordered: Vec<Vec<String>> = levels.values().cloned().collect();
-        let sections: Vec<(String, String)> = order_links.iter().cloned().collect();
+        let mut ordered: Vec<Vec<String>> = id::rank_strings(levels.values());
+        let sections: Vec<(String, String)> = id::pair_strings(&order_links).into_iter().collect();
         // The start (global layering): the order of the per-area layout, placed on copies: a container's place in its
         // parent's plan is its block's key, a unit's place in its container's plan its own key, and a chain takes the
         // middle of its two ends. The sweeps keep only what improves on it.
@@ -7227,16 +7235,16 @@ fn place(
         for (a, b) in chains.keys() {
             let Some(chain_path) = chains[&(a.clone(), b.clone())]
                 .first()
-                .and_then(|d| dummy_path.get(d))
+                .and_then(|d| dummy_path.get(d.as_str()))
             else {
                 continue;
             };
             let level = chain_path.len() - 1;
-            let key_of = |end: &String| {
+            let key_of = |end: &id::Id| {
                 let p = flattening.path(end);
                 match p.get(level) {
                     Some(block) => start.blocks.get(block).copied(),
-                    None => start.elements.get(end).copied(),
+                    None => start.elements.get(end.as_str()).copied(),
                 }
             };
             if let (Some(ka), Some(kb)) = (key_of(a), key_of(b)) {
@@ -7248,7 +7256,7 @@ fn place(
         hierarchy_keys =
             layered_plan::hierarchical_order(&mut ordered, &sections, &element_path, Some(&start));
         for (ids, better) in levels.values_mut().zip(ordered) {
-            *ids = better;
+            *ids = better.into_iter().map(id::Id::from).collect();
         }
     }
     let label_width = options
@@ -7269,6 +7277,11 @@ fn place(
     let clearance_gap = options
         .required_clearance
         .map_or(0., |c| 2. * c + options.track_spacing);
+    // The widened corridors by their ends as text, so that the shared ids of the levels look them up without a copy.
+    let gap_between: BTreeMap<(&str, &str), f64> = gaps
+        .iter()
+        .map(|((a, b), g)| ((a.as_str(), b.as_str()), *g))
+        .collect();
     let mut arrange = |vertical: bool| {
         // `nodeSpacing` and `layerSpacing` replace the base gaps when set (provisional; the ELK adapter maps ELK's spacings
         // to them); a negative or non-finite value counts as none.
@@ -7287,45 +7300,51 @@ fn place(
             .max(clearance_gap),
             grid,
         );
-        let cross_total = |ids: &Vec<String>| {
+        let cross_total = |ids: &Vec<id::Id>| {
             ids.iter()
                 .map(|id| {
                     if vertical {
-                        sizes[id].0 + cross_gap
+                        sizes[id.as_str()].0 + cross_gap
                     } else {
-                        sizes[id].1 + cross_gap
+                        sizes[id.as_str()].1 + cross_gap
                     }
                 })
                 .sum::<f64>()
                 // The widened corridors count: levels are centred on their real extent (see `corridor_gaps`).
                 + ids
                     .windows(2)
-                    .filter_map(|pair| gaps.get(&(pair[0].clone(), pair[1].clone())))
+                    .filter_map(|pair| gap_between.get(&(pair[0].as_str(), pair[1].as_str())))
                     .sum::<f64>()
         };
         let max_cross = levels.values().map(cross_total).fold(0., f64::max);
         let mut primary = snap(if vertical { 48. } else { 24. }, grid);
         let mut cross_extent: f64 = snap(if vertical { 48. } else { 90. }, grid);
         let mut placed = BTreeMap::new();
-        let level_list: Vec<&Vec<String>> = levels.values().collect();
+        let level_list: Vec<&Vec<id::Id>> = levels.values().collect();
         for (level, ids) in level_list.iter().enumerate() {
             let band = ids
                 .iter()
-                .map(|id| if vertical { sizes[id].1 } else { sizes[id].0 })
+                .map(|id| {
+                    if vertical {
+                        sizes[id.as_str()].1
+                    } else {
+                        sizes[id.as_str()].0
+                    }
+                })
                 .fold(0., f64::max);
             let mut cross = snap(if vertical { 24. } else { 48. }, grid);
             if optimize >= 3 {
                 cross = snap(cross + (max_cross - cross_total(ids)) / 2., grid);
             }
             for (i, id) in ids.iter().enumerate() {
-                let (width, height) = sizes[id];
+                let (width, height) = sizes[id.as_str()];
                 let (x, y) = if vertical {
                     (cross, primary)
                 } else {
                     (primary, cross)
                 };
                 placed.insert(
-                    id.clone(),
+                    id.to_string(),
                     Rect {
                         x,
                         y,
@@ -7336,7 +7355,7 @@ fn place(
                 // The widening of a corridor to the next sibling (see `corridor_gaps`).
                 let widened = snap(
                     ids.get(i + 1)
-                        .and_then(|next| gaps.get(&(id.clone(), next.clone())))
+                        .and_then(|next| gap_between.get(&(id.as_str(), next.as_str())))
                         .copied()
                         .unwrap_or(0.),
                     grid,
@@ -7355,10 +7374,10 @@ fn place(
                 level_list
                     .get(level + 1)
                     .map(|next| {
-                        let next: BTreeSet<&str> = next.iter().map(String::as_str).collect();
+                        let next: BTreeSet<&str> = next.iter().map(id::Id::as_str).collect();
                         ids.iter()
                             .flat_map(|a| {
-                                gaps.range((a.clone(), String::new())..)
+                                gaps.range((a.to_string(), String::new())..)
                                     .take_while(move |((x, _), _)| x == a)
                                     .filter(|((_, b), _)| next.contains(b.as_str()))
                                     .map(|(_, extra)| *extra)
@@ -7372,7 +7391,7 @@ fn place(
             // A border rank (step 6) needs only the margin and a track before or after it; the channel widening adds what its
             // lane changes need.
             // Experimental (`sharedBorderRanks`): a rank of border nodes and side nodes only counts as a border rank too.
-            let border_level = |ids: &Vec<String>| {
+            let border_level = |ids: &Vec<id::Id>| {
                 ids.iter().all(|id| id.starts_with(BORDER_PREFIX))
                     || options.shared_border_ranks
                         && ids.iter().any(|id| id.starts_with(BORDER_PREFIX))
@@ -7404,8 +7423,11 @@ fn place(
         if global {
             let rules = arqlet_scene::GeometryRules::default();
             let containers: BTreeSet<String> = flattening.children.keys().cloned().collect();
+            // Global layering only: its packing works on the ranks as text.
+            let global_ranks = id::rank_strings(level_list.iter().copied());
+            let global_list: Vec<&Vec<String>> = global_ranks.iter().collect();
             let reach = global::skyline(
-                &level_list,
+                &global_list,
                 &mut placed,
                 &element_path,
                 &hierarchy_keys,
@@ -7417,7 +7439,7 @@ fn place(
             );
             cross_extent = cross_extent.max(reach + cross_gap);
             primary += global::main_margins(
-                &level_list,
+                &global_list,
                 &mut placed,
                 &element_path,
                 &containers,
@@ -7429,8 +7451,8 @@ fn place(
         if options.free_placement && grid <= 0. && !global && !reuse_cross {
             slide_free(
                 &mut placed,
-                &levels,
-                &links,
+                &id::level_strings(&levels),
+                &id::pair_strings(&links),
                 vertical,
                 cross_gap,
                 cross_extent,
@@ -7446,19 +7468,24 @@ fn place(
             // of its chain (the place of a leaf's port, of a container's border node, of its slot in a dummy), from the
             // element's start across the flow; the placement aligns these lanes and counts the tracks from them.
             let (explicit, lead_room) = if options.port_sides && options.single_pass {
-                explicit_lanes(
+                let (explicit, room) = explicit_lanes(
                     graph,
                     index,
                     parent,
-                    &levels,
+                    &id::level_strings(&levels),
                     &placed,
                     vertical,
                     (routing_params(options).clearance, options.track_spacing),
-                )
+                );
+                let room: BTreeMap<id::Id, (f64, f64)> = room
+                    .into_iter()
+                    .map(|(k, v)| (id::Id::from(k), v))
+                    .collect();
+                (explicit, room)
             } else {
                 Default::default()
             };
-            let mut lanes: Option<BTreeMap<(String, String), f64>> =
+            let mut lanes: Option<BTreeMap<(id::Id, id::Id), f64>> =
                 options.hierarchical_ordering.then(|| {
                     *port_offsets.borrow_mut() = plan_port_offsets(
                         graph,
@@ -7473,7 +7500,7 @@ fn place(
                         options.min_port_spacing.max(options.track_spacing),
                         options.single_pass,
                     );
-                    let mut lanes: BTreeMap<(String, String), f64> = children
+                    let mut lanes: BTreeMap<(id::Id, id::Id), f64> = children
                         .iter()
                         .filter_map(|c| Some((c.id.as_str(), plans.get(&c.id)?)))
                         .flat_map(|(c, plan)| {
@@ -7484,7 +7511,7 @@ fn place(
                                 } else {
                                     d.y + d.height / 2.
                                 };
-                                Some(((c.to_string(), edge.clone()), centre))
+                                Some(((id::Id::from(c), id::Id::from(edge)), centre))
                             })
                         })
                         .collect();
@@ -7518,7 +7545,7 @@ fn place(
                                 let m = keyed.len() as f64;
                                 for (i, (_, _, edge)) in keyed.into_iter().enumerate() {
                                     lanes.insert(
-                                        (child.id.clone(), edge.clone()),
+                                        (id::Id::from(&child.id), id::Id::from(edge)),
                                         size * (i as f64 + 0.5) / m,
                                     );
                                 }
@@ -7543,20 +7570,24 @@ fn place(
                                 edge.target.as_deref()
                             };
                             if let Some(node) = node {
-                                lanes.insert((node.to_string(), edge.id.clone()), offset);
+                                lanes.insert((id::Id::from(node), id::Id::from(&edge.id)), offset);
                             }
                         }
                     }
                     // Port sides (option `portSides`): an explicit port lies where it is configured, and a port across the
                     // flow is met at its lead's lane, so the placement aligns the other end with that lane.
-                    lanes.extend(explicit.iter().map(|(k, v)| (k.clone(), *v)));
+                    lanes.extend(
+                        explicit
+                            .iter()
+                            .map(|((a, b), v)| ((id::Id::from(a), id::Id::from(b)), *v)),
+                    );
                     lanes
                 });
             // A side node beside a grandchild that leaves by a border node of its own (amendment A3) has its port on that border
             // node's lane (`layered_plan::lateral_child_lane`). The tracks of the channels are counted at that exact place; the
             // alignment keeps the side's order instead (aligning other lanes onto the exact places narrowed the channels on
             // synthetic-2k, `benchmarks/results/single-pass-lateral-20261108.md`).
-            let mut exact_lanes: BTreeMap<(String, String), f64> = BTreeMap::new();
+            let mut exact_lanes: BTreeMap<(id::Id, id::Id), f64> = BTreeMap::new();
             if options.single_pass && lanes.is_some() {
                 for child in &children {
                     let Some(plan) = plans.get(&child.id) else {
@@ -7580,19 +7611,19 @@ fn place(
                             })
                         });
                         if let Some(lane) = lane {
-                            exact_lanes.insert((child.id.clone(), edge.clone()), lane);
+                            exact_lanes.insert((id::Id::from(&child.id), id::Id::from(edge)), lane);
                         }
                     }
                 }
             }
-            let counted = |lanes: &BTreeMap<(String, String), f64>| {
+            let counted = |lanes: &BTreeMap<(id::Id, id::Id), f64>| {
                 let mut all = lanes.clone();
                 all.extend(exact_lanes.iter().map(|(k, v)| (k.clone(), *v)));
                 all
             };
             // Experimental (`alignStacked`): the stack edges, the only edge between two containers of adjacent ranks, at
             // their exact ports in the containers' own plans (a side node's port as drawn, a border node's lane).
-            let stacked: BTreeMap<(String, String), f64> = if options.align_stacked
+            let stacked: BTreeMap<(id::Id, id::Id), f64> = if options.align_stacked
                 && options.single_pass
             {
                 let containers: BTreeSet<&str> = children
@@ -7676,8 +7707,8 @@ fn place(
                         if options.free_placement && grid <= 0. {
                             slide_free(
                                 &mut placed,
-                                &levels,
-                                &links,
+                                &id::level_strings(&levels),
+                                &id::pair_strings(&links),
                                 vertical,
                                 cross_gap,
                                 cross_extent,
@@ -7762,15 +7793,20 @@ fn place(
                     None => {
                         slide_free(
                             &mut placed,
-                            &levels,
-                            &order_links,
+                            &id::level_strings(&levels),
+                            &id::pair_strings(&order_links),
                             vertical,
                             cross_gap,
                             cross_extent,
                         );
                         // The dummies of every long edge on one line: a bend costs more than the room it saves (the
                         // objectives rank bends before length).
-                        let reach = straighten_chains(&mut placed, &levels, &chains, vertical);
+                        let reach = straighten_chains(
+                            &mut placed,
+                            &id::level_strings(&levels),
+                            &id::chain_strings(&chains),
+                            vertical,
+                        );
                         cross_extent = cross_extent.max(reach + cross_gap);
                     }
                 }
@@ -7882,7 +7918,7 @@ fn place(
                 None => widen_channels(
                     &mut placed,
                     &level_list,
-                    &order_links,
+                    &id::pair_strings(&order_links),
                     vertical,
                     options,
                     grid,
@@ -7987,7 +8023,7 @@ fn place(
     let end_to_end = |placed: &BTreeMap<String, Rect>| -> f64 {
         links
             .iter()
-            .filter_map(|(a, b)| Some((placed.get(a)?, placed.get(b)?)))
+            .filter_map(|(a, b)| Some((placed.get(a.as_str())?, placed.get(b.as_str())?)))
             .map(|(a, b)| {
                 let dx = a.x + a.width / 2. - b.x - b.width / 2.;
                 let dy = a.y + a.height / 2. - b.y - b.height / 2.;
@@ -8068,12 +8104,12 @@ fn place(
         // The area was checked by `compute` to form a forest, so the placement can read it directly.
         Mode::Tree(orientation) => {
             let ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
-            let link_set: BTreeSet<(String, String)> = links.iter().cloned().collect();
+            let link_set: BTreeSet<(String, String)> = id::pair_strings(&links);
             tree::tree_arrange(orientation, &ids, &link_set, &sizes, 64., 24., grid)
         }
         Mode::Organic => {
             let ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
-            let link_set: BTreeSet<(String, String)> = links.iter().cloned().collect();
+            let link_set: BTreeSet<(String, String)> = id::pair_strings(&links);
             // A warm start: children that already have a box from an earlier layout begin where they are. The centre of
             // the earlier box is kept, so a child whose size changed stays centred where it was.
             let start: Option<BTreeMap<String, (f64, f64)>> = ids
@@ -8157,7 +8193,7 @@ fn place(
         }
         Mode::Radial => {
             let ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
-            let link_set: BTreeSet<(String, String)> = links.iter().cloned().collect();
+            let link_set: BTreeSet<(String, String)> = id::pair_strings(&links);
             tree::radial_arrange(&ids, &link_set, &sizes, grid)
         }
     };
@@ -8184,15 +8220,19 @@ fn place(
                 layered_plan::AreaPlan {
                     vertical: o.vertical(),
                     reversed: o.reversed(),
-                    ranks: levels.values().cloned().collect(),
-                    chains,
-                    reversed_links,
+                    ranks: id::rank_strings(levels.values()),
+                    chains: id::chain_strings(&chains),
+                    reversed_links: id::pair_strings(&reversed_links),
                     borders,
                     sides: sides.clone(),
                     fixed,
                     fixed_borders,
                     port_offsets: port_offsets.take(),
-                    lane_offsets: lane_offsets.take(),
+                    lane_offsets: lane_offsets
+                        .take()
+                        .into_iter()
+                        .map(|((a, b), v)| ((a.to_string(), b.to_string()), v))
+                        .collect(),
                     dummies: placed
                         .iter()
                         .filter(|(id, _)| id.starts_with(DUMMY_PREFIX))

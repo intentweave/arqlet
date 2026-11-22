@@ -3,18 +3,18 @@ use crate::{direction_for, layered_plan, GraphIndex};
 use arqlet_model::{Graph, LayoutOptions, Mode, Node};
 use std::collections::{BTreeMap, BTreeSet};
 
-type Links = BTreeSet<(String, String)>;
+type Links = BTreeSet<(crate::id::Id, crate::id::Id)>;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Plan {
     pub links: Links,
-    pub levels: BTreeMap<usize, Vec<String>>,
+    pub levels: BTreeMap<usize, Vec<crate::id::Id>>,
     pub order_links: Links,
-    pub chains: BTreeMap<(String, String), Vec<String>>,
+    pub chains: BTreeMap<(crate::id::Id, crate::id::Id), Vec<crate::id::Id>>,
     pub reversed_links: Links,
     pub borders: BTreeMap<String, String>,
     pub sides: BTreeMap<String, String>,
-    pub link_edges: BTreeMap<(String, String), Vec<String>>,
+    pub link_edges: BTreeMap<(crate::id::Id, crate::id::Id), Vec<crate::id::Id>>,
     pub virtual_sizes: BTreeMap<String, (f64, f64)>,
     pub components: BTreeMap<String, usize>,
 }
@@ -32,7 +32,7 @@ pub(crate) struct Input {
     track: u64,
     grid: u64,
     /// Only ancestor reversal decisions can change which border a crossing edge uses.
-    ancestors: Vec<Links>,
+    ancestors: Vec<BTreeSet<(String, String)>>,
     /// Single pass (ADR 0017, amendment A3): what decides which edges cross the parent beside this area (`through_edges`):
     /// whether this area stands first or last in its rank in the parent's plan, and the parent's side nodes.
     through: Option<(bool, bool, Vec<String>)>,
@@ -46,7 +46,7 @@ impl Input {
         index: &GraphIndex<'_>,
         options: &LayoutOptions,
         plans: &layered_plan::LayeredPlans,
-        reversals: &BTreeMap<String, Links>,
+        reversals: &BTreeMap<String, BTreeSet<(String, String)>>,
     ) -> Self {
         let layered = options.layered_construction
             && matches!(

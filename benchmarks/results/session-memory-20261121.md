@@ -113,3 +113,27 @@ computes what it needs again.
 Since the start of this work on the 114k graph: 864.2 → 656.0 MB (−24 %). Output byte-identical: the refinement
 fingerprints of the 15 views (limit 100, threads 1 and 4) are identical to `main` on the same inputs. The import times
 of that run (one repetition each, machine under load, so no performance figure) show no slowdown.
+
+## Shared ids in the placement (2026-11-22)
+
+After the memos were released before the completion, the peak of the 114k graph sat in a placement pass, and two thirds
+of it were the nodes of `BTreeMap`s with `String` keys, a quarter of the rest the strings' own heap blocks: the levels,
+links, chains and edges per link of an area, their lanes and cross plans, each copy with its own copy of every id. An
+experiment that turned the placement's memos off raised the peak (735.3 MB against 656.0 MB): the memos were not the
+cost, the working copies were.
+
+The placement now works on a shared id (`arqlet_layout::id::Id`, an `Arc<str>` that compares, orders and hashes as its
+text): a copy is a reference count instead of an allocation, and a key takes 16 bytes instead of 24. The structure plan
+interns its ids once (`id::Interner`), so the levels, links and chains of an area share them; the order helpers of
+`layered_plan` became generic over the id type (`String` keeps working for the scene). Rarely used paths (global
+layering, free placement, explicit port sides, placement without hierarchical ordering) and the plans kept beyond one
+placement (`AreaPlan`) convert at their boundary.
+
+| Graph | Peak before | Peak after |
+|---|---|---|
+| 22 819 nodes | 58.8 MB | 50.6 MB |
+| 114 196 nodes | 656.0 MB | 519.5 MB (−21 %) |
+
+Since the start of this work on the 114k graph: 864.2 → 519.5 MB (−40 %). Output byte-identical: the refinement
+fingerprints of the 15 views (limit 100, threads 1 and 4) are identical to `main` on the same inputs. The import times
+of that run (one repetition each, machine under load, so no performance figure) sum to 176 ms before and 172 ms after.
