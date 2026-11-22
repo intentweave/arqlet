@@ -1,5 +1,5 @@
 import {createStyle} from './style.js';
-import {parseColour} from './scene-buffers.js';
+import {parseColour, sceneBuffers, BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE} from './scene-buffers.js';
 // Cluster overview (ADR 0018), the part without DOM or WebGL: the hierarchy of an `overview` result, the vertex buffers
 // a renderer draws, picking and the excerpt of a drill-down. Pure; the engine computes every position.
 
@@ -241,7 +241,7 @@ export function representationsOf(model, view, width, height, {
  * scene), and per structured cluster its `back` boxes (containers), `routes` (lines), `arrows` (triangles at each route's
  * target, so the logical direction shows) and `front` boxes (leaves).
  */
-export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null, galaxy = false, style = null} = {}) {
+export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null, galaxy = false, style = null, structured = 'cluster'} = {}) {
   const {overview: o, n, children, depth, cluster, tops} = model;
   // The appearance (style.js, ADR 0026): with a style that is not the default, the trace, the routes inside structured
   // clusters, the lines between clusters and the buses take its theme's colours, and the clusters its palette when it
@@ -305,12 +305,16 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   for (const [i, {scene}] of expanded) {
     const place = placeScene(model, i, scene), c = colour(i), frame = frameOf(model, i, scene);
     const shown = node => node.id !== o.ids[i] && !node.id.startsWith(BORDER_PREFIX);
+    // `structured: 'scene'` (ADR 0025 O3): the cluster's content as the scene view draws it, from `sceneBuffers` with
+    // the style and the trace, placed into the disc; else boxes in the cluster's colour.
+    const asScene = structured === 'scene', clippedRoutes = [], outwardIds = new Set();
     for (const node of scene.nodes) {
       if (!shown(node)) continue;
       const b = node.bounds;
       const [cx, cy] = place.apply([b.x + b.width / 2, b.y + b.height / 2]);
       const hx = (b.width / 2) * place.scale, hy = (b.height / 2) * place.scale;
       boxCentre.set(node.id, [cx, cy]);
+      if (asScene) continue;
       const lit = trace?.nodeIds.has(node.id);
       if (node.container) pushShape(back, cx, cy, hx, hy, c.map(v => v * 0.5), 0.12, 3);
       else pushShape(front, cx, cy, hx, hy, lit ? AMBER : trace?.fade ? c.map(v => v * 0.35) : c, 1, 2);
@@ -325,11 +329,21 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
         // Keyed by cluster and edge: an edge between two structured clusters has a port in each.
         for (const id of new Set([route.id, ...(route.members ?? [])])) ports.set(`${i}:${id}`, place.apply(clipped.port));
       }
+      if (asScene) {
+        clippedRoutes.push({...route, points: inner.map(([x, y]) => ({x, y}))});
+        if (outward) outwardIds.add(route.id);
+        continue;
+      }
       const points = inner.map(place.apply);
       const litRoute = trace && [route.id, ...(route.members ?? [])].some(id => trace.edgeIds.has(id));
       const [rr, rg, rb, ra] = litRoute ? [...AMBER, 1] : [...ROUTE, trace?.fade ? 0.25 : 0.9];
       for (let k = 1; k < points.length; k++) routes.push(...points[k - 1], rr, rg, rb, ra, ...points[k], rr, rg, rb, ra);
       if (points.length >= 2 && !outward) arrowHead(arrows, points.at(-2), points.at(-1), Math.max(4 * place.scale, 0.6));
+    }
+    if (asScene) {
+      const excerpt = {...scene, schemaVersion: scene.schemaVersion ?? 1, nodes: scene.nodes.filter(shown), routes: clippedRoutes, ports: [], labels: [], crossings: [], membershipHulls: undefined};
+      const sceneTrace = trace ? {nodes: [...trace.nodeIds], routes: [...trace.edgeIds], fade: !!trace.fade} : null;
+      sceneInDisc(sceneBuffers(excerpt, {style, trace: sceneTrace, noArrow: outwardIds}), place, {back, front, routes, arrows});
     }
   }
   const edges = [];
@@ -456,6 +470,41 @@ export function clipToFrame(points, frame, inward) {
 }
 
 /** A filled triangle at `to`, pointing along `from` → `to`. */
+// The scene view's buffers of a structured cluster (`sceneBuffers`) as the overview's parts, placed into the disc: frames
+// to `back`, leaves, bus bars, junctions and marks to `front` (a fill and an outline each: a box of kind 3, or a disc and
+// a ring for a circle), route and row segments to `routes` (one-pixel lines), arrowheads to `arrows`. Hulls and texts
+// stay out (the overview names what it shows itself).
+function sceneInDisc(buffers, place, parts) {
+  const boxes = (data, out) => {
+    for (let k = 0; k + BOX_STRIDE <= data.length; k += BOX_STRIDE) {
+      const [x, y, w, h, , kind, strokeWidth] = data.subarray(k, k + 7);
+      const fill = data.subarray(k + 8, k + 12), stroke = data.subarray(k + 12, k + 16);
+      const [cx, cy] = place.apply([x + w / 2, y + h / 2]), hx = (w / 2) * place.scale, hy = (h / 2) * place.scale;
+      const round = kind > 0.5;
+      if (fill[3] > 0) pushShape(out, cx, cy, hx, hy, [fill[0], fill[1], fill[2]], fill[3], round ? 0 : 3);
+      if (stroke[3] > 0 && strokeWidth > 0) pushShape(out, cx, cy, hx, hy, [stroke[0], stroke[1], stroke[2]], round ? stroke[3] : 0, round ? 1 : 3);
+    }
+  };
+  const segments = (data, out) => {
+    for (let k = 0; k + SEGMENT_STRIDE <= data.length; k += SEGMENT_STRIDE) {
+      const a = place.apply([data[k], data[k + 1]]), b = place.apply([data[k + 2], data[k + 3]]), c = data.subarray(k + 9, k + 13);
+      out.push(...a, c[0], c[1], c[2], c[3], ...b, c[0], c[1], c[2], c[3]);
+    }
+  };
+  const triangles = (data, out) => {
+    for (let k = 0; k + TRIANGLE_STRIDE <= data.length; k += TRIANGLE_STRIDE) out.push(...place.apply([data[k], data[k + 1]]), data[k + 3], data[k + 4], data[k + 5], data[k + 6]);
+  };
+  const [, containers, routeLayer, leaves, marks] = buffers.layers;
+  boxes(containers.boxes, parts.back);
+  segments(containers.segments, parts.routes);
+  segments(routeLayer.segments, parts.routes);
+  triangles(routeLayer.triangles, parts.arrows);
+  boxes(routeLayer.boxes, parts.front);
+  boxes(leaves.boxes, parts.front);
+  segments(leaves.segments, parts.routes);
+  boxes(marks.boxes, parts.front);
+}
+
 function arrowHead(out, from, to, size) {
   const dx = to[0] - from[0], dy = to[1] - from[1], l = Math.hypot(dx, dy);
   // Always three vertices, so that two states of one drawing have the same vertices to morph between.

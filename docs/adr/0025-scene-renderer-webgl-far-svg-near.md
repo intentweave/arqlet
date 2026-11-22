@@ -203,8 +203,15 @@ keeping every overview feature:
   backend under 0.15 % of the pixels off (WebGL 2 and WebGL 1 identical). The playground's overview page asks for WebGPU
   (`?backend=webgl` keeps WebGL). It shares the backend choice (`sceneBackend`) with the scene view, not yet the shell:
   that comes with O3, when the structured clusters are drawn by `sceneBuffers`.
-- **O3 — one drawing of structured clusters:** the boxes and routes inside a disc come from `sceneBuffers` with the
-  disc's transform, so they look as in the scene view.
+- **O3 — one drawing of structured clusters (done, as an option):** with `structured: 'scene'` (`setStructured`) the
+  content of a structured cluster comes from `sceneBuffers` (the scene view's geometry, colours, style and trace,
+  arrowheads left out where a route leaves the cluster) and is placed into the disc in the overview's own parts, so the
+  lens, the orbit, the cosmic motion and the morph apply to it as to the rest. Frames, leaves, bus bars, taps, junctions
+  and marks become boxes (a fill and an outline each; a disc and a ring for a circle), segments one-pixel lines,
+  arrowheads triangles; hulls and texts stay out (the overview names what it shows). It shows what the cluster colours
+  left out (bus bars and taps, rows). The default stays the cluster colours, which tell clusters apart from afar; O4
+  uses the scene look where it hands over to the scene view. Checked in Chrome (`overview-backends.mjs`): both looks
+  on every backend; Node tests for the parts, the placement and the style.
 - **O4 — one morph and the continuous zoom:** the morph of O2 serves the scene (section 6); zooming into a structured
   cluster hands over to the scene view of that cluster.
 

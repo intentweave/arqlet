@@ -24,7 +24,7 @@ try {
   await page.send('Page.navigate', {url: `${running.url}overview.html`});
   await page.waitFor(`document.readyState === 'complete'`, 'the page loads', 30000);
   const results = await evaluate(`(async () => {
-    const {overviewModel, resolvedEdgeIds, pathOf} = await import('/packages/viewer/overview.js');
+    const {overviewModel, resolvedEdgeIds, pathOf, structuredExcerpt} = await import('/packages/viewer/overview.js');
     const {createOverviewRenderer} = await import('/packages/viewer/overview-gl.js');
     const {sceneBackend} = await import('/packages/viewer/scene-renderer.js');
     const ref = ${reference} ? await import('/packages/viewer/overview-gl-reference.js') : null;
@@ -45,6 +45,15 @@ try {
     const root = model.tops?.[0] ?? 0;
     const view = {centreX: 0, centreY: 0, scale: Math.min(W, H) / (2.1 * (answer.overview.rootRadius || 1))};
     const leafIds = answer.overview.ids.filter((_, i) => !model.children[i].length).slice(0, 6);
+    // A structured cluster (O3): the largest container of at most 60 nodes below it, laid out by the engine as the page
+    // does, seen close up; drawn in its colour and as the scene view draws it.
+    const below = i => model.children[i].reduce((n, c) => n + 1 + below(c), 0);
+    const cluster = [...model.children.keys()].filter(i => model.children[i].length && below(i) <= 60).sort((a, b) => below(b) - below(a))[0];
+    const excerpt = structuredExcerpt(graph, model, answer.overview.ids[cluster], {});
+    const imported = run({op: 'import', graph: excerpt.graph, limit: excerpt.graph.nodes.length, options: excerpt.options});
+    const clusterScene = run({op: 'scene', snapshot: imported.snapshot}).scene;
+    const close = {centreX: answer.overview.x[cluster], centreY: answer.overview.y[cluster], scale: Math.min(W, H) / (2.2 * answer.overview.r[cluster])};
+    const structure = (r, look) => { r.setView(close); r.setState({expanded: new Map([[cluster, {scene: clusterScene}]])}); if (look) r.setStructured(look); };
     const modes = {
       plain: r => {},
       galaxy: r => r.setGalaxy(true),
@@ -53,7 +62,11 @@ try {
       path: r => r.setState({trace: pathOf(model, {nodes: leafIds, edges: []}), selected: model.children.findIndex(c => c.length)}),
       breathing: r => { fixed = 1000; r.breathe({amplitude: 0.12, period: 4000, wavelength: 500, fadeIn: 1}); fixed = 2234; },
       morph: r => { fixed = 1000; r.morph(moved, {duration: 1000}); fixed = 1500; },
+      'structured, cluster look': r => structure(r, null),
+      'structured, scene look': r => structure(r, 'scene'),
     };
+    // The earlier renderer has no scene look: that mode is compared with the WebGL 1 backend.
+    const own = mode => mode === 'structured, scene look' || !ref;
     const make = (kind, mode) => {
       const canvas = document.createElement('canvas');
       canvas.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px';
@@ -75,9 +88,9 @@ try {
     const kinds = [gpu.kind === 'webgpu' ? 'webgpu' : null, 'webgl2', ref ? 'webgl1' : null].filter(Boolean);
     const out = [];
     for (const mode of Object.keys(modes)) {
-      const base = ref ? make('reference', mode) : make('webgl1', mode);
-      out.push({mode, kind: ref ? 'reference' : 'webgl1', backend: base.backend, url: base.url, share: 0});
-      for (const kind of kinds) {
+      const base = own(mode) ? make('webgl1', mode) : make('reference', mode);
+      out.push({mode, kind: own(mode) ? 'webgl1' : 'reference', backend: base.backend, url: base.url, share: 0, base: true});
+      for (const kind of kinds.filter(k => !(own(mode) && k === 'webgl1'))) {
         const r = make(kind, mode);
         let off = 0;
         for (let i = 0; i < r.pixels.length; i += 4) if (Math.max(Math.abs(r.pixels[i] - base.pixels[i]), Math.abs(r.pixels[i + 1] - base.pixels[i + 1]), Math.abs(r.pixels[i + 2] - base.pixels[i + 2])) > 48) off++;
@@ -89,8 +102,8 @@ try {
   })()`);
   console.log(`${graphName}: ${results.nodes} nodes, compared with ${reference ? 'the earlier WebGL 1 renderer' : 'the WebGL 1 backend'}`);
   for (const r of results.out) {
-    writeFileSync(join(out, `${r.mode}-${r.kind}.png`), Buffer.from(r.url.split(',')[1], 'base64'));
-    if (r.kind === 'reference' || (r.kind === 'webgl1' && !reference)) continue;
+    writeFileSync(join(out, `${r.mode.replace(/[^a-z]+/g, '-')}-${r.kind}.png`), Buffer.from(r.url.split(',')[1], 'base64'));
+    if (r.base) continue;
     check(`O2 ${r.mode}: ${r.kind} (${r.backend}) draws as WebGL 1`, r.share < 0.01, `${(r.share * 100).toFixed(2)} % of pixels off`);
   }
   console.log(`pictures in ${out}`);

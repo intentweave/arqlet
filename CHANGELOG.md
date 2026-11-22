@@ -19,6 +19,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - The cluster overview draws with WebGPU (`createOverviewRenderer(…, {device})`, ADR 0025 O2), else WebGL 2, else WebGL 1,
   with every mode (galaxy, orbit, lens, breathing, morph) as before; the playground's overview page uses WebGPU where
   available.
+- The cluster overview can draw structured clusters as the scene view does (`structured: 'scene'`, `setStructured`;
+  ADR 0025 O3), with the style and the trace; the overview page has a checkbox for it.
 
 - Scene renderer for large views (ADR 0025 V1–V2, provisional) in `@arqlet/viewer`: a far layer on the GPU, WebGPU
   first and WebGL 2 as the fallback (`createSceneGpuRenderer`, `createSceneRenderer`, `sceneBackend`), drawing the

@@ -214,7 +214,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   }
   unbind?.(); renderer?.destroy();
   model = next;
-  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: schedule, shapes, galaxy: $('galaxy').checked});
+  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: schedule, shapes, galaxy: $('galaxy').checked, structured: $('scene-look').checked ? 'scene' : 'cluster'});
   unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   if ($('orbit').checked) renderer.setOrbit({yaw: 0.35, pitch: 0.25});
   renderer.setNames({nodes: $('node-names').checked, details: $('node-details').checked});
@@ -229,7 +229,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
 function showRough(overview, roughGraph, cut) {
   unbind?.(); renderer?.destroy();
   model = overviewModel(overview, resolvedEdgeIds(roughGraph));
-  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: () => {}, shapes, galaxy: $('galaxy').checked, edgeAlpha: 0.5});
+  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: () => {}, shapes, galaxy: $('galaxy').checked, structured: $('scene-look').checked ? 'scene' : 'cluster', edgeAlpha: 0.5});
   unbind = bindOverviewNavigation($('canvas'), renderer, {});
   // The view that holds every disc (the extent of the places, not the root's radius: the radii a host set for the cut
   // containers can reach past it).
@@ -742,6 +742,7 @@ for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
 // The galaxy style with looser forces: less gravity, more repulsion and a wider gap let the clusters fray out into clouds
 // instead of round discs. Fields the user changed are left alone; turning the style off gives the defaults back.
 const GALAXY_FORCES = {gravity: 0.05, charge: 0.1, gap: 3};
+$('scene-look').onchange = () => renderer?.setStructured($('scene-look').checked ? 'scene' : 'cluster');
 $('galaxy').onchange = () => {
   const on = $('galaxy').checked;
   renderer?.setGalaxy(on);
