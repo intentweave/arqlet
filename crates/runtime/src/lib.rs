@@ -17,12 +17,15 @@ pub mod filter;
 pub mod find;
 pub mod hierarchy;
 pub mod history;
+pub mod memory;
 pub mod overview;
 pub mod patch;
 pub mod peek;
 pub mod port_edit;
 pub mod protocol;
+pub mod query;
 pub mod session;
+pub mod session_store;
 pub mod settle;
 pub mod trace;
 
@@ -751,6 +754,9 @@ pub fn import_graph_counted(
     graph
         .edge_ports
         .retain(|b| kept.contains(b.edge_id.as_str()));
+    // The source graph is kept with the snapshot (and a session) for its lifetime; `retain` keeps the room of what it
+    // dropped (half of a 114k-node graph's lists after the selection), so it is trimmed.
+    graph.shrink_to_fit();
     // Experimental (global layering, iteration 1): within a node budget the first view collapses containers, the
     // outermost first, and a collapsed container takes the size estimated from its content.
     if aggregates(options) {

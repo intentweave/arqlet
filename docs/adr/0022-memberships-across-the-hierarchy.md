@@ -187,7 +187,10 @@ in organic ones — and falls back step by step where that is not possible or no
 that looks like a container and may overlap one, as in the target picture; `polygon` is the padded convex hull, tighter
 around scattered members, with diagonal edges. `LayoutOptions.membershipHull` sets it for every group, and a criterion's
 `hull` overrides it (M1). The rectangle always encloses the polygon, so it finds at least as many foreign nodes; where
-either shape would enclose one, the group is split (stage 2) rather than drawn in a third, more complicated outline. A
+either shape would enclose one, the group is split (stage 2) rather than drawn in a third, more complicated outline.
+This is deliberate: the split does not depend on the shape chosen, so switching the shape changes outlines only and
+never how a group is divided; the price is that a view drawn with `polygon` also gets the splits that only the rectangle
+needs. A
 hull is drawn behind the nodes and is **not an obstacle** — the router does not see it, routes may cross it, and it never
 makes a drawing invalid. Both shapes are comparison geometry, no trigonometry.
 

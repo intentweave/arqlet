@@ -115,14 +115,16 @@ export function httpRun(base = '/api', {fetchImpl = globalThis.fetch} = {}) {
  */
 let dragCounter = 0;
 
-export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
+export function createSession(engine, {onChange, resident: wanted = 'auto'} = {}) {
+  // The engine and, when resident, its session: replaced by `recycle` (a new worker, ADR 0023 R7).
+  let run = engine;
   let snapshot = null;
   let generation = 0;
   let queue = Promise.resolve();
   const scenes = new WeakMap();
   if (wanted === true && !run.openSession) throw Error('This engine has no resident sessions');
   const resident = wanted === true || (wanted === 'auto' && typeof run.openSession === 'function');
-  const opened = resident ? Promise.resolve(run.openSession()) : null;
+  let opened = resident ? Promise.resolve(run.openSession()) : null;
   // The engine call: with a resident session, the request goes to it and its answer is turned into the shape of an
   // answer with a snapshot (the state), its scene remembered for that state.
   const call = async request => {
@@ -275,6 +277,25 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
       return call({op: 'changesSince', sequence});
     },
 
+    /**
+     * Provisional (ADR 0023, R7, read only): what the session holds, part by part, in estimated heap bytes (`parts`,
+     * `total`, `perNode`); from the WASM engine also the module's live heap (`heapBytes`) and its linear memory
+     * (`linearMemoryBytes`), which WebAssembly never gives back (only a new worker does).
+     */
+    async memory() {
+      if (!resident) return {ok: false, error: 'memory needs a resident session'};
+      return call({op: 'memory'});
+    },
+
+    /**
+     * Provisional (ADR 0023, R7): gives parts back: `content` (all, or only `keys`), `changeLog` (a replica behind it then
+     * resyncs), `columns`, `overview`. The snapshot stays; the answer is `memory` after it, with `released`.
+     */
+    release(parts, {keys} = {}) {
+      if (!resident) return Promise.resolve({ok: false, error: 'release needs a resident session'});
+      return enqueue(() => call({op: 'release', parts, ...(keys ? {keys} : {})}));
+    },
+
     /** Provisional (ADR 0023, R2, read only): the whole content and the log's sequence, for a replica that resyncs. */
     async content() {
       if (!resident) return {ok: false, error: 'content needs a resident session'};
@@ -295,6 +316,22 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
       if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
       return call({op: 'find', snapshot, query, ...(limit !== undefined ? {limit} : {}), ...(nodeKinds ? {nodeKinds} : {}),
         ...(key ? {key} : {})});
+    },
+
+    /**
+     * Provisional (ADR 0021, M5b; read only, needs an engine built with the cargo feature `query`): an openCypher query over
+     * the session's source graph and its content (`payload`): `{ok, columns, rows, rowCount, nodes, edges, graph, ...}`.
+     * Nodes and edges in `rows` are `{node: id}` and `{edge: id}`; `nodes` and `edges` list the ids once each. `params`
+     * are the `$name` values; `maxSteps`, `maxRows` and `maxHops` lower or raise the execution limits; with `view: true`
+     * the answer also has `shown`, the box that shows each node and the line that carries each edge. A failure is
+     * `{ok: false, error: 'query <class>: ...'}` with the class `syntax`, `unsupported`, `runtime` or `limit`. A query
+     * sees the source graph the engine kept (for a bounded import the selection; `graph` gives its size).
+     */
+    async query(text, {params, view, maxSteps, maxRows, maxHops} = {}) {
+      if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return call({op: 'query', snapshot, query: text, ...(params ? {params} : {}), ...(view ? {view: true} : {}),
+        ...(maxSteps !== undefined ? {maxSteps} : {}), ...(maxRows !== undefined ? {maxRows} : {}),
+        ...(maxHops !== undefined ? {maxHops} : {})});
     },
 
     /**
@@ -443,6 +480,39 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
 
     /** Whether the snapshot stays in the engine (see `createSession`). */
     get resident() { return resident; },
+
+    /**
+     * Provisional (ADR 0023, R7): moves a resident session to another engine (`newEngine`, typically a new worker), so that
+     * the old one can be ended and its memory comes back: WebAssembly never shrinks its linear memory, a new worker starts
+     * small. The snapshot, the content (with its revision) and the change log's number move; the log's groups do not, so
+     * a replica behind that number resyncs. The engines give identical results, so the view does not change. Runs after
+     * the changes queued before it; on a refusal the session stays on the old engine. The host ends the old worker after.
+     */
+    recycle(newEngine) {
+      if (!resident) return Promise.resolve({ok: false, error: 'recycle needs a resident session'});
+      if (typeof newEngine?.openSession !== 'function') {
+        return Promise.resolve({ok: false, error: 'recycle needs an engine with resident sessions'});
+      }
+      return enqueue(async () => {
+        const old = await opened;
+        const exported = await old.run({op: 'export'});
+        if (!exported.ok) return exported;
+        const content = await old.run({op: 'content'});
+        if (!content.ok) return content;
+        const fresh = await newEngine.openSession();
+        // No scene in the answer: the host has it already, and writing it would grow the new engine's memory.
+        const loaded = await fresh.run({op: 'load', scene: false, snapshot: exported.snapshot, sequence: content.sequence,
+          content: {contentRevision: content.contentRevision, nodes: content.nodes, edges: content.edges}});
+        if (!loaded.ok) {
+          await fresh.close?.();
+          return loaded;
+        }
+        await old.close?.();
+        run = newEngine;
+        opened = Promise.resolve(fresh);
+        return {ok: true, unchanged: true, sequence: content.sequence, contentRevision: content.contentRevision};
+      });
+    },
 
     /** Ends a resident session in the engine (frees its snapshot). The session object is not usable afterwards. */
     async close() {

@@ -44,11 +44,14 @@ def local_index(root):
                       "source": "local examples folder", "overview": bool(meta.get("overview")) and "nodes" in graph})
     return index
 # Every operation handled by the Rust dispatcher; the backend adds no graph semantics.
-OPERATIONS = {"import", "add", "toggle", "reveal", "filter", "patch", "trace", "neighbourhood", "details", "find", "digest", "peek", "payload", "change", "changesSince", "content", "direction", "refine", "structuredRefine", "configure", "optionDefaults", "measure", "shape", "scene", "move", "strategy", "routing", "metrics", "routeConflicts", "componentRefine", "containerRefine", "elkLayout", "overview", "overviewTrace", "overviewNeighbourhood", "refineProgressive", "intent", "restore", "port", "settle", "pin", "referenceCreate", "referenceRefresh", "referenceReroute", "referenceValidate", "referenceCanonical", "referenceSvg", "referenceFromSvg", "referenceReproduce", "referenceRepair", "communities"}
+OPERATIONS = {"import", "add", "toggle", "reveal", "filter", "patch", "trace", "neighbourhood", "details", "find", "digest", "peek", "query", "payload", "change", "changesSince", "content", "memory", "release", "direction", "refine", "structuredRefine", "configure", "optionDefaults", "measure", "shape", "scene", "move", "strategy", "routing", "metrics", "routeConflicts", "componentRefine", "containerRefine", "elkLayout", "overview", "overviewTrace", "overviewNeighbourhood", "refineProgressive", "intent", "restore", "port", "settle", "pin", "referenceCreate", "referenceRefresh", "referenceReroute", "referenceValidate", "referenceCanonical", "referenceSvg", "referenceFromSvg", "referenceReproduce", "referenceRepair", "communities"}
 MAX_BODY = 64_000_000
 # Operations a session runs on its own view (besides OPERATIONS): start it from a snapshot, hand its snapshot out.
 SESSION_OPERATIONS = {"load", "export"}
 MAX_SESSIONS = 32
+# Provisional (ADR 0023, R7): the most bytes the sessions may weigh together (estimated by the engine); beyond it the
+# process drops the least recently used ones, which are then answered as unknown. ARQLET_SESSION_BYTES overrides it.
+SESSION_BYTES = int(os.environ.get("ARQLET_SESSION_BYTES", str(2 << 30)))
 SESSION_TIMEOUT = 15
 
 
@@ -65,7 +68,8 @@ class SessionHost:
         self.keys = {}
 
     def _start(self):
-        self.process = subprocess.Popen([str(BINARY), "--sessions"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        self.process = subprocess.Popen([str(BINARY), "--sessions", "--session-bytes", str(SESSION_BYTES)],
+                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.DEVNULL, text=True)
         self.answers = queue.Queue()
         stdout, answers = self.process.stdout, self.answers
@@ -113,6 +117,14 @@ class SessionHost:
                 if not isinstance(request, dict) or request.get("op") not in OPERATIONS | SESSION_OPERATIONS:
                     return 400, {"ok": False, "error": "Unsupported operation"}
                 answer = self._ask({"session": native, "request": request})
+                if answer.get("error") == "Unknown session":
+                    # The process dropped it for the byte limit: forget the key too.
+                    del self.keys[session]
+                    return 404, answer
+                if answer.get("evictedSessions"):
+                    live = set(self._ask({"sessions": "list"}).get("sessions", []))
+                    for key in [k for k, n in self.keys.items() if n not in live]:
+                        del self.keys[key]
                 return (200 if answer.get("ok") else 400), answer
             except TimeoutError:
                 return 504, {"ok": False, "error": "Time budget exceeded; the backend's sessions were restarted"}

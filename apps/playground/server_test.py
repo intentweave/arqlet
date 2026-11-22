@@ -86,6 +86,15 @@ class BackendTest(unittest.TestCase):
         with self.request({"op":"add","snapshot":snapshot,"expectedRevision":snapshot["revision"],"sourceId":source,"label":"Backend node"}) as response:
             result=json.load(response)["snapshot"]
         self.assertEqual(result["revision"],snapshot["revision"]+1)
+    def test_query_runs_at_the_backend(self):
+        # ADR 0021, M5b: the operation `query` through the backend (the native binary built with the cargo feature `query`).
+        snapshot=json.loads((ROOT/"generated/snapshot.json").read_text())
+        with self.request({"op":"query","snapshot":snapshot,"query":"MATCH (n) RETURN count(*)"}) as response:
+            result=json.load(response)
+        if not result.get("ok") and "not built into" in result.get("error",""):
+            self.skipTest("the layout command was built without the feature `query`")
+        self.assertTrue(result["ok"],result)
+        self.assertEqual(result["rows"][0][0],len(snapshot.get("sourceGraph",snapshot["graph"])["nodes"]))
     def test_the_allowlist_covers_every_operation_the_dispatcher_knows(self):
         import re
         # The operations the typed protocol reads (ADR 0019): every op name its parser matches.
@@ -120,6 +129,22 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(self.session({"session":key,"close":True})[0],200)
         self.assertEqual(self.session({"session":key,"request":{"op":"export"}}),(404,{"ok":False,"error":"Unknown session"}))
         self.assertEqual(self.session({"session":"guessed","request":{"op":"export"}})[0],404)
+    def test_backend_sessions_over_the_byte_limit_are_dropped_least_recently_used_first(self):
+        # A host of its own with a limit below two sessions: importing into the second drops the first.
+        graph=json.loads((ROOT/"../../examples/fixtures/small.json").read_text())
+        saved=module.SESSION_BYTES;module.SESSION_BYTES=1
+        host=module.SessionHost()
+        try:
+            keys=[host.handle({"session":"open"})[1]["session"] for _ in range(2)]
+            self.assertEqual(host.handle({"session":keys[0],"request":{"op":"import","graph":graph,"limit":100}})[0],200)
+            status,second=host.handle({"session":keys[1],"request":{"op":"import","graph":graph,"limit":100}})
+            self.assertEqual((status,second.get("evictedSessions")),(200,1))
+            self.assertNotIn(keys[0],host.keys,"the host forgets the dropped key")
+            self.assertEqual(host.handle({"session":keys[0],"request":{"op":"export"}}),(404,{"ok":False,"error":"Unknown session"}))
+            self.assertEqual(host.handle({"session":keys[1],"request":{"op":"export"}})[0],200,"the one that ran stays")
+        finally:
+            module.SESSION_BYTES=saved
+            host._stop()
     def test_cross_origin_is_rejected(self):
         with self.assertRaises(urllib.error.HTTPError) as error:self.request({"op":"refine"},"https://example.org")
         self.assertEqual(error.exception.code,403)
