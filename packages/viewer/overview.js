@@ -152,6 +152,21 @@ export function placeScene(model, i, scene, margin = 0.94) {
 }
 
 /**
+ * Provisional (ADR 0025 O4): the scene view's view (`{centreX, centreY, scale}` in the scene's coordinates and CSS pixels
+ * per unit) that shows a structured cluster's scene exactly where the overview's view `view` shows it in its disc, and
+ * back (`overviewViewOf`). A hand-over between the two moves nothing.
+ */
+export function sceneViewOf(model, i, scene, view) {
+  const place = placeScene(model, i, scene), [centreX, centreY] = place.invert([view.centreX, view.centreY]);
+  return {centreX, centreY, scale: view.scale * place.scale};
+}
+/** The overview's view that shows the cluster's scene where the scene view's `view` shows it (see `sceneViewOf`). */
+export function overviewViewOf(model, i, scene, view) {
+  const place = placeScene(model, i, scene), [centreX, centreY] = place.apply([view.centreX, view.centreY]);
+  return {centreX, centreY, scale: view.scale / place.scale};
+}
+
+/**
  * For every node, the outermost structured (`expanded`, index → scene) or collapsed (`collapsed`, a set of indices)
  * cluster it lies in, itself excluded, or -1: the node is drawn by that cluster, not as a disc of its own.
  */

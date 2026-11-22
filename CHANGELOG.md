@@ -21,6 +21,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   available.
 - The cluster overview can draw structured clusters as the scene view does (`structured: 'scene'`, `setStructured`;
   ADR 0025 O3), with the style and the trace; the overview page has a checkbox for it.
+- The GPU far layer morphs to a new scene (`setScene(next, {animate})`: boxes move by id, lines fade over, texts wait;
+  ADR 0025 §6, O4); the playground's GPU view morphs on every new layout. The overview page zooms on into the scene view
+  of a structured cluster and back without a jump (`sceneViewOf`, `overviewViewOf`; checkbox *Zoom on into the scene
+  view*).
 
 - Scene renderer for large views (ADR 0025 V1–V2, provisional) in `@arqlet/viewer`: a far layer on the GPU, WebGPU
   first and WebGL 2 as the fallback (`createSceneGpuRenderer`, `createSceneRenderer`, `sceneBackend`), drawing the

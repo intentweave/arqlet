@@ -13,14 +13,16 @@ export {bindSceneNavigation} from './scene-renderer.js';
 
 const BOX_VS = `#version 300 es
 in vec2 a_corner;
-in vec4 a_rect; in vec4 a_shape; in vec4 a_fill; in vec4 a_stroke;
-uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size;
+in vec4 a_rect; in vec4 a_shape; in vec4 a_fill; in vec4 a_stroke; in vec4 a_from;
+uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size; uniform float u_t;
 out vec2 v_p; out vec2 v_half; out float v_radius; out float v_stroke; out float v_kind; out float v_dash;
 out vec4 v_fill; out vec4 v_strokeColour; out float v_unit; out float v_thin;
 void main() {
-  vec2 centre = (a_rect.xy + a_rect.zw * 0.5 - u_centre) * u_scale;
+  // A morph (u_t from 0 to 1) moves the box from where it was (a_from) to where it is.
+  vec4 rect = mix(a_from, a_rect, u_t);
+  vec2 centre = (rect.xy + rect.zw * 0.5 - u_centre) * u_scale;
   // At least half a device pixel, so that a box far out stays a dot.
-  vec2 half_ = max(a_rect.zw * 0.5 * u_scale, vec2(0.5));
+  vec2 half_ = max(rect.zw * 0.5 * u_scale, vec2(0.5));
   float stroke = a_shape.z > 0.0 ? max(a_shape.z * u_scale, 1.0) : 0.0;
   vec2 extent = half_ + stroke * 0.5 + 1.0;
   vec2 screen = centre + a_corner * extent;
@@ -75,10 +77,11 @@ void main() {
 const SEGMENT_FS = `#version 300 es
 precision highp float;
 in float v_across; in float v_half; in float v_along; in vec2 v_dash; in vec4 v_colour; in float v_thin;
+uniform float u_alpha;
 out vec4 colour;
 void main() {
   if (v_dash.x > 0.0 && mod(v_along, v_dash.x + v_dash.y) > v_dash.x) discard;
-  float a = clamp(v_half + 0.5 - abs(v_across), 0.0, 1.0) * v_colour.a * v_thin;
+  float a = clamp(v_half + 0.5 - abs(v_across), 0.0, 1.0) * v_colour.a * v_thin * u_alpha;
   if (a <= 0.0) discard;
   colour = vec4(v_colour.rgb * a, a);
 }`;
@@ -94,7 +97,8 @@ void main() {
 const TRIANGLE_FS = `#version 300 es
 precision highp float;
 in vec4 v_colour; out vec4 colour;
-void main() { colour = vec4(v_colour.rgb * v_colour.a, v_colour.a); }`;
+uniform float u_alpha;
+void main() { float a = v_colour.a * u_alpha; colour = vec4(v_colour.rgb * a, a); }`;
 
 function program(gl, vs, fs) {
   const shader = (type, source) => {
@@ -108,7 +112,7 @@ function program(gl, vs, fs) {
   gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(p));
   const uniforms = {};
-  for (const name of ['u_centre', 'u_scale', 'u_size']) uniforms[name] = gl.getUniformLocation(p, name);
+  for (const name of ['u_centre', 'u_scale', 'u_size', 'u_t', 'u_alpha']) uniforms[name] = gl.getUniformLocation(p, name);
   return {p, uniforms, attribute: name => gl.getAttribLocation(p, name)};
 }
 
@@ -163,40 +167,75 @@ export function createSceneRenderer(canvas, scene, options = {}) {
     return {vao, buffer, count: data.length / TRIANGLE_STRIDE};
   };
 
-  let layers = [];
-  const release = () => { for (const l of layers) for (const part of [l.boxes, l.segments, l.triangles]) { gl.deleteVertexArray(part.vao); gl.deleteBuffer(part.buffer); } layers = []; };
-  const uniforms = (prog, view, ratio) => {
+  // The layers drawn now, and during a morph the previous ones (their lines and arrowheads fade out).
+  let layers = [], previous = [];
+  const releaseSet = set => { for (const l of set) { for (const part of [l.boxes, l.segments, l.triangles]) { gl.deleteVertexArray(part.vao); gl.deleteBuffer(part.buffer); } if (l.boxes.from) gl.deleteBuffer(l.boxes.from); } };
+  const release = () => { releaseSet(layers); releaseSet(previous); layers = []; previous = []; };
+  const uniforms = (prog, view, ratio, t = 1, alpha = 1) => {
     gl.useProgram(prog.p);
     gl.uniform2f(prog.uniforms.u_centre, view.centreX, view.centreY);
     gl.uniform1f(prog.uniforms.u_scale, view.scale * ratio);
     gl.uniform2f(prog.uniforms.u_size, canvas.width, canvas.height);
+    if (prog.uniforms.u_t) gl.uniform1f(prog.uniforms.u_t, t);
+    if (prog.uniforms.u_alpha) gl.uniform1f(prog.uniforms.u_alpha, alpha);
   };
+  // The start of every box of a morph (`a_from`): its own buffer when given, else the box's own rectangle.
+  const boxLayer = (data, starts) => {
+    const part = instanced(boxes, data, BOX_STRIDE, [['a_rect', 4, 0], ['a_shape', 4, 4], ['a_fill', 4, 8], ['a_stroke', 4, 12]]);
+    const at = boxes.attribute('a_from');
+    if (at >= 0) {
+      gl.bindVertexArray(part.vao);
+      if (starts) {
+        part.from = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, part.from);
+        gl.bufferData(gl.ARRAY_BUFFER, starts, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(at); gl.vertexAttribPointer(at, 4, gl.FLOAT, false, 16, 0);
+      } else {
+        gl.bindBuffer(gl.ARRAY_BUFFER, part.buffer);
+        gl.enableVertexAttribArray(at); gl.vertexAttribPointer(at, 4, gl.FLOAT, false, BOX_STRIDE * 4, 0);
+      }
+      gl.vertexAttribDivisor(at, 1);
+      gl.bindVertexArray(null);
+    }
+    return part;
+  };
+  const drawBoxes = (part, view, ratio, t) => { if (!part.count) return; uniforms(boxes, view, ratio, t); gl.bindVertexArray(part.vao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, part.count); };
+  const drawSegments = (part, view, ratio, alpha) => { if (!part.count) return; uniforms(segments, view, ratio, 1, alpha); gl.bindVertexArray(part.vao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, part.count); };
+  const drawTriangles = (part, view, ratio, alpha) => { if (!part.count) return; uniforms(triangles, view, ratio, 1, alpha); gl.bindVertexArray(part.vao); gl.drawArrays(gl.TRIANGLES, 0, part.count); };
   const backend = {
-    upload(built) {
-      release();
-      layers = built.layers.map(l => ({
-        boxes: instanced(boxes, l.boxes, BOX_STRIDE, [['a_rect', 4, 0], ['a_shape', 4, 4], ['a_fill', 4, 8], ['a_stroke', 4, 12]]),
+    // `starts` (morphStarts) per layer, and `keep`: the layers drawn so far stay as the previous ones of a morph.
+    upload(built, {starts = null, keep = false} = {}) {
+      if (keep) { releaseSet(previous); previous = layers; } else { releaseSet(layers); releaseSet(previous); previous = []; }
+      layers = built.layers.map((l, k) => ({
+        boxes: boxLayer(l.boxes, starts?.[k] ?? null),
         segments: instanced(segments, l.segments, SEGMENT_STRIDE, [['a_ends', 4, 0], ['a_style', 4, 4], ['a_from', 1, 8], ['a_colour', 4, 9]]),
         triangles: plain(triangles, l.triangles),
       }));
     },
-    draw(view, ratio) {
+    dropPrevious() { releaseSet(previous); previous = []; },
+    // A morph at `t` (0 to 1): the boxes between their starts and their places, the previous lines and arrowheads fading
+    // out under the new ones fading in.
+    draw(view, ratio, {t = 1} = {}) {
+      const morph = previous.length > 0 && t < 1;
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(background[0] * background[3], background[1] * background[3], background[2] * background[3], background[3]);
       gl.clearDepth(1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      const lineAlpha = morph ? t : 1;
       layers.forEach((l, i) => {
         const routes = i === 2;
+        if (morph && previous[i]) { gl.disable(gl.DEPTH_TEST); drawSegments(previous[i].segments, view, ratio, 1 - t); drawTriangles(previous[i].triangles, view, ratio, 1 - t); }
         if (routes) { gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true); } else gl.disable(gl.DEPTH_TEST);
-        if (!routes && l.triangles.count) { uniforms(triangles, view, ratio); gl.bindVertexArray(l.triangles.vao); gl.drawArrays(gl.TRIANGLES, 0, l.triangles.count); }
-        if (!routes && l.boxes.count) { uniforms(boxes, view, ratio); gl.bindVertexArray(l.boxes.vao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, l.boxes.count); }
-        if (l.segments.count) { uniforms(segments, view, ratio); gl.bindVertexArray(l.segments.vao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, l.segments.count); }
+        if (!routes) drawTriangles(l.triangles, view, ratio, lineAlpha);
+        if (!routes) drawBoxes(l.boxes, view, ratio, t);
+        drawSegments(l.segments, view, ratio, lineAlpha);
         if (routes) {
-          if (l.triangles.count) { gl.depthFunc(gl.LEQUAL); uniforms(triangles, view, ratio); gl.bindVertexArray(l.triangles.vao); gl.drawArrays(gl.TRIANGLES, 0, l.triangles.count); }
+          gl.depthFunc(gl.LEQUAL);
+          drawTriangles(l.triangles, view, ratio, lineAlpha);
           gl.disable(gl.DEPTH_TEST);
-          if (l.boxes.count) { uniforms(boxes, view, ratio); gl.bindVertexArray(l.boxes.vao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, l.boxes.count); }
+          drawBoxes(l.boxes, view, ratio, t);
         }
       });
       gl.bindVertexArray(null);

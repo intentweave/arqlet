@@ -1,7 +1,7 @@
 // Provisional (ADR 0025): what both GPU backends of the far layer share. A backend (`scene-gpu.js` with WebGPU, the
 // first choice; `scene-gl.js` with WebGL 2, the fallback) only uploads the buffers of `sceneBuffers` and draws them for a
 // view; the shell here holds the view, the state, the texts on the 2D canvas, picking and the frame scheduling.
-import {sceneBuffers, hoverBuffers, viewRect} from './scene-buffers.js';
+import {sceneBuffers, hoverBuffers, morphStarts, viewRect} from './scene-buffers.js';
 
 /**
  * The backend a browser offers for the far layer: WebGPU (with its device), else WebGL 2, else none (SVG alone).
@@ -51,7 +51,9 @@ export function rendererShell(canvas, scene, options, backend, kind) {
   // What the far layer draws besides the scene: the selection, pins, a trace and the style (`sceneBuffers`), and the
   // hover outline.
   let state = {selected: options.selected ?? null, selectedRoute: options.selectedRoute ?? null, pinned: options.pinned ?? null, trace: options.trace ?? null, style: options.style ?? null};
-  let current = scene, built = null, frame = 0, hovered = null;
+  let current = scene, built = null, frame = 0, hovered = null, morph = null;
+  const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+  const morphT = () => (morph ? ease(Math.min(1, (performance.now() - morph.start) / morph.duration)) : 1);
   const build = () => { built = sceneBuffers(current, state); if (hovered != null) built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered, state.style); backend.upload(built); };
   build();
   const ratio = () => globalThis.devicePixelRatio || 1;
@@ -63,9 +65,15 @@ export function rendererShell(canvas, scene, options, backend, kind) {
   let view = options.view ?? fit();
   function draw() {
     if (frame) { cancelAnimationFrame(frame); frame = 0; }
-    backend.draw(view, ratio());
-    if (ctx) drawTexts(ctx, labels, built.texts, view, ratio(), textOptions);
+    const t = morphT();
+    backend.draw(view, ratio(), {t});
+    // While the drawing moves, the texts wait (they would stand at the end's places), as in the cluster overview.
+    if (ctx) drawTexts(ctx, labels, built.texts, view, ratio(), morph ? {...textOptions, text: false} : textOptions);
     options.onView?.(view);
+    if (morph) {
+      if (t >= 1) { morph = null; backend.dropPrevious?.(); draw(); }
+      else frame = requestAnimationFrame(() => { frame = 0; draw(); });
+    }
   }
   const schedule = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; draw(); }); };
   return {
@@ -76,12 +84,30 @@ export function rendererShell(canvas, scene, options, backend, kind) {
     get state() { return {...state}; },
     setView(next) { view = {...next}; schedule(); },
     fit() { view = fit(); schedule(); return view; },
-    setScene(next, {keepView = true} = {}) { current = next; build(); if (!keepView) view = fit(); schedule(); },
+    /**
+     * A new scene; with `animate` (milliseconds, none under reduced motion) a morph from the drawing now: every box moves
+     * from where it was (by id), lines and arrowheads fade over, texts wait until it ends.
+     */
+    setScene(next, {keepView = true, animate = 0} = {}) {
+      const reduced = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      if (animate > 0 && !reduced && backend.dropPrevious) {
+        const before = built;
+        current = next;
+        built = sceneBuffers(current, state);
+        if (hovered != null) built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered, state.style);
+        backend.upload(built, {starts: morphStarts(before, built), keep: true});
+        morph = {start: performance.now(), duration: animate};
+      } else { morph = null; current = next; build(); }
+      if (!keepView) view = fit();
+      schedule();
+    },
+    /** Whether a morph is running. */
+    get animating() { return !!morph; },
     setState(next) { state = {...state, ...next}; build(); schedule(); },
     get hovered() { return hovered; },
     /** Outlines the node (leaf, container or bus bar) `id` as hovered, or none with null; rebuilds only that layer. */
     setHover(id) {
-      if ((id ?? null) === hovered) return;
+      if ((id ?? null) === hovered || morph) return;
       hovered = id ?? null;
       built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered, state.style);
       backend.upload(built);

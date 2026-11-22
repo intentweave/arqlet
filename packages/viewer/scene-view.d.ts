@@ -68,7 +68,8 @@ export interface SceneView {
   readonly near: SVGSVGElement;
   setView(view: SceneViewTransform): void;
   fit(): SceneViewTransform;
-  setScene(scene: Scene | SceneColumnsLike, options?: {keepView?: boolean}): void;
+  /** A new scene; `animate` (milliseconds) morphs the far layer (the near layer draws at once). */
+  setScene(scene: Scene | SceneColumnsLike, options?: {keepView?: boolean; animate?: number}): void;
   /** Merges into the state: the selection goes to both layers, the rest to the near layer. */
   setState(state: {selected?: string | null; selectedRoute?: string | null; [key: string]: unknown}): void;
   resize(): void;

@@ -212,8 +212,18 @@ keeping every overview feature:
   left out (bus bars and taps, rows). The default stays the cluster colours, which tell clusters apart from afar; O4
   uses the scene look where it hands over to the scene view. Checked in Chrome (`overview-backends.mjs`): both looks
   on every backend; Node tests for the parts, the placement and the style.
-- **O4 — one morph and the continuous zoom:** the morph of O2 serves the scene (section 6); zooming into a structured
-  cluster hands over to the scene view of that cluster.
+- **O4 — one morph and the continuous zoom (done):** the far layer morphs as the overview does (section 6):
+  `setScene(next, {animate})` moves every box from where the same id was (`morphStarts`; a box's start rectangle as a
+  second instance attribute, the morph's eased `t` a uniform, in both backends), fades the old lines and arrowheads out
+  under the new ones and holds the texts until it ends; the near layer draws the new scene at once. The playground
+  morphs its GPU view on every new layout (400 ms, none under reduced motion). The continuous zoom: `sceneViewOf` and
+  `overviewViewOf` map the overview's view to the scene view of a structured cluster and back, exactly (the disc's
+  placement); the overview page hands over to the scene view of that cluster when its disc covers the whole view (all
+  four corners inside, with hysteresis) and takes back when it no longer would, drawing the cluster in the scene look in
+  between (O3), so the hand-over changes only who draws. Checked: Node tests of the mapping and the morph starts; in
+  Chrome a morph half way on both backends (the moved box half way, both alike, the end equal to the new scene drawn
+  still, `scene-gl.mjs`) and the zoom with real wheel input (`overview-zoom.mjs`: at the hand-over 0.6 % of the drawn
+  pixels differ between the scene view and the overview under it; zooming out hands back).
 
 ## Measurements before defaults
 

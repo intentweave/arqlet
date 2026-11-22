@@ -14,7 +14,8 @@ export interface SceneText {
   x: number; y: number; text: string; size: number; colour: string;
   align?: 'start' | 'center'; baseline?: 'alphabetic' | 'middle'; weight?: number; angle?: number;
 }
-export interface SceneLayerBuffers { boxes: Float32Array; segments: Float32Array; triangles: Float32Array }
+/** `ids`: per box instance the id of what it draws (null for none), for a morph. */
+export interface SceneLayerBuffers { boxes: Float32Array; segments: Float32Array; triangles: Float32Array; ids: (string | null)[] }
 export interface SceneHit { kind: 'node' | 'route'; id: string }
 export interface SceneIndex {
   /** The node item (leaf, container or bus bar) of an id. */
@@ -32,6 +33,8 @@ export interface SceneDrawState {
   pinned?: Iterable<string> | null;
   /** The path in amber, the rest receding (renderSvg's `trace`). */
   trace?: {nodes?: string[]; routes?: string[]; distance?: Record<string, number> | Map<string, number>; fade?: boolean} | null;
+  /** Route ids drawn without an arrowhead. */
+  noArrow?: Iterable<string>;
   /** The appearance (style.js). */
   style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null;
 }
@@ -67,3 +70,5 @@ export function nearPolicy(input: {elements: number; boxPixels: number; current?
 export function medianBoxPixels(index: SceneIndex, ids: Iterable<string>, scale: number): number;
 /** The part of a scene that touches `rect`, as a scene with `rect` as its bounds (coordinates unchanged). */
 export function sceneExcerpt(scene: Scene, index: SceneIndex, rect: Rect): Scene;
+/** Provisional (ADR 0025 §6): where each box of `next` starts a morph from `previous` (x, y, width, height per instance, per layer). */
+export function morphStarts(previous: SceneBuffers | null, next: SceneBuffers): Float32Array[];
