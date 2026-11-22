@@ -122,6 +122,8 @@ mod reproduce;
 mod route_crossings;
 #[path = "rows.rs"]
 mod rows;
+#[path = "session_store.rs"]
+mod session_store;
 #[path = "shape_change.rs"]
 mod shape_change;
 #[path = "shape_geometry.rs"]
