@@ -1,7 +1,9 @@
 // ADR 0025, exits of V1 and V2, in a real Chrome. Starts its own server and Chrome (`launch.mjs`). Not part of CI.
 //
-// V1: the golden scenes of `packages/viewer/fixtures` drawn by `renderSvg` and by the WebGL renderer at the same
-// transform, without text (the far layer's text is a 2D canvas and is not compared): the share of pixels whose colour
+// V1: the golden scenes of `packages/viewer/fixtures` and the scenes of the playground's examples, one or more per kind
+// of drawing (EXAMPLES: tree and radial, organic and mixed strategies, ER rows, circles, bus lines, hulls, rounded routes,
+// self-loops; taken from the playground's download after it laid them out, the scene computed by the WASM engine),
+// drawn by `renderSvg` and by each GPU backend at the same transform, without text (the far layer's text is a 2D canvas and is not compared): the share of pixels whose colour
 // differs by more than 48 in a channel must stay below 1 %. Writes both pictures and the difference to OUT
 // (default: the system's temporary folder) for inspection.
 // V2: the scene view zoomed in and out across the threshold in small steps: at every step the near layer's boxes must
@@ -23,8 +25,60 @@ try {
   await page.send('Runtime.enable');
   await page.send('Page.enable');
   await page.send('Emulation.setDeviceMetricsOverride', {width: 1400, height: 900, deviceScaleFactor: 1, mobile: false});
-  await page.send('Page.navigate', {url: `${running.url}overview.html`});
+  await page.send('Page.navigate', {url: running.url});
   await page.waitFor(`document.readyState === 'complete'`, 'the page loads', 30000);
+  await page.sleep(2000);
+  // The examples' scenes as the playground lays them out: its download hands over the snapshot, the engine draws the scene.
+  const EXAMPLES = (process.env.EXAMPLES ?? 'workflow-dag,nested-tree-radial,mixed-layouts,mixed-large,er-diagram,uml-class,petri-net-shapes,vehicle-buses,vehicle-buses-organic,vehicle-zonal,memberships,self-loops,cloud-architecture,network-vlan,org-chart').split(',');
+  const SETUP = {
+    // One edit at a time: the hulls first, then their shape.
+    memberships: `(async () => { const c = document.getElementById('membership-hulls'); if (!c.checked) { c.checked = true; c.dispatchEvent(new Event('change')); }
+      for (let i = 0; i < 100 && !document.querySelector('#graph .lw-hull'); i++) await new Promise(r => setTimeout(r, 100));
+      const h = document.getElementById('membership-hull'); h.value = 'polygon'; h.dispatchEvent(new Event('change')); })()`,
+    'network-vlan': `(() => { document.getElementById('options-json').value = JSON.stringify({hubRefs: 4}); document.getElementById('apply-options').click(); })()`,
+  };
+  for (const name of EXAMPLES) {
+    await page.waitForExample(name);
+    await evaluate(`(() => { const s = document.getElementById('example'); s.value = ${JSON.stringify(name)}; s.dispatchEvent(new Event('change')); })()`);
+    await page.sleep(1500);
+    await page.waitFor(`document.querySelectorAll('#graph g.node').length > 0 && !document.getElementById('save').disabled`, `the example ${name} is drawn`);
+    await page.sleep(1000);
+    // Two kinds need an option: membership hulls (as polygons) and hub references.
+    if (SETUP[name]) { await evaluate(SETUP[name]); await page.sleep(2500); }
+    const features = await evaluate(`(async () => {
+      let blob = null;
+      const create = URL.createObjectURL, click = HTMLAnchorElement.prototype.click;
+      URL.createObjectURL = b => { blob = b; return 'blob:none'; };
+      HTMLAnchorElement.prototype.click = function () {};
+      try { document.getElementById('save').click(); } finally { URL.createObjectURL = create; HTMLAnchorElement.prototype.click = click; }
+      const snapshot = JSON.parse(await blob.text());
+      window.__engine ??= await (await import('/packages/engine-client/wasm-client.js')).createEngine(await (await fetch('/generated/arqlet.wasm')).arrayBuffer());
+      const answer = window.__engine({op: 'scene', snapshot});
+      if (!answer.ok) throw Error(answer.error);
+      const scene = answer.scene;
+      (window.__scenes ??= {})[${JSON.stringify(name)}] = scene;
+      // Every strategy and routing style of the whole view, on one example, through the engine's operations.
+      if (${JSON.stringify(name)} === 'workflow-dag') {
+        for (const [op, value] of [['strategy', 'tree'], ['strategy', 'radial'], ['strategy', 'organic'], ['strategy', 'none'],
+          ['routing', 'straight'], ['routing', 'roundedOrthogonal'], ['routing', 'polyline'], ['routing', 'roundedPolyline'], ['routing', 'octilinear'], ['routing', 'curve'], ['routing', 'bus'], ['bundling', 'complete']]) {
+          const base = {snapshot, expectedRevision: snapshot.revision, expectedLayoutVersion: snapshot.layoutVersion ?? 0};
+          const changed = op === 'bundling' ? window.__engine({op: 'configure', ...base, options: {bundling: value}}) : window.__engine({op, ...base, nodeId: null, [op]: value});
+          if (!changed.ok) { window.__variantErrors = [...(window.__variantErrors ?? []), op + '=' + value + ': ' + changed.error]; continue; }
+          const drawn = window.__engine({op: 'scene', snapshot: changed.snapshot});
+          if (drawn.ok) window.__scenes['workflow-dag ' + op + '=' + value] = drawn.scene;
+        }
+      }
+      const diagonal = scene.routes.some(r => r.points.some((p, i) => i && p.x !== r.points[i - 1].x && p.y !== r.points[i - 1].y));
+      const f = {rows: scene.nodes.some(n => n.rows?.length), circles: scene.nodes.some(n => n.shape === 'circle'), hulls: !!scene.membershipHulls?.length,
+        busLines: !!scene.busLines?.length, hubRefs: !!scene.hubRefs?.length, junctions: !!scene.junctions?.length, rounded: scene.routes.some(r => r.rounded),
+        diagonal, labels: scene.labels.length > 0, ports: scene.showPorts, selfLoops: scene.routes.some(r => r.source === r.target), aggregated: scene.routes.some(r => r.backWeight != null)};
+      return Object.keys(f).filter(k => f[k]).join(' ');
+    })()`);
+    console.log(`scene ${name}: ${features || 'boxes and routes'}`);
+  }
+  const variants = await evaluate(`JSON.stringify({names: Object.keys(window.__scenes).filter(k => k.includes(' ')), errors: window.__variantErrors ?? [],
+    rounded: Object.entries(window.__scenes).filter(([, s]) => s.routes.some(r => r.rounded)).map(([k]) => k), junctions: Object.entries(window.__scenes).filter(([, s]) => s.junctions?.length).map(([k]) => k)})`);
+  console.log(`variants ${variants}`);
 
   const golden = await evaluate(`(async () => {
     const {renderSvg} = await import('/packages/viewer/svg.js');
@@ -34,14 +88,26 @@ try {
     const gpu = await sceneBackend();
     const W = 1200, H = 700, bg = '#0e1520';
     const results = [];
-    for (const backend of [gpu.kind === 'webgpu' ? 'webgpu' : null, 'webgl2'].filter(Boolean))
-    for (const name of ['state-tcp', 'bpmn-pools']) {
-      const scene = await (await fetch('/packages/viewer/fixtures/' + name + '.scene.json')).json();
+    for (const backend of [gpu.kind === 'webgpu' ? 'webgpu' : null, 'webgl2'].filter(Boolean)) {
+    // The states both layers draw (renderSvg's options): a trace with fading, pins, a selected node, a selected route.
+    const stated = [];
+    for (const base of ['workflow-dag', 'bpmn-pools']) {
+      const scene = window.__scenes?.[base] ?? await (await fetch('/packages/viewer/fixtures/' + base + '.scene.json')).json();
+      const leaves = scene.nodes.filter(n => !n.container), route = scene.routes.find(r => r.points.length > 2) ?? scene.routes[0];
+      const distance = Object.fromEntries(scene.nodes.map((n, i) => [n.id, i % 4]));
+      stated.push([base + ' trace', scene, {trace: {nodes: [route.source, route.target], routes: [route.id], distance, fade: true}}]);
+      stated.push([base + ' pins and selection', scene, {pinned: new Set(leaves.slice(0, 3).map(n => n.id)), selected: leaves[1].id}]);
+      stated.push([base + ' selected route', scene, {selectedRoute: route.id}]);
+    }
+    const all = [];
+    for (const name of ['state-tcp', 'bpmn-pools', ...Object.keys(window.__scenes ?? {})]) all.push([name, window.__scenes?.[name] ?? await (await fetch('/packages/viewer/fixtures/' + name + '.scene.json')).json(), {}]);
+    all.push(...stated);
+    for (const [name, scene, state] of all) {
       const b = scene.bounds, scale = Math.min(W / b.width, H / b.height) * 0.95;
       const view = {centreX: b.x + b.width / 2, centreY: b.y + b.height / 2, scale};
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-      renderSvg(svg, scene, {scale, document});
+      renderSvg(svg, scene, {scale, document, ...state});
       const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
       style.textContent = 'text{display:none}';
       svg.prepend(style);
@@ -55,7 +121,7 @@ try {
       const gl = document.createElement('canvas');
       gl.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px';
       document.body.append(gl);
-      const r = backend === 'webgpu' ? createSceneGpuRenderer(gl, scene, {view, device: gpu.device}) : createSceneRenderer(gl, scene, {view, preserveDrawingBuffer: true});
+      const r = backend === 'webgpu' ? createSceneGpuRenderer(gl, scene, {view, device: gpu.device, ...state}) : createSceneRenderer(gl, scene, {view, preserveDrawingBuffer: true, ...state});
       r.resize();
       const c = document.createElement('canvas'); c.width = W; c.height = H;
       const cc = c.getContext('2d', {willReadFrequently: true});
@@ -71,14 +137,28 @@ try {
         else { diff.data[i] = diff.data[i + 1] = diff.data[i + 2] = pa[i] / 3; diff.data[i + 3] = 255; }
       }
       cd.putImageData(diff, 0, 0);
-      results.push({backend, name, share: off / (W * H), mean: sum / (W * H), svg: a.toDataURL(), gl: c.toDataURL(), diff: d.toDataURL()});
+      // Hover: the outline of a leaf turns renderSvg's hover blue on its left border.
+      let hover = null;
+      if (name === 'bpmn-pools') {
+        const leaf = scene.nodes.find(n => !n.container && n.shape !== 'circle');
+        r.setHover(leaf.id); r.draw();
+        const h = document.createElement('canvas'); h.width = W; h.height = H;
+        const hc = h.getContext('2d', {willReadFrequently: true}); hc.drawImage(gl, 0, 0);
+        const x = Math.round(W / 2 + (leaf.bounds.x - view.centreX) * scale), y = Math.round(H / 2 + (leaf.bounds.y + leaf.bounds.height / 2 - view.centreY) * scale);
+        let best = 0;
+        for (let i = x - 2; i <= x + 2; i++) { const p = hc.getImageData(i, y, 1, 1).data; best = Math.max(best, p[2] - p[0]); }
+        hover = best;
+      }
+      results.push({backend, name, hover, share: off / (W * H), mean: sum / (W * H), svg: a.toDataURL(), gl: c.toDataURL(), diff: d.toDataURL()});
       r.destroy(); gl.remove();
+    }
     }
     return results;
   })()`);
   for (const g of golden) {
     for (const k of ['svg', 'gl', 'diff']) writeFileSync(join(out, `${g.name}-${g.backend}-${k}.png`), Buffer.from(g[k].split(',')[1], 'base64'));
     check(`V1 ${g.backend} ${g.name}: the far layer matches renderSvg without text`, g.share < 0.01, `${(g.share * 100).toFixed(2)} % of pixels off, mean channel difference ${g.mean.toFixed(2)}`);
+    if (g.hover !== null) check(`V1 ${g.backend}: a hovered leaf is outlined in the hover blue`, g.hover > 60, `blue minus red on the border: ${g.hover}`);
   }
 
   const switchings = await evaluate(`(async () => {
@@ -125,12 +205,14 @@ try {
         const [x, y] = screen(target.bounds.x, cy);
         const row = cc.getImageData(0, Math.round(y - hostRect.top), 900, 1).data;
         const px = x - hostRect.left;
-        let found = -1, best = -1;
+        // The first pixel from the left that differs from the background: the box's outer edge (its stroke is centred on
+        // the border, half a pixel or less outside).
+        const bgAt = Math.max(0, Math.floor(px) - 8) * 4, bg = row[bgAt] + row[bgAt + 1] + row[bgAt + 2];
+        let found = -1;
         for (let i = Math.max(0, Math.floor(px) - 6); i <= Math.min(899, Math.ceil(px) + 6); i++) {
-          const bright = row[i * 4] + row[i * 4 + 1] + row[i * 4 + 2];
-          if (bright > best) { best = bright; found = i; }
+          if (Math.abs(row[i * 4] + row[i * 4 + 1] + row[i * 4 + 2] - bg) > 12) { found = i; break; }
         }
-        if (view.scale * target.bounds.width > 8) worstFar = Math.max(worstFar, Math.abs(found + 0.5 - px));
+        if (view.scale * target.bounds.width > 8 && found >= 0) worstFar = Math.max(worstFar, Math.abs(found + 0.5 - px));
       }
       steps.push(layer + ':' + v.counts.elements + '/' + v.counts.boxPixels.toFixed(1));
     }

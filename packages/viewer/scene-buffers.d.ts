@@ -8,7 +8,7 @@ export const SEGMENT_STRIDE: 13;
 /** Provisional: floats per triangle vertex (x, y, depth, RGBA). */
 export const TRIANGLE_STRIDE: 7;
 /** The layers in drawing order. */
-export const LAYERS: readonly ['hulls', 'containers', 'routes', 'leaves', 'marks'];
+export const LAYERS: readonly ['hulls', 'containers', 'routes', 'leaves', 'marks', 'overlay'];
 
 export interface SceneText {
   x: number; y: number; text: string; size: number; colour: string;
@@ -24,8 +24,18 @@ export interface SceneIndex {
   /** The element under a world point in renderSvg's hit order (leaf or bus bar, line within `tolerance`, deepest container). */
   pick(x: number, y: number, tolerance?: number): SceneHit | null;
 }
+/** What the far layer draws besides the scene, as renderSvg's options of the same names. */
+export interface SceneDrawState {
+  selected?: string | null;
+  selectedRoute?: string | null;
+  /** Pinned node ids: a dot on each pinned leaf. */
+  pinned?: Iterable<string> | null;
+  /** The path in amber, the rest receding (renderSvg's `trace`). */
+  trace?: {nodes?: string[]; routes?: string[]; distance?: Record<string, number> | Map<string, number>; fade?: boolean} | null;
+}
 export interface SceneBuffers {
   scene: Scene;
+  state: SceneDrawState;
   bounds: Rect;
   layers: SceneLayerBuffers[];
   texts: SceneText[];
@@ -36,7 +46,9 @@ export interface SceneViewTransform { centreX: number; centreY: number; scale: n
 /** The scene object of a scene or of its columns. */
 export function sceneOf(scene: Scene | SceneColumnsLike): Scene;
 /** Provisional (ADR 0025, V1): what the WebGL renderer draws, in renderSvg's order, colours and outlines. */
-export function sceneBuffers(scene: Scene | SceneColumnsLike, state?: {selected?: string | null; selectedRoute?: string | null}): SceneBuffers;
+export function sceneBuffers(scene: Scene | SceneColumnsLike, state?: SceneDrawState): SceneBuffers;
+/** The overlay layer with renderSvg's hover outline on the node `id` (leaf, container or bus bar); empty for null. */
+export function hoverBuffers(scene: Scene, id: string | null): SceneLayerBuffers;
 /** A uniform grid over the scene's elements, for picking and the elements in view. */
 export function sceneIndex(scene: Scene): SceneIndex;
 /** Ear clipping of a simple polygon: triangles as index triples. */

@@ -21,7 +21,21 @@ function DiagramNode({data,selected}){
 function DiagramEdge({id,data}){
  return <BaseEdge id={id} path={routePath(data.points)} markerEnd="url(#lw-rf-arrow)" style={{stroke:data.invalid?'#f08f80':'#73bba7',strokeWidth:Math.min(4,1.6+.4*(data.weight-1))}}/>;
 }
-const nodeTypes={arqlet:DiagramNode},edgeTypes={arqlet:DiagramEdge};
+// What is neither node nor edge (toReactFlow's overlays, with `overlayNode`): membership hulls behind everything, bus bars
+// with their taps, junction dots and hub-reference stubs, in renderSvg's colours, inside one inert node over the scene.
+function OverlayNode({data}){
+ const o=data.origin,pt=p=>`${p.x-o.x},${p.y-o.y}`,dims=[...new Set(data.hulls.map(h=>h.dimension))];
+ return <svg className="lw-overlay" width="100%" height="100%" style={{overflow:'visible',pointerEvents:'none'}}>
+  {data.hulls.filter(h=>h.points?.length>=3).map(h=>{const hue=(dims.indexOf(h.dimension)*67+191)%360;return <polygon key={`${h.dimension}:${h.group}`} points={h.points.map(pt).join(' ')} fill={`hsl(${hue} 60% 55% / .12)`} stroke={`hsl(${hue} 60% 65% / .55)`} strokeWidth={1.4} strokeDasharray="6 4"/>;})}
+  {data.busLines.map(b=><g key={b.id}>{b.taps.map(t=><polyline key={t.edge} points={t.points.map(pt).join(' ')} fill="none" stroke="#73bba7" strokeWidth={1.6} strokeOpacity={.75} markerEnd="url(#lw-rf-arrow)"/>)}
+   <rect x={b.bounds.x-o.x} y={b.bounds.y-o.y} width={b.bounds.width} height={b.bounds.height} rx={Math.min(b.bounds.width,b.bounds.height)/2} fill="#6f93b8" stroke="#4c6682"/></g>)}
+  {data.hubRefs.map(r=><g key={r.edge}><polyline points={r.points.map(pt).join(' ')} fill="none" stroke="#73bba7" strokeWidth={1.6} strokeOpacity={.85} markerEnd="url(#lw-rf-arrow)"/>
+   <rect x={r.label.x-o.x} y={r.label.y-o.y} width={r.label.width} height={r.label.height} rx={3} fill="#142133" stroke="#3b5068" strokeWidth={.8}/>
+   <text x={r.label.x-o.x+4} y={r.label.y-o.y+r.label.height/2} dominantBaseline="middle" fill="#9fc3e6" fontSize={10.5}>{(r.outgoing?'→ ':'← ')+r.text.slice(0,32)}</text></g>)}
+  {data.junctions.map((j,i)=><circle key={i} cx={j.x-o.x} cy={j.y-o.y} r={3.5} fill="#73bba7" stroke="#142133"/>)}
+ </svg>;
+}
+const nodeTypes={arqlet:DiagramNode,arqletOverlay:OverlayNode},edgeTypes={arqlet:DiagramEdge};
 function FitScene({bounds}){const {fitBounds}=useReactFlow();useEffect(()=>{fitBounds(bounds,{padding:.1});},[bounds,fitBounds]);return null;}
 
 const Arrow=()=><svg style={{position:'absolute',width:0,height:0}}><defs><marker id="lw-rf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#73bba7"/></marker></defs></svg>;
@@ -48,7 +62,7 @@ function FarSceneView({scene,selected,onSelect}){
  },[]);
  useEffect(()=>{view.current?.setScene(scene);},[scene]);
  useEffect(()=>{view.current?.setState({selected});},[selected]);
- const mapped=useMemo(()=>near?toReactFlow(near):null,[near]);
+ const mapped=useMemo(()=>near?toReactFlow(near,{overlayNode:true}):null,[near]);
  const nodes=useMemo(()=>mapped?mapped.nodes.map(n=>({...n,selected:n.id===selected})):[],[mapped,selected]);
  return <div className="far-host" ref={host}><span className="far-info">{info}</span>{createPortal(mapped&&<ReactFlow nodes={nodes} edges={mapped.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} viewport={viewport} onNodeClick={(_,node)=>select.current(node.id)}
   nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false} preventScrolling={false} deleteKeyCode={null} proOptions={{hideAttribution:true}}>
@@ -66,7 +80,7 @@ function App(){
  const built=useMemo(()=>{if(!snapshot||!engine)return null;try{return {scene:sceneOf(engine,snapshot)};}catch(e){return {error:e.message};}},[snapshot,engine]);
  const scene=built?.scene??null;
  const sceneError=built?.error??'';
- const mapped=useMemo(()=>scene?toReactFlow(scene):null,[scene]);
+ const mapped=useMemo(()=>scene?toReactFlow(scene,{overlayNode:true}):null,[scene]);
  useEffect(()=>{if(mapped)setNodes(mapped.nodes);},[mapped]);
  useEffect(()=>{setError(sceneError);},[sceneError]);
 

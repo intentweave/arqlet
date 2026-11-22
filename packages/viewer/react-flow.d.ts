@@ -1,4 +1,4 @@
-import type {BoundaryCrossing, PlacedLabel, Point, Scene, SceneBusLine, SceneHubRef, SceneNode, SceneRoute} from '@arqlet/contracts';
+import type {BoundaryCrossing, PlacedLabel, Point, Scene, SceneBusLine, SceneHubRef, SceneHull, SceneNode, SceneRoute} from '@arqlet/contracts';
 
 export interface ArqletFlowHandle {
   id: string;
@@ -44,6 +44,8 @@ export interface ArqletFlowOverlays {
   junctions: Point[];
   /** Stubs of hub references (`hubRefs`): a short line at the edge's other end and a label naming the hub. */
   hubRefs: SceneHubRef[];
+  /** Membership hulls (ADR 0022, `membershipHulls`): polygons around the members of a group, drawn behind the nodes. */
+  hulls: SceneHull[];
 }
 
 /** With `overlayNode`: one node over the whole scene that a node type `arqletOverlay` draws. */

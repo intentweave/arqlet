@@ -15,6 +15,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - The scene view's near layer is replaceable (`near`, `svgNearLayer`, `reactFlowViewport`; ADR 0025 V4). The playground
   has a large-view mode (button *GPU*, key G; on by itself from 1 500 elements) with selection, collapse and pins; the
   React Flow example can draw large views with the GPU from afar and React Flow up close (*GPU far layer*).
+- The far layer draws the trace (path in amber, the rest receding), pin dots and a hover outline as `renderSvg` does;
+  lines thinner than a pixel keep their coverage as opacity, as in SVG. `toReactFlow` returns membership hulls among its
+  overlays (`hulls`), and the React Flow example draws all overlays.
 
 ## 0.8.0 — 2026-11-22
 

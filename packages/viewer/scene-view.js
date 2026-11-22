@@ -57,8 +57,10 @@ export function createSceneView(host, input, options = {}) {
   let view = options.view ?? fitView();
   // What the host changes between drawings: the selection for both layers, anything else (pins, sizes) for the near one.
   let state = {selected: options.svg?.selected ?? options.state?.selected ?? null, selectedRoute: options.svg?.selectedRoute ?? options.state?.selectedRoute ?? null, ...options.state};
+  // The part of the state the far layer draws too.
+  const farState = () => ({selected: state.selected, selectedRoute: state.selectedRoute, pinned: state.pinned ?? null, trace: state.trace ?? null});
   if (gl) {
-    const farOptions = {labels, view, background: options.background, preserveDrawingBuffer: options.preserveDrawingBuffer, selected: state.selected, selectedRoute: state.selectedRoute};
+    const farOptions = {labels, view, background: options.background, preserveDrawingBuffer: options.preserveDrawingBuffer, ...farState()};
     far = backend.kind === 'webgpu' ? createSceneGpuRenderer(canvas, scene, {...farOptions, device: backend.device}) : createSceneRenderer(canvas, scene, farOptions);
     index = far.index;
   }
@@ -148,7 +150,7 @@ export function createSceneView(host, input, options = {}) {
     },
     setState(next) {
       state = {...state, ...next};
-      far?.setState({selected: state.selected, selectedRoute: state.selectedRoute});
+      far?.setState(farState());
       if (layer === 'near') drawNear();
     },
     resize() { far?.resize(); if (layer === 'near') drawNear(); update(); },
@@ -158,8 +160,22 @@ export function createSceneView(host, input, options = {}) {
       const x = view.centreX + (clientX - rect.left - rect.width / 2) / view.scale, y = view.centreY + (clientY - rect.top - rect.height / 2) / view.scale;
       return index.pick(x, y, 5 / view.scale);
     },
-    destroy() { clearTimeout(timer); far?.destroy(); canvas?.remove(); labels?.remove(); nearLayer.clear(); near.remove(); },
+    destroy() { clearTimeout(timer); unhover?.(); far?.destroy(); canvas?.remove(); labels?.remove(); nearLayer.clear(); near.remove(); },
   };
+  // Hover from afar: the far layer outlines the node under the pointer, as renderSvg does up close.
+  let unhover = null;
+  if (gl && options.hover !== false && host.addEventListener) {
+    const move = e => {
+      if (layer !== 'far' || e.buttons) return;
+      const hit = api.pick(e.clientX, e.clientY);
+      far.setHover(hit?.kind === 'node' ? hit.id : null);
+      host.style.cursor = hit ? 'pointer' : '';
+    };
+    const leave = () => { far.setHover(null); host.style.cursor = ''; };
+    host.addEventListener('pointermove', move);
+    host.addEventListener('pointerleave', leave);
+    unhover = () => { host.removeEventListener('pointermove', move); host.removeEventListener('pointerleave', leave); };
+  }
   far?.resize();
   if (!gl) drawNear();
   update();

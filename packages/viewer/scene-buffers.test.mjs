@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {sceneBuffers, sceneIndex, sceneExcerpt, nearPolicy, medianBoxPixels, triangulate, arrowCorners, viewRect, BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE, LAYERS} from './scene-buffers.js';
+import {sceneBuffers, hoverBuffers, sceneIndex, sceneExcerpt, nearPolicy, medianBoxPixels, triangulate, arrowCorners, viewRect, BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE, LAYERS} from './scene-buffers.js';
 
 const fixture = name => JSON.parse(readFileSync(new URL(`./fixtures/${name}.scene.json`, import.meta.url)));
 
@@ -15,8 +15,9 @@ const tiny = () => ({
 
 test('every element of a scene becomes instances in the drawing order of renderSvg', () => {
   const b = sceneBuffers(tiny());
-  assert.deepEqual(LAYERS, ['hulls', 'containers', 'routes', 'leaves', 'marks']);
-  const [hulls, containers, routes, leaves, marks] = b.layers;
+  assert.deepEqual(LAYERS, ['hulls', 'containers', 'routes', 'leaves', 'marks', 'overlay']);
+  const [hulls, containers, routes, leaves, marks, overlay] = b.layers;
+  assert.equal(overlay.boxes.length, 0, 'the overlay starts empty');
   assert.equal(hulls.boxes.length + hulls.segments.length + hulls.triangles.length, 0);
   assert.equal(containers.boxes.length / BOX_STRIDE, 1);
   assert.equal(routes.segments.length / SEGMENT_STRIDE, 3, 'one segment per pair of points');
@@ -121,4 +122,29 @@ test('the columns of a scene draw as the scene', async () => {
   const scene = fixture('state-tcp');
   const a = sceneBuffers(scene), b = sceneBuffers(columnsOfScene(scene));
   for (let i = 0; i < a.layers.length; i++) for (const k of ['boxes', 'segments', 'triangles']) assert.equal(a.layers[i][k].length, b.layers[i][k].length, `${LAYERS[i]} ${k}`);
+});
+
+test('a trace lights its path in amber and lets the rest recede, as renderSvg\'s trace', () => {
+  const s = tiny();
+  s.routes.push({id: 'b->a', source: 'b', target: 'a', points: [{x: 200, y: 50}, {x: 80, y: 50}], weight: 1});
+  const b = sceneBuffers(s, {trace: {nodes: ['a', 'b'], routes: ['a->b'], distance: {g: 1}, fade: true}});
+  const seg = b.layers[2].segments, at = (i, k) => seg[i * SEGMENT_STRIDE + k];
+  assert.ok(Math.abs(at(0, 4) - 3.1) < 1e-6, 'the path is wider');
+  assert.deepEqual([at(0, 9), at(0, 10), at(0, 11), at(0, 12)].map(v => +v.toFixed(3)), [1, 0.784, 0.38, 1], 'amber, opaque');
+  assert.ok(Math.abs(at(3, 12) - 0.08) < 1e-6, 'another route recedes (fade)');
+  const leaves = b.layers[3].boxes;
+  assert.equal(leaves[6], 2.5, 'a node on the path has a stronger outline');
+  const frame = b.layers[1].boxes;
+  assert.ok(Math.abs(frame[11] - 0.7) < 1e-6, 'a container one hop away is drawn at 70 %');
+});
+
+test('a pinned leaf gets renderSvg\'s dot; the hover outline is its own small layer', () => {
+  const b = sceneBuffers(tiny(), {pinned: new Set(['a'])});
+  const leaves = b.layers[3].boxes;
+  assert.equal(leaves.length / BOX_STRIDE, 3, 'two leaves and one dot');
+  assert.deepEqual([...leaves.slice(BOX_STRIDE, BOX_STRIDE + 4)], [20 + 60 - 10 - 4, 40 + 10 - 4, 8, 8], 'top right of a, 10 in');
+  const hover = hoverBuffers(tiny(), 'b');
+  assert.equal(hover.boxes.length / BOX_STRIDE, 1);
+  assert.deepEqual([...hover.boxes.slice(0, 4)], [200, 40, 60, 40]);
+  assert.equal(hoverBuffers(tiny(), null).boxes.length, 0);
 });

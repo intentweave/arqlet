@@ -38,7 +38,7 @@ export interface SceneViewOptions {
   svg?: Partial<RenderSvgOptions>;
   /** A near layer of the host's own instead of renderSvg (React Flow, for example). */
   near?: SceneNearLayer;
-  /** The first state: `selected` and `selectedRoute` for both layers, anything else for the near layer. */
+  /** The first state: `selected`, `selectedRoute`, `pinned` and `trace` for both layers, anything else for the near layer. */
   state?: Record<string, unknown>;
   /** The far layer's backend (from `sceneBackend`); default WebGL 2 when available, else SVG alone. */
   backend?: SceneBackend;
@@ -47,6 +47,8 @@ export interface SceneViewOptions {
   view?: SceneViewTransform;
   background?: [number, number, number, number];
   preserveDrawingBuffer?: boolean;
+  /** false: no hover outline from afar (default on). */
+  hover?: boolean;
   onLayer?: (layer: 'far' | 'near') => void;
   onView?: (view: SceneViewTransform, layer: 'far' | 'near') => void;
 }

@@ -16,6 +16,8 @@ export interface SceneRendererOptions {
   fontFamily?: string;
   selected?: string | null;
   selectedRoute?: string | null;
+  pinned?: Iterable<string> | null;
+  trace?: import('./scene-buffers.js').SceneDrawState['trace'];
   /** Keeps the drawing readable after the frame (for pixel checks). */
   preserveDrawingBuffer?: boolean;
   onView?: (view: SceneViewTransform) => void;
@@ -27,13 +29,17 @@ export interface SceneRenderer {
   readonly view: SceneViewTransform;
   readonly scene: Scene;
   readonly index: SceneIndex;
-  readonly state: {selected: string | null; selectedRoute: string | null};
+  readonly state: import('./scene-buffers.js').SceneDrawState;
+  /** The node outlined as hovered, or null. */
+  readonly hovered: string | null;
+  /** Outlines a node as hovered (null: none); rebuilds only the overlay layer. */
+  setHover(id: string | null): void;
   /** Sets the view; drawn on the next animation frame. */
   setView(view: SceneViewTransform): void;
   /** Shows the whole scene. */
   fit(): SceneViewTransform;
   setScene(scene: Scene | SceneColumnsLike, options?: {keepView?: boolean}): void;
-  setState(state: {selected?: string | null; selectedRoute?: string | null}): void;
+  setState(state: import('./scene-buffers.js').SceneDrawState): void;
   /** Matches the canvases to their CSS size and the device pixel ratio, and draws. */
   resize(): void;
   /** Draws now. */

@@ -1,7 +1,7 @@
 // Provisional (ADR 0025): what both GPU backends of the far layer share. A backend (`scene-gpu.js` with WebGPU, the
 // first choice; `scene-gl.js` with WebGL 2, the fallback) only uploads the buffers of `sceneBuffers` and draws them for a
 // view; the shell here holds the view, the state, the texts on the 2D canvas, picking and the frame scheduling.
-import {sceneBuffers, viewRect} from './scene-buffers.js';
+import {sceneBuffers, hoverBuffers, viewRect} from './scene-buffers.js';
 
 /**
  * The backend a browser offers for the far layer: WebGPU (with its device), else WebGL 2, else none (SVG alone).
@@ -48,9 +48,10 @@ export function rendererShell(canvas, scene, options, backend, kind) {
   const labels = options.labels ?? null;
   const ctx = labels?.getContext('2d') ?? null;
   const textOptions = {minTextPixels: options.minTextPixels ?? 6, font: options.fontFamily ?? 'system-ui, -apple-system, Segoe UI, sans-serif', text: options.text};
-  let state = {selected: options.selected ?? null, selectedRoute: options.selectedRoute ?? null};
-  let current = scene, built = null, frame = 0;
-  const build = () => { built = sceneBuffers(current, state); backend.upload(built); };
+  // What the far layer draws besides the scene: the selection, pins and a trace (`sceneBuffers`), and the hover outline.
+  let state = {selected: options.selected ?? null, selectedRoute: options.selectedRoute ?? null, pinned: options.pinned ?? null, trace: options.trace ?? null};
+  let current = scene, built = null, frame = 0, hovered = null;
+  const build = () => { built = sceneBuffers(current, state); if (hovered != null) built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered); backend.upload(built); };
   build();
   const ratio = () => globalThis.devicePixelRatio || 1;
   const fit = () => {
@@ -76,6 +77,15 @@ export function rendererShell(canvas, scene, options, backend, kind) {
     fit() { view = fit(); schedule(); return view; },
     setScene(next, {keepView = true} = {}) { current = next; build(); if (!keepView) view = fit(); schedule(); },
     setState(next) { state = {...state, ...next}; build(); schedule(); },
+    get hovered() { return hovered; },
+    /** Outlines the node (leaf, container or bus bar) `id` as hovered, or none with null; rebuilds only that layer. */
+    setHover(id) {
+      if ((id ?? null) === hovered) return;
+      hovered = id ?? null;
+      built.layers[built.layers.length - 1] = hoverBuffers(built.scene, hovered);
+      backend.upload(built);
+      schedule();
+    },
     resize() {
       const r = ratio(), w = Math.max(1, Math.round((canvas.clientWidth || canvas.width) * r)), h = Math.max(1, Math.round((canvas.clientHeight || canvas.height) * r));
       for (const c of [canvas, labels]) if (c && (c.width !== w || c.height !== h)) { c.width = w; c.height = h; }

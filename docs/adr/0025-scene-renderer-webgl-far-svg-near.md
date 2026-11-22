@@ -166,6 +166,24 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
 - Found on the way: with only lines in view (no leaf), the switch takes the scene's typical leaf as the size on
   screen, else a zoom onto long edges would never hand over.
 
+### Completeness of the far layer
+
+- Every kind of drawing is checked against `renderSvg` in both backends (`browser-checks/scene-gl.mjs`, pixels without
+  text, under 1 % of the pixels off): the golden scenes and the playground's examples as it lays them out (tree and
+  radial, mixed strategies with circle containers, ER rows, UML, Petri nets with shapes, bus lines in layered and organic
+  views, a zonal vehicle, membership hulls as polygons, hub references, self-loops), each strategy (organic, none) and
+  routing style (straight, orthogonal, rounded orthogonal, polyline, rounded polyline) of one view, bundling, and the
+  states: a trace with fading, pins with a selection, a selected route. The engine refuses the routing styles
+  `octilinear`, `curve` and `bus` for now ("not drawn yet"); junction dots of explicit buses are drawn but no example
+  produces them yet.
+- Found on the way: lines and outlines thinner than a pixel were drawn one pixel wide at full opacity, much stronger
+  than SVG from afar (4 % of the pixels off on a view of 96 nodes); they now keep one pixel of width with their coverage
+  as opacity, as SVG rasterises them.
+- States drawn from afar as up close: the trace (amber path, the rest receding, with fading by distance), pin dots, the
+  selection, and the hover outline (its own small layer, so a hover never rebuilds the scene's buffers).
+- React Flow as the near layer draws bus bars, taps, junctions, hub references and membership hulls through
+  `toReactFlow(scene, {overlayNode: true})` (hulls are new among its overlays).
+
 ## Measurements before defaults
 
 The budget of the near layer, the size threshold, the hysteresis and the compaction ratio are set by measurement on the

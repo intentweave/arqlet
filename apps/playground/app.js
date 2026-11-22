@@ -254,7 +254,7 @@ let farChoice=null,sceneView=null,sceneViewOpening=null,farNext=null,farHandlers
 const farWanted=scene=>!curation&&!dragPreview&&(farChoice??(scene.nodes.length+scene.routes.length>=FAR_AUTO));
 // An SVG element has no `hidden` property; the attribute hides it (CSS [hidden]).
 const setHidden=(el,on)=>{if(on)el.setAttribute('hidden','');else el.removeAttribute?.('hidden');el.hidden=on;};
-const farState=()=>({selected,selectedRoute,pinned:new Set(Object.keys(effectiveOptions().pins))});
+const farState=()=>({selected,selectedRoute,pinned:new Set(Object.keys(effectiveOptions().pins)),trace:traceView()??null});
 function syncFarInfo(){
  const on=!!sceneView||!!sceneViewOpening;
  $('far-view').setAttribute('aria-pressed',String(on));
