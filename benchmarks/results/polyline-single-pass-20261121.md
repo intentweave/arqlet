@@ -6,7 +6,7 @@ With `singlePassPolyline` (default on, `false` restores the fallback) it is laid
 `straight` routing still need `singlePassMixed`; orthogonal output is unchanged.
 
 Setup: Apple M3, macOS, loaded; release `layout-command`; before = `main` at `eb635df` plus #71, after = with this
-change; single runs (the four 500-node inputs: medians of 3). Crossings and bends are counted on the layout routes
+change; single runs. Crossings and bends are counted on the layout routes
 (orthogonal, horizontal × vertical strictly inside); node hits are the scene's `route-through-node` conflicts.
 
 All benchmark datasets except the five with 10 000 nodes or more, with `defaultRouting: polyline` (36; 19 change):
@@ -23,8 +23,8 @@ Per dataset (changed ones): crossings fall on 10, rise on 2 (activity-order 74 �
 the regression is the known gap between single pass and the older pipeline on that view, not a polyline effect. Bends
 rise on bpmn-pools (+9), cloud-architecture (+18), network-vlan (+4), org-chart (+9), synthetic-2k (+61, crossings −434).
 
-The explorer's two slow 500-node views (anonymized, private) through `elkLayout` with `elk.edgeRouting: POLYLINE`: the
-long-edge view 1 778 → 509 ms (now the same drawing as `ORTHOGONAL`); the dense view 603 → 569 ms.
+Also checked on two private evaluation graphs (not in the repository, figures not published): the one with long edges
+now gets the same drawing with `POLYLINE` as with `ORTHOGONAL`, several times faster than before.
 
 Orthogonal output byte-identical on all 41 datasets (default and explicit `orthogonal`) and the two private inputs
 (84 cases); 15 refinement fingerprint views identical.

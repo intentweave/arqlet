@@ -167,9 +167,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## 0.7.0 — 2026-11-21
 
-Large views read faster and denser. A dense flat graph lays out in 0.58 s instead of 1.4 s, a graph with long edges and
-polyline routing in 0.5 s instead of 3.5 s, with the same drawings (pure speedups) or with single pass now also for
-polyline routing. Views that start abstract lift edges between containers and grid large unlinked areas by default, and
+Large views read faster and denser: dense flat graphs and graphs with long edges and polyline routing lay out several
+times faster, with the same drawings (pure speedups) or with single pass now also for polyline routing. Views that start abstract lift edges between containers and grid large unlinked areas by default, and
 the first-view budget holds. Buses can be given as data (`Graph.buses` with `taps`) and are navigable, drawn as lines
 without bars if wanted, clear of foreign boxes, and orthogonal in organic areas. New for hosts: paging through
 `+N more` with a step back, child counts on scene nodes, phase timings on request, a typed drag API, and bus lines,
@@ -202,35 +201,30 @@ orbit, adaptive dimming and names, and builds in steps.
   `roundedPolyline` are laid out orthogonally and pulled taut by the scene, as before, but a graph with them no longer
   falls back to the pipeline before single pass. On 36 benchmark datasets with polyline routing: crossings −16 %, bends
   −2 %, time −29 %, no route through a node; workflow-dag gets its orthogonal single-pass drawing (crossings 136 → 553).
-  `elkLayout` with `POLYLINE` on an anonymized 500-node graph with long edges: 1 778 → 509 ms (request 28). Orthogonal
-  output unchanged. Measurements: `benchmarks/results/polyline-single-pass-20261121.md`.
+  Orthogonal output unchanged. Measurements: `benchmarks/results/polyline-single-pass-20261121.md`.
 
 ### Added (experimental)
 
 - `sharedTracks: "target"` (provisional, off by default; request 27): in the last channel before a node, the edges into
   that node share one track (one bend per group in the coordination, segments of a group may overlap), and the placement
   makes room for the shared tracks only. When the shared bends make the lane orders cyclic for many edges (groups
-  interleaved in narrow gaps, as in a dense flat graph), the layout is computed again without groups (diagnostic). On an
-  anonymized 500-node graph with long edges: height −46 %, length −16 %, bends equal, crossings +4.8 %, same time; the
-  dense flat graph keeps its drawing (fallback, 1.4 s instead of 0.6 s). 41 datasets: no error, no route through a node;
+  interleaved in narrow gaps, as in a dense flat graph), the layout is computed again without groups (diagnostic). 41
+  datasets: no error, no route through a node;
   18 change (area 94–100 %, crossings +0.4 % and bends −3.6 % on the smaller ones). Measurements:
   `benchmarks/results/shared-tracks-20261121.md`. Output without the option is byte-identical.
 
 ### Performance
 
 - The rule that bends of one channel keep a track apart is answered by a range query instead of listing every pair of the
-  channel (1.49 million on a dense graph); the output is byte-identical. The dense 500-node graph above: 773 → 601 ms.
-  Measurements: `benchmarks/results/channel-overlaps-20261121.md`.
+  channel (1.49 million on a dense graph); the output is byte-identical. Measurements: `benchmarks/results/channel-overlaps-20261121.md`.
 - Indexes instead of scans by edge and node id, and a channel's slots by a range query over its lanes; output
-  byte-identical, the dense 500-node graph about 600 → 578 ms (same file).
+  byte-identical (same file).
 - Dense channels: the order of a channel's lane changes is found without copying the order or reading a full cost
   matrix along columns, and a channel's cross-flow pairs are built into their map at once; the output is byte-identical.
-  On an anonymized 500-node graph of 3 138 edges in almost one layer the default layout takes 773 ms instead of 1 400 ms
-  (623 instead of 1 607 ms with `POLYLINE`). Measurements: `benchmarks/results/dense-channels-20261121.md`.
+  Measurements: `benchmarks/results/dense-channels-20261121.md`.
 - The constructive search finds the lane changes of a corridor in two sweeps instead of a scan from every lane (linear
-  instead of quadratic in the lanes); the output is byte-identical. On an anonymized 500-node graph with long edges and
-  `POLYLINE` routing the layout takes 1 883 ms instead of 3 505 ms (routing 1 520 instead of 3 143 ms); the default
-  single pass does not use this search and is unchanged. Measurements: `benchmarks/results/lane-sweep-20261121.md`.
+  instead of quadratic in the lanes); the output is byte-identical. The default single pass does not use this search and
+  is unchanged. Measurements: `benchmarks/results/lane-sweep-20261121.md`.
 
 ### Added (phase timings)
 
@@ -273,8 +267,7 @@ orbit, adaptive dimming and names, and builds in steps.
 ### Fixed (first-view budget)
 
 - `levelOfDetail.nodes` counts the boxes as drawn: an opened container stays a box (its frame) and adds its children;
-  before, it was counted as replaced by them, so every opened container added one box over the budget (a private
-  catalog: `nodes: 300` gave 573 boxes with 273 containers opened, now 300; `nodes: 100` gave 139, now 100). A first
+  before, it was counted as replaced by them, so every opened container added one box over the budget. A first
   view that cannot keep its budget (the top level alone is larger, or its edges are) says so in `layoutDiagnostics`
   ("First view: N boxes, M over the node budget of B: …"). The older `initial_collapse` (import `limit`) is unchanged.
 ### Fixed (bus lines)
@@ -284,9 +277,7 @@ orbit, adaptive dimming and names, and builds in steps.
   another place along the stretch it shares with the bar, bends around it (an L or a Z), or follows a short orthogonal
   search on a grid of the nearby boxes' edges. In an area that is not layered, `busStyle: trunk`/`lines` lays a bus out
   as a bar and turns it into shared lines along the bar's middle (no diagonal lines any more). Issues found on the taps'
-  hidden layout routes, which are never drawn, are dropped. On a private bus view (392 nodes, 107 buses): layered bars
-  over foreign boxes 123 → 0, taps through boxes 12 → 0; organic taps through boxes 277 → 0, organic lines 31 diagonal
-  and 68 through boxes → 0 and 3; with collapsed satellites organic taps 1 598 → 22. Default output unchanged.
+  hidden layout routes, which are never drawn, are dropped. Default output unchanged.
 
 ### Added (bus lines)
 
@@ -295,20 +286,16 @@ orbit, adaptive dimming and names, and builds in steps.
   also draw buses given as data (`Bus::taps` without a node). Playground: Routing → *Buses*.
 - A tap at a member hidden in a collapsed container attaches to that container, once per bus and container (the view
   projection remaps the taps; a bus inside a collapsed container is hidden with it). Before, such buses fell back to a
-  bar (57 of 107 on a private bus view with collapsed satellites); now none does in `trunk` or `lines`, with bus nodes
-  or with taps-only input.
+  bar; now none does in `trunk` or `lines`, with bus nodes or with taps-only input.
 ### Changed
 
 - **Default:** in views that start abstract (`levelOfDetail` or `communities` set), an area with at least 50 children
   without an edge to a sibling lays them out as a grid (`isolatedGridFrom` unset now means 50 there; `0` turns it off).
-  Opening a container of 574 unlinked children inside a community gave one column of 230 × 44 820, now a grid of
-  2 960 × 7 968 (an anonymized 41k tree); on a private catalog, opening the largest container gives 12 110 × 36 310
-  instead of 8 030 × 74 958 at the same time (0.48 s). Views without an abstract start are unchanged (15 fingerprint
+  Opening a container of many unlinked children inside a community gave one tall column, now a grid. Views without an abstract start are unchanged (15 fingerprint
   views identical). `LayoutOptions::isolated_grid_threshold()` gives the effective value.
 - **Default:** `liftEdges` is on in views that start abstract (`levelOfDetail` or `communities` set, `liftEdges`
   unset): edges between opened containers are drawn between the outermost containers they differ in, one route per
-  pair. On a private catalog with `levelOfDetail: {depth: 0}` opening the largest container takes 0.47 s instead of
-  2.10 s and the scene is 12 110 × 36 310 instead of 24 528 × 111 082 (single runs, loaded machine). `liftEdges: false`
+  pair. `liftEdges: false`
   keeps the earlier drawing; views without an abstract start are unchanged (15 fingerprint views identical).
   `LayoutOptions::lift_edges` is an `Option<bool>` now; `lifts_edges()` gives the effective value.
 
@@ -325,15 +312,12 @@ orbit, adaptive dimming and names, and builds in steps.
   after a partial reveal was refused ("unknown node").
 - `communityHubs.top` (provisional, also the overview's `hubs.top`): a relative hub threshold, a share of a container's
   linked children with the most links (`0.01`: the top 1 %, at least one; ties by the children's order), beside the
-  absolute `minLinks`. On a private catalog (373 top-level containers, `communities: 40`) `minLinks: 60` left no
-  community at all, `top: 0.01` 9 communities (the largest 102 members instead of 148 without hubs).
+  absolute `minLinks`, so a threshold scales with the container instead of leaving no community at all.
 - `hubRefs` (provisional layout option, unset): an edge of a node with at least this many edges in the view is not laid
   out or routed but drawn as a short stub at its other end, named after the hub (out of the right side for an edge to
   the hub, into the left for one from it), as a wiring diagram refers to another sheet (`Snapshot.hubRefs`, scene
   `hubRefs`; the SVG viewer draws them, a trace marks them). The channels between ranks keep room for the stubs and
-  names. On a flat view of 373 nodes and 1 338 edges with a few hubs of 100 to 270 edges (a private evaluation graph):
-  layout 372 ms → 71 ms with `hubRefs: 80` (763 references) and 24 ms with 20, extent 9 270 × 32 169 → 3 988 × 21 692
-  and 1 556 × 20 122, no line through a node either way (single runs, heavily loaded machine). Not yet: grouping the
+  names. Not yet: grouping the
   stubs of one node, a hub's own side of the references.
 - Adaptive edge dimming in the WebGL overview (`edgeDimming`, on): the renderer estimates how many edge lines lie over a
   pixel on average in what is visible (their length on the screen over the area) and makes each line fainter the more
