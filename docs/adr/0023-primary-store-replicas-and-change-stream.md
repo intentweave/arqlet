@@ -235,7 +235,9 @@ A backend that scales by adding instances should not depend on a session living 
   client to the same instance ("sticky") is an optimization, not a requirement.
 - **Determinism makes it exact.** Every instance computes the same answer from (graph digest, view state, request), on
   every platform (`platform-parity`), so a rebuilt session continues exactly where the evicted one was, and answers can
-  be cached by a hash of that triple where a host wants to.
+  be cached where a host wants to. Such a cache is keyed by the tenant and the set of property keys the caller may see
+  as well as by that triple: an answer carries content filtered for its caller (access control below), and a cache
+  keyed by the triple alone would hand one caller what another was allowed to load.
 - **In Node without a child process.** A native adapter (`crates/node`, napi-rs) wraps `dispatch`, the engine session
   and the session store as the WASM adapter does; long calls run as asynchronous tasks on the thread pool, so the event
   loop stays free. The answers are bit-identical to WASM and the native binaries.
@@ -363,5 +365,5 @@ Also measured:
 - Access control: who may read which graph and which keys is the host's decision (item 9 fixes only how the engine
   respects it: digests never authorize, content filtered by key before a session sees it, client-held view state
   untrusted). Signing shared view state and the key it uses are host choices.
-- Whether answers are cached by (graph digest, view state, request) across instances, and where: a host choice that
-  determinism allows (item 9).
+- Whether answers are cached across instances, and where: a host choice that determinism allows (item 9), with the
+  tenant and the caller's visible keys in the key.
