@@ -134,6 +134,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- Membership hulls are rectangles by default (provisional, ADR 0022 §3): the padded bounding box of a group's boxes,
+  instead of the padded convex polygon drawn so far. `LayoutOptions.membershipHull: "polygon"` gives the previous
+  outline. A rectangle encloses at least as much as the polygon, so a view with overlays may report more intruders.
+  Drawing only: no node moves and no route changes; views without `membershipViews` are unchanged.
 - The playground runs its view through the view controller: every change, the undo stack (now also covering the
   three modes through `execute`), drags and refinement results handed over with `adopt`.
 - The remembered state (`intent`) keeps the filter (`hidden`), so a step back undoes a filter.

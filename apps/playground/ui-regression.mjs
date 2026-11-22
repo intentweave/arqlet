@@ -290,11 +290,26 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   assert.ok(drawn.membershipReport.every(r=>r.applied&&r.drawn===3),'every dimension is applied and complete');
   assert.equal(JSON.stringify(drawn.nodes.map(n=>n.bounds)),boxesBefore,'a hull may not move a node');
   assert.equal(JSON.stringify(drawn.routes.map(r=>r.points)),routesBefore,'a hull is invisible to the router');
+  // The default shape is the rectangle: four corners, axis-parallel edges.
+  const axisParallel=h=>h.points.length===4&&h.points.every((p,i)=>{const q=h.points[(i+1)%4];return p.x===q.x||p.y===q.y;});
+  assert.equal(get('membership-hull').value,'rectangle');
+  assert.ok(drawn.membershipHulls.every(axisParallel),'rectangles by default');
+
+  // The polygon: the same groups, nothing moved, and a polygon never reaches outside its group's rectangle.
+  get('membership-hull').value='polygon';get('membership-hull').onchange();await flush();
+  assert.equal(latest.options.membershipHull,'polygon');
+  const polygons=sceneOf(engine,latest);
+  assert.equal(polygons.membershipHulls.length,9);
+  assert.deepEqual(polygons.membershipHulls.map(h=>h.group),drawn.membershipHulls.map(h=>h.group));
+  assert.equal(JSON.stringify(polygons.nodes.map(n=>n.bounds)),boxesBefore,'the shape moves no node');
+  assert.equal(JSON.stringify(polygons.routes.map(r=>r.points)),routesBefore,'the shape changes no route');
+  get('membership-hull').value='rectangle';get('membership-hull').onchange();await flush();
+  assert.equal(latest.options.membershipHull,undefined,'the default is omitted again');
 
   get('membership-hulls').checked=false;get('membership-hulls').onchange();await flush();
   assert.equal((sceneOf(engine,latest).membershipHulls??[]).length,0,'unticking removes them again');
   get('example').value='default';get('example').onchange();await flush();
-  console.log('Membership hulls passed: 9 hulls over 3 dimensions, boxes and routes unchanged.');
+  console.log('Membership hulls passed: 9 hulls over 3 dimensions in both shapes, boxes and routes unchanged.');
 }else console.log('Membership hulls skipped: the memberships example is not built.');
 
 // Options: preset and bundling go through `configure`; the page reflects bundling from the snapshot.

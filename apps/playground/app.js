@@ -1110,6 +1110,8 @@ function syncDetails(){
  const dimensions=membershipDimensions();
  $('membership-hulls').disabled=dimensions.length===0;
  $('membership-hulls').checked=Object.values(o.membershipViews??{}).some(mode=>mode==='overlay');
+ $('membership-hull').disabled=dimensions.length===0;
+ $('membership-hull').value=o.membershipHull??'rectangle';
 }
 /** The ids of the membership dimensions the current graph declares, in their declared order. */
 function membershipDimensions(){
@@ -1193,6 +1195,9 @@ $('membership-hulls').onchange=()=>{
  if(!dimensions.length)return;
  setOption({membershipViews:on?Object.fromEntries(dimensions.map(id=>[id,'overlay'])):{}},'membershipViews');
 };
+// Provisional (ADR 0022 §3): the hull's outline. Sent as it is; the engine omits the default (rectangle) when it writes
+// the options back, so a snapshot that never chose a shape stays unchanged.
+$('membership-hull').onchange=()=>setOption({membershipHull:$('membership-hull').value},'Hull shape');
 // Live needs force-directed behaviour: turning it on turns that on (the configure edit then starts the settling).
 $('live').onchange=()=>{
  if(!$('live').checked)return;
