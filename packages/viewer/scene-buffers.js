@@ -212,10 +212,10 @@ export function sceneBuffers(input, state = {}) {
     if (round) {
       const rad = Math.min(r.width, r.height) / 2, mx = r.x + r.width / 2, my = r.y + r.height / 2;
       box(containerLayer, n.id, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, width, fill, stroke, dash);
-      text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: fadeCss(title, a), align: 'center'});
+      text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: fadeCss(title, a), align: 'center', lod: {kind: 'container', box: {x: mx - rad * 0.7, y: my - rad * 0.7, width: rad * 1.4, height: rad * 1.4}}});
     } else {
       box(containerLayer, n.id, r, radiusOf(look, r, 10), 0, width, fill, stroke, dash);
-      text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: fadeCss(title, a)});
+      text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: fadeCss(title, a), lod: {kind: 'container', box: r}});
     }
     if (n.kind === 'entity') containerLayer.segments.push(r.x, r.y + 34, r.x + r.width, r.y + 34, 1, 0, 0, 0, 0, ...COLOURS.frameStroke);
   }
@@ -292,7 +292,10 @@ export function sceneBuffers(input, state = {}) {
     const own = look.text ?? COLOURS.text, colour = faded < 1 ? fadeCss(own, faded) : own;
     if (!n.rows?.length) {
       const label = (n.collapsed ? '▸ ' : '') + n.label.slice(0, 23);
-      text(round ? {x: cx, y: cy + 5, text: label, size: 13, colour, align: 'center'} : {x: r.x + 10, y: attribute ? r.y + r.height / 2 + 5 : r.y + 32, text: label, size: 13, colour});
+      // `lod`: where the name goes when the box is too small on screen for the text at its own size (the renderer's
+      // labels of a fixed screen size).
+      const lod = attribute ? undefined : {kind: 'leaf', box: r};
+      text(round ? {x: cx, y: cy + 5, text: label, size: 13, colour, align: 'center', lod} : {x: r.x + 10, y: attribute ? r.y + r.height / 2 + 5 : r.y + 32, text: label, size: 13, colour, lod});
     } else {
       n.rows.forEach((row, i) => { const b = row.bounds; text({x: b.x + 6, y: b.y + b.height / 2 + 5, text: row.label, size: i === 0 ? 14 : 13, weight: i === 0 ? 600 : 400, colour: i === 0 ? colour : fadeCss(COLOURS.row, faded)}); });
       const t = n.rows[0].bounds;

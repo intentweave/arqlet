@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- The GPU far layer labels from afar: where a text is too small at its own size, container titles and node names are
+  drawn at a fixed screen size where they fit and do not overlap (containers first, a title following the view inside
+  a large container, a halo for contrast). Before, the far layer showed almost no text. The playground's *Style* field
+  is in the canvas toolbar now.
 - Routing style `octilinear` (#129): the orthogonal route with its corners cut at 45° in the scene, clear of the nodes,
   drawn alike by SVG, both GPU backends, React Flow and the overview; selectable in the containment tree. With the
   metro style it gives a metro-map look.
