@@ -12,6 +12,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   same boxes, routes, arrowheads, hulls and marks as `renderSvg`, with texts on a 2D canvas and picking; and a scene
   view with both layers (`createSceneView`, `openSceneView`) that switches to SVG up close (`nearPolicy`, with
   hysteresis) without moving anything. Frame times while panning and zooming: `benchmarks/results/scene-frames-20261122.md`.
+- The scene view's near layer is replaceable (`near`, `svgNearLayer`, `reactFlowViewport`; ADR 0025 V4). The playground
+  has a large-view mode (button *GPU*, key G; on by itself from 1 500 elements) with selection, collapse and pins; the
+  React Flow example can draw large views with the GPU from afar and React Flow up close (*GPU far layer*).
 
 ## 0.8.0 — 2026-11-22
 
