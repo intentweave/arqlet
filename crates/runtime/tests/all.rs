@@ -6,6 +6,8 @@
 mod abstract_pipeline;
 #[path = "bus_line.rs"]
 mod bus_line;
+#[path = "change_log.rs"]
+mod change_log;
 #[path = "channels_by_demand.rs"]
 mod channels_by_demand;
 #[path = "circle_containers.rs"]

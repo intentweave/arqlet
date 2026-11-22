@@ -37,6 +37,9 @@ pub struct EngineSession {
     /// Provisional (ADR 0023, R1): the properties of nodes and edges, beside the snapshot and never in it. A new import
     /// starts it empty; `load` (a hand-over of the same graph) keeps it.
     content: crate::content::Content,
+    /// Provisional (ADR 0023, R2): the numbered changes of the source (`patch`, `payload`, `change`). A new import or a
+    /// `load` clears it (a replica has to resync); the sequence goes on.
+    log: crate::changes::ChangeLog,
 }
 
 impl EngineSession {
@@ -102,6 +105,7 @@ impl EngineSession {
         Some(match self.apply(handle(request), with_scene) {
             Ok(answer) => {
                 self.content = Default::default();
+                self.log.clear();
                 answer
             }
             Err(error) => json!({"ok": false, "error": error}),
@@ -133,21 +137,43 @@ impl EngineSession {
                 let request = Request::from_value(v)?;
                 let answer = self.apply(handle(request), with_scene)?;
                 self.content = Default::default();
+                self.log.clear();
                 Ok(answer)
             }
             // Provisional (ADR 0023, R1): set, unset or clear properties of nodes and edges, as one change.
             Some("payload") => {
+                let before = self.content.revision;
                 let graph = self
                     .snapshot
                     .as_ref()
                     .map(|s| s.source_graph.as_deref().unwrap_or(&s.graph));
-                self.content.apply(v, graph)
+                let mut answer = self.content.apply(v, graph)?;
+                if self.content.revision != before {
+                    answer["sequence"] =
+                        json!(self.log.push(json!({"payload": payload_part(v)}))?);
+                }
+                Ok(answer)
             }
+            Some("patch") => {
+                let mut answer = self.edit(v, with_scene)?;
+                answer["sequence"] = json!(self.log.push(json!({"patch": v["patch"].clone()}))?);
+                Ok(answer)
+            }
+            // Provisional (ADR 0023, R2): structure and content changed together, as one group: all of it or nothing.
+            Some("change") => self.change(v, with_scene),
+            Some("changesSince") => {
+                let since = v["sequence"].as_u64().ok_or("Missing sequence")?;
+                Ok(self.log.since(since))
+            }
+            // The whole content, for a replica that resyncs.
+            Some("content") => Ok(json!({"ok": true, "contentRevision": self.content.revision,
+                "sequence": self.log.sequence, "nodes": self.content.nodes, "edges": self.content.edges})),
             Some("load") => {
                 let snapshot: Snapshot =
                     serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
                 self.snapshot = Some(snapshot);
                 self.columns = None;
+                self.log.clear();
                 self.summary(with_scene)
             }
             // Provisional (ADR 0019, step 4): the scene as columns. The answer describes them (versions, id tables,
@@ -192,23 +218,92 @@ impl EngineSession {
             }
             Some(
                 "direction" | "strategy" | "routing" | "move" | "add" | "toggle" | "reveal"
-                | "filter" | "patch" | "configure" | "port" | "settle" | "pin" | "restore"
-                | "shape" | "measure" | "refine" | "refineProgressive",
-            ) => {
-                let current = self.current()?;
-                // The session's versions unless the request names its own (then a stale request is refused as always).
-                let mut v = v.clone();
-                if v["expectedRevision"].is_null() {
-                    v["expectedRevision"] = json!(current.revision);
-                }
-                if v["expectedLayoutVersion"].is_null() {
-                    v["expectedLayoutVersion"] = json!(current.layout_version);
-                }
-                let request = Request::from_value_on(&v, Box::new(current.clone()))?;
-                self.apply(handle(request), with_scene)
-            }
+                | "filter" | "configure" | "port" | "settle" | "pin" | "restore" | "shape"
+                | "measure" | "refine" | "refineProgressive",
+            ) => self.edit(v, with_scene),
             // Everything that does not read the session's view.
             _ => serde_json::from_str(&crate::dispatch(&v.to_string())).map_err(|e| e.to_string()),
+        }
+    }
+
+    /// An operation on the session's snapshot, with the session's versions unless the request names its own (then a stale
+    /// request is refused as always).
+    fn edit(&mut self, v: &Value, with_scene: bool) -> Result<Value, String> {
+        let current = self.current()?;
+        let mut v = v.clone();
+        if v["expectedRevision"].is_null() {
+            v["expectedRevision"] = json!(current.revision);
+        }
+        if v["expectedLayoutVersion"].is_null() {
+            v["expectedLayoutVersion"] = json!(current.layout_version);
+        }
+        let request = Request::from_value_on(&v, Box::new(current.clone()))?;
+        self.apply(handle(request), with_scene)
+    }
+
+    /// `change`: a `patch` and a `payload` applied as one group (`expectedSequence` refuses a stale one). If either part
+    /// is refused, the snapshot and the content stay as they were.
+    fn change(&mut self, v: &Value, with_scene: bool) -> Result<Value, String> {
+        if let Some(expected) = v.get("expectedSequence").and_then(Value::as_u64) {
+            if expected != self.log.sequence {
+                return Err(format!(
+                    "Stale change: expected sequence {expected}, the log is at {}",
+                    self.log.sequence
+                ));
+            }
+        }
+        let has_patch = v.get("patch").is_some_and(|p| !p.is_null());
+        let has_payload = ["set", "unset", "clear"]
+            .iter()
+            .any(|k| v.get("payload").and_then(|p| p.get(k)).is_some());
+        if !has_patch && !has_payload {
+            return Err("A change needs a patch, a payload or both".into());
+        }
+        let (snapshot, columns, content) = (
+            self.snapshot.clone(),
+            self.columns.clone(),
+            self.content.clone(),
+        );
+        let result = (|| -> Result<Value, String> {
+            let mut answer = if has_patch {
+                let mut request = json!({"op": "patch", "patch": v["patch"].clone()});
+                for key in ["expectedRevision", "expectedLayoutVersion"] {
+                    if let Some(x) = v.get(key) {
+                        request[key] = x.clone();
+                    }
+                }
+                self.edit(&request, with_scene)?
+            } else {
+                self.summary(with_scene)?
+            };
+            if has_payload {
+                let graph = self
+                    .snapshot
+                    .as_ref()
+                    .map(|s| s.source_graph.as_deref().unwrap_or(&s.graph));
+                let content = self.content.apply(&v["payload"], graph)?;
+                answer["contentRevision"] = content["contentRevision"].clone();
+            }
+            Ok(answer)
+        })();
+        match result {
+            Ok(mut answer) => {
+                let mut group = json!({});
+                if has_patch {
+                    group["patch"] = v["patch"].clone();
+                }
+                if has_payload {
+                    group["payload"] = payload_part(&v["payload"]);
+                }
+                answer["sequence"] = json!(self.log.push(group)?);
+                Ok(answer)
+            }
+            Err(error) => {
+                self.snapshot = snapshot;
+                self.columns = columns;
+                self.content = content;
+                Err(error)
+            }
         }
     }
 
@@ -421,4 +516,15 @@ mod tests {
         );
         assert!(session.run("not json").contains(r#""ok":false"#));
     }
+}
+
+/// The part of a `payload` request that a change log keeps and a replica applies: `set`, `unset`, `clear`.
+fn payload_part(v: &Value) -> Value {
+    let mut part = json!({});
+    for key in ["set", "unset", "clear"] {
+        if let Some(x) = v.get(key) {
+            part[key] = x.clone();
+        }
+    }
+    part
 }

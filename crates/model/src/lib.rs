@@ -3359,6 +3359,29 @@ pub struct GraphPatch {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
     pub remove_edges: Vec<String>,
+    /// Provisional (ADR 0022 §5b): dimensions and groups to add or replace, as `nodes` and `edges` add: a dimension of the
+    /// same id takes the groups given (a group of the same id replaced, a new one appended) and a label if one is given; a
+    /// new dimension is appended. Applied after `removeMemberships`. Member ids the graph does not have are kept and
+    /// counted, as anywhere.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub memberships: Option<Memberships>,
+    /// Provisional (ADR 0022 §5b): whole dimensions, or groups within one (with the groups nested in them), to remove;
+    /// applied first. Unknown ones are refused.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<MembershipRemoval>>"))]
+    pub remove_memberships: Vec<MembershipRemoval>,
+}
+
+/// Provisional (ADR 0022 §5b): a dimension to remove, or with `group` one group of it (and the groups nested in it).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MembershipRemoval {
+    pub dimension: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub group: Option<String>,
 }
 
 impl GraphPatch {
@@ -3367,6 +3390,17 @@ impl GraphPatch {
             && self.edges.is_empty()
             && self.remove_nodes.is_empty()
             && self.remove_edges.is_empty()
+            && self.memberships.is_none()
+            && self.remove_memberships.is_empty()
+    }
+
+    /// Whether the patch changes the memberships only (no node or edge), so that no geometry depends on it.
+    pub fn memberships_only(&self) -> bool {
+        self.nodes.is_empty()
+            && self.edges.is_empty()
+            && self.remove_nodes.is_empty()
+            && self.remove_edges.is_empty()
+            && (self.memberships.is_some() || !self.remove_memberships.is_empty())
     }
 }
 

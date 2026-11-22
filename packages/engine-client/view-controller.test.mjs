@@ -355,3 +355,24 @@ test('content in a resident session: details show it, find searches a key', {ski
   await plain.import(graph(), {limit: 100});
   assert.match((await plain.payload({set: {nodes: {c05: {owner: 'Ann'}}}})).error, /resident session/);
 });
+
+test('the change log of a resident session: groups in one sequence, replayed on a second session', {skip: !engine || !engine.openSession}, async () => {
+  const primary = createSession(engine, {resident: true});
+  await primary.import(graph(), {limit: 100});
+  const start = (await primary.content()).sequence;
+  const added = await primary.change({patch: {nodes: [{id: 'new', kind: 'odd', label: 'new', parentId: 'box'}],
+    edges: [{id: 'to-new', kind: 'k', source: 'src', target: 'new'}]}, payload: {set: {nodes: {new: {owner: 'Ann'}}}}});
+  assert.equal(added.ok, true, JSON.stringify(added));
+  assert.deepEqual([added.sequence, added.contentRevision], [start + 1, 1]);
+  const log = await primary.changesSince(start);
+  assert.deepEqual(log.changes.map(g => g.sequence), [start + 1]);
+  assert.equal((await primary.change({expectedSequence: start, payload: {set: {nodes: {new: {x: 1}}}}})).ok, false, 'stale');
+  // A second session applies the group and has the node and its property.
+  const replica = createSession(engine, {resident: true});
+  await replica.import(graph(), {limit: 100});
+  const {sequence: _s, ...group} = log.changes[0];
+  assert.equal((await replica.change(group)).ok, true);
+  assert.equal((await replica.details({nodeId: 'new'})).node.properties.owner, 'Ann');
+  // Without a resident session there is no log.
+  assert.match((await createSession(engine, {resident: false}).changesSince(0)).error, /resident session/);
+});

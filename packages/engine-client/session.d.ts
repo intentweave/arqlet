@@ -45,6 +45,13 @@ export interface PayloadChange {
   expectedContentRevision?: number;
 }
 
+/** Provisional (ADR 0023, R2): one change group: a patch of the structure, a payload of the content, or both. */
+export interface ChangeGroup {
+  patch?: GraphPatch;
+  payload?: Omit<PayloadChange, 'expectedContentRevision'>;
+  expectedSequence?: number;
+}
+
 /** The content's revision and counts after a change; ids the structure does not have are kept and counted. */
 export interface PayloadAnswer {
   ok: true;
@@ -132,6 +139,12 @@ export interface Session {
    * it). Needs a resident session.
    */
   payload(change: PayloadChange): Promise<PayloadAnswer | {ok: false; error?: string; stale?: true}>;
+  /** Provisional (ADR 0023, R2): structure and content changed as one group; the answer has its `sequence`. */
+  change(group: ChangeGroup): Promise<SessionResult & {sequence?: number; contentRevision?: number}>;
+  /** Provisional (ADR 0023, R2): the change groups after `sequence`, or `resync` when the log no longer has them. */
+  changesSince(sequence: number): Promise<{ok: true; sequence: number; changes?: Array<ChangeGroup & {sequence: number}>; resync?: true} | {ok: false; error?: string}>;
+  /** Provisional (ADR 0023, R2): the whole content and the log's sequence (for a resync). */
+  content(): Promise<{ok: true; contentRevision: number; sequence: number; nodes: Record<string, Record<string, unknown>>; edges: Record<string, Record<string, unknown>>} | {ok: false; error?: string}>;
   /** Provisional (read only): a look into a collapsed container without opening it. */
   peek(nodeId: string, init?: {limit?: number}): Promise<ReadAnswer<PeekAnswer>>;
   /**
