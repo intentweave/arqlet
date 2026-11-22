@@ -9,7 +9,8 @@ moving a session to a new engine (`session.recycle`; 2026-11-22, `benchmarks/res
 Related: [ADR 0019](0019-engine-interface.md) (protocol, sessions, state stays where it is computed, the columnar data
 path, prepared source and lean snapshots), [ADR 0021](https://github.com/intentweave/arqlet/pull/70) (proposed: a Cypher
 query layer, its store seam and the shared in-memory graph question), [ADR 0022](0022-memberships-across-the-hierarchy.md)
-(memberships as graph data). Requirements: the three deployment modes and the concurrency rules in `CLAUDE.md`.
+(memberships as graph data), [ADR 0024](0024-concurrent-sessions-in-a-backend.md) (concurrent sessions in a
+backend). Requirements: the three deployment modes and the concurrency rules in `CLAUDE.md`.
 
 ## Context
 
@@ -279,6 +280,8 @@ Each step is useful on its own, behind an option or a new operation, and measure
 - **S3 — a graph cache by digest in a backend**, scoped by tenant, with a byte limit per tenant (the playground's server
   as the example). *Exit:* a request with a digest the caller may not read is refused before any lookup; two tenants'
   sessions do not evict each other.
+- **S4 — concurrent sessions** (item 9): parallel between sessions, serial within one, admission by memory, active
+  sessions never evicted; decided in [ADR 0024](0024-concurrent-sessions-in-a-backend.md) (its steps C1 to C3).
 - **H1 — scene first, engine on demand** (item 5), independent of R1 to R5 (it may move into an ADR of its own; neither
   blocks the other): the backend sends the scene and the lean
   layout state; the playground's split mode renders before the WASM engine has loaded and starts it at the first local
