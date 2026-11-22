@@ -10,8 +10,8 @@
 //! `PortableMath` call and no cross-platform risk (`CLAUDE.md`).
 use arqlet_model::{Point, Rect};
 
-/// Orders two coordinates totally. Scene coordinates are finite, so this is a total order; a NaN would sort last rather
-/// than poison the sort.
+/// Orders two points by x, then y, with IEEE 754's total order (`total_cmp`). Scene coordinates are finite; a NaN would
+/// still not break the sort: a positive NaN sorts after every number, a negative one before.
 fn by_xy(a: &Point, b: &Point) -> std::cmp::Ordering {
     a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y))
 }

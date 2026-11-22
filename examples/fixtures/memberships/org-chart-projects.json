@@ -1,0 +1,56 @@
+{
+  "defaultDirection": "tb",
+  "nodes": [
+    { "id": "sales", "kind": "department", "label": "Sales", "parentId": null },
+    { "id": "eng", "kind": "department", "label": "Engineering", "parentId": null },
+    { "id": "ops", "kind": "department", "label": "Operations", "parentId": null },
+
+    { "id": "anna", "kind": "person", "label": "Anna", "parentId": "sales" },
+    { "id": "ben", "kind": "person", "label": "Ben", "parentId": "sales" },
+
+    { "id": "carl", "kind": "person", "label": "Carl", "parentId": "eng" },
+    { "id": "dora", "kind": "person", "label": "Dora", "parentId": "eng" },
+    { "id": "emil", "kind": "person", "label": "Emil", "parentId": "eng" },
+
+    { "id": "fay", "kind": "person", "label": "Fay", "parentId": "ops" },
+    { "id": "gus", "kind": "person", "label": "Gus", "parentId": "ops" }
+  ],
+  "edges": [
+    { "id": "c1", "kind": "works-with", "source": "anna", "target": "carl" },
+    { "id": "c1b", "kind": "works-with", "source": "anna", "target": "carl" },
+    { "id": "c2", "kind": "works-with", "source": "carl", "target": "dora" },
+    { "id": "c3", "kind": "works-with", "source": "dora", "target": "emil" },
+    { "id": "c4", "kind": "works-with", "source": "emil", "target": "fay" },
+    { "id": "c5", "kind": "works-with", "source": "fay", "target": "dora" },
+    { "id": "c6", "kind": "works-with", "source": "ben", "target": "anna" },
+    { "id": "c7", "kind": "works-with", "source": "gus", "target": "fay" },
+    { "id": "c8", "kind": "reviews", "source": "dora", "target": "dora" }
+  ],
+  "memberships": {
+    "dimensions": [
+      {
+        "id": "project",
+        "label": "Project",
+        "groups": [
+          { "id": "apollo", "label": "Apollo", "members": ["anna", "carl", "dora"] },
+          { "id": "zeus", "label": "Zeus", "members": ["dora", "emil", "fay"] },
+          { "id": "hermes", "label": "Hermes", "members": ["ben"] }
+        ]
+      },
+      {
+        "id": "site",
+        "label": "Site",
+        "groups": [
+          { "id": "berlin", "label": "Berlin", "members": ["anna", "ben", "carl"] },
+          { "id": "munich", "label": "Munich", "members": ["dora", "emil", "fay", "gus"] }
+        ]
+      }
+    ]
+  },
+  "membershipViews": { "project": "overlay", "site": "overlay" },
+  "groupingPriority": [
+    { "by": "project", "values": ["zeus", "apollo", "hermes"] },
+    { "by": "parent" },
+    { "by": "site" }
+  ]
+}

@@ -61,6 +61,15 @@ git tag -a vx.y.z -m x.y.z && git push origin vx.y.z
 `cargo publish --workspace` publishes in dependency order. `pnpm -r publish` publishes in dependency order as well and
 skips versions that already exist.
 
+## The `query` feature
+
+`arqlet-runtime` has an optional feature `query` (the operation `query`, ADR 0021 M5b) that depends on the query crates,
+which are `publish = false` for now. `cargo publish` needs every dependency, optional ones too, to exist on the registry,
+so `arqlet-runtime` and `arqlet-wasm` cannot be published with the feature declared until `arqlet-query`,
+`arqlet-query-cypher` and `arqlet-query-model` are published first (they need the publish metadata, a README and the
+licenses of the other crates, and `decypher`'s notice in the npm package). Until then, release from a revision that does
+not declare the feature, or publish the query crates in the same release. The npm artifact is built without the feature.
+
 ## Later
 
 - A release workflow on tags with trusted publishing (OIDC) for crates.io and npm and npm provenance, so no tokens
