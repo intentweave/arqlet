@@ -36,3 +36,17 @@ and area), ELK's defaults trade quality for area: two line–node hits, 2.9 % mo
 about 9 % less area at the median. The tighter layer gap leaves the routes less room to change lanes, which is where the
 bends come from. The adapter keeps applying only the spacings a graph names; a host that wants ELK's compactness names
 them (see `docs/integration-guide.md`). The area gap to elk-rs is a matter of placement, not of the default spacings.
+
+## Seen in the drawings (open)
+
+Looking at the drawings side by side (decision confirmed: ELK packs tightly and seems to move nodes and containers to
+pack densely and avoid some crossings, but readability and the look suffer in most views):
+
+- Some nodes are placed far out at the edges of the drawing. On can-bus, the nodes of the first layer that feed into
+  several containers stand at the far left and right, with long edges into the middle, where elk-rs keeps them close
+  to their targets.
+- layerweave-code is very tall (7 978 × 11 315 against elk-rs's 7 544 × 6 104) and has three times elk-rs's crossings
+  (2 220 against 732) at about the same bends.
+
+Both are placement questions (where an area's first layer and its long edges go), not spacing ones; to be looked at
+separately.
