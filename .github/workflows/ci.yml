@@ -16,7 +16,8 @@ jobs:
       - run: python3 examples/cypher/oracle.py --check
       - run: cargo +stable test --workspace --locked
       # The operation `query` (ADR 0021, M5b) is a cargo feature of the runtime, off by default: test it too.
-      - run: cargo +stable test -p arqlet-runtime --features query --locked --test all query::
+      # Quoted: a plain YAML value ending in `:` is read as a mapping key, which invalidates the whole workflow.
+      - run: 'cargo +stable test -p arqlet-runtime --features query --locked --test all query::'
       - run: rustup target add wasm32-unknown-unknown --toolchain stable
       # ADR 0021, M5c: the query-only WASM module against the oracle.
       - run: cargo +stable build -p arqlet-query-wasm --target wasm32-unknown-unknown --release --locked
