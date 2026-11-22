@@ -115,6 +115,7 @@ dependencies = [
  "arqlet-model",
  "arqlet-query-json",
  "arqlet-query-model",
+ "serde",
  "serde_json",
 ]
 

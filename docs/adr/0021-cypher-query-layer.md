@@ -350,8 +350,8 @@ the JSON request and answer with the engine's `query` operation through the crat
 drift. It is `publish = false`, joins the isolation guard (host and wasm32), and is checked against the oracle through the
 real WASM file (`tools/query-wasm.test.mjs`, CI). **An npm package for it is not made yet.**
 
-**Why the crate.** Measured (`benchmarks/results/query-m5c-20261122.md`): the module is 1.02 MB (0.33 MB gzip) in the
-`wasm-size` profile, against 7.12 MB (1.84 MB gzip) for the engine with `query`; about one seventh of the bytes, a sixth
+**Why the crate.** Measured (`benchmarks/results/query-m5c-20261122.md`): the module is 1.08 MB (0.34 MB gzip) in the
+`wasm-size` profile, against 7.12 MB (1.84 MB gzip) for the engine with `query`; about a seventh of the bytes, a fifth
 of the gzip. A host that only filters a graph (a browser tab, a worker, a function) should not download a layout engine
 for it, and the cost of keeping the crate is small: about 120 lines, and no logic of its own.
 

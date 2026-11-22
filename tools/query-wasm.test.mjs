@@ -54,7 +54,8 @@ test('every supported case gives the oracle\'s rows through the WASM module', {s
 test('errors are answers with a class, and a failed load keeps what was loaded', {skip: !existsSync(wasmFile)}, async () => {
   const run = await module();
   assert.equal(run({op: 'query', query: 'MATCH (n) RETURN n'}).ok, false, 'nothing loaded');
-  assert.equal(run({op: 'load', graph: JSON.parse(read('examples/cypher/graphs/small.json'))}).ok, true);
+  const loaded = run({op: 'load', graph: JSON.parse(read('examples/cypher/graphs/small.json'))});
+  assert.deepEqual([loaded.ok, loaded.nodes, loaded.edges, loaded.unresolvedEdges], [true, 3, 5, 1]);
   assert.match(run({op: 'query', query: 'MATCH (n RETURN n'}).error, /^query syntax:/);
   assert.match(run({op: 'query', query: 'CREATE (n)'}).error, /^query unsupported:/);
   assert.match(run({op: 'query', query: 'MATCH (a), (b), (c) RETURN count(*)', maxSteps: 10}).error, /^query limit:/);

@@ -3,7 +3,10 @@
 //!
 //! Requests (JSON, one per `lw_run`):
 //! - `{"op": "load", "graph": {...}, "payload": {"nodes": {...}, "edges": {...}}}` keeps the graph (an `arqlet-model`
-//!   graph) and its optional payload, replacing what was loaded; answers `{ok, nodes, edges}`.
+//!   graph) and its optional payload, replacing what was loaded; answers `{ok, nodes, edges, unresolvedEdges}`: `edges` counts
+//!   the edges of the graph as given, `unresolvedEdges` those a query does not see (no target, or an end that is no node), so
+//!   a query's `graph.edges` is `edges - unresolvedEdges`. The graph is read straight from the request text, not through a
+//!   JSON value of the whole request first.
 //! - `{"op": "query", "query": "...", "params": {...}, "maxSteps": n, "maxRows": n, "maxHops": n}` answers as the engine's
 //!   `query` (see `arqlet-query-json`), without the mapping onto a view: there is no view here.
 //!
@@ -11,6 +14,16 @@
 use arqlet_model::Graph;
 use arqlet_query_model::Payload;
 use serde_json::{json, Value};
+use std::collections::HashSet;
+
+/// A `load` request read straight into its types.
+#[derive(serde::Deserialize)]
+struct LoadRequest {
+    op: String,
+    graph: Graph,
+    #[serde(default)]
+    payload: Option<Value>,
+}
 
 /// A loaded graph with its payload.
 #[derive(Default)]
@@ -21,6 +34,20 @@ pub struct QueryModule {
 impl QueryModule {
     /// Runs one request given as JSON text and answers as JSON text.
     pub fn run(&mut self, input: &str) -> String {
+        // A `load` read in one pass into its types: no JSON value of the whole graph beside the graph itself (which holds
+        // it twice for a moment and, in WASM, leaves the linear memory at that high-water mark). Anything this reading
+        // refuses goes the general way below, with the errors it has always given.
+        if input.contains("\"load\"") {
+            if let Ok(request) = serde_json::from_str::<LoadRequest>(input) {
+                if request.op == "load" {
+                    return match self.load(request.graph, request.payload.as_ref()) {
+                        Ok(answer) => answer,
+                        Err(e) => json!({"ok": false, "error": e}),
+                    }
+                    .to_string();
+                }
+            }
+        }
         let answer = match serde_json::from_str::<Value>(input) {
             Ok(v) => self
                 .answer(&v)
@@ -30,19 +57,38 @@ impl QueryModule {
         answer.to_string()
     }
 
+    /// Keeps `graph` and the payload, and answers what was loaded. A payload that is refused keeps what was loaded before.
+    fn load(&mut self, graph: Graph, payload: Option<&Value>) -> Result<Value, String> {
+        let payload = match payload {
+            None | Some(Value::Null) => Payload::default(),
+            Some(p) => Payload::from_json(p)?,
+        };
+        // Only to look up; never iterated.
+        let ids: HashSet<&str> = graph.nodes.iter().map(|n| n.id.as_str()).collect();
+        let unresolved = graph
+            .edges
+            .iter()
+            .filter(|e| {
+                !ids.contains(e.source.as_str())
+                    || !e.target.as_deref().is_some_and(|t| ids.contains(t))
+            })
+            .count();
+        let answer = json!({
+            "ok": true,
+            "nodes": graph.nodes.len(),
+            "edges": graph.edges.len(),
+            "unresolvedEdges": unresolved,
+        });
+        self.loaded = Some((graph, payload));
+        Ok(answer)
+    }
+
     fn answer(&mut self, v: &Value) -> Result<Value, String> {
         match v["op"].as_str() {
             Some("load") => {
                 let graph: Graph = serde_json::from_value(v["graph"].clone())
                     .map_err(|e| format!("The graph is not an Arqlet graph: {e}"))?;
-                let payload = match v.get("payload") {
-                    None | Some(Value::Null) => Payload::default(),
-                    Some(p) => Payload::from_json(p)?,
-                };
-                let answer =
-                    json!({"ok": true, "nodes": graph.nodes.len(), "edges": graph.edges.len()});
-                self.loaded = Some((graph, payload));
-                Ok(answer)
+                self.load(graph, v.get("payload"))
             }
             Some("query") => {
                 let (graph, payload) = self
@@ -123,7 +169,10 @@ mod tests {
             &mut m,
             json!({"op": "load", "graph": graph(), "payload": {"nodes": {"a": {"loc": 7}}}}),
         );
-        assert_eq!(load, json!({"ok": true, "nodes": 2, "edges": 2}));
+        assert_eq!(
+            load,
+            json!({"ok": true, "nodes": 2, "edges": 2, "unresolvedEdges": 1})
+        );
         let q = ask(
             &mut m,
             json!({"op": "query", "query": "MATCH (a)-[r]->(b) WHERE a.loc > $min RETURN a, r, b.label", "params": {"min": 1}}),
@@ -138,6 +187,29 @@ mod tests {
             "the unresolved edge is left out"
         );
         assert_eq!(q["nodes"], json!(["a"]));
+    }
+
+    #[test]
+    fn a_load_read_in_one_pass_is_the_same_as_the_general_way() {
+        let request =
+            json!({"op": "load", "graph": graph(), "payload": {"nodes": {"a": {"loc": 7}}}});
+        let mut one_pass = QueryModule::default();
+        let mut general = QueryModule::default();
+        // `run` reads a `load` straight into its types; `answer` takes the JSON value, as every other request does.
+        let a = ask(&mut one_pass, request.clone());
+        let b = general.answer(&request).unwrap();
+        assert_eq!(a, b);
+        let question = json!({"op": "query", "query": "MATCH (n) WHERE n.loc = 7 RETURN n.label"});
+        assert_eq!(
+            ask(&mut one_pass, question.clone()),
+            ask(&mut general, question)
+        );
+        // A payload that is refused is refused the same way, and keeps what was loaded.
+        let bad =
+            json!({"op": "load", "graph": graph(), "payload": {"nodes": {"a": {"m": {"k": 1}}}}});
+        let (x, y) = (ask(&mut one_pass, bad.clone()), ask(&mut general, bad));
+        assert_eq!(x["ok"], false);
+        assert_eq!(x, y);
     }
 
     #[test]

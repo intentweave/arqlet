@@ -53,3 +53,4 @@ jobs:
       - run: cargo +1.94.0 check --workspace --locked
       # The browser adapter is built for WASM; check it with the minimum version too.
       - run: cargo +1.94.0 check -p arqlet-wasm --target wasm32-unknown-unknown --locked
+      - run: cargo +1.94.0 check -p arqlet-query-wasm --target wasm32-unknown-unknown --locked
