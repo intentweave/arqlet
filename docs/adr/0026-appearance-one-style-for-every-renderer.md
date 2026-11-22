@@ -55,6 +55,22 @@ Checked: the SVG golden files unchanged; Node tests that one sheet gives the sam
 buffers and React Flow; in Chrome (`browser-checks/scene-gl.mjs`) `byKind`, `light` and a sheet with tokens, widths,
 opacity, dashes and `auto` fills, drawn by `renderSvg` and both GPU backends, differ in under 0.1 % of the pixels.
 
+### Metro maps (amended the same day)
+
+The first style that reaches into a strategy: explicit buses drawn as metro lines. `bind(scene)` derives data for the
+rules from the scene's explicit buses (`scene.buses`): an edge's `bus` (its index), a node's `bus` (when it is an end of
+routes of one bus), `buses` and `interchange` (more than one). With `[key]` selectors (the field is set), colours
+`auto(field)` (a number picks the palette by index, so buses take distinct colours), the node property `radius` (a number
+or `pill`) and `arrow: 'none'`, the preset `metro` draws every bus as a thick coloured line without arrowheads, the
+nodes on one bus as stations (pills in the line's colour) and a node on several buses (a gateway) as an interchange (a
+black pill), on a light background; junction dots are the theme's `junctionFill` and `junctionStroke`. It needs buses
+drawn as shared lines (`busStyle: 'lines'`); the playground switches the bus style when *Metro* is chosen, as a layout
+option that undo takes back. Checked in all three renderers (Node) and in Chrome against `renderSvg` in both backends.
+
+Not yet, and the steps after it: octilinear routing (0°, 45°, 90°, which the engine refuses today), the order of
+parallel lines in a shared corridor (metro-line crossing minimisation), line names in the scene (a bus carries only its
+edges, so lines are numbered, not named) and a legend; and a profile that carries layout options and a style together.
+
 ## Consequences
 
 - A host themes the drawing with data (a sheet) or with CSS (tokens), and the far layer, the SVG near layer and React

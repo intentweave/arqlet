@@ -1,9 +1,9 @@
 import type {BoundaryCrossing, PlacedLabel, Point, Scene, SceneBusLine, SceneHubRef, SceneHull, SceneNode, SceneRoute} from '@arqlet/contracts';
 
 /** A node's appearance resolved from a style, the theme filled in; the state colours for the host to use. */
-export interface ArqletNodeLook { fill: string; stroke: string; text: string; strokeWidth: number; dash?: string; selectedFill: string; selectedStroke: string; invalid: string }
+export interface ArqletNodeLook { fill: string; stroke: string; text: string; strokeWidth: number; dash?: string; radius?: number | 'pill'; selectedFill: string; selectedStroke: string; invalid: string }
 /** An edge's appearance resolved from a style. */
-export interface ArqletEdgeLook { stroke: string; arrow: string; width?: number; opacity?: number; dash?: string; invalid: string }
+export interface ArqletEdgeLook { stroke: string; /** 'none': no arrowhead. */ arrow: string; width?: number; opacity?: number; dash?: string; invalid: string }
 
 export interface ArqletFlowHandle {
   id: string;

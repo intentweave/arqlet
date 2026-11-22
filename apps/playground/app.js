@@ -257,6 +257,7 @@ let viewStyle=null;
 function makeViewStyle(){
  const preset=STYLE_PRESETS[$('style-preset').value]??{};
  $('canvas').classList.toggle('light',$('style-preset').value==='light');
+ $('canvas').classList.toggle('metro',$('style-preset').value==='metro');
  viewStyle=createStyle({...preset,theme:{...(preset.theme??{}),...themeFromCss($('canvas'))}});
  return viewStyle;
 }
@@ -1495,7 +1496,9 @@ $('port-labels').onchange=()=>{
  setOption({portLabels},'Port labels');
 };
 
-$('style-preset').onchange=()=>{makeViewStyle();if(snapshot)draw();};
+// Metro draws explicit buses as lines: with bars (the default bus style) there are none, so it switches the bus style to
+// shared lines, a layout option like any other (undo takes it back).
+$('style-preset').onchange=()=>{makeViewStyle();if(snapshot)draw();if($('style-preset').value==='metro'&&snapshot&&(effectiveOptions().busStyle??'bar')==='bar'&&!pending)setOption({busStyle:'lines'},'Bus style for Metro');};
 $('show-ports').onchange=()=>setOption({appearance:{...effectiveOptions().appearance,showPorts:$('show-ports').checked}},'port markers');
 
 bindNavigation($('canvas'),()=>scale,value=>{autoFit=false;scale=value;if(snapshot)draw();});

@@ -204,7 +204,8 @@ Drag the diagram to move it; the mouse wheel zooms at the pointer. Fit, zoom in 
 available. The advanced JSON field passes layout and routing options to `configure`; e.g.
 `{"routingClearance":16,"trackSpacing":12}`.
 
-The field *Style* switches the appearance (ADR 0026: default, by kind, light) in the SVG view and the GPU view alike.
+The field *Style* switches the appearance (ADR 0026: default, by kind, metro, light) in the SVG view and the GPU view alike.
+*Metro* draws explicit buses as metro lines (a vehicle example shows it best) and switches the bus style to shared lines.
 
 Large views (ADR 0025): the button *GPU* (key G) draws the view with the scene view, from afar on the GPU (WebGPU, else
 WebGL 2) and up close with the SVG viewer; it is on by itself from 1 500 nodes and routes. Selection, collapse and

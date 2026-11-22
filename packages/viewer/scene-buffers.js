@@ -68,7 +68,7 @@ const coloursOf = (() => {
       route: hex(t.route), activeRoute: hex(t.activeRoute), arrow: hex(t.arrow),
       bus: hex(t.bus), busSelected: hex(t.selectedStroke), hubFill: hex(t.hubFill), hubStroke: hex(t.hubStroke),
       portSource: hex(t.portSource), portTarget: hex(t.portTarget), crossing: hex(t.crossing), label: hex(t.labelFill),
-      pin: hex(t.pin), trace: hex(t.trace), hover: hex(t.hover),
+      pin: hex(t.pin), trace: hex(t.trace), hover: hex(t.hover), junctionFill: hex(t.junctionFill), junctionStroke: hex(t.junctionStroke),
       text: t.text, title: t.title, row: t.row, busText: t.busText, labelText: t.labelText,
     };
     cache.set(style, c);
@@ -152,7 +152,8 @@ export const sceneOf = scene => (isSceneColumns(scene) ? sceneOfColumns(scene) :
  */
 export function sceneBuffers(input, state = {}) {
   const scene = sceneOf(input);
-  const style = createStyle(state.style), COLOURS = coloursOf(style);
+  const style = createStyle(state.style), COLOURS = coloursOf(style), looks = style.bind(scene);
+  const radiusOf = (look, r, fallback) => (look.radius === 'pill' ? Math.min(r.width, r.height) / 2 : look.radius ?? fallback);
   if (scene.schemaVersion !== 1) throw Error('Unsupported scene schema');
   const {selected = null, selectedRoute = null, trace = null} = state;
   const pinned = state.pinned instanceof Set ? state.pinned : new Set(state.pinned ?? []);
@@ -199,7 +200,7 @@ export function sceneBuffers(input, state = {}) {
 
   // Containers, outer first.
   for (const n of scene.nodes.filter(n => parents.has(n.id)).sort((a, b) => depthOf(a) - depthOf(b))) {
-    const r = n.bounds, round = n.shape === 'circle', a = faint(n.id), lit = onPath.has(n.id), look = style.node(n);
+    const r = n.bounds, round = n.shape === 'circle', a = faint(n.id), lit = onPath.has(n.id), look = looks.node(n);
     const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : look.stroke ? hex(look.stroke) : COLOURS.frameStroke, a);
     const fill = withAlpha(look.fill ? hex(look.fill) : COLOURS.frame, a), width = lit ? 2.5 : look.strokeWidth ?? 1, dash = look.dash ? 1 : 0;
     const title = look.text ?? COLOURS.title;
@@ -208,7 +209,7 @@ export function sceneBuffers(input, state = {}) {
       box(containerLayer, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, width, fill, stroke, dash);
       text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: fadeCss(title, a), align: 'center'});
     } else {
-      box(containerLayer, r, 10, 0, width, fill, stroke, dash);
+      box(containerLayer, r, radiusOf(look, r, 10), 0, width, fill, stroke, dash);
       text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: fadeCss(title, a)});
     }
     if (n.kind === 'entity') containerLayer.segments.push(r.x, r.y + 34, r.x + r.width, r.y + 34, 1, 0, 0, 0, 0, ...COLOURS.frameStroke);
@@ -219,12 +220,12 @@ export function sceneBuffers(input, state = {}) {
   const endpoints = new Set(active ? [active.source, active.target] : []);
   const lines = [];
   for (const route of scene.routes) {
-    const weight = route.weight ?? 1, isActive = route === active, dim = !!active && !isActive, look = style.edge(route);
+    const weight = route.weight ?? 1, isActive = route === active, dim = !!active && !isActive, look = looks.edge(route);
     const aggregated = route.backWeight !== undefined && route.backWeight !== null, back = aggregated ? route.backWeight : 0, total = weight + back;
     const width = (look.width ?? (aggregated ? Math.min(7, 1 + 1.2 * Math.log2(total + 1)) : Math.min(4, 1.6 + 0.4 * (weight - 1)))) + (isActive ? 1.5 : 0);
     const opacity = dim ? 0.2 : isActive ? 1 : look.opacity ?? (aggregated ? 0.3 + 0.55 * Math.min(1, Math.log2(total + 1) / 6) : 0.75);
     const colour = route.invalid || conflictedRoutes.has(route.id) ? COLOURS.invalid : isActive ? COLOURS.activeRoute : look.stroke ? hex(look.stroke) : COLOURS.route;
-    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0, arrow: look.arrow ? hex(look.arrow) : COLOURS.arrow, dash: dashOf(look.dash)});
+    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0, arrow: look.arrow === 'none' ? null : look.arrow ? hex(look.arrow) : COLOURS.arrow, dash: dashOf(look.dash)});
     if ((aggregated && total > 1) || weight > 1) {
       const mid = route.points[Math.floor(route.points.length / 2)];
       text({x: mid.x + 6, y: mid.y - 6, text: aggregated && back ? `${weight} ⇄ ${back}` : String(weight), size: 12, colour: COLOURS.text});
@@ -242,7 +243,7 @@ export function sceneBuffers(input, state = {}) {
       routeLayer.segments.push(p[k].x, p[k].y, p[k + 1].x, p[k + 1].y, line.width, depth, on, off, along, ...line.colour);
       along += Math.hypot(p[k + 1].x - p[k].x, p[k + 1].y - p[k].y);
     }
-    if (p.length >= 2) {
+    if (p.length >= 2 && line.arrow !== null) {
       const arrowColour = line.arrow ?? COLOURS.arrow;
       const arrow = (end, from) => { for (const [x, y] of arrowCorners(end, end.x - from.x, end.y - from.y)) routeLayer.triangles.push(x, y, depth, ...arrowColour); };
       const last = p.length - 1;
@@ -263,11 +264,11 @@ export function sceneBuffers(input, state = {}) {
     box(routeLayer, r, 3, 0, 0.8, COLOURS.hubFill, COLOURS.hubStroke);
     text({x: r.x + 4, y: r.y + r.height / 2, text: (ref.outgoing ? '→ ' : '← ') + ref.text.slice(0, 32), size: 10.5, colour: COLOURS.busText, baseline: 'middle'});
   }
-  for (const j of scene.junctions ?? []) box(routeLayer, {x: j.x - 3.5, y: j.y - 3.5, width: 7, height: 7}, 3.5, 1, 1, COLOURS.route, COLOURS.frame);
+  for (const j of scene.junctions ?? []) box(routeLayer, {x: j.x - 3.5, y: j.y - 3.5, width: 7, height: 7}, 3.5, 1, 1, COLOURS.junctionFill, COLOURS.junctionStroke);
 
   // Leaves.
   for (const n of scene.nodes.filter(n => !parents.has(n.id))) {
-    const r = n.bounds, faded = (active && !endpoints.has(n.id) ? 0.4 : 1) * faint(n.id), lit = onPath.has(n.id), look = style.node(n);
+    const r = n.bounds, faded = (active && !endpoints.has(n.id) ? 0.4 : 1) * faint(n.id), lit = onPath.has(n.id), look = looks.node(n);
     const fill = withAlpha(n.id === selected ? COLOURS.selectedFill : look.fill ? hex(look.fill) : COLOURS.leaf, faded);
     const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : n.id === selected ? COLOURS.selectedStroke : look.stroke ? hex(look.stroke) : COLOURS.leafStroke, faded);
     const strokeWidth = lit ? 2.5 : look.strokeWidth ?? 1;
@@ -276,7 +277,7 @@ export function sceneBuffers(input, state = {}) {
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     if (!attribute) {
       if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, strokeWidth, fill, stroke, dash); }
-      else box(leafLayer, r, 7, 0, strokeWidth, fill, stroke, dash);
+      else box(leafLayer, r, radiusOf(look, r, 7), 0, strokeWidth, fill, stroke, dash);
     }
     // A pinned leaf: renderSvg's dot (drawn there when the host has no pin control, which the far layer never has).
     if (pinned.has(n.id) && !attribute) {
@@ -321,13 +322,16 @@ export function sceneBuffers(input, state = {}) {
  * bus bar; empty for none. Small, so that a hover never rebuilds the scene's buffers.
  */
 export function hoverBuffers(scene, id, styleSheet) {
-  const COLOURS = coloursOf(createStyle(styleSheet));
+  const style = createStyle(styleSheet), COLOURS = coloursOf(style);
   const out = {boxes: new Floats(), segments: new Floats(), triangles: new Floats()};
   const n = id == null ? null : scene.nodes.find(m => m.id === id) ?? scene.busLines?.find(b => b.id === id);
   if (n && n.kind !== 'attribute') {
     const r = n.bounds, bar = !scene.nodes.includes(n), round = !bar && n.shape === 'circle' && !(n.rows?.length && !n.container);
     if (round) { const rad = Math.min(r.width, r.height) / 2, cx = r.x + r.width / 2, cy = r.y + r.height / 2; out.boxes.push(cx - rad, cy - rad, 2 * rad, 2 * rad, rad, 1, 2, 0, ...NONE, ...COLOURS.hover); }
-    else out.boxes.push(r.x, r.y, r.width, r.height, bar ? Math.min(r.width, r.height) / 2 : n.container ? 10 : 7, 0, 2, 0, ...NONE, ...COLOURS.hover);
+    else {
+      const own = bar ? {} : style.bind(scene).node(n), radius = bar || own.radius === 'pill' ? Math.min(r.width, r.height) / 2 : own.radius ?? (n.container ? 10 : 7);
+      out.boxes.push(r.x, r.y, r.width, r.height, radius, 0, 2, 0, ...NONE, ...COLOURS.hover);
+    }
   }
   return {boxes: out.boxes.done(), segments: out.segments.done(), triangles: out.triangles.done()};
 }

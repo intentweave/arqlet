@@ -58,6 +58,12 @@ try {
       const scene = answer.scene;
       (window.__scenes ??= {})[${JSON.stringify(name)}] = scene;
       // Every strategy and routing style of the whole view, on one example, through the engine's operations.
+      // Explicit buses as shared lines (for the metro style below).
+      if (${JSON.stringify(name)} === 'vehicle-buses') {
+        const lined = window.__engine({op: 'configure', snapshot, expectedRevision: snapshot.revision, expectedLayoutVersion: snapshot.layoutVersion ?? 0, options: {busStyle: 'lines'}});
+        if (lined.ok) { const drawn = window.__engine({op: 'scene', snapshot: lined.snapshot}); if (drawn.ok) window.__scenes['vehicle-buses busStyle=lines'] = drawn.scene; }
+        else window.__variantErrors = [...(window.__variantErrors ?? []), 'busStyle=lines: ' + lined.error];
+      }
       if (${JSON.stringify(name)} === 'workflow-dag') {
         for (const [op, value] of [['strategy', 'tree'], ['strategy', 'radial'], ['strategy', 'organic'], ['strategy', 'none'],
           ['routing', 'straight'], ['routing', 'roundedOrthogonal'], ['routing', 'polyline'], ['routing', 'roundedPolyline'], ['routing', 'octilinear'], ['routing', 'curve'], ['routing', 'bus'], ['bundling', 'complete']]) {
@@ -110,6 +116,8 @@ try {
       stated.push([base + ' style byKind', scene, {style: STYLE_PRESETS.byKind}]);
       stated.push([base + ' style light', scene, {style: STYLE_PRESETS.light}]);
     }
+    const lines = await named('vehicle-buses busStyle=lines');
+    if (lines) { stated.push(['vehicle-buses lines style metro', lines, {style: STYLE_PRESETS.metro}]); stated.push(['vehicle-buses lines metro trace', lines, {style: STYLE_PRESETS.metro, selectedRoute: lines.routes[0].id}]); }
     const custom = {theme: {route: 'rgb(220, 120, 60)', leafFill: '#203040'}, rules: [{selector: 'edge', style: {width: 2.5, opacity: 0.9, dash: '8 4'}}, {selector: 'container', style: {stroke: '$trace', strokeWidth: 2}}, {selector: 'leaf', style: {fill: 'auto'}}]};
     const customScene = (await named('uml-class')) ?? (await named('bpmn-pools'));
     stated.push(['custom style', customScene, {style: custom}]);
