@@ -62,6 +62,12 @@ try {
       if (${JSON.stringify(name)} === 'vehicle-buses') {
         const lined = window.__engine({op: 'configure', snapshot, expectedRevision: snapshot.revision, expectedLayoutVersion: snapshot.layoutVersion ?? 0, options: {busStyle: 'lines'}});
         if (lined.ok) { const drawn = window.__engine({op: 'scene', snapshot: lined.snapshot}); if (drawn.ok) window.__scenes['vehicle-buses busStyle=lines'] = drawn.scene; }
+        // And octilinear: the metro map's 45° corners.
+        if (lined.ok) {
+          const l = lined.snapshot, oct = window.__engine({op: 'routing', snapshot: l, expectedRevision: l.revision, expectedLayoutVersion: l.layoutVersion ?? 0, nodeId: null, routing: 'octilinear'});
+          if (oct.ok) { const drawn = window.__engine({op: 'scene', snapshot: oct.snapshot}); if (drawn.ok) window.__scenes['vehicle-buses lines octilinear'] = drawn.scene; }
+          else window.__variantErrors = [...(window.__variantErrors ?? []), 'lines octilinear: ' + oct.error];
+        }
         else window.__variantErrors = [...(window.__variantErrors ?? []), 'busStyle=lines: ' + lined.error];
       }
       if (${JSON.stringify(name)} === 'workflow-dag') {
@@ -117,6 +123,8 @@ try {
       stated.push([base + ' style light', scene, {style: STYLE_PRESETS.light}]);
     }
     const lines = await named('vehicle-buses busStyle=lines');
+    const linesOct = await named('vehicle-buses lines octilinear');
+    if (linesOct) stated.push(['vehicle-buses octilinear style metro', linesOct, {style: STYLE_PRESETS.metro}]);
     if (lines) { stated.push(['vehicle-buses lines style metro', lines, {style: STYLE_PRESETS.metro}]); stated.push(['vehicle-buses lines metro trace', lines, {style: STYLE_PRESETS.metro, selectedRoute: lines.routes[0].id}]); }
     const custom = {theme: {route: 'rgb(220, 120, 60)', leafFill: '#203040'}, rules: [{selector: 'edge', style: {width: 2.5, opacity: 0.9, dash: '8 4'}}, {selector: 'container', style: {stroke: '$trace', strokeWidth: 2}}, {selector: 'leaf', style: {fill: 'auto'}}]};
     const customScene = (await named('uml-class')) ?? (await named('bpmn-pools'));

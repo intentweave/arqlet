@@ -386,6 +386,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
         };
         let style = constraint.as_ref().and_then(pulled);
         let rounds = constraint.as_ref().is_some_and(|c| c.rounds());
+        let chamfers = constraint.as_ref().is_some_and(|c| c.chamfers());
         // A container that holds an endpoint is traversable for the edge; every other node is an obstacle, except the two
         // endpoints, which the route may leave and reach along their border. A pulled route keeps a distance; a rounded
         // orthogonal route only must not run into a node.
@@ -423,7 +424,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             None => 0.,
         };
         let mut points = route.points.clone();
-        if style.is_some() || rounds {
+        if style.is_some() || rounds || chamfers {
             let blocks = obstacles(clearance);
             if style.is_some() {
                 pulled_ids.insert(route.id.clone());
@@ -431,6 +432,11 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
             }
             if rounds && arcs {
                 points = realize::round_corners(&points, realize::CORNER_RADIUS, &blocks);
+            }
+            // Octilinear: the corners cut at 45°. Like the arcs, only in the drawn scene: the metrics count the corners of
+            // the orthogonal route (`build_corner_scene`).
+            if chamfers && arcs {
+                points = realize::chamfer_corners(&points, realize::CHAMFER, &blocks);
             }
         }
         routes.push(SceneRoute {
@@ -1056,6 +1062,29 @@ mod tests {
         let plain = build_scene(&s).unwrap();
         assert!(!plain.routes[0].rounded);
         assert_eq!(plain.routes[0].points.len(), 4);
+    }
+
+    #[test]
+    fn an_octilinear_route_cuts_its_corners_at_45_degrees_and_the_metrics_keep_the_corners() {
+        let bend = json!([{"x": 220, "y": 175}, {"x": 335, "y": 175}, {"x": 335, "y": 185}, {"x": 450, "y": 185}]);
+        let mut s = snapshot(json!({"routes": [{"id": "e", "points": bend}]}));
+        s.graph.default_routing = Some(RoutingConstraint::Fixed(RoutingStyle::Octilinear));
+        let route = &build_scene(&s).unwrap().routes[0];
+        // Two corners of a 10-unit step, each cut by half the step (the cuts meet in its middle): the diagonals at 45°.
+        let p: Vec<(f64, f64)> = route.points.iter().map(|p| (p.x, p.y)).collect();
+        assert_eq!(
+            p,
+            vec![
+                (220., 175.),
+                (330., 175.),
+                (335., 180.),
+                (340., 185.),
+                (450., 185.)
+            ]
+        );
+        assert!(!route.rounded);
+        // The corner scene, which the metrics measure, keeps the orthogonal corners.
+        assert_eq!(build_corner_scene(&s).unwrap().routes[0].points.len(), 4);
     }
 
     #[test]
