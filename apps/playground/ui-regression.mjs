@@ -30,6 +30,8 @@ class Element{
  focus(){}
  scrollIntoView(){}
  addEventListener(){}
+ removeEventListener(){}
+ get classList(){const set=this._classes??=new Set();return {add:c=>set.add(c),remove:c=>set.delete(c),contains:c=>set.has(c),toggle:(c,on)=>{if(on??!set.has(c))set.add(c);else set.delete(c);}};}
  append(...items){this.children.push(...items);}
  replaceChildren(...items){this.children=items;}
  setAttribute(k,v){this[k]=v;}
@@ -61,7 +63,11 @@ class Worker{
 }
 // What the page registers on the document (key handlers), so that a test can press keys.
 const listeners={};
-const context={GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{addEventListener:(type,fn)=>{(listeners[type]??=[]).push(fn);},getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
+// The scene view of the large-view mode (ADR 0025, V4) needs a GPU and a real DOM: here a stand-in records what the page asks of it.
+const sceneViews=[];let sceneNavigation=null;
+const fakeSceneView=async(host,scene,options)=>{const v={backend:'webgl2',layer:'far',host,options,scenes:[scene],states:[options.state],destroyed:false,view:{centreX:0,centreY:0,scale:1},
+ setScene(next){this.scenes.push(next);},setState(state){this.states.push(state);},fit(){this.fitted=true;},resize(){},setView(view){this.view=view;},pick:()=>v.nextPick,destroy(){this.destroyed=true;}};sceneViews.push(v);return v;};
+const context={openSceneView:fakeSceneView,bindSceneNavigation:(host,view,handlers)=>{sceneNavigation=handlers;return()=>{sceneNavigation=null;};},GeometryReports,bindNavigation,presetState,applyPreset,routeDetails,routeConflictsOf,evaluateSnapshot,withAggregatedWeights,Selection,describeSelection,containmentRows,settingsOf,rootSettingsOf,renderContainmentTree,settingsElementOf,layoutFieldsElementOf,loadEngine:async()=>engine,sceneOf,renderSvg,document:{addEventListener:(type,fn)=>{(listeners[type]??=[]).push(fn);},getElementById:get,createElement:()=>new Element(),createElementNS:()=>new Element(),activeElement:null,createTextNode:text=>{const e=new Element();e.textContent=text;return e;}},Worker,createEngineWorker:()=>new Worker(),refinementFits,createLayoutSession,createViewController,console,AbortController,Blob,URL,queueMicrotask,performance,
  setTimeout:fn=>{timers.set(++tid,fn);return tid;},clearTimeout:id=>timers.delete(id),
  fetch:async(url,options)=>{
    if(url.includes('snapshot.json')){latest=structuredClone(initial);return {ok:true,json:async()=>structuredClone(initial)};}
@@ -539,4 +545,32 @@ console.log('Port visibility changes appearance without moving routes.');
   assert.equal(runInNewContext('snapshot.options.portPlacement',context),'optimized');
   assert.equal(get('port-placement').value,'optimized');
   console.log('Port placement passed: the option reaches the engine and the selector follows the snapshot.');
+}
+
+// Large-view mode (ADR 0025, V4): the button switches the canvas to the scene view and back; selection from the far
+// layer's picking and from the near layer's handlers reaches the page, and every redraw reaches the scene view.
+{
+  assert.equal(runInNewContext('farWanted({nodes:Array(1000),routes:Array(400)})',context),false,'small views stay in the plain view');
+  assert.equal(runInNewContext('farWanted({nodes:Array(1000),routes:Array(500)})',context),true,'from 1500 elements the large-view mode is on by itself');
+  get('far-view').click();await settle();
+  const view=sceneViews.at(-1);
+  assert.ok(view&&!view.destroyed,'the scene view is opened');
+  assert.equal(get('graph').hidden,true);assert.equal(get('scene-view').hidden,false);
+  assert.equal(get('far-view')['aria-pressed'],'true');
+  assert.match(get('layer-info').textContent,/WebGL 2 · far/);
+  const node=runInNewContext('snapshot.graph.nodes.find(n=>!snapshot.graph.nodes.some(c=>c.parentId===n.id)).id',context);
+  view.nextPick={kind:'node',id:node};sceneNavigation.onClick(10,10);await settle();
+  assert.equal(view.states.at(-1).selected,node,'a pick in the far layer selects the node');
+  assert.ok(view.scenes.length>=2,'the redraw reaches the scene view');
+  const route=runInNewContext('sceneOf(sceneRun,snapshot).routes[0].id',context);
+  view.options.svg.onSelectRoute(route);await settle();
+  assert.equal(view.states.at(-1).selectedRoute,route,'a route chosen in the near layer is selected');
+  get('fit').click();assert.ok(view.fitted,'Fit acts on the scene view');
+  get('far-view').click();await settle();
+  assert.ok(view.destroyed,'switching back closes the scene view');
+  assert.equal(get('graph').hidden,false);assert.equal(get('scene-view').hidden,true);
+  assert.ok(get('graph').children.length>0,'the plain view draws again');
+  assert.equal(runInNewContext('farWanted({nodes:Array(1000),routes:Array(500)})',context),false,'the user\'s choice wins over the size');
+  runInNewContext('farChoice=null',context);
+  console.log('Large-view mode passed: the switch, selection from both layers, redraws and Fit reach the scene view.');
 }

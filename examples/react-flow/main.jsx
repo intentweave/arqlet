@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
+import {createPortal} from 'react-dom';
 import {ReactFlow,Handle,Position,BaseEdge,Controls,ViewportPortal,applyNodeChanges,useReactFlow} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './style.css';
@@ -7,6 +8,8 @@ import {routePath} from '@arqlet/viewer/scene.js';
 import {loadEngine,sceneOf} from '@arqlet/engine-client/engine.js';
 import {toReactFlow} from '@arqlet/viewer/react-flow.js';
 import {applyPreset} from '@arqlet/engine-client/presets.js';
+import {openSceneView,reactFlowViewport} from '@arqlet/viewer/scene-view.js';
+import {bindSceneNavigation} from '@arqlet/viewer/scene-renderer.js';
 
 const sides={left:Position.Left,right:Position.Right,top:Position.Top,bottom:Position.Bottom};
 function DiagramNode({data,selected}){
@@ -21,11 +24,43 @@ function DiagramEdge({id,data}){
 const nodeTypes={arqlet:DiagramNode},edgeTypes={arqlet:DiagramEdge};
 function FitScene({bounds}){const {fitBounds}=useReactFlow();useEffect(()=>{fitBounds(bounds,{padding:.1});},[bounds,fitBounds]);return null;}
 
+const Arrow=()=><svg style={{position:'absolute',width:0,height:0}}><defs><marker id="lw-rf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#73bba7"/></marker></defs></svg>;
+
+// Large views (ADR 0025, V4): the scene view draws from afar on the GPU (WebGPU, else WebGL 2), and React Flow takes the
+// near layer's place: it gets the excerpt in view (plus a margin) and a viewport set from the view, so both layers show
+// the same geometry and the switch moves nothing. The scene view navigates (wheel, drag); React Flow's own panning and
+// zooming are off. Views from FAR_AUTO elements open this way.
+const FAR_AUTO=1500;
+function FarSceneView({scene,selected,onSelect}){
+ const host=useRef(null),view=useRef(null),select=useRef(onSelect);select.current=onSelect;
+ const [layer]=useState(()=>{const d=document.createElement('div');d.style.width='100%';d.style.height='100%';return d;});
+ const [near,setNear]=useState(null),[viewport,setViewport]=useState({x:0,y:0,zoom:1}),[info,setInfo]=useState('');
+ useEffect(()=>{
+  let alive=true,unbind=null;
+  const describe=v=>setInfo(`${v.backend==='webgpu'?'WebGPU':v.backend==='webgl2'?'WebGL 2':'no GPU'} · ${v.layer==='near'?'near (React Flow)':'far'}`);
+  const nearLayer={element:layer,draw:(excerpt,f)=>{setNear(excerpt);setViewport(reactFlowViewport(f.view,f.width,f.height));},move:f=>setViewport(reactFlowViewport(f.view,f.width,f.height)),clear:()=>setNear(null)};
+  openSceneView(host.current,scene,{near:nearLayer,state:{selected},onLayer:()=>view.current&&describe(view.current)}).then(v=>{
+   if(!alive){v.destroy();return;}
+   view.current=v;describe(v);
+   unbind=bindSceneNavigation(host.current,v,{onClick:(x,y)=>{if(v.layer!=='far')return;const hit=v.pick(x,y);if(hit?.kind==='node')select.current(hit.id);}});
+  });
+  return()=>{alive=false;unbind?.();view.current?.destroy();view.current=null;};
+ },[]);
+ useEffect(()=>{view.current?.setScene(scene);},[scene]);
+ useEffect(()=>{view.current?.setState({selected});},[selected]);
+ const mapped=useMemo(()=>near?toReactFlow(near):null,[near]);
+ const nodes=useMemo(()=>mapped?mapped.nodes.map(n=>({...n,selected:n.id===selected})):[],[mapped,selected]);
+ return <div className="far-host" ref={host}><span className="far-info">{info}</span>{createPortal(mapped&&<ReactFlow nodes={nodes} edges={mapped.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} viewport={viewport} onNodeClick={(_,node)=>select.current(node.id)}
+  nodesDraggable={false} nodesConnectable={false} elementsSelectable={false} panOnDrag={false} panOnScroll={false} zoomOnScroll={false} zoomOnPinch={false} zoomOnDoubleClick={false} preventScrolling={false} deleteKeyCode={null} proOptions={{hideAttribution:true}}>
+  <Arrow/><ViewportPortal>{mapped.labels.map(l=><div className="scene-label" key={`${l.kind}:${l.id}`} style={{left:l.bounds.x,top:l.bounds.y,width:l.bounds.width,height:l.bounds.height}}>{l.text}</div>)}</ViewportPortal>
+ </ReactFlow>,layer)}</div>;
+}
+
 async function getJson(url){const response=await fetch(url,{cache:'no-store'});if(!response.ok)throw Error(`${url} is not available`);return response.json();}
 
 function App(){
  const [snapshot,setSnapshot]=useState(null),[error,setError]=useState(''),[selected,setSelected]=useState(null),[busy,setBusy]=useState(false),[nodes,setNodes]=useState([]);
- const [engine,setEngine]=useState(null),[profiles,setProfilees]=useState([]);
+ const [engine,setEngine]=useState(null),[profiles,setProfilees]=useState([]),[farChoice,setFarChoice]=useState(null);
  const epoch=useRef(0),fileInput=useRef(null);
  // The engine computes scene geometry; this host only maps and renders it.
  const built=useMemo(()=>{if(!snapshot||!engine)return null;try{return {scene:sceneOf(engine,snapshot)};}catch(e){return {error:e.message};}},[snapshot,engine]);
@@ -69,11 +104,13 @@ function App(){
  async function openFile(event){const file=event.target.files?.[0];if(!file)return;const token=++epoch.current;setBusy(false);try{const value=JSON.parse(await file.text());if(token===epoch.current){setSnapshot(value);setSelected(null);setError('');}}catch(e){if(token===epoch.current)setError(e.message);}event.target.value='';}
 
  const active=scene?.nodes.find(n=>n.id===selected);
+ const far=!!scene&&(farChoice??(scene.nodes.length+scene.routes.length>=FAR_AUTO));
  return <main><header><strong>Arqlet · React Flow</strong><button onClick={load}>Initial snapshot</button><button onClick={()=>fileInput.current.click()}>Open snapshot</button><input ref={fileInput} type="file" accept=".json" hidden onChange={openFile}/>
   <select aria-label="Profile" disabled={busy||!profiles.length} value="" onChange={e=>applyProfilee(e.target.value)}><option value="" disabled>Choose profile …</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.title??p.id}</option>)}</select>
-  <button disabled={busy||!active?.aggregate} onClick={toggle}>{active?.collapsed?'Expand':'Collapse'}</button><span>{selected??'Select a node'} · {scene?.nodes.length??0} nodes</span></header>
+  <button disabled={busy||!active?.aggregate} onClick={toggle}>{active?.collapsed?'Expand':'Collapse'}</button><label><input type="checkbox" checked={far} disabled={!scene} onChange={e=>setFarChoice(e.target.checked)}/> GPU far layer</label><span>{selected??'Select a node'} · {scene?.nodes.length??0} nodes</span></header>
  {error&&<p role="alert">{error}</p>}
- {scene&&<ReactFlow nodes={nodes} edges={mapped.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={changes=>setNodes(ns=>applyNodeChanges(changes,ns))} onNodeClick={(_,node)=>setSelected(node.id)} nodesDraggable={false} nodesConnectable={false} deleteKeyCode={null} elevateEdgesOnSelect={false} elevateNodesOnSelect={false} minZoom={.02} fitView>
+ {scene&&far&&<FarSceneView scene={scene} selected={selected} onSelect={setSelected}/>}
+ {scene&&!far&&<ReactFlow nodes={nodes} edges={mapped.edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onNodesChange={changes=>setNodes(ns=>applyNodeChanges(changes,ns))} onNodeClick={(_,node)=>setSelected(node.id)} nodesDraggable={false} nodesConnectable={false} deleteKeyCode={null} elevateEdgesOnSelect={false} elevateNodesOnSelect={false} minZoom={.02} fitView>
   <svg style={{position:'absolute',width:0,height:0}}><defs><marker id="lw-rf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#73bba7"/></marker></defs></svg>
   <ViewportPortal>{mapped.labels.map(l=><div className="scene-label" key={`${l.kind}:${l.id}`} style={{left:l.bounds.x,top:l.bounds.y,width:l.bounds.width,height:l.bounds.height}}>{l.text}</div>)}{mapped.crossings.map((c,i)=><div className="crossing" key={i} style={{left:c.position.x-3,top:c.position.y-3}}/>)}</ViewportPortal>
   <FitScene bounds={scene.bounds}/><Controls showInteractive={false}/>

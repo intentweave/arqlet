@@ -1,8 +1,9 @@
 # ADR 0025: A scene renderer with the GPU from afar (WebGPU, WebGL 2) and SVG up close
 
 Date: 2026-11-22.
-Status: accepted, V1 and V2 implemented (provisional, `@arqlet/viewer`: `scene-buffers.js`, `scene-renderer.js`,
-`scene-gpu.js`, `scene-gl.js`, `scene-view.js`); V3 and V4 open. Before, the scene was drawn by `renderSvg` (SVG) or
+Status: accepted, V1, V2 and V4 implemented (provisional, `@arqlet/viewer`: `scene-buffers.js`, `scene-renderer.js`,
+`scene-gpu.js`, `scene-gl.js`, `scene-view.js`; the playground's large-view mode; React Flow as the near layer in
+`examples/react-flow`); V3 open. Before, the scene was drawn by `renderSvg` (SVG) or
 handed to React Flow (`toReactFlow`); the cluster overview has its own WebGL renderer (`overview-gl.js`, ADR 0018).
 Amended on the same day: the far layer draws with WebGPU where the browser offers it and with WebGL 2 as the fallback
 (section 7).
@@ -127,7 +128,7 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
 - **V3 — stable indices and scene changes:** stable per-session indices in `SceneColumns`, D1 changes by index, buffer
   patches. *Exit:* applying a change to the buffers gives the same buffers as drawing the later scene whole (byte for
   byte); a change across a renumbering is refused.
-- **V4 — playground and React Flow:** the playground draws large views with the far layer; a React Flow host takes the
+- **V4 — playground and React Flow (done):** the playground draws large views with the far layer; a React Flow host takes the
   near layer's place. *Exit:* `ui-regression.mjs` covers the switch; the React Flow example keeps working.
 
 ### What V1 and V2 built
@@ -147,6 +148,23 @@ frames. Elements added or removed fade. Stale results are not drawn (the control
   scenes drawn by both backends differ from `renderSvg` in 0.01 % of the pixels without text, and over a zoom sweep in
   and out the near layer's boxes stand exactly where the view puts them, the far layer's within a pixel, with the
   hysteresis visible. Frame times: `benchmarks/results/scene-frames-20261122.md`.
+
+### What V4 built
+
+- The near layer is replaceable: `createSceneView(host, scene, {near})` takes `{element, draw(excerpt, frame),
+  move(frame), clear()}`; the default is `svgNearLayer` (renderSvg). `reactFlowViewport(view, width, height)` gives the
+  viewport under which React Flow shows exactly the view's geometry.
+- Playground: a large-view mode (button *GPU*, key G) draws the scene with the scene view; it is on by itself from
+  1 500 elements (nodes and routes) unless the user chose. Selection (picking from afar, the near layer's handlers),
+  route selection, collapse and expand, pins, Fit and zoom work in it; the editing gestures (drags, resize, ports,
+  labels) and a curation draft use the plain SVG view. Tested in `ui-regression.mjs` (a stand-in scene view: the
+  switch, selection from both layers, redraws, Fit) and in Chrome (`browser-checks/large-view.mjs`: a large example
+  opens far, real wheel zoom hands over to the near layer and back, real clicks select in both).
+- React Flow example: a checkbox *GPU far layer* (on from 1 500 elements): from afar the GPU, up close React Flow with
+  the excerpt and a viewport set from the view; React Flow's own panning and zooming are off, the scene view navigates.
+  Checked in Chrome (`browser-checks/react-flow-near.mjs`).
+- Found on the way: with only lines in view (no leaf), the switch takes the scene's typical leaf as the size on
+  screen, else a zoom onto long edges would never hand over.
 
 ## Measurements before defaults
 

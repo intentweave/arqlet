@@ -5,6 +5,24 @@ import type {SceneRenderer} from './scene-gl.js';
 import type {SceneBackend} from './scene-renderer.js';
 import type {RenderSvgOptions} from './svg.js';
 
+/** What the near layer is told: the view, the rectangle it holds (world), the pane's CSS size and the state. */
+export interface SceneNearFrame {
+  view: SceneViewTransform;
+  held: {x: number; y: number; width: number; height: number};
+  width: number;
+  height: number;
+  state: Record<string, unknown>;
+}
+/** Provisional (ADR 0025, V4): a near layer; the scene view places `element` over the canvas and fades it. */
+export interface SceneNearLayer {
+  element: HTMLElement | SVGElement;
+  /** Draw the excerpt (a scene whose bounds are `held`). */
+  draw(excerpt: Scene, frame: SceneNearFrame): void;
+  /** The view moved within `held`. */
+  move(frame: SceneNearFrame): void;
+  clear(): void;
+}
+
 export interface SceneViewOptions {
   /** The near layer takes over at or below this many elements (nodes and lines) in view; default 400 (provisional). */
   budget?: number;
@@ -16,8 +34,12 @@ export interface SceneViewOptions {
   margin?: number;
   /** Milliseconds of the fade at a switch; none under reduced motion; default 150. */
   fade?: number;
-  /** Options of renderSvg for the near layer (handlers, selection, pins); `scale` and `document` are the view's. */
+  /** Options of renderSvg for the default near layer (handlers, pins); `scale` and `document` are the view's. */
   svg?: Partial<RenderSvgOptions>;
+  /** A near layer of the host's own instead of renderSvg (React Flow, for example). */
+  near?: SceneNearLayer;
+  /** The first state: `selected` and `selectedRoute` for both layers, anything else for the near layer. */
+  state?: Record<string, unknown>;
   /** The far layer's backend (from `sceneBackend`); default WebGL 2 when available, else SVG alone. */
   backend?: SceneBackend;
   /** false without `backend`: SVG only. */
@@ -43,7 +65,8 @@ export interface SceneView {
   setView(view: SceneViewTransform): void;
   fit(): SceneViewTransform;
   setScene(scene: Scene | SceneColumnsLike, options?: {keepView?: boolean}): void;
-  setState(state: {selected?: string | null; selectedRoute?: string | null}): void;
+  /** Merges into the state: the selection goes to both layers, the rest to the near layer. */
+  setState(state: {selected?: string | null; selectedRoute?: string | null; [key: string]: unknown}): void;
   resize(): void;
   /** The element under a CSS pixel from the index. */
   pick(clientX: number, clientY: number): SceneHit | null;
@@ -58,3 +81,8 @@ export function createSceneView(host: HTMLElement, scene: Scene | SceneColumnsLi
 
 /** The scene view with the best backend this browser offers: WebGPU, else WebGL 2, else SVG alone. */
 export function openSceneView(host: HTMLElement, scene: Scene | SceneColumnsLike, options?: SceneViewOptions & {prefer?: 'webgl2' | 'svg'}): Promise<SceneView>;
+
+/** The default near layer: renderSvg on an SVG element, moved by a CSS transform. */
+export function svgNearLayer(doc: Document, svgOptions?: Partial<RenderSvgOptions>): SceneNearLayer;
+/** React Flow's viewport that shows `view` on a pane of `width` by `height` CSS pixels. */
+export function reactFlowViewport(view: SceneViewTransform, width: number, height: number): {x: number; y: number; zoom: number};

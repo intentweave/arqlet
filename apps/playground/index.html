@@ -78,6 +78,9 @@ h2{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#b8c6d6;ma
 /* Canvas with overlaid view controls and a status bar. */
 #stage{position:relative;display:grid;grid-template-rows:minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
 #canvas{overflow:auto;touch-action:none;scrollbar-gutter:stable;min-height:0}
+#canvas.far{overflow:hidden;position:relative}
+#scene-view{position:absolute;inset:0}
+.layer-info{color:var(--muted);font-size:12px;align-self:center;padding:0 4px}
 svg{display:block}
 .node{cursor:pointer}
 g.node:hover>rect,g.node:hover>circle{stroke:#90e4c3;stroke-width:2}
@@ -159,9 +162,9 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
 </aside>
 
 <section id="stage">
- <section id="canvas" aria-label="Graph view"><svg id="graph" role="img" aria-label="Hierarchical code graph"></svg></section>
+ <section id="canvas" aria-label="Graph view"><svg id="graph" role="img" aria-label="Hierarchical code graph"></svg><div id="scene-view" hidden></div></section>
  <div id="curation-badge" role="status" hidden></div>
- <div class="canvas-tools" role="toolbar" aria-label="View"><button id="toggle-tree-panel" aria-pressed="true" title="Show or hide the containment tree">Tree</button><button id="toggle-side-panel" aria-pressed="true" title="Show or hide the details panel">Details</button><span class="sep" aria-hidden="true"></span><button id="fit" title="Fit view (F)">Fit</button><button id="zoom-out" title="Zoom out (−)" aria-label="Zoom out">−</button><button id="zoom" title="Zoom in (+)" aria-label="Zoom in">+</button></div>
+ <div class="canvas-tools" role="toolbar" aria-label="View"><button id="toggle-tree-panel" aria-pressed="true" title="Show or hide the containment tree">Tree</button><button id="toggle-side-panel" aria-pressed="true" title="Show or hide the details panel">Details</button><span class="sep" aria-hidden="true"></span><button id="far-view" aria-pressed="false" title="Large-view mode: GPU from afar, SVG up close; editing gestures in the plain view (G)">GPU</button><span id="layer-info" class="layer-info"></span><span class="sep" aria-hidden="true"></span><button id="fit" title="Fit view (F)">Fit</button><button id="zoom-out" title="Zoom out (−)" aria-label="Zoom out">−</button><button id="zoom" title="Zoom in (+)" aria-label="Zoom in">+</button></div>
  <footer id="statusbar"><p id="status" role="status">Loading snapshot …</p><p id="stats"></p><p id="discarded" class="hint" title="Results of optimization jobs that arrived after the view had changed (or were superseded) and were therefore not applied." hidden></p><span class="hint">Drag a node to move it · drag the background to pan · wheel or F, +, − to zoom</span></footer>
 </section>
 

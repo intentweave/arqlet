@@ -1,6 +1,8 @@
 import {bindNavigation} from '@arqlet/viewer/navigation.js';
 import {loadEngine,sceneOf,createEngineWorker} from '@arqlet/engine-client/engine.js';
 import {renderSvg} from '@arqlet/viewer/svg.js';
+import {openSceneView} from '@arqlet/viewer/scene-view.js';
+import {bindSceneNavigation} from '@arqlet/viewer/scene-renderer.js';
 import {containmentRows} from '@arqlet/containment-tree/model.js';
 import {settingsOf,rootSettingsOf} from '@arqlet/containment-tree/settings.js';
 import {renderContainmentTree,settingsElementOf} from '@arqlet/containment-tree/render.js';
@@ -243,6 +245,53 @@ function applyContainerSizing(id,entry){
  if(!id||!snapshot||pending)return;
  edit({op:'configure',snapshot,options:{containerSizing:{[id]:entry}}},{busy:'Applying container size …',fit:true,remember:'Container size'});
 }
+// Large views (ADR 0025, V4): the scene view draws from afar on the GPU (WebGPU, else WebGL 2) and up close with renderSvg
+// on an excerpt, with selection, routes, collapse and pins. It is on from FAR_AUTO elements unless the user chose
+// (button GPU, key G); the editing gestures (drags, resize, ports, labels, curation) stay in the plain SVG view, which a
+// curation draft or a drag preview always uses.
+const FAR_AUTO=1500;
+let farChoice=null,sceneView=null,sceneViewOpening=null,farNext=null,farHandlers={},unbindFar=null;
+const farWanted=scene=>!curation&&!dragPreview&&(farChoice??(scene.nodes.length+scene.routes.length>=FAR_AUTO));
+// An SVG element has no `hidden` property; the attribute hides it (CSS [hidden]).
+const setHidden=(el,on)=>{if(on)el.setAttribute('hidden','');else el.removeAttribute?.('hidden');el.hidden=on;};
+const farState=()=>({selected,selectedRoute,pinned:new Set(Object.keys(effectiveOptions().pins))});
+function syncFarInfo(){
+ const on=!!sceneView||!!sceneViewOpening;
+ $('far-view').setAttribute('aria-pressed',String(on));
+ $('layer-info').textContent=sceneView?`${sceneView.backend==='svg'?'SVG only':sceneView.backend==='webgpu'?'WebGPU':'WebGL 2'} · ${sceneView.layer==='near'?'near (SVG)':'far'}`:'';
+}
+function showFar(scene,fit){
+ setHidden($('graph'),true);setHidden($('scene-view'),false);$('canvas').classList.add('far');
+ if(sceneView){sceneView.setScene(scene,{keepView:!fit});sceneView.setState(farState());syncFarInfo();return;}
+ farNext={scene,fit};
+ if(sceneViewOpening)return;
+ const host=$('scene-view');
+ sceneViewOpening=openSceneView(host,scene,{state:farState(),onLayer:syncFarInfo,svg:{document,
+  onSelect:(id,e)=>farHandlers.onSelect?.(id,e),onSelectRoute:id=>farHandlers.onSelectRoute?.(id),onToggle:toggleContainer,onPin:(id,on)=>farHandlers.onPin?.(id,on)}}).then(view=>{
+  sceneViewOpening=null;
+  if(!$('canvas').classList.contains('far')){view.destroy();return;}
+  sceneView=view;
+  // The scene view navigates itself; the plain view's scroll navigation on the canvas must not see its events.
+  const stop=e=>e.stopPropagation();
+  for(const t of ['wheel','pointerdown','pointermove'])host.addEventListener(t,stop);
+  const unbind=bindSceneNavigation(host,view,{onClick:(x,y)=>{
+   if(view.layer!=='far')return;
+   const hit=view.pick(x,y);
+   if(hit?.kind==='node')farHandlers.onSelect?.(hit.id);else if(hit?.kind==='route')farHandlers.onSelectRoute?.(hit.id);
+  }});
+  unbindFar=()=>{unbind();for(const t of ['wheel','pointerdown','pointermove'])host.removeEventListener(t,stop);};
+  const next=farNext;farNext=null;
+  if(next){view.setScene(next.scene,{keepView:false});view.setState(farState());}
+  syncFarInfo();
+ }).catch(error=>{sceneViewOpening=null;farChoice=false;status(`Large-view mode is not available: ${error.message}`);draw();});
+ syncFarInfo();
+}
+function hideFar(){
+ if(sceneView){unbindFar?.();unbindFar=null;sceneView.destroy();sceneView=null;}
+ farNext=null;
+ setHidden($('graph'),false);setHidden($('scene-view'),true);$('canvas').classList.remove('far');
+ syncFarInfo();
+}
 function draw(fit=false){
  const baseline=withAggregatedWeights(sceneOf(sceneRun,snapshot),snapshot);
  const scene=curation?curation.scene(baseline):baseline;
@@ -253,8 +302,12 @@ function draw(fit=false){
  const key=`${snapshot.revision}:${snapshot.layoutVersion??0}`;
  if(selectionKey!==key||!scene.routes.some(r=>r.id===selectedRoute)){selectedRoute=null;selectionKey=null;}
  selection.prune({nodes:new Set(scene.nodes.map(n=>n.id)),routes:new Set(scene.routes.map(r=>r.id))});
- renderSvg($('graph'),shown,{document,trace:traceView(),onPortDragStart:(port,e)=>startPortDrag(port,e),onLabelDragStart:(label,e)=>startLabelDrag(label,e),onNodeDragStart:(n,e,opts)=>startDrag(n,e,opts),onToggle:toggleContainer,onPin:(id,on)=>{if(performance.now()<pinClickGuard)return;setPin(id,on);},onReset:resetSize,onResize:startResize,sized:sizedAxes(),selected,selectedRoute,scale,pinned:new Set(Object.keys(effectiveOptions().pins)),onSelect:(id,event)=>{if(suppressClick){suppressClick=false;return;}if(event?.ctrlKey||event?.metaKey)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=(scene.nodes.find(n=>n.id===id)??scene.busLines?.find(b=>b.id===id))?.label??id;draw();},
-  onSelectRoute:id=>{selectedRoute=selectedRoute===id?null:id;selection.selectRoute(selectedRoute);selectionKey=selectedRoute?key:null;selectDetails(selectedRoute?{edgeId:selectedRoute}:null);draw();}});
+ const onSelect=(id,event)=>{if(suppressClick){suppressClick=false;return;}if(event?.ctrlKey||event?.metaKey)selection.toggleNode(id);else selection.replaceNode(id);selected=id;$('selected').textContent=(scene.nodes.find(n=>n.id===id)??scene.busLines?.find(b=>b.id===id))?.label??id;draw();};
+ const onSelectRoute=id=>{selectedRoute=selectedRoute===id?null:id;selection.selectRoute(selectedRoute);selectionKey=selectedRoute?key:null;selectDetails(selectedRoute?{edgeId:selectedRoute}:null);draw();};
+ const onPin=(id,on)=>{if(performance.now()<pinClickGuard)return;setPin(id,on);};
+ farHandlers={onSelect,onSelectRoute,onPin};
+ if(farWanted(shown))showFar(shown,fit);
+ else{hideFar();renderSvg($('graph'),shown,{document,trace:traceView(),onPortDragStart:(port,e)=>startPortDrag(port,e),onLabelDragStart:(label,e)=>startLabelDrag(label,e),onNodeDragStart:(n,e,opts)=>startDrag(n,e,opts),onToggle:toggleContainer,onPin,onReset:resetSize,onResize:startResize,sized:sizedAxes(),selected,selectedRoute,scale,pinned:new Set(Object.keys(effectiveOptions().pins)),onSelect,onSelectRoute});}
  renderTreeView(scene);
   if(curation){markPending();bindCurationGestures($('graph'),curation,scene,{changed:()=>draw(),status,growContainers:()=>true,selectedNodes:()=>selection.nodes});}
  renderInspector();
@@ -760,7 +813,9 @@ function abortGesture(reason){
 $('add').onclick=()=>{if(!selected)return;edit({op:'add',snapshot,sourceId:selected,label:$('name').value||'New function'},{busy:'Local computation …'});};
 // A shape change is an engine operation: the node's outline changes, the other positions are kept as a warm start.
 $('shape-select').onchange=()=>{if(!selected||pending)return;edit({op:'shape',snapshot,nodeId:selected,shape:$('shape-select').value},{busy:'Applying shape …',remember:'Shape'});};
-$('fit').onclick=()=>snapshot&&draw(true);$('zoom').onclick=()=>{autoFit=false;scale=Math.min(scale*1.5,2);if(snapshot)draw();};
+$('fit').onclick=()=>{if(sceneView){sceneView.fit();return;}if(snapshot)draw(true);};
+$('zoom').onclick=()=>{if(sceneView){const v=sceneView.view;sceneView.setView({...v,scale:v.scale*1.5});return;}autoFit=false;scale=Math.min(scale*1.5,2);if(snapshot)draw();};
+$('far-view').onclick=()=>{if(!snapshot)return;farChoice=!(sceneView||sceneViewOpening);draw(true);};
 $('save').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`arqlet-revision-${snapshot.revision}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 // The default graph uses the native precomputation in split and backend modes. Browser-only mode
 // and every other example are imported through the mode's import lane (WASM worker or backend).
@@ -1433,10 +1488,10 @@ $('port-labels').onchange=()=>{
 $('show-ports').onchange=()=>setOption({appearance:{...effectiveOptions().appearance,showPorts:$('show-ports').checked}},'port markers');
 
 bindNavigation($('canvas'),()=>scale,value=>{autoFit=false;scale=value;if(snapshot)draw();});
-$('zoom-out').onclick=()=>{autoFit=false;scale=Math.max(.02,scale/1.5);if(snapshot)draw();};
+$('zoom-out').onclick=()=>{if(sceneView){const v=sceneView.view;sceneView.setView({...v,scale:v.scale/1.5});return;}autoFit=false;scale=Math.max(.02,scale/1.5);if(snapshot)draw();};
 if(typeof ResizeObserver!=='undefined'){
  let frame=0;
- new ResizeObserver(()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;if(snapshot&&autoFit&&!drag)draw(true);});}).observe($('canvas'));
+ new ResizeObserver(()=>{if(frame)return;frame=requestAnimationFrame(()=>{frame=0;if(sceneView){sceneView.resize();return;}if(snapshot&&autoFit&&!drag)draw(true);});}).observe($('canvas'));
 }
 // Either side panel can be hidden to give the canvas room; the choice is kept in this browser.
 for(const [button,name] of [['toggle-tree-panel','hide-tree'],['toggle-side-panel','hide-side']]){
@@ -1444,10 +1499,10 @@ for(const [button,name] of [['toggle-tree-panel','hide-tree'],['toggle-side-pane
  try{apply(localStorage.getItem(`arqlet.${name}`)==='1');}catch{apply(false);}
  $(button).onclick=()=>{const hidden=!document.body.classList.contains(name);apply(hidden);try{localStorage.setItem(`arqlet.${name}`,hidden?'1':'0');}catch{}};
 }
-// View shortcuts: F fits, + and - zoom. Ignored while typing in a field or with a modifier key.
+// View shortcuts: F fits, + and - zoom, G switches the large-view mode. Ignored while typing in a field or with a modifier key.
 document.addEventListener?.('keydown',e=>{
  if(!snapshot||e.metaKey||e.ctrlKey||e.altKey||/^(INPUT|SELECT|TEXTAREA)$/.test(e.target?.tagName??'')||e.target?.isContentEditable)return;
- const action={f:'fit',F:'fit','+':'zoom','=':'zoom','-':'zoom-out'}[e.key];
+ const action={f:'fit',F:'fit','+':'zoom','=':'zoom','-':'zoom-out',g:'far-view',G:'far-view'}[e.key];
  if(!action)return;
  e.preventDefault();$(action).onclick();
 });

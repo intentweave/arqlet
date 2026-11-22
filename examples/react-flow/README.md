@@ -24,6 +24,11 @@ upload a snapshot; an explicit container action sends it to the local backend.
 The production bundle needs a host providing `/generated/snapshot.json` and
 `/api/op`; Vite's development proxy is not included in the bundle.
 
+Large views: the checkbox *GPU far layer* (on by itself from 1 500 elements) draws the scene with `@arqlet/viewer`'s
+scene view: from afar on the GPU (WebGPU, else WebGL 2), up close React Flow with the part in view and a viewport set
+from the view (`reactFlowViewport`), so nothing moves at the switch (ADR 0025). `ARQLET_BACKEND` points the development
+proxy at another port than 8765.
+
 This is a reference viewer, not an editor. Node dragging and edge reconnection
 are disabled. Both viewers use `@arqlet/viewer/scene.js`; supplied routes are never
 recomputed by React Flow. See [scene contract](../../docs/scene-viewers.md).

@@ -8,6 +8,11 @@
 // switch fades over `fade` milliseconds (none under reduced motion); once the near layer is opaque the canvas is hidden.
 // The far layer's backend is WebGPU when `options.backend` carries a device (`openSceneView` asks for one), else WebGL 2;
 // without either the SVG layer draws alone, on every view.
+//
+// The near layer is replaceable (ADR 0025, V4): `options.near` is {element, draw(excerpt, frame), move(frame), clear()}
+// with frame = {view, held, width, height, state}; the scene view places `element` over the canvas and fades it, and
+// the host draws the excerpt in it (React Flow, for example, with its viewport set from the view: `reactFlowViewport`).
+// The default is `svgNearLayer`, `renderSvg` with `options.svg`.
 import {renderSvg} from './svg.js';
 import {createSceneRenderer, webgl2Available} from './scene-gl.js';
 import {createSceneGpuRenderer} from './scene-gpu.js';
@@ -20,7 +25,7 @@ export function createSceneView(host, input, options = {}) {
   const doc = host.ownerDocument;
   const {budget = 400, minPixels = 24, hysteresis = 1.25, margin = 0.5, fade = 150} = options;
   const reduced = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  if ((globalThis.getComputedStyle?.(host).position ?? 'static') === 'static') host.style.position = 'relative';
   host.style.overflow = 'hidden';
   const layerStyle = 'position:absolute;left:0;top:0;width:100%;height:100%;';
   const backend = options.backend ?? {kind: options.webgl !== false && webgl2Available(doc) ? 'webgl2' : 'svg'};
@@ -32,9 +37,9 @@ export function createSceneView(host, input, options = {}) {
     labels = doc.createElement('canvas'); labels.style.cssText = layerStyle + 'pointer-events:none;'; labels.className = 'lw-far-text';
     host.append(canvas, labels);
   }
-  const near = doc.createElementNS(SVG_NS, 'svg');
-  near.setAttribute('class', 'lw-near');
-  near.style.cssText = 'position:absolute;left:0;top:0;overflow:visible;opacity:0;visibility:hidden;';
+  const nearLayer = options.near ?? svgNearLayer(doc, options.svg);
+  const near = nearLayer.element;
+  near.style.position = 'absolute'; near.style.left = '0'; near.style.top = '0'; near.style.opacity = '0'; near.style.visibility = 'hidden';
   host.append(near);
 
   let index = gl ? null : sceneIndex(scene);
@@ -50,16 +55,17 @@ export function createSceneView(host, input, options = {}) {
     return {centreX: b.x + b.width / 2, centreY: b.y + b.height / 2, scale};
   };
   let view = options.view ?? fitView();
-  let state = {selected: options.svg?.selected ?? null, selectedRoute: options.svg?.selectedRoute ?? null};
+  // What the host changes between drawings: the selection for both layers, anything else (pins, sizes) for the near one.
+  let state = {selected: options.svg?.selected ?? options.state?.selected ?? null, selectedRoute: options.svg?.selectedRoute ?? options.state?.selectedRoute ?? null, ...options.state};
   if (gl) {
-    const farOptions = {labels, view, background: options.background, preserveDrawingBuffer: options.preserveDrawingBuffer, ...state};
+    const farOptions = {labels, view, background: options.background, preserveDrawingBuffer: options.preserveDrawingBuffer, selected: state.selected, selectedRoute: state.selectedRoute};
     far = backend.kind === 'webgpu' ? createSceneGpuRenderer(canvas, scene, {...farOptions, device: backend.device}) : createSceneRenderer(canvas, scene, farOptions);
     index = far.index;
   }
   let layer = gl ? 'far' : 'near', held = null, heldScale = 0, timer = 0;
   const counts = {elements: 0, boxPixels: 0, held: 0};
 
-  // The near layer: the excerpt of `held`, drawn by renderSvg at the view's scale and placed where `held` is on screen.
+  // The near layer: the excerpt of `held`, drawn by the near layer at the view's scale and placed where `held` is on screen.
   function drawNear() {
     const rect = viewRect(view, width(), height());
     const grow = gl ? margin : 0;
@@ -67,13 +73,11 @@ export function createSceneView(host, input, options = {}) {
     heldScale = view.scale;
     const excerpt = gl ? sceneExcerpt(scene, index, held) : {...scene};
     counts.held = excerpt.nodes.length + excerpt.routes.length;
-    renderSvg(near, excerpt, {...options.svg, ...state, scale: view.scale, document: doc});
+    nearLayer.draw(excerpt, frame());
     place();
   }
-  function place() {
-    const rect = viewRect(view, width(), height());
-    near.style.transform = `translate(${(held.x - rect.x) * view.scale}px, ${(held.y - rect.y) * view.scale}px)`;
-  }
+  const frame = () => ({view: {...view}, held, width: width(), height: height(), state});
+  function place() { nearLayer.move(frame()); }
   const covers = rect => held && rect.x >= held.x && rect.y >= held.y && rect.x + rect.width <= held.x + held.width && rect.y + rect.height <= held.y + held.height;
 
   function setLayer(next) {
@@ -92,7 +96,7 @@ export function createSceneView(host, input, options = {}) {
       canvas.style.visibility = 'visible'; labels.style.visibility = 'visible';
       far.setView(view); far.draw();
       near.style.opacity = '0';
-      const clear = () => { if (layer === 'far') { near.style.visibility = 'hidden'; near.replaceChildren(); held = null; } };
+      const clear = () => { if (layer === 'far') { near.style.visibility = 'hidden'; nearLayer.clear(); held = null; } };
       if (ms) timer = setTimeout(clear, ms); else clear();
     }
     options.onLayer?.(layer);
@@ -104,7 +108,8 @@ export function createSceneView(host, input, options = {}) {
     if (leafMedian * view.scale < minPixels / hysteresis) { counts.elements = -1; counts.boxPixels = leafMedian * view.scale; return 'far'; }
     const inView = index.query(viewRect(view, width(), height()));
     counts.elements = inView.nodes.size + inView.routes.size;
-    counts.boxPixels = medianBoxPixels(index, inView.nodes, view.scale);
+    // With no leaf in view (only lines or a container's inside), the scene's typical leaf stands for the size on screen.
+    counts.boxPixels = medianBoxPixels(index, inView.nodes, view.scale) || leafMedian * view.scale;
     return nearPolicy({elements: counts.elements, boxPixels: counts.boxPixels, current: layer, budget, minPixels, hysteresis});
   }
 
@@ -113,7 +118,8 @@ export function createSceneView(host, input, options = {}) {
     if (gl && (next === 'far' || layer === 'far')) far.setView(view);
     if (next !== layer) setLayer(next);
     else if (layer === 'near') {
-      if (view.scale !== heldScale || !covers(viewRect(view, width(), height()))) drawNear();
+      // Without a GPU backend the near layer holds the whole scene: only a new scale draws it again.
+      if (view.scale !== heldScale || (gl && !covers(viewRect(view, width(), height())))) drawNear();
       else place();
     }
     options.onView?.(view, layer);
@@ -142,7 +148,7 @@ export function createSceneView(host, input, options = {}) {
     },
     setState(next) {
       state = {...state, ...next};
-      far?.setState(state);
+      far?.setState({selected: state.selected, selectedRoute: state.selectedRoute});
       if (layer === 'near') drawNear();
     },
     resize() { far?.resize(); if (layer === 'near') drawNear(); update(); },
@@ -152,13 +158,37 @@ export function createSceneView(host, input, options = {}) {
       const x = view.centreX + (clientX - rect.left - rect.width / 2) / view.scale, y = view.centreY + (clientY - rect.top - rect.height / 2) / view.scale;
       return index.pick(x, y, 5 / view.scale);
     },
-    destroy() { clearTimeout(timer); far?.destroy(); canvas?.remove(); labels?.remove(); near.remove(); },
+    destroy() { clearTimeout(timer); far?.destroy(); canvas?.remove(); labels?.remove(); nearLayer.clear(); near.remove(); },
   };
   far?.resize();
   if (!gl) drawNear();
   update();
   if (!gl) { near.style.visibility = 'visible'; near.style.opacity = '1'; }
   return api;
+}
+
+/**
+ * The default near layer: `renderSvg` on an SVG element with `svgOptions` (handlers, pins) and the view's state, at the
+ * view's scale, moved by a CSS transform to where its rectangle is on screen.
+ */
+export function svgNearLayer(doc, svgOptions = {}) {
+  const element = doc.createElementNS(SVG_NS, 'svg');
+  element.setAttribute('class', 'lw-near');
+  element.style.overflow = 'visible';
+  return {
+    element,
+    draw(excerpt, {view, state}) { renderSvg(element, excerpt, {...svgOptions, ...state, scale: view.scale, document: doc}); },
+    move({view, held, width, height}) {
+      const rect = viewRect(view, width, height);
+      element.style.transform = `translate(${(held.x - rect.x) * view.scale}px, ${(held.y - rect.y) * view.scale}px)`;
+    },
+    clear() { element.replaceChildren(); },
+  };
+}
+
+/** React Flow's viewport (`{x, y, zoom}`) that shows a view on a pane of `width` by `height`: the same geometry. */
+export function reactFlowViewport(view, width, height) {
+  return {x: width / 2 - view.centreX * view.scale, y: height / 2 - view.centreY * view.scale, zoom: view.scale};
 }
 
 /**

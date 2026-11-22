@@ -204,6 +204,10 @@ Drag the diagram to move it; the mouse wheel zooms at the pointer. Fit, zoom in 
 available. The advanced JSON field passes layout and routing options to `configure`; e.g.
 `{"routingClearance":16,"trackSpacing":12}`.
 
+Large views (ADR 0025): the button *GPU* (key G) draws the view with the scene view, from afar on the GPU (WebGPU, else
+WebGL 2) and up close with the SVG viewer; it is on by itself from 1 500 nodes and routes. Selection, collapse and
+expand, and pins work there; dragging, resizing, ports, labels and curation use the plain SVG view (press G).
+
 `/compare.html` compares two local snapshot JSON files (a demo download or files from
 `benchmarks/results/*-snapshots/`). Both receive current shared metrics from WASM.
 Matching scale is optional; panning stays independent. A different visible graph structure
