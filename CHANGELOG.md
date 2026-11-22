@@ -60,12 +60,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - `reveal` takes the id of a bus given as data (`Graph.buses` with `taps` and no node): it opens the containers above
   the bus (`parentId`), so its line is drawn; with `partial` the bus's own container opens in part, its taps at the rest.
   Before, such an id was refused as an unknown node.
+- A query-only WASM module (provisional, ADR 0021 stage M5c; `publish = false`): `arqlet-query-wasm` holds one graph with its payload (`load`) and answers queries (`query`) with the JSON the engine's `query` operation gives, without the layout engine: 1.08 MB (gzip 0.34 MB) in the `wasm-size` profile against 7.12 MB (1.84 MB) for the engine with `query` (`benchmarks/results/query-m5c-20261122.md`). The new `arqlet-query-json` holds the request and answer and is shared with the engine. `tools/query-wasm.test.mjs` runs the oracle's 40 supported cases through the WASM file. No npm package for it yet (ADR 0021, *M5c: the query-only module*).
+- The operation `query` (provisional, ADR 0021 stage M5b; cargo feature `query` of `arqlet-runtime` and `arqlet-wasm`, off by default): an openCypher query over the source graph and the content of a resident session (ADR 0023, R1), also as a stateless `dispatch` request with `snapshot` and `content`. Answer: `columns`, `rows` (nodes as `{node: id}`, edges as `{edge: id}`), the ids once each, the size of the graph it saw, the content's revision, counts of content it ignored or could not read (a map value reads as null and is counted); `params`, `maxSteps`, `maxRows`, `maxHops` in the request; with `view: true`, `shown` maps each node to the box that shows it and each edge to the line that carries it. Errors read `query <class>: message`. `session.query` in `@arqlet/engine-client`. The playground build and the parity run (`tools/platform-parity.mjs`, `platforms.yml`) switch the feature on; native and WASM answer identically. A query sees the session's source graph, for a bounded import the selection it kept. With the feature the WASM engine is 12 % larger (`benchmarks/results/query-m5b-20261122.md`).
+- The Cypher query layer runs queries (ADR 0021, stages M1 to M5a; provisional, `publish = false`, no `dispatch` operation yet): `arqlet-query` gains values, the store seam, the plan IR and a deterministic executor (three-valued logic, patterns with relationships, variable-length paths, `OPTIONAL MATCH`, `WITH`, `UNWIND`, `DISTINCT`, aggregation, `ORDER BY`, `SKIP`, `LIMIT`, checked integer arithmetic, a work budget in steps, a row limit and a hop limit); `arqlet-query-cypher` lowers decypher's HIR into the plan (the column order, which the HIR loses for aggregating queries, is read from the syntax tree); the new `arqlet-query-model` reads an `arqlet-model` graph in place with a payload table (unresolved edges are left out, payload for unknown ids is ignored and counted); the new tool `arqlet-query GRAPH.json 'QUERY' [--payload F] [--param N=JSON] [--json]` runs a query without the layout engine. All 40 supported cases of `examples/cypher/` give the oracle's rows, over a raw-JSON store and over the real model. Not yet: `UNION`, the power operator, a path variable, `RETURN *`.
 - The first two crates of the Cypher query layer (ADR 0021; provisional, `publish = false`, no operation yet):
   `arqlet-query` (error classes) and `arqlet-query-cypher`, which checks a query with decypher and rejects, from its
   syntax tree, what decypher drops silently (`shortestPath`, quantified paths, `WHERE` inside a pattern: upstream #132 to
   #134), writes, `CALL`, subqueries, `=~` and unknown functions. A test runs the guard against the fixtures of
   `examples/cypher/`. Both crates are usable without the layout engine; `tools/check-query-isolation.mjs` checks it in
-  CI, for the host and for wasm32. No executor, no plan IR and no `dispatch` operation yet.
+  CI, for the host and for wasm32. (The plan IR and the executor followed; see the entry above.)
 - Memberships across the hierarchy, first slice (provisional, ADR 0022): `Graph.memberships` (dimensions of groups,
   besides the containment) and `LayoutOptions.membershipViews`; a dimension shown as `overlay` is drawn as a padded
   convex hull behind the nodes (`Scene.membershipHulls`, with the boxes it encloses and the foreign leaf boxes inside
@@ -131,6 +134,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- Membership hulls are rectangles by default (provisional, ADR 0022 §3): the padded bounding box of a group's boxes,
+  instead of the padded convex polygon drawn so far. `LayoutOptions.membershipHull: "polygon"` gives the previous
+  outline. A rectangle encloses at least as much as the polygon, so a view with overlays may report more intruders.
+  Drawing only: no node moves and no route changes; views without `membershipViews` are unchanged.
 - The playground runs its view through the view controller: every change, the undo stack (now also covering the
   three modes through `execute`), drags and refinement results handed over with `adopt`.
 - The remembered state (`intent`) keeps the filter (`hidden`), so a step back undoes a filter.

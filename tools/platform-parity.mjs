@@ -4,8 +4,8 @@
 // platform computes the same). Prints one line per request and, with `--digest`, the SHA-256 of each response, so that
 // runs on different platforms can be compared directly. Exits 1 on any difference.
 //
-//   cargo build --release -p arqlet-runtime --bin layout-command --locked
-//   cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --locked
+//   cargo build --release -p arqlet-runtime --bin layout-command --features query --locked
+//   cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --features query --locked
 //   python3 benchmarks/generate.py --no-manifest
 //   python3 benchmarks/overview/generate.py --nodes 10000 --seed 1 --out benchmarks/datasets/overview-10000.json
 //   node tools/platform-parity.mjs [--digest]
@@ -36,6 +36,21 @@ const requests = [
   ['elkLayout refined', {op: 'elkLayout', graph: elk, refine: true}],
   ['overview 10 000', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json')}],
 ];
+// The operation `query` (ADR 0021, M5b) on a snapshot and its content, without a session: the rows must be the same
+// natively and in WASM. (Without the cargo feature both engines answer the same refusal, which also compares equal.)
+const imported = JSON.parse(execFileSync(native, {
+  input: JSON.stringify({op: 'import', graph: graph('benchmarks/datasets/organic-100.json'), limit: 200}),
+  maxBuffer: 1 << 30,
+}).toString());
+const content = {nodes: Object.fromEntries(graph('benchmarks/datasets/organic-100.json').nodes.slice(0, 40).map((n, i) => [n.id, {rank: i, tag: i % 3 === 0 ? 'x' : 'y'}]))};
+for (const [name, query] of [
+  ['query nodes by kind', 'MATCH (n) RETURN n.kind, count(*) ORDER BY n.kind'],
+  ['query content filter', "MATCH (n) WHERE n.tag = 'x' RETURN n.id, n.rank ORDER BY n.rank SKIP 2 LIMIT 5"],
+  ['query two hops', 'MATCH (a)-[r1]->(b)-[r2]->(c) RETURN a.id, c.id ORDER BY a.id, c.id LIMIT 20'],
+  ['query paths with a view', 'MATCH (a)-[*1..2]->(b) RETURN DISTINCT b.id ORDER BY b.id LIMIT 10'],
+]) {
+  requests.push([name, {op: 'query', query, snapshot: imported.snapshot, content, view: name.includes('view')}]);
+}
 const digest = process.argv.includes('--digest');
 let differ = 0;
 for (const [name, request] of requests) {

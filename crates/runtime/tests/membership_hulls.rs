@@ -5,7 +5,7 @@
 //!    hulls are the only addition, so no quality gate is needed to accept the step.
 //! 2. **A default view is untouched.** Without `membershipViews`, a graph carrying `memberships` serializes and draws
 //!    exactly as the same graph without them.
-use arqlet_model::{Graph, LayoutOptions, MembershipView, Snapshot};
+use arqlet_model::{Graph, HullShape, LayoutOptions, MembershipView, Snapshot};
 use arqlet_runtime::import_graph_with;
 use arqlet_scene::{build_scene, Scene};
 use std::collections::BTreeMap;
@@ -95,6 +95,58 @@ fn the_overlay_adds_hulls_and_moves_nothing() {
             "a hull is invisible to the router, so no route may change"
         );
     }
+}
+
+#[test]
+fn both_hull_shapes_draw_the_same_groups_and_move_nothing() {
+    for text in [THREE_DIMENSIONS, CROSSES_CONTAINERS, ONE_GROUP_PER_NODE] {
+        let g = graph(text);
+        let rectangle = overlay_all(&g);
+        let mut polygon = overlay_all(&g);
+        polygon.membership_hull = HullShape::Polygon;
+        let (_, plain) = laid_out(text, &LayoutOptions::default());
+        let (_, boxes) = laid_out(text, &rectangle);
+        let (_, hulls) = laid_out(text, &polygon);
+
+        // The shape is drawing only: the same nodes, the same routes, the same groups and the same boxes per group.
+        assert_eq!(geometry(&plain), geometry(&boxes));
+        assert_eq!(geometry(&plain), geometry(&hulls));
+        let groups = |s: &Scene| -> Vec<(String, String, Vec<String>)> {
+            s.membership_hulls
+                .iter()
+                .map(|h| (h.dimension.clone(), h.group.clone(), h.boxes.clone()))
+                .collect()
+        };
+        assert_eq!(groups(&boxes), groups(&hulls));
+
+        for (r, p) in boxes.membership_hulls.iter().zip(&hulls.membership_hulls) {
+            // The default is a rectangle: four corners, every edge axis-parallel.
+            assert_eq!(r.points.len(), 4, "{}: a rectangle", r.group);
+            for i in 0..4 {
+                let (a, b) = (&r.points[i], &r.points[(i + 1) % 4]);
+                assert!(a.x == b.x || a.y == b.y, "{}: a slanted edge", r.group);
+            }
+            // The rectangle encloses the polygon, so it can only find as many intruders or more, never fewer.
+            assert!(
+                p.points
+                    .iter()
+                    .all(|q| arqlet_scene::hull::contains(&r.points, q)),
+                "{}: the polygon reaches outside the rectangle",
+                r.group
+            );
+            assert!(r.intruders.len() >= p.intruders.len(), "{}", r.group);
+        }
+    }
+    // The default is omitted: options that only set the polygon mention it, the default does not.
+    let text = serde_json::to_string(&LayoutOptions::default()).unwrap();
+    assert!(!text.contains("membershipHull"));
+    let polygon = LayoutOptions {
+        membership_hull: HullShape::Polygon,
+        ..LayoutOptions::default()
+    };
+    assert!(serde_json::to_string(&polygon)
+        .unwrap()
+        .contains(r#""membershipHull":"polygon""#));
 }
 
 #[test]

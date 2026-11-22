@@ -1,0 +1,31 @@
+{
+  "defaultDirection": "auto",
+  "nodes": [
+    { "id": "A", "kind": "group", "label": "A", "parentId": null },
+    { "id": "a", "kind": "node", "label": "a", "parentId": "A" },
+    { "id": "b", "kind": "node", "label": "b", "parentId": "A" },
+    { "id": "s", "kind": "node", "label": "s", "parentId": "A" },
+    { "id": "c", "kind": "node", "label": "c", "parentId": null },
+    { "id": "d", "kind": "node", "label": "d", "parentId": null }
+  ],
+  "edges": [
+    { "id": "ab", "kind": "flow", "source": "a", "target": "b" },
+    { "id": "sa", "kind": "flow", "source": "s", "target": "a" },
+    { "id": "sb", "kind": "flow", "source": "s", "target": "b" },
+    { "id": "ca", "kind": "flow", "source": "c", "target": "a" },
+    { "id": "cs", "kind": "flow", "source": "c", "target": "s" },
+    { "id": "ds", "kind": "flow", "source": "d", "target": "s" },
+    { "id": "dc", "kind": "flow", "source": "d", "target": "c" }
+  ],
+  "memberships": {
+    "dimensions": [
+      {
+        "id": "team",
+        "label": "Team",
+        "groups": [{ "id": "B", "label": "B", "members": ["s", "c", "d"] }]
+      }
+    ]
+  },
+  "membershipViews": { "team": "overlay" },
+  "groupingPriority": [{ "by": "parent" }, { "by": "team" }]
+}

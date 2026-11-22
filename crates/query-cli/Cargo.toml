@@ -1,0 +1,24 @@
+[package]
+name = "arqlet-query-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Provisional: arqlet-query, a command that runs an openCypher query over an Arqlet graph file, without the layout engine (ADR 0021, M5a)."
+publish = false
+
+[[bin]]
+name = "arqlet-query"
+path = "src/main.rs"
+
+# A host: it may read files and write to the terminal. It takes no layout, routing, scene, view, runtime or WASM crate
+# (`tools/check-query-isolation.mjs`).
+[dependencies]
+arqlet-model = { workspace = true }
+arqlet-query = { workspace = true }
+arqlet-query-cypher = { workspace = true }
+arqlet-query-model = { workspace = true }
+serde_json = "1"

@@ -277,6 +277,8 @@ impl EngineSession {
             }
             Some("find") => crate::find::find_on_with(self.current()?, v, Some(&self.content)),
             Some("peek") => crate::peek::peek_on(self.current()?, v),
+            // Provisional (ADR 0021, M5b): a query over the source graph and the session's content.
+            Some("query") => crate::query::query_on(self.current()?, Some(&self.content), v),
             Some("digest") => Ok(crate::find::digest_on(self.current()?)),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))
