@@ -20,9 +20,10 @@ export function toReactFlow(scene,{overlayNode=false,draggable=false}={}){
  });
  const edges=scene.routes.filter(r=>r.points.length>=2).map(r=>({id:r.id,source:r.source,target:r.target,sourceHandle:`source:${r.id}`,targetHandle:`target:${r.id}`,type:'arqlet',zIndex:1,deletable:false,data:r}));
  // What is neither a node nor an edge between two nodes, in flow coordinates (the scene's): bus bars with their taps, the
- // junction dots where shared lines branch, and the stubs of hub references.
- const overlays={busLines:scene.busLines??[],junctions:scene.junctions??[],hubRefs:scene.hubRefs??[]};
- if(overlayNode&&(overlays.busLines.length||overlays.junctions.length||overlays.hubRefs.length)){
+ // junction dots where shared lines branch, the stubs of hub references and the membership hulls.
+ // Membership hulls (ADR 0022) too: polygons behind the nodes, one hue per dimension as renderSvg draws them.
+ const overlays={busLines:scene.busLines??[],junctions:scene.junctions??[],hubRefs:scene.hubRefs??[],hulls:scene.membershipHulls??[]};
+ if(overlayNode&&(overlays.busLines.length||overlays.junctions.length||overlays.hubRefs.length||overlays.hulls.length)){
   // One node over the whole scene that draws them (type `arqletOverlay`); `origin` turns flow into node coordinates.
   const b=scene.bounds;
   nodes.push({id:'arqlet:overlay',type:'arqletOverlay',position:{x:b.x,y:b.y},width:b.width,height:b.height,

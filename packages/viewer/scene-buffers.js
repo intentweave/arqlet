@@ -17,7 +17,7 @@ export const SEGMENT_STRIDE = 13;
 /** Floats per triangle vertex: x, y, depth, RGBA. */
 export const TRIANGLE_STRIDE = 7;
 /** The layers in drawing order. */
-export const LAYERS = ['hulls', 'containers', 'routes', 'leaves', 'marks'];
+export const LAYERS = ['hulls', 'containers', 'routes', 'leaves', 'marks', 'overlay'];
 
 const hex = (h, alpha = 1) => {
   const v = parseInt(h.slice(1), 16);
@@ -38,6 +38,7 @@ export const COLOURS = {
   route: hex('#73bba7'), activeRoute: hex('#c8f5e4'), arrow: hex('#73bba7'),
   bus: hex('#6f93b8'), busSelected: hex('#90e4c3'), hubFill: hex('#142133'), hubStroke: hex('#3b5068'),
   portSource: hex('#7ee1bc'), portTarget: hex('#9dbaff'), crossing: hex('#edc477'), label: hex('#142133'),
+  pin: hex('#edc477'), trace: hex('#ffc861'), hover: hex('#7fb4ff'),
   text: '#edf5ff', title: '#9eb8d1', row: '#c4d6e8', busText: '#9fc3e6',
 };
 
@@ -106,12 +107,25 @@ export const sceneOf = scene => (isSceneColumns(scene) ? sceneOfColumns(scene) :
 
 /**
  * What the WebGL renderer draws for `scene` (a scene or its columns): per layer the box instances, segment instances
- * and triangle vertices, the texts, and the index. `state`: `selected` (node id), `selectedRoute` (route id).
+ * and triangle vertices, the texts, and the index. `state` as renderSvg's options: `selected` (node id), `selectedRoute`
+ * (route id), `pinned` (ids; a dot on each pinned leaf), `trace` ({nodes, routes, distance, fade}: the path in amber,
+ * the rest receding, as renderSvg's trace). The last layer (overlay) is left empty: `hoverBuffers` fills it.
  */
 export function sceneBuffers(input, state = {}) {
   const scene = sceneOf(input);
   if (scene.schemaVersion !== 1) throw Error('Unsupported scene schema');
-  const {selected = null, selectedRoute = null} = state;
+  const {selected = null, selectedRoute = null, trace = null} = state;
+  const pinned = state.pinned instanceof Set ? state.pinned : new Set(state.pinned ?? []);
+  // The trace (renderSvg's applyTrace): routes and nodes on the path in amber and stronger, the other routes receding;
+  // with fade, every node the fainter the farther it is from the path.
+  const onPath = new Set(trace?.nodes ?? []), onTraceRoute = new Set(trace?.routes ?? []);
+  const hops = id => (trace?.distance instanceof Map ? trace.distance.get(id) : trace?.distance?.[id]);
+  const faint = id => { if (!trace?.fade || onPath.has(id)) return 1; const d = hops(id); return d === undefined ? 0.12 : Math.max(0.15, 1 - 0.3 * d); };
+  const traced = (id, colour, width, opacity) => {
+    if (!trace) return {colour: withAlpha(colour, opacity), width};
+    if (onTraceRoute.has(id)) return {colour: COLOURS.trace, width: width + 1.5};
+    return {colour: withAlpha(colour, trace.fade ? 0.08 : 0.25), width};
+  };
   const layers = LAYERS.map(() => ({boxes: new Floats(), segments: new Floats(), triangles: new Floats()}));
   const [hullLayer, containerLayer, routeLayer, leafLayer, markLayer] = layers;
   const texts = [];
@@ -145,15 +159,15 @@ export function sceneBuffers(input, state = {}) {
 
   // Containers, outer first.
   for (const n of scene.nodes.filter(n => parents.has(n.id)).sort((a, b) => depthOf(a) - depthOf(b))) {
-    const r = n.bounds, round = n.shape === 'circle';
-    const stroke = invalid(n.id) ? COLOURS.invalid : COLOURS.frameStroke;
+    const r = n.bounds, round = n.shape === 'circle', a = faint(n.id), lit = onPath.has(n.id);
+    const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : COLOURS.frameStroke, a), fill = withAlpha(COLOURS.frame, a), width = lit ? 2.5 : 1;
     if (round) {
       const rad = Math.min(r.width, r.height) / 2, mx = r.x + r.width / 2, my = r.y + r.height / 2;
-      box(containerLayer, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, 1, COLOURS.frame, stroke);
-      text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: COLOURS.title, align: 'center'});
+      box(containerLayer, {x: mx - rad, y: my - rad, width: 2 * rad, height: 2 * rad}, rad, 1, width, fill, stroke);
+      text({x: mx, y: my - rad + Math.min(34, rad * 0.3), text: n.label.slice(0, 55), size: 14, colour: fadeCss(COLOURS.title, a), align: 'center'});
     } else {
-      box(containerLayer, r, 10, 0, 1, COLOURS.frame, stroke);
-      text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: COLOURS.title});
+      box(containerLayer, r, 10, 0, width, fill, stroke);
+      text({x: r.x + 12, y: r.y + 25, text: '▾ ' + n.label.slice(0, 55), size: 14, colour: fadeCss(COLOURS.title, a)});
     }
     if (n.kind === 'entity') containerLayer.segments.push(r.x, r.y + 34, r.x + r.width, r.y + 34, 1, 0, 0, 0, 0, ...COLOURS.frameStroke);
   }
@@ -168,14 +182,14 @@ export function sceneBuffers(input, state = {}) {
     const width = (aggregated ? Math.min(7, 1 + 1.2 * Math.log2(total + 1)) : Math.min(4, 1.6 + 0.4 * (weight - 1))) + (isActive ? 1.5 : 0);
     const opacity = dim ? 0.2 : isActive ? 1 : aggregated ? 0.3 + 0.55 * Math.min(1, Math.log2(total + 1) / 6) : 0.75;
     const colour = route.invalid || conflictedRoutes.has(route.id) ? COLOURS.invalid : isActive ? COLOURS.activeRoute : COLOURS.route;
-    lines.push({points: route.points, width, colour: withAlpha(colour, opacity), start: back > 0});
+    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0});
     if ((aggregated && total > 1) || weight > 1) {
       const mid = route.points[Math.floor(route.points.length / 2)];
       text({x: mid.x + 6, y: mid.y - 6, text: aggregated && back ? `${weight} ⇄ ${back}` : String(weight), size: 12, colour: COLOURS.text});
     }
   }
-  for (const bus of scene.busLines ?? []) for (const tap of bus.taps) lines.push({points: tap.points, width: 1.6, colour: withAlpha(COLOURS.route, active ? 0.2 : 0.75)});
-  for (const ref of scene.hubRefs ?? []) lines.push({points: ref.points, width: 1.6, colour: withAlpha(COLOURS.route, active ? 0.2 : 0.85)});
+  for (const bus of scene.busLines ?? []) for (const tap of bus.taps) lines.push({points: tap.points, ...traced(tap.edge, COLOURS.route, 1.6, active ? 0.2 : 0.75)});
+  for (const ref of scene.hubRefs ?? []) lines.push({points: ref.points, ...traced(ref.edge, COLOURS.route, 1.6, active ? 0.2 : 0.85)});
   lines.forEach((line, i) => {
     // Later lines nearer (smaller depth), as later SVG elements cover earlier ones.
     const depth = 1 - (i + 1) / (lines.length + 2);
@@ -190,8 +204,8 @@ export function sceneBuffers(input, state = {}) {
     }
   });
   for (const bus of scene.busLines ?? []) {
-    const r = bus.bounds, on = bus.id === selected;
-    box(routeLayer, r, Math.min(r.width, r.height) / 2, 0, 1, on ? COLOURS.busSelected : COLOURS.bus, on ? COLOURS.busSelected : COLOURS.leafStroke);
+    const r = bus.bounds, on = bus.id === selected, a = faint(bus.id), lit = onPath.has(bus.id);
+    box(routeLayer, r, Math.min(r.width, r.height) / 2, 0, lit ? 2.5 : 1, withAlpha(on ? COLOURS.busSelected : COLOURS.bus, a), withAlpha(lit ? COLOURS.trace : on ? COLOURS.busSelected : COLOURS.leafStroke, a));
     const flat = r.width >= r.height, at = busLabelAt(bus, flat);
     text(flat ? {x: at, y: r.y - 6, text: bus.label.slice(0, 40), size: 12, colour: COLOURS.busText, align: 'center'}
       : {x: r.x + r.width + 14, y: at, text: bus.label.slice(0, 40), size: 12, colour: COLOURS.busText, align: 'center', angle: -Math.PI / 2});
@@ -205,15 +219,21 @@ export function sceneBuffers(input, state = {}) {
 
   // Leaves.
   for (const n of scene.nodes.filter(n => !parents.has(n.id))) {
-    const r = n.bounds, faded = active && !endpoints.has(n.id) ? 0.4 : 1;
+    const r = n.bounds, faded = (active && !endpoints.has(n.id) ? 0.4 : 1) * faint(n.id), lit = onPath.has(n.id);
     const fill = withAlpha(n.id === selected ? COLOURS.selectedFill : COLOURS.leaf, faded);
-    const stroke = withAlpha(invalid(n.id) ? COLOURS.invalid : n.id === selected ? COLOURS.selectedStroke : COLOURS.leafStroke, faded);
+    const stroke = withAlpha(lit ? COLOURS.trace : invalid(n.id) ? COLOURS.invalid : n.id === selected ? COLOURS.selectedStroke : COLOURS.leafStroke, faded);
+    const strokeWidth = lit ? 2.5 : 1;
     const attribute = n.kind === 'attribute', round = n.shape === 'circle' && !attribute && !n.rows?.length;
     const dash = n.kind === 'rest' ? 1 : 0;
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     if (!attribute) {
-      if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, 1, fill, stroke, dash); }
-      else box(leafLayer, r, 7, 0, 1, fill, stroke, dash);
+      if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, strokeWidth, fill, stroke, dash); }
+      else box(leafLayer, r, 7, 0, strokeWidth, fill, stroke, dash);
+    }
+    // A pinned leaf: renderSvg's dot (drawn there when the host has no pin control, which the far layer never has).
+    if (pinned.has(n.id) && !attribute) {
+      const rad = Math.min(r.width, r.height) / 2, px = round ? cx + rad * 0.62 : r.x + r.width - 10, py = round ? cy - rad * 0.62 : r.y + 10;
+      box(leafLayer, {x: px - 4, y: py - 4, width: 8, height: 8}, 4, 1, 0, withAlpha(COLOURS.pin, faded), NONE);
     }
     const colour = faded < 1 ? fadeCss(COLOURS.text, faded) : COLOURS.text;
     if (!n.rows?.length) {
@@ -240,6 +260,7 @@ export function sceneBuffers(input, state = {}) {
 
   return {
     scene,
+    state: {...state},
     bounds: scene.bounds,
     layers: layers.map(l => ({boxes: l.boxes.done(), segments: l.segments.done(), triangles: l.triangles.done()})),
     texts,
@@ -247,8 +268,23 @@ export function sceneBuffers(input, state = {}) {
   };
 }
 
+/**
+ * The overlay layer for the element under the pointer: renderSvg's hover outline (#7fb4ff) on a leaf, a container or a
+ * bus bar; empty for none. Small, so that a hover never rebuilds the scene's buffers.
+ */
+export function hoverBuffers(scene, id) {
+  const out = {boxes: new Floats(), segments: new Floats(), triangles: new Floats()};
+  const n = id == null ? null : scene.nodes.find(m => m.id === id) ?? scene.busLines?.find(b => b.id === id);
+  if (n && n.kind !== 'attribute') {
+    const r = n.bounds, bar = !scene.nodes.includes(n), round = !bar && n.shape === 'circle' && !(n.rows?.length && !n.container);
+    if (round) { const rad = Math.min(r.width, r.height) / 2, cx = r.x + r.width / 2, cy = r.y + r.height / 2; out.boxes.push(cx - rad, cy - rad, 2 * rad, 2 * rad, rad, 1, 2, 0, ...NONE, ...COLOURS.hover); }
+    else out.boxes.push(r.x, r.y, r.width, r.height, bar ? Math.min(r.width, r.height) / 2 : n.container ? 10 : 7, 0, 2, 0, ...NONE, ...COLOURS.hover);
+  }
+  return {boxes: out.boxes.done(), segments: out.segments.done(), triangles: out.triangles.done()};
+}
+
 const fadeCss = (css, a) => {
-  if (a >= 1) return css;
+  if (a >= 1 || !css.startsWith('#')) return css;
   const c = hex(css);
   return `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
 };

@@ -16,7 +16,7 @@ in vec2 a_corner;
 in vec4 a_rect; in vec4 a_shape; in vec4 a_fill; in vec4 a_stroke;
 uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size;
 out vec2 v_p; out vec2 v_half; out float v_radius; out float v_stroke; out float v_kind; out float v_dash;
-out vec4 v_fill; out vec4 v_strokeColour; out float v_unit;
+out vec4 v_fill; out vec4 v_strokeColour; out float v_unit; out float v_thin;
 void main() {
   vec2 centre = (a_rect.xy + a_rect.zw * 0.5 - u_centre) * u_scale;
   // At least half a device pixel, so that a box far out stays a dot.
@@ -29,11 +29,13 @@ void main() {
   v_p = a_corner * extent; v_half = half_; v_radius = min(a_shape.x * u_scale, min(half_.x, half_.y));
   v_kind = a_shape.y; v_stroke = stroke; v_dash = a_shape.w; v_unit = u_scale;
   v_fill = a_fill; v_strokeColour = a_stroke;
+  // A stroke thinner than a pixel is drawn one pixel wide with its coverage as opacity, as SVG rasterises it.
+  v_thin = a_shape.z > 0.0 ? min(a_shape.z * u_scale, 1.0) : 0.0;
 }`;
 const BOX_FS = `#version 300 es
 precision highp float;
 in vec2 v_p; in vec2 v_half; in float v_radius; in float v_stroke; in float v_kind; in float v_dash;
-in vec4 v_fill; in vec4 v_strokeColour; in float v_unit;
+in vec4 v_fill; in vec4 v_strokeColour; in float v_unit; in float v_thin;
 out vec4 colour;
 void main() {
   float d;
@@ -48,7 +50,7 @@ void main() {
     if (mod(along / v_unit, 10.0) > 6.0) stroke = 0.0;
   }
   vec4 f = vec4(v_fill.rgb * v_fill.a, v_fill.a) * fill;
-  vec4 s = vec4(v_strokeColour.rgb * v_strokeColour.a, v_strokeColour.a) * stroke;
+  vec4 s = vec4(v_strokeColour.rgb * v_strokeColour.a, v_strokeColour.a) * stroke * v_thin;
   colour = s + f * (1.0 - s.a);
   if (colour.a <= 0.0) discard;
 }`;
@@ -56,7 +58,7 @@ const SEGMENT_VS = `#version 300 es
 in vec2 a_corner;
 in vec4 a_ends; in vec4 a_style; in float a_from; in vec4 a_colour;
 uniform vec2 u_centre; uniform float u_scale; uniform vec2 u_size;
-out float v_across; out float v_half; out float v_along; out vec2 v_dash; out vec4 v_colour;
+out float v_across; out float v_half; out float v_along; out vec2 v_dash; out vec4 v_colour; out float v_thin;
 void main() {
   vec2 p0 = (a_ends.xy - u_centre) * u_scale, p1 = (a_ends.zw - u_centre) * u_scale;
   vec2 d = p1 - p0; float len = length(d);
@@ -67,16 +69,16 @@ void main() {
   vec2 screen = end + normal * across;
   vec2 clip = screen / (u_size * 0.5);
   gl_Position = vec4(clip.x, -clip.y, a_style.y * 2.0 - 1.0, 1.0);
-  v_across = across; v_half = half_; v_colour = a_colour; v_dash = a_style.zw;
+  v_across = across; v_half = half_; v_colour = a_colour; v_dash = a_style.zw; v_thin = min(a_style.x * u_scale, 1.0);
   v_along = a_from + (a_corner.x < 0.0 ? -half_ : len + half_) / u_scale;
 }`;
 const SEGMENT_FS = `#version 300 es
 precision highp float;
-in float v_across; in float v_half; in float v_along; in vec2 v_dash; in vec4 v_colour;
+in float v_across; in float v_half; in float v_along; in vec2 v_dash; in vec4 v_colour; in float v_thin;
 out vec4 colour;
 void main() {
   if (v_dash.x > 0.0 && mod(v_along, v_dash.x + v_dash.y) > v_dash.x) discard;
-  float a = clamp(v_half + 0.5 - abs(v_across), 0.0, 1.0) * v_colour.a;
+  float a = clamp(v_half + 0.5 - abs(v_across), 0.0, 1.0) * v_colour.a * v_thin;
   if (a <= 0.0) discard;
   colour = vec4(v_colour.rgb * a, a);
 }`;

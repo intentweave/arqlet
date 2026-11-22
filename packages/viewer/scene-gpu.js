@@ -24,7 +24,7 @@ struct Out {
   @builtin(position) position: vec4f,
   @location(0) p: vec2f, @location(1) extent: vec2f, @location(2) radius: f32, @location(3) stroke: f32,
   @location(4) kind: f32, @location(5) dash: f32, @location(6) fill: vec4f, @location(7) strokeColour: vec4f,
-  @location(8) unit: f32,
+  @location(8) unit: f32, @location(9) thin: f32,
 };
 @vertex fn vs(@location(0) corner: vec2f, @location(1) rect: vec4f, @location(2) shape: vec4f,
               @location(3) fill: vec4f, @location(4) strokeColour: vec4f) -> Out {
@@ -38,6 +38,9 @@ struct Out {
   o.position = toClip(centre + corner * reach, 0.0);
   o.p = corner * reach; o.extent = h; o.radius = min(shape.x * view.scale, min(h.x, h.y));
   o.stroke = stroke; o.kind = shape.y; o.dash = shape.w; o.fill = fill; o.strokeColour = strokeColour; o.unit = view.scale;
+  // A stroke thinner than a pixel is drawn one pixel wide with its coverage as opacity, as SVG rasterises it.
+  o.thin = 0.0;
+  if (shape.z > 0.0) { o.thin = min(shape.z * view.scale, 1.0); }
   return o;
 }
 @fragment fn fs(i: Out) -> @location(0) vec4f {
@@ -56,7 +59,7 @@ struct Out {
     if (wrap(along / i.unit, 10.0) > 6.0) { stroke = 0.0; }
   }
   let f = vec4f(i.fill.rgb * i.fill.a, i.fill.a) * fill;
-  let s = vec4f(i.strokeColour.rgb * i.strokeColour.a, i.strokeColour.a) * stroke;
+  let s = vec4f(i.strokeColour.rgb * i.strokeColour.a, i.strokeColour.a) * stroke * i.thin;
   let colour = s + f * (1.0 - s.a);
   if (colour.a <= 0.0) { discard; }
   return colour;
@@ -66,7 +69,7 @@ const SEGMENT = COMMON + `
 struct Out {
   @builtin(position) position: vec4f,
   @location(0) across: f32, @location(1) halfWidth: f32, @location(2) along: f32, @location(3) dash: vec2f,
-  @location(4) colour: vec4f,
+  @location(4) colour: vec4f, @location(5) thin: f32,
 };
 @vertex fn vs(@location(0) corner: vec2f, @location(1) ends: vec4f, @location(2) style: vec4f,
               @location(3) startAlong: f32, @location(4) colour: vec4f) -> Out {
@@ -84,12 +87,12 @@ struct Out {
   if (corner.x < 0.0) { end = p0 - dir * hw; along = startAlong - hw / view.scale; }
   let across = corner.y * (hw + 1.0);
   o.position = toClip(end + normal * across, style.y);
-  o.across = across; o.halfWidth = hw; o.along = along; o.dash = style.zw; o.colour = colour;
+  o.across = across; o.halfWidth = hw; o.along = along; o.dash = style.zw; o.colour = colour; o.thin = min(style.x * view.scale, 1.0);
   return o;
 }
 @fragment fn fs(i: Out) -> @location(0) vec4f {
   if (i.dash.x > 0.0 && wrap(i.along, i.dash.x + i.dash.y) > i.dash.x) { discard; }
-  let a = clamp(i.halfWidth + 0.5 - abs(i.across), 0.0, 1.0) * i.colour.a;
+  let a = clamp(i.halfWidth + 0.5 - abs(i.across), 0.0, 1.0) * i.colour.a * i.thin;
   if (a <= 0.0) { discard; }
   return vec4f(i.colour.rgb * a, a);
 }`;

@@ -77,7 +77,7 @@ test('React Flow returns bus bars, junctions and hub references as overlays, opt
   const base = scene('state-tcp');
   // Without them nothing is added.
   const plain = toReactFlow(base, {overlayNode: true});
-  assert.deepEqual([plain.busLines, plain.junctions, plain.hubRefs], [[], [], []]);
+  assert.deepEqual([plain.busLines, plain.junctions, plain.hubRefs, plain.hulls], [[], [], [], []]);
   assert.ok(!plain.nodes.some(n => n.id === 'arqlet:overlay'));
   // A scene that has them: they come back in flow coordinates, unchanged.
   const busLines = [{id: 'can', label: 'CAN', kind: 'bus', bounds: {x: 10, y: 20, width: 200, height: 8},
@@ -102,6 +102,11 @@ test('React Flow returns bus bars, junctions and hub references as overlays, opt
   assert.equal(overlay.style.pointerEvents, 'none');
   assert.deepEqual(overlay.data.busLines, busLines);
   assert.equal(withNode.nodes.at(-1), overlay, 'after every scene node');
+  // Hulls alone are reason enough for the overlay node.
+  const hulls = [{dimension: 'zone', group: 'z1', label: 'Zone 1', points: [{x: 0, y: 0}, {x: 40, y: 0}, {x: 40, y: 30}]}];
+  const hulled = toReactFlow({...base, membershipHulls: hulls}, {overlayNode: true});
+  assert.deepEqual(hulled.hulls, hulls);
+  assert.deepEqual(hulled.nodes.at(-1).data.hulls, hulls);
 });
 
 test('React Flow marks leaves draggable on request, never containers', () => {
