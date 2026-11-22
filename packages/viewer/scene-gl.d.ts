@@ -40,7 +40,10 @@ export interface SceneRenderer {
   setView(view: SceneViewTransform): void;
   /** Shows the whole scene. */
   fit(): SceneViewTransform;
-  setScene(scene: Scene | SceneColumnsLike, options?: {keepView?: boolean}): void;
+  /** A new scene; `animate` (milliseconds) morphs from the drawing now: boxes move by id, lines fade over, texts wait. */
+  setScene(scene: Scene | SceneColumnsLike, options?: {keepView?: boolean; animate?: number}): void;
+  /** Whether a morph is running. */
+  readonly animating: boolean;
   setState(state: import('./scene-buffers.js').SceneDrawState): void;
   /** Matches the canvases to their CSS size and the device pixel ratio, and draws. */
   resize(): void;

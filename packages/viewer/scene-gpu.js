@@ -10,7 +10,7 @@ import {BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE} from './scene-buffers.js';
 import {rendererShell} from './scene-renderer.js';
 
 const COMMON = `
-struct View { centre: vec2f, scale: f32, unused: f32, size: vec2f, unused2: vec2f };
+struct View { centre: vec2f, scale: f32, t: f32, size: vec2f, alpha: f32, unused: f32 };
 @group(0) @binding(0) var<uniform> view: View;
 fn toClip(screen: vec2f, depth: f32) -> vec4f {
   let clip = screen / (view.size * 0.5);
@@ -26,9 +26,11 @@ struct Out {
   @location(4) kind: f32, @location(5) dash: f32, @location(6) fill: vec4f, @location(7) strokeColour: vec4f,
   @location(8) unit: f32, @location(9) thin: f32,
 };
-@vertex fn vs(@location(0) corner: vec2f, @location(1) rect: vec4f, @location(2) shape: vec4f,
-              @location(3) fill: vec4f, @location(4) strokeColour: vec4f) -> Out {
+@vertex fn vs(@location(0) corner: vec2f, @location(1) place: vec4f, @location(2) shape: vec4f,
+              @location(3) fill: vec4f, @location(4) strokeColour: vec4f, @location(5) start: vec4f) -> Out {
   var o: Out;
+  // A morph (view.t from 0 to 1) moves the box from where it was (start) to where it is (place).
+  let rect = mix(start, place, view.t);
   let centre = (rect.xy + rect.zw * 0.5 - view.centre) * view.scale;
   // At least half a device pixel, so that a box far out stays a dot.
   let h = max(rect.zw * 0.5 * view.scale, vec2f(0.5));
@@ -94,7 +96,8 @@ struct Out {
   if (i.dash.x > 0.0 && wrap(i.along, i.dash.x + i.dash.y) > i.dash.x) { discard; }
   let a = clamp(i.halfWidth + 0.5 - abs(i.across), 0.0, 1.0) * i.colour.a * i.thin;
   if (a <= 0.0) { discard; }
-  return vec4f(i.colour.rgb * a, a);
+  let faded = a * view.alpha;
+  return vec4f(i.colour.rgb * faded, faded);
 }`;
 
 const TRIANGLE = COMMON + `
@@ -105,11 +108,11 @@ struct Out { @builtin(position) position: vec4f, @location(0) colour: vec4f };
   o.colour = colour;
   return o;
 }
-@fragment fn fs(i: Out) -> @location(0) vec4f { return vec4f(i.colour.rgb * i.colour.a, i.colour.a); }`;
+@fragment fn fs(i: Out) -> @location(0) vec4f { let a = i.colour.a * view.alpha; return vec4f(i.colour.rgb * a, a); }`;
 
 const attrs = (list, stride, stepMode) => ({arrayStride: stride * 4, stepMode, attributes: list.map(([loc, size, offset]) => ({shaderLocation: loc, offset: offset * 4, format: size === 1 ? 'float32' : `float32x${size}`}))});
 const CORNERS = attrs([[0, 2, 0]], 2, 'vertex');
-const BOX_LAYOUT = [CORNERS, attrs([[1, 4, 0], [2, 4, 4], [3, 4, 8], [4, 4, 12]], BOX_STRIDE, 'instance')];
+const BOX_LAYOUT = [CORNERS, attrs([[1, 4, 0], [2, 4, 4], [3, 4, 8], [4, 4, 12]], BOX_STRIDE, 'instance'), attrs([[5, 4, 0]], 4, 'instance')];
 const SEGMENT_LAYOUT = [CORNERS, attrs([[1, 4, 0], [2, 4, 4], [3, 1, 8], [4, 4, 9]], SEGMENT_STRIDE, 'instance')];
 const TRIANGLE_LAYOUT = [attrs([[0, 3, 0], [1, 4, 3]], TRIANGLE_STRIDE, 'vertex')];
 const SAMPLES = 4;
@@ -129,9 +132,12 @@ export function createSceneGpuRenderer(canvas, scene, options = {}) {
   const format = navigator.gpu.getPreferredCanvasFormat();
   context.configure({device, format, alphaMode: 'premultiplied'});
   const background = options.background ?? [0, 0, 0, 0];
-  const uniform = device.createBuffer({size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
-  const groupLayout = device.createBindGroupLayout({entries: [{binding: 0, visibility: GPUShaderStage.VERTEX, buffer: {}}]});
-  const group = device.createBindGroup({layout: groupLayout, entries: [{binding: 0, resource: {buffer: uniform}}]});
+  // Two uniform blocks at dynamic offsets: the current layers (the morph's t, their lines' opacity) and the previous ones
+  // (their lines fading out).
+  const SLOT = 256;
+  const uniform = device.createBuffer({size: 2 * SLOT, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
+  const groupLayout = device.createBindGroupLayout({entries: [{binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: {hasDynamicOffset: true}}]});
+  const group = device.createBindGroup({layout: groupLayout, entries: [{binding: 0, resource: {buffer: uniform, size: 32}}]});
   const layout = device.createPipelineLayout({bindGroupLayouts: [groupLayout]});
   const blend = {color: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}, alpha: {srcFactor: 'one', dstFactor: 'one-minus-src-alpha'}};
   const modules = {box: device.createShaderModule({code: BOX}), segment: device.createShaderModule({code: SEGMENT}), triangle: device.createShaderModule({code: TRIANGLE})};
@@ -153,14 +159,22 @@ export function createSceneGpuRenderer(canvas, scene, options = {}) {
   const corners = device.createBuffer({size: 32, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST});
   device.queue.writeBuffer(corners, 0, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]));
 
-  let layers = [], targets = null;
+  let layers = [], previous = [], targets = null;
   const upload = (data, stride) => {
     if (!data.length) return {buffer: null, count: 0};
     const buffer = device.createBuffer({size: Math.ceil(data.byteLength / 4) * 4, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST});
     device.queue.writeBuffer(buffer, 0, data);
     return {buffer, count: data.length / stride};
   };
-  const release = () => { for (const l of layers) for (const part of [l.boxes, l.segments, l.triangles]) part.buffer?.destroy(); layers = []; };
+  // The start of every box of a morph: given (morphStarts), else the box's own rectangle.
+  const startsOf = (boxes, starts) => {
+    if (starts) return starts;
+    const out = new Float32Array(boxes.length / BOX_STRIDE * 4);
+    for (let k = 0; k * BOX_STRIDE < boxes.length; k++) out.set(boxes.subarray(k * BOX_STRIDE, k * BOX_STRIDE + 4), k * 4);
+    return out;
+  };
+  const releaseSet = set => { for (const l of set) for (const part of [l.boxes, l.segments, l.triangles, l.from]) part.buffer?.destroy(); };
+  const release = () => { releaseSet(layers); releaseSet(previous); layers = []; previous = []; };
   // The multisampled colour and the depth targets, made again when the canvas changes size.
   const targetsFor = (width, height) => {
     if (targets && targets.width === width && targets.height === height) return targets;
@@ -172,30 +186,40 @@ export function createSceneGpuRenderer(canvas, scene, options = {}) {
   };
 
   const backend = {
-    upload(built) {
-      release();
-      layers = built.layers.map(l => ({boxes: upload(l.boxes, BOX_STRIDE), segments: upload(l.segments, SEGMENT_STRIDE), triangles: upload(l.triangles, TRIANGLE_STRIDE)}));
+    // `starts` (morphStarts) per layer, and `keep`: the layers drawn so far stay as the previous ones of a morph.
+    upload(built, {starts = null, keep = false} = {}) {
+      if (keep) { releaseSet(previous); previous = layers; } else { releaseSet(layers); releaseSet(previous); previous = []; }
+      layers = built.layers.map((l, k) => ({boxes: upload(l.boxes, BOX_STRIDE), from: upload(startsOf(l.boxes, starts?.[k] ?? null), 4), segments: upload(l.segments, SEGMENT_STRIDE), triangles: upload(l.triangles, TRIANGLE_STRIDE)}));
     },
-    draw(view, ratio) {
+    dropPrevious() { releaseSet(previous); previous = []; },
+    // A morph at `t` (0 to 1): the boxes between their starts and their places, the previous lines and arrowheads fading
+    // out under the new ones fading in.
+    draw(view, ratio, {t: at = 1} = {}) {
+      const morph = previous.length > 0 && at < 1;
       const t = targetsFor(canvas.width, canvas.height);
-      device.queue.writeBuffer(uniform, 0, new Float32Array([view.centreX, view.centreY, view.scale * ratio, 0, canvas.width, canvas.height, 0, 0]));
+      const block = new Float32Array(2 * SLOT / 4);
+      block.set([view.centreX, view.centreY, view.scale * ratio, at, canvas.width, canvas.height, morph ? at : 1, 0], 0);
+      block.set([view.centreX, view.centreY, view.scale * ratio, 1, canvas.width, canvas.height, 1 - at, 0], SLOT / 4);
+      device.queue.writeBuffer(uniform, 0, block);
       const encoder = device.createCommandEncoder();
       const pass = encoder.beginRenderPass({
         colorAttachments: [{view: t.colourView, resolveTarget: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'discard',
           clearValue: {r: background[0] * background[3], g: background[1] * background[3], b: background[2] * background[3], a: background[3]}}],
         depthStencilAttachment: {view: t.depthView, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'discard'},
       });
-      pass.setBindGroup(0, group);
-      const quads = (p, part) => { if (!part.count) return; pass.setPipeline(p); pass.setVertexBuffer(0, corners); pass.setVertexBuffer(1, part.buffer); pass.draw(4, part.count); };
+      const current = () => pass.setBindGroup(0, group, [0]), old = () => pass.setBindGroup(0, group, [SLOT]);
+      const quads = (p, part, from) => { if (!part.count) return; pass.setPipeline(p); pass.setVertexBuffer(0, corners); pass.setVertexBuffer(1, part.buffer); if (from) pass.setVertexBuffer(2, from.buffer); pass.draw(4, part.count); };
       const tris = (p, part) => { if (!part.count) return; pass.setPipeline(p); pass.setVertexBuffer(0, part.buffer); pass.draw(part.count); };
       layers.forEach((l, i) => {
+        if (morph && previous[i]) { old(); quads(pipelines.segment, previous[i].segments); tris(pipelines.triangle, previous[i].triangles); }
+        current();
         if (i === 2) {
           quads(pipelines.routeSegment, l.segments);
           tris(pipelines.routeArrow, l.triangles);
-          quads(pipelines.box, l.boxes);
+          quads(pipelines.box, l.boxes, l.from);
         } else {
           tris(pipelines.triangle, l.triangles);
-          quads(pipelines.box, l.boxes);
+          quads(pipelines.box, l.boxes, l.from);
           quads(pipelines.segment, l.segments);
         }
       });

@@ -20,6 +20,8 @@ export interface OverviewRendererOptions {
   /** Provisional: the names of nodes (`setNames`) and their details. */
   names?: boolean;
   details?: boolean;
+  /** Provisional (ADR 0025 O3): structured clusters as boxes in the cluster's colour ('cluster', default) or as the scene view draws them ('scene'). */
+  structured?: 'cluster' | 'scene';
   /** Provisional: the appearance (style.js, ADR 0026): trace, route, line and bus colours from its theme, cluster colours from its palette. */
   style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null;
   /** Dim the edges by how many overlap on a pixel (default true). */
@@ -40,6 +42,8 @@ export interface OverviewRenderer {
   setGalaxy(on: boolean): void;
   /** The backend drawing it. */
   readonly backend: 'webgpu' | 'webgl2' | 'webgl';
+  /** Provisional: how structured clusters are drawn: 'cluster' or 'scene'. */
+  setStructured(mode: 'cluster' | 'scene'): void;
   /** Provisional: sets the appearance (null: the overview's own colours). */
   setStyle(style: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null): void;
   /** Provisional: the orbit (pseudo-3D): turned by `yaw` and `pitch` (radians) around the view's centre, points at depths

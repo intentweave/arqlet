@@ -507,6 +507,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   let galaxy = !!options.galaxy;
   // The appearance (style.js): the theme's trace, route, line and bus colours and a palette for the clusters.
   let style = options.style ?? null;
+  // How structured clusters are drawn (ADR 0025 O3): 'cluster' (boxes in the cluster's colour) or 'scene' (as the scene view).
+  let structured = options.structured ?? 'cluster';
   // Provisional: the orbit (pseudo-3D, `setOrbit`): {yaw, pitch, depth} in radians and world units, or null (flat).
   let orbit = null;
   // Provisional: names of nodes when they are large enough on the screen, and their details (`setNames`).
@@ -514,7 +516,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   // The edges' total length in world units, measured whenever the buffers are built (for the adaptive dimming).
   let edgeLength = 0;
   const data = () => {
-    const d = overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy, style});
+    const d = overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy, style, structured});
     let sum = 0;
     for (let k = 0; k + 1 < d.count.edges; k += 2) {
       const a = k * LINE_STRIDE, b = (k + 1) * LINE_STRIDE;
@@ -670,6 +672,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     setGalaxy(on) { if (galaxy !== !!on) { galaxy = !!on; renderer.setState({}); } },
     /** Provisional: the appearance (style.js, ADR 0026); null for the overview's own colours. */
     setStyle(next) { style = next ?? null; renderer.setState({}); },
+    /** Provisional: how structured clusters are drawn: 'cluster' or 'scene' (as the scene view, with the style). */
+    setStructured(mode) { structured = mode === 'scene' ? 'scene' : 'cluster'; renderer.setState({}); },
     /**
      * Provisional: the orbit (pseudo-3D): `{yaw, pitch}` in radians turn the drawing around the view's centre, every point
      * at a depth of up to `depth` (default half the drawing's radius) from a smooth field, so clusters lie at

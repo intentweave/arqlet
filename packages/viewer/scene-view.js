@@ -140,10 +140,11 @@ export function createSceneView(host, input, options = {}) {
     get near() { return near; },
     setView(next) { view = {...next}; update(); },
     fit() { view = fitView(); update(); return api.view; },
-    setScene(next, {keepView = true} = {}) {
+    /** A new scene; `animate` (milliseconds) morphs the far layer from the drawing now (the near layer draws at once). */
+    setScene(next, {keepView = true, animate = 0} = {}) {
       scene = sceneOf(next);
       measureLeaves();
-      if (far) { far.setScene(scene); index = far.index; } else index = sceneIndex(scene);
+      if (far) { far.setScene(scene, {animate}); index = far.index; } else index = sceneIndex(scene);
       if (!keepView) view = fitView();
       held = null;
       if (layer === 'near') drawNear();

@@ -4,9 +4,10 @@
 // zoom (`representationsOf`). Only a decision of the user makes a structured cluster grow and its neighbours make room;
 // what the zoom or a rule structures is fitted into the disc it has, so that zooming never makes the drawing jump.
 // Stale replies are dropped.
-import {overviewModel, viewOf, viewOfNodes, pathOf, revealPathDecisions, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES} from '@arqlet/viewer/overview.js';
+import {overviewModel, viewOf, viewOfNodes, pathOf, revealPathDecisions, structuredExcerpt, resolvedEdgeIds, frameOf, representationsOf, flowDirectionOf, nameOf, OUTLINES, sceneViewOf, overviewViewOf} from '@arqlet/viewer/overview.js';
 import {createOverviewRenderer, bindOverviewNavigation} from '@arqlet/viewer/overview-gl.js';
-import {sceneBackend} from '@arqlet/viewer/scene-renderer.js';
+import {sceneBackend, bindSceneNavigation} from '@arqlet/viewer/scene-renderer.js';
+import {openSceneView} from '@arqlet/viewer/scene-view.js';
 // The renderer's backend (ADR 0025 O2): WebGPU where the browser offers it, else WebGL 2, else WebGL 1; `?backend=webgl`
 // keeps WebGL.
 const gpu = new URLSearchParams(globalThis.location?.search ?? '').get('backend') === 'webgl' ? null : await sceneBackend().catch(() => null);
@@ -214,7 +215,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
   }
   unbind?.(); renderer?.destroy();
   model = next;
-  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: schedule, shapes, galaxy: $('galaxy').checked});
+  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: () => { schedule(); handOver(); }, shapes, galaxy: $('galaxy').checked, structured: $('scene-look').checked ? 'scene' : 'cluster'});
   unbind = bindOverviewNavigation($('canvas'), renderer, {onClick: select, onHover: hover, onDoubleClick: zoomInto, onNodeDrag: dragNode, draggable, lens: lensSettings, idle: idleSettings()});
   if ($('orbit').checked) renderer.setOrbit({yaw: 0.35, pitch: 0.25});
   renderer.setNames({nodes: $('node-names').checked, details: $('node-details').checked});
@@ -229,7 +230,7 @@ function show(overview, keep = false, anchor = -1, showWhole = -1) {
 function showRough(overview, roughGraph, cut) {
   unbind?.(); renderer?.destroy();
   model = overviewModel(overview, resolvedEdgeIds(roughGraph));
-  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: () => {}, shapes, galaxy: $('galaxy').checked, edgeAlpha: 0.5});
+  renderer = createOverviewRenderer($('canvas'), model, {...gpuOptions, labels: $('labels'), onView: () => {}, shapes, galaxy: $('galaxy').checked, structured: $('scene-look').checked ? 'scene' : 'cluster', edgeAlpha: 0.5});
   unbind = bindOverviewNavigation($('canvas'), renderer, {});
   // The view that holds every disc (the extent of the places, not the root's radius: the radii a host set for the cut
   // containers can reach past it).
@@ -269,6 +270,56 @@ function radiusOf(id, key) {
 // The policy runs after the view has rested for a moment, and one change at a time; a change meanwhile runs it again.
 let timer = 0, busy = false, dirty = false, pointer = null, zoomAfter = null, roomKey = '';
 function schedule() { clearTimeout(timer); timer = setTimeout(evaluate, 140); }
+
+// Continuous zoom (ADR 0025 O4): when a structured cluster's disc covers the whole view (the view's diagonal inside it),
+// the scene view of that cluster takes over, exactly where the overview shows it (`sceneViewOf`), drawn as the overview's
+// scene look draws it; when the scene view zooms out until the disc would no longer cover the view, the overview takes
+// back at the matching view (`overviewViewOf`). Not under the orbit, the galaxy style or the lens.
+const HAND_OVER = 1.05, HAND_BACK = 0.95;
+let handed = null;
+// How well the disc of cluster i covers a view: the room from the view's centre to the disc's rim, on the screen, over
+// half the view's diagonal; at least 1 when all four corners of the view lie in the disc.
+const coverage = (i, view) => {
+  const c = $('canvas'), o = model.overview;
+  return (o.r[i] - Math.hypot(view.centreX - o.x[i], view.centreY - o.y[i])) * view.scale / (Math.hypot(c.clientWidth, c.clientHeight) / 2);
+};
+async function handOver() {
+  if (handed || !model || !renderer || !$('continuous').checked || renderer.orbit || renderer.galaxy || renderer.lens) return;
+  const v = renderer.view;
+  for (const [id, key] of shown) {
+    const scene = scenes.get(key), i = model.index.get(id);
+    if (!scene || i === undefined || coverage(i, v) < HAND_OVER) continue;
+    const host = document.createElement('div');
+    host.id = 'scene-zoom';
+    host.dataset.cluster = id;
+    host.style.cssText = 'position:absolute;inset:0;opacity:0;transition:opacity 200ms linear;background:rgb(12,16,24)';
+    $('stage').append(host);
+    handed = {id, i, scene, host, view: null, unbind: null};
+    // The overview draws the cluster as the scene view does, so the hand-over changes nothing but who draws.
+    renderer.setStructured('scene');
+    const view = await openSceneView(host, scene, {view: sceneViewOf(model, i, scene, v), background: [0.047, 0.063, 0.094, 1], ...(gpu ? {backend: gpu} : {}),
+      onView: next => handBack(next)});
+    if (!handed || handed.host !== host) { view.destroy(); host.remove(); return; }
+    handed.view = view;
+    handed.unbind = bindSceneNavigation(host, view);
+    requestAnimationFrame(() => { host.style.opacity = '1'; });
+    status(`${nameOf(model, i)}: scene view (${view.backend}); zoom out to return to the overview`);
+    return;
+  }
+}
+function handBack(view) {
+  if (!handed?.view) return;
+  const {i, scene} = handed;
+  if (coverage(i, overviewViewOf(model, i, scene, view)) >= HAND_BACK) return;
+  const back = handed;
+  handed = null;
+  renderer.setView(overviewViewOf(model, back.i, back.scene, view));
+  renderer.setStructured($('scene-look').checked ? 'scene' : 'cluster');
+  back.unbind?.();
+  back.host.style.opacity = '0';
+  setTimeout(() => { back.view.destroy(); back.host.remove(); }, 220);
+  status(`${nameOf(model, back.i)}: back in the overview`);
+}
 
 async function evaluate() {
   if (!model) return;
@@ -742,6 +793,7 @@ for (const id of ['breathe', 'breathe-after', 'breathe-amplitude']) {
 // The galaxy style with looser forces: less gravity, more repulsion and a wider gap let the clusters fray out into clouds
 // instead of round discs. Fields the user changed are left alone; turning the style off gives the defaults back.
 const GALAXY_FORCES = {gravity: 0.05, charge: 0.1, gap: 3};
+$('scene-look').onchange = () => renderer?.setStructured($('scene-look').checked ? 'scene' : 'cluster');
 $('galaxy').onchange = () => {
   const on = $('galaxy').checked;
   renderer?.setGalaxy(on);
