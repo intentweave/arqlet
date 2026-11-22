@@ -20,7 +20,16 @@ pub fn details_response(v: &Value) -> Value {
 
 /// The details of the request `v` (`nodeId` or `edgeId`, optional `limit`) on a snapshot the caller holds (a session's).
 pub fn details_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
-    details_answer_on(snapshot, v).and_then(|answer| answered(&answer))
+    details_on_with(snapshot, v, None)
+}
+
+/// `details_on` with the session's content (ADR 0023, R1): the node's or edge's properties, and the content's revision.
+pub fn details_on_with(
+    snapshot: &Snapshot,
+    v: &Value,
+    content: Option<&crate::content::Content>,
+) -> Result<Value, String> {
+    details_answer_on_with(snapshot, v, content).and_then(|answer| answered(&answer))
 }
 
 /// The answer of a `details` request that carries its snapshot.
@@ -33,6 +42,15 @@ pub fn details_answer(v: &Value) -> Result<DetailsAnswer, String> {
 /// The typed answer of `details_on`. `edgeId` may name a drawn line (`route`) or an edge of the source graph (`edge`, with
 /// the line that carries it as `route`), or both when the edge is drawn as itself.
 pub fn details_answer_on(snapshot: &Snapshot, v: &Value) -> Result<DetailsAnswer, String> {
+    details_answer_on_with(snapshot, v, None)
+}
+
+/// `details_answer_on` with the session's content.
+pub fn details_answer_on_with(
+    snapshot: &Snapshot,
+    v: &Value,
+    content: Option<&crate::content::Content>,
+) -> Result<DetailsAnswer, String> {
     let node_id = v["nodeId"].as_str();
     let edge_id = v["edgeId"].as_str();
     if node_id.is_some() == edge_id.is_some() {
@@ -50,7 +68,11 @@ pub fn details_answer_on(snapshot: &Snapshot, v: &Value) -> Result<DetailsAnswer
     let map = ViewMap::new(snapshot, canonical)?;
     let mut answer = DetailsAnswer::default();
     if let Some(id) = node_id {
-        answer.node = Some(node_details(snapshot, canonical, &map, id)?);
+        let mut node = node_details(snapshot, canonical, &map, id)?;
+        if let Some(properties) = content.and_then(|c| c.node(id)) {
+            node.properties = properties.clone();
+        }
+        answer.node = Some(node);
     }
     if let Some(id) = edge_id {
         let edge = canonical.edges.iter().find(|e| e.id == id);
@@ -61,6 +83,10 @@ pub fn details_answer_on(snapshot: &Snapshot, v: &Value) -> Result<DetailsAnswer
             source: e.source.clone(),
             target: e.target.clone(),
             route: carried.clone(),
+            properties: content
+                .and_then(|c| c.edge(&e.id))
+                .cloned()
+                .unwrap_or_default(),
         });
         // The line asked for, else the one that carries the edge.
         let line = if map.drawn.contains_key(id) || snapshot.routes.iter().any(|r| r.id == id) {
@@ -76,6 +102,7 @@ pub fn details_answer_on(snapshot: &Snapshot, v: &Value) -> Result<DetailsAnswer
             return Err(format!("Unknown edge: {id}"));
         }
     }
+    answer.content_revision = content.filter(|c| !c.is_empty()).map(|c| c.revision);
     Ok(answer)
 }
 
@@ -140,6 +167,7 @@ fn node_details(
         descendants,
         incoming,
         outgoing,
+        properties: BTreeMap::new(),
     })
 }
 

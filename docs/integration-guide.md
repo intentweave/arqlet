@@ -136,10 +136,11 @@ result, so the host can highlight, reveal or focus it:
 | `find` | nodes by label or id, best first | `find(query)`, then `focus(id)` |
 | `peek` | the contents of a collapsed container as a small scene | `peek(id)`, `state.peek` |
 
-Domain attributes stay with the host: the engine's model has `id`, `kind`, `label`, `parentId` and `shape`; look up the
-rest by id. Properties inside the engine are planned with the query layer
-([ADR 0021](https://github.com/intentweave/arqlet/pull/70), [ADR 0023](https://github.com/intentweave/arqlet/pull/85),
-both proposed).
+The engine's model has `id`, `kind`, `label`, `parentId` and `shape`; domain attributes stay with the host by default.
+A resident session can also keep them as **content** (provisional, ADR 0023 step R1): `session.payload({set: {nodes:
+{id: {owner: 'Ann'}}}})` (or `controller.payload`) stores properties beside the snapshot, never in it, with their own
+`contentRevision`; `details` then answers `properties`, and `find(query, {key: 'owner'})` searches one property. Layout
+never reads content, so it changes no drawing. The query layer of ADR 0021 will read the same content.
 
 ## 7. Keeping and sharing a view
 

@@ -37,6 +37,25 @@ export interface SessionResult {
   unchanged?: boolean;
 }
 
+/** Provisional (ADR 0023, R1): one change of a session's content. Values are JSON; an integer stays an integer. */
+export interface PayloadChange {
+  set?: {nodes?: Record<string, Record<string, unknown>>; edges?: Record<string, Record<string, unknown>>};
+  unset?: {nodes?: Record<string, string[]>; edges?: Record<string, string[]>};
+  clear?: boolean;
+  expectedContentRevision?: number;
+}
+
+/** The content's revision and counts after a change; ids the structure does not have are kept and counted. */
+export interface PayloadAnswer {
+  ok: true;
+  contentRevision: number;
+  nodes: number;
+  edges: number;
+  keys: string[];
+  unknownNodes: number;
+  unknownEdges: number;
+}
+
 /** Provisional: a look into a container (`peek`): its contents as a scene, and the border edges per child shown. */
 export interface PeekAnswer {
   nodeId: string;
@@ -107,7 +126,12 @@ export interface Session {
    * Provisional (read only): the nodes whose label or id contains `query` (ignoring case), best first, with the box that
    * shows each; at most `limit` (default 20), only `nodeKinds` if given.
    */
-  find(query: string, init?: {limit?: number; nodeKinds?: string[]}): Promise<ReadAnswer<FindAnswer>>;
+  find(query: string, init?: {limit?: number; nodeKinds?: string[]; key?: string}): Promise<ReadAnswer<FindAnswer>>;
+  /**
+   * Provisional (ADR 0023, R1): sets, unsets or clears properties in the session's content (beside the snapshot, never in
+   * it). Needs a resident session.
+   */
+  payload(change: PayloadChange): Promise<PayloadAnswer | {ok: false; error?: string; stale?: true}>;
   /** Provisional (read only): a look into a collapsed container without opening it. */
   peek(nodeId: string, init?: {limit?: number}): Promise<ReadAnswer<PeekAnswer>>;
   /**

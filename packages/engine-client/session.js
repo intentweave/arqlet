@@ -244,6 +244,17 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
      * `limit` (default 20), only `nodeKinds` if given; `total` counts them all.
      */
     /**
+     * Provisional (ADR 0023, R1): sets, unsets or clears properties of nodes and edges in the session's content, as one
+     * change: `{set: {nodes: {id: {key: value}}, edges: {…}}, unset: {nodes: {id: [key]}}, clear, expectedContentRevision}`.
+     * Kept beside the snapshot (never in it; layout never reads it); `details` answers the properties, `find` with `key`
+     * searches one. Needs a resident session; a new import starts the content empty.
+     */
+    payload(change = {}) {
+      if (!resident) return Promise.resolve({ok: false, error: 'payload needs a resident session'});
+      return enqueue(() => call({op: 'payload', ...change}));
+    },
+
+    /**
      * Provisional (read only): a look into the collapsed container `nodeId` without opening it: its contents laid out on
      * their own as a small scene (the containers inside collapsed, at most `limit` direct children, default 50), and per
      * child shown the edges that cross the container's border (`external`).
@@ -253,9 +264,10 @@ export function createSession(run, {onChange, resident: wanted = 'auto'} = {}) {
       return call({op: 'peek', snapshot, nodeId, ...(limit !== undefined ? {limit} : {})});
     },
 
-    async find(query, {limit, nodeKinds} = {}) {
+    async find(query, {limit, nodeKinds, key} = {}) {
       if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
-      return call({op: 'find', snapshot, query, ...(limit !== undefined ? {limit} : {}), ...(nodeKinds ? {nodeKinds} : {})});
+      return call({op: 'find', snapshot, query, ...(limit !== undefined ? {limit} : {}), ...(nodeKinds ? {nodeKinds} : {}),
+        ...(key ? {key} : {})});
     },
 
     /**

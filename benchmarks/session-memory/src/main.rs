@@ -110,6 +110,38 @@ fn main() {
     let request_bytes = request.len();
     drop(request);
 
+    // Content (ADR 0023, R1): with SESSION_MEMORY_KEYS=n, n properties per node (a string, an integer, a float, …) set in
+    // one payload; the heap the session keeps for them.
+    let keys: usize = std::env::var("SESSION_MEMORY_KEYS").ok().and_then(|k| k.parse().ok()).unwrap_or(0);
+    let mut content_ids = 0usize;
+    let content_kept = if keys > 0 {
+        let ids: Vec<String> = session.snapshot().expect("a snapshot").source_graph.as_deref()
+            .map(|g| g.nodes.iter().map(|n| n.id.clone()).collect()).unwrap_or_default();
+        content_ids = ids.len();
+        let mut table = serde_json::Map::new();
+        for (i, id) in ids.iter().enumerate() {
+            let mut properties = serde_json::Map::new();
+            for k in 0..keys {
+                let value = match k % 3 {
+                    0 => serde_json::json!(format!("owner-{}", i % 97)),
+                    1 => serde_json::json!(i as i64 * 7 + k as i64),
+                    _ => serde_json::json!(i as f64 / 3.0),
+                };
+                properties.insert(format!("key{k}"), value);
+            }
+            table.insert(id.clone(), serde_json::Value::Object(properties));
+        }
+        let request = serde_json::json!({"op": "payload", "set": {"nodes": table}});
+        let before = live();
+        let answer = session.run_value(&request);
+        assert_eq!(answer["ok"], true, "{answer}");
+        drop(answer);
+        let kept = live().saturating_sub(before);
+        drop(request);
+        Some(kept)
+    } else {
+        None
+    };
     // The parts, each measured as the heap a copy of it takes (a shared Arc counted once).
     let s = session.snapshot().expect("a snapshot");
     let (_a, source) = kept(|| s.source_graph.as_deref().cloned());
@@ -161,6 +193,13 @@ fn main() {
     println!("peak during the import, above the request text: {} ({})", mb(peak), per(peak));
     println!("phase peaks: parse {} · validate {} · index {} · import (with a copy of the graph, {}) {}",
         mb(parse), mb(validate), mb(index), mb(graph_copy), mb(import));
+    if let Some(bytes) = content_kept {
+        println!(
+            "content of {keys} properties per node kept: {} ({:.0} B per node with properties; {content_ids} such nodes)",
+            mb(bytes),
+            bytes as f64 / content_ids.max(1) as f64
+        );
+    }
     println!("parts (heap of a copy):");
     println!("  source graph          {:>10}  {}", mb(source), per(source));
     if shares_source {

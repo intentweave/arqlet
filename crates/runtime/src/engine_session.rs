@@ -34,6 +34,9 @@ pub struct EngineSession {
     /// The scene as columns, built by a `columns` request; dropped when the snapshot changes.
     columns: Option<crate::columns::SceneColumns>,
     overview: crate::overview::OverviewSession,
+    /// Provisional (ADR 0023, R1): the properties of nodes and edges, beside the snapshot and never in it. A new import
+    /// starts it empty; `load` (a hand-over of the same graph) keeps it.
+    content: crate::content::Content,
 }
 
 impl EngineSession {
@@ -97,7 +100,10 @@ impl EngineSession {
         let (request, _) = crate::protocol::Request::from_json_delivered(input).ok()?;
         let with_scene = head.scene.as_ref().and_then(Value::as_bool) != Some(false);
         Some(match self.apply(handle(request), with_scene) {
-            Ok(answer) => answer,
+            Ok(answer) => {
+                self.content = Default::default();
+                answer
+            }
             Err(error) => json!({"ok": false, "error": error}),
         })
     }
@@ -125,7 +131,17 @@ impl EngineSession {
         match v["op"].as_str() {
             Some("import") => {
                 let request = Request::from_value(v)?;
-                self.apply(handle(request), with_scene)
+                let answer = self.apply(handle(request), with_scene)?;
+                self.content = Default::default();
+                Ok(answer)
+            }
+            // Provisional (ADR 0023, R1): set, unset or clear properties of nodes and edges, as one change.
+            Some("payload") => {
+                let graph = self
+                    .snapshot
+                    .as_ref()
+                    .map(|s| s.source_graph.as_deref().unwrap_or(&s.graph));
+                self.content.apply(v, graph)
             }
             Some("load") => {
                 let snapshot: Snapshot =
@@ -165,8 +181,10 @@ impl EngineSession {
             }
             Some("trace") => crate::trace::trace_on(self.current()?, v),
             Some("neighbourhood") => crate::trace::neighbourhood_on(self.current()?, v),
-            Some("details") => crate::details::details_on(self.current()?, v),
-            Some("find") => crate::find::find_on(self.current()?, v),
+            Some("details") => {
+                crate::details::details_on_with(self.current()?, v, Some(&self.content))
+            }
+            Some("find") => crate::find::find_on_with(self.current()?, v, Some(&self.content)),
             Some("peek") => crate::peek::peek_on(self.current()?, v),
             Some("digest") => Ok(crate::find::digest_on(self.current()?)),
             Some("intent") => {

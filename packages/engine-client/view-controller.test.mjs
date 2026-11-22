@@ -335,3 +335,23 @@ test('a look into a collapsed container leaves the view as it is', {skip: !engin
   assert.equal(view.getState().peek, null);
   assert.equal((await view.peek('src')).ok, false, 'a leaf has nothing to look into');
 });
+
+test('content in a resident session: details show it, find searches a key', {skip: !engine || !engine.openSession}, async () => {
+  const view = createViewController(createSession(engine, {resident: true}));
+  await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  await view.select({nodeId: 'c05'});
+  assert.equal(view.getState().details.node.properties, undefined);
+  const set = await view.payload({set: {nodes: {c05: {owner: 'Ann', loc: 12}, nowhere: {owner: 'Gil'}}}});
+  assert.equal(set.ok, true, JSON.stringify(set));
+  assert.deepEqual([set.contentRevision, set.unknownNodes], [1, 1]);
+  assert.deepEqual(view.getState().details.node.properties, {loc: 12, owner: 'Ann'}, 'the selection shows the properties');
+  assert.equal(view.getState().contentRevision, 1);
+  assert.equal(view.getState().canBack, false, 'content is not a view decision');
+  const found = await view.find('ann', {key: 'owner'});
+  assert.deepEqual([found.total, found.matches[0].id, found.matches[0].value], [1, 'c05', 'Ann']);
+  assert.equal((await view.payload({set: {nodes: {c05: {label: 'x'}}}})).ok, false, 'a key of the model itself');
+  // Without a resident session there is no content.
+  const plain = createViewController(createSession(engine, {resident: false}));
+  await plain.import(graph(), {limit: 100});
+  assert.match((await plain.payload({set: {nodes: {c05: {owner: 'Ann'}}}})).error, /resident session/);
+});
