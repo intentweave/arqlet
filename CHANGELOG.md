@@ -7,6 +7,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- What a session holds, and giving it back (provisional, ADR 0023 step R7): `memory` answers the session's parts in
+  estimated heap bytes (source graph, the structure's view and index, the view graph, boxes, routes, layered plans, the
+  rest of the snapshot, content, change log, columns, overview), within 15 % below the counted heap; the WASM engine adds
+  its live heap (`heapBytes`, counted) and its linear memory (`linearMemoryBytes`, never given back). `release` gives
+  content (all or by key, logged as `dropKeys`), the change log, the columns and the overview back; the snapshot stays.
+  The import trims the source graph's lists after selecting the view (a 114k graph: a session keeps 67 MB instead of
+  89 MB); the change log is bounded by heap and keeps no group larger than its bound (a large payload is no longer held
+  twice). JS: `session.memory`, `session.release`. `benchmarks/results/memory-release-20261122.md`.
 - A change log in a resident session (provisional, ADR 0023 step R2): every change of the source, structure (`patch`)
   or content (`payload`), is a numbered group in one sequence; the new operation `change` applies a patch and a payload
   together as one group, all of it or nothing (`expectedSequence` refuses a stale one). `changesSince` answers the

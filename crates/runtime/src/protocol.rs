@@ -588,7 +588,7 @@ impl Request {
             Some("digest") => return Ok(Request::Digest { body: body() }),
             Some("peek") => return Ok(Request::Peek { body: body() }),
             Some("query") => return Ok(Request::Query { body: body() }),
-            Some(op @ ("payload" | "change" | "changesSince" | "content")) => {
+            Some(op @ ("payload" | "change" | "changesSince" | "content" | "memory" | "release")) => {
                 return Err(format!(
                     "{op} needs a resident session (the content and the change log are kept by the session)"
                 ))

@@ -376,3 +376,21 @@ test('the change log of a resident session: groups in one sequence, replayed on 
   // Without a resident session there is no log.
   assert.match((await createSession(engine, {resident: false}).changesSince(0)).error, /resident session/);
 });
+
+test('a resident session tells what it holds and gives parts back', {skip: !engine || !engine.openSession}, async () => {
+  const session = createSession(engine, {resident: true});
+  await session.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  const owners = Object.fromEntries(Array.from({length: 30}, (_, i) => [`c${String(i).padStart(2, '0')}`, {owner: `t${i % 3}`, loc: i}]));
+  await session.payload({set: {nodes: owners}});
+  const held = await session.memory();
+  assert.equal(held.ok, true, JSON.stringify(held));
+  assert.ok(held.parts.sourceGraph > 0 && held.parts.content > 0 && held.total > 0);
+  assert.ok(held.heapBytes > 0, 'the WASM engine counts its heap');
+  assert.ok(held.linearMemoryBytes >= held.heapBytes, 'and names its linear memory');
+  const freed = await session.release(['content'], {keys: ['loc']});
+  assert.ok(freed.parts.content < held.parts.content, JSON.stringify(freed.parts));
+  assert.equal((await session.details({nodeId: 'c05'})).node.properties.loc, undefined);
+  const all = await session.release(['content', 'changeLog']);
+  assert.deepEqual([all.parts.content, all.parts.changeLog], [0, 0]);
+  assert.match((await createSession(engine, {resident: false}).memory()).error, /resident session/);
+});
