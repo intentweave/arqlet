@@ -1,5 +1,7 @@
-// WebGL renderer of the cluster overview (ADR 0018). No dependency: WebGL 1 with two programs, one for shapes (discs and
-// boxes as quads, the outline found in the fragment shader) and one for lines and triangles. Texts go on an optional 2D
+// GPU renderer of the cluster overview (ADR 0018). No dependency. Two programs, one for shapes (discs and boxes as
+// quads, the outline found in the fragment shader) and one for lines and triangles, on one of three backends (ADR 0025,
+// O2): WebGPU when `options.device` is given (WGSL below), else WebGL 2, else WebGL 1 (the same GLSL ES 1.00 programs,
+// which WebGL 2 runs as they are). Texts go on an optional 2D
 // canvas laid over it. Draws what `overviewBuffers` returns; computes no layout.
 //
 // Changes are animated, not simulated: the engine computes the final drawing, the renderer only interpolates. A new
@@ -155,6 +157,121 @@ precision mediump float;
 varying vec4 v_colour; uniform float u_alpha; uniform float u_fade;
 void main() { gl_FragColor = vec4(v_colour.rgb, v_colour.a * u_alpha * u_fade); }`;
 
+// The same programs in WGSL for WebGPU. One uniform block per draw (a dynamic offset): the view, the morph's t, the fade,
+// the lens, breathing, the cosmic motion, the twinkle, the orbit and the line opacity.
+const WGSL_COMMON = `
+struct U {
+  centre: vec2f, size: vec2f,
+  scale: f32, ratio: f32, t: f32, fade: f32,
+  lens: vec4f, breath: vec4f, cosmic: vec4f, twinkle: vec4f, orbit: vec4f,
+  extent: f32, alpha: f32, unused0: f32, unused1: f32,
+};
+@group(0) @binding(0) var<uniform> u: U;
+fn lens(p: vec2f) -> vec3f {
+  if (u.lens.z <= 0.0) { return vec3f(p, 1.0); }
+  let d = p - u.lens.xy;
+  let r = length(d) / u.lens.z;
+  if (r >= 1.0) { return vec3f(p, 1.0); }
+  let f = u.lens.w / ((u.lens.w - 1.0) * r + 1.0);
+  return vec3f(u.lens.xy + d * f, f);
+}
+fn cosmic(p: vec2f) -> vec2f {
+  if (u.cosmic.y <= 0.0) { return p; }
+  let d = length(p) / max(u.cosmic.z, 1.0);
+  let a = u.cosmic.y * (0.045 * sin(u.cosmic.x * 0.21 + d * 5.0) + 0.025 * sin(u.cosmic.x * 0.13 - d * 9.0 + 1.3));
+  let c = cos(a);
+  let s = sin(a);
+  return vec2f(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+fn orbitDepth(w: vec2f) -> f32 {
+  let q = w / max(u.extent, 1.0) * 3.0;
+  let field = sin(q.x * 1.7 + 0.3) * cos(q.y * 1.3 - 0.7) * 0.7 + sin((q.x + q.y) * 2.3) * 0.3;
+  return field + (fract(sin(w.x * 12.9898 + w.y * 78.233) * 43758.5453) - 0.5) * 0.3;
+}
+fn orbit(w: vec2f) -> vec3f {
+  let rel = w - u.centre;
+  if (u.orbit.w < 0.5) { return vec3f(rel, 1.0); }
+  var p = vec3f(rel, orbitDepth(w) * u.orbit.z);
+  let cy = cos(u.orbit.x);
+  let sy = sin(u.orbit.x);
+  p = vec3f(cy * p.x + sy * p.z, p.y, -sy * p.x + cy * p.z);
+  let cp = cos(u.orbit.y);
+  let sp = sin(u.orbit.y);
+  p = vec3f(p.x, cp * p.y - sp * p.z, sp * p.y + cp * p.z);
+  let dist = max(u.extent, 1.0) * 3.0;
+  let f = dist / max(dist + p.z, dist * 0.2);
+  return vec3f(p.xy * f, f);
+}
+`;
+const SHAPE_WGSL = WGSL_COMMON + `
+struct S {
+  @builtin(position) position: vec4f,
+  @location(0) local: vec2f, @location(1) colour: vec4f, @location(2) kind: f32, @location(3) pixels: vec2f, @location(4) seed: f32,
+};
+@vertex fn vs(@location(0) centreA: vec2f, @location(1) halfA: vec2f, @location(2) corner: vec2f, @location(3) colour: vec4f,
+              @location(4) kind: f32, @location(5) centreB: vec2f, @location(6) halfB: vec2f) -> S {
+  var o: S;
+  let centre = cosmic(mix(centreA, centreB, u.t));
+  let extent = mix(halfA, halfB, u.t);
+  let seen = orbit(centre);
+  o.seed = fract(sin(dot(mix(centreA, centreB, u.t), vec2f(12.9898, 78.233))) * 43758.5453);
+  var pixels = max(extent * u.scale * u.ratio * seen.z, vec2f(0.75));
+  let middle = seen.xy * u.scale * u.ratio;
+  if (u.breath.y > 0.0 && kind < 1.5) { pixels = pixels * (1.0 + u.breath.y * sin(u.breath.x - 6.2831853 * length(middle) / u.breath.z)); }
+  let screen = lens(middle + corner * pixels).xy;
+  let clip = screen / (u.size * 0.5);
+  o.position = vec4f(clip.x, -clip.y, 0.0, 1.0);
+  o.local = corner; o.colour = colour; o.kind = kind; o.pixels = pixels * lens(middle).z;
+  return o;
+}
+fn outlineDistance(p: vec2f, outline: f32) -> f32 {
+  let a = abs(p);
+  if (outline < 0.5) { return length(p); }
+  if (outline < 1.5) { return max(a.x, a.y) * 1.4142136; }
+  if (outline < 2.5) { return max(max(a.x, a.y), (a.x + a.y) * 0.7071068) / 0.9238795; }
+  return a.x + a.y;
+}
+@fragment fn fs(i: S) -> @location(0) vec4f {
+  var colour: vec4f;
+  if (i.kind > 3.5) {
+    let d = length(i.local);
+    if (d > 1.0) { discard; }
+    let glow = exp(-d * d * 4.5) * (1.0 - d);
+    var a = max(1.0 - smoothstep(0.22, 0.34, d), glow * 0.55);
+    if (i.kind < 4.5) { a = glow; }
+    if (i.kind > 4.5 && u.twinkle.y > 0.0) { a = a * (1.0 - 0.4 * u.twinkle.y * (0.5 + 0.5 * sin(u.twinkle.x * 2.3 + i.seed * 6.2831853))); }
+    colour = vec4f(i.colour.rgb, i.colour.a * a);
+  } else if (i.kind < 1.5) {
+    let base = floor(i.kind + 0.05);
+    let d = outlineDistance(i.local, floor((i.kind - base) * 10.0 + 0.5));
+    if (d > 1.0) { discard; }
+    let edge = 1.0 / max(i.pixels.x, 1.0);
+    if (base < 0.5) {
+      colour = vec4f(i.colour.rgb, i.colour.a * (1.0 - smoothstep(1.0 - edge, 1.0, d)));
+    } else {
+      let line = 1.0 - smoothstep(1.2 * edge, 2.4 * edge, 1.0 - d);
+      colour = vec4f(i.colour.rgb, max(line * 0.8, 0.045));
+    }
+  } else {
+    let inside = (1.0 - abs(i.local)) * i.pixels;
+    let border = min(inside.x, inside.y);
+    let line = 1.0 - smoothstep(0.6, 1.4, border);
+    if (i.kind < 2.5) { colour = vec4f(mix(vec3f(0.14, 0.21, 0.29), i.colour.rgb, line), 1.0); }
+    else { colour = vec4f(i.colour.rgb, max(line * 0.9, i.colour.a)); }
+  }
+  return vec4f(colour.rgb, colour.a * u.fade);
+}`;
+const LINE_WGSL = WGSL_COMMON + `
+struct L { @builtin(position) position: vec4f, @location(0) colour: vec4f };
+@vertex fn vs(@location(0) a: vec2f, @location(1) colour: vec4f, @location(2) b: vec2f) -> L {
+  var o: L;
+  let clip = lens(orbit(cosmic(mix(a, b, u.t))).xy * u.scale * u.ratio).xy / (u.size * 0.5);
+  o.position = vec4f(clip.x, -clip.y, 0.0, 1.0);
+  o.colour = colour;
+  return o;
+}
+@fragment fn fs(i: L) -> @location(0) vec4f { return vec4f(i.colour.rgb, i.colour.a * u.alpha * u.fade); }`;
+
 function program(gl, vs, fs) {
   const compile = (type, source) => {
     const s = gl.createShader(type);
@@ -173,6 +290,186 @@ function program(gl, vs, fs) {
 
 const PARTS = ['edges', 'buses', 'discs', 'back', 'routes', 'arrows', 'front'];
 const SHAPE_PARTS = new Set(['discs', 'back', 'front']);
+// The parts in drawing order and how each is drawn.
+const DRAW_ORDER = [['edges', 'lines'], ['buses', 'triangles'], ['discs', 'triangles'], ['back', 'triangles'], ['routes', 'lines'], ['arrows', 'triangles'], ['front', 'triangles']];
+
+// A backend draws layers (per part a buffer of a morph's start and one of its end) with the uniform values the renderer
+// computes: `layer(from, to)`, `drop(layer)`, `frame(draws, background, additive)` with draws = [{layer, uniforms}],
+// `destroy()`. WebGL 2 runs the GLSL ES 1.00 programs as they are; `webgl1` forces WebGL 1.
+function webglBackend(canvas, webgl1 = false) {
+  const settings = {antialias: true, premultipliedAlpha: false};
+  const gl = (webgl1 ? null : canvas.getContext('webgl2', settings)) ?? canvas.getContext('webgl', settings);
+  if (!gl) throw Error('WebGL is not available');
+  const kind = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext ? 'webgl2' : 'webgl';
+  const shapes = program(gl, SHAPE_VS, SHAPE_FS), lines = program(gl, LINE_VS, LINE_FS);
+  const attribute = (p, name, buffer, stride, size, offset) => {
+    const at = gl.getAttribLocation(p, name);
+    if (at < 0) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.enableVertexAttribArray(at);
+    gl.vertexAttribPointer(at, size, gl.FLOAT, false, stride * 4, offset * 4);
+  };
+  const set = (p, u) => {
+    const at = name => gl.getUniformLocation(p, name);
+    gl.uniform2f(at('u_centre'), u.centre[0], u.centre[1]);
+    gl.uniform1f(at('u_scale'), u.scale);
+    gl.uniform2f(at('u_size'), u.size[0], u.size[1]);
+    gl.uniform1f(at('u_ratio'), u.ratio);
+    gl.uniform1f(at('u_t'), u.t);
+    gl.uniform1f(at('u_fade'), u.fade);
+    gl.uniform4f(at('u_lens'), ...u.lens);
+    gl.uniform3f(at('u_breath'), ...u.breath);
+    gl.uniform3f(at('u_cosmic'), ...u.cosmic);
+    gl.uniform2f(at('u_twinkle'), ...u.twinkle);
+    gl.uniform4f(at('u_orbit'), ...u.orbit);
+    gl.uniform1f(at('u_extent'), u.extent);
+  };
+  const drawPart = (l, part, mode, u) => {
+    if (!l.counts[part]) return;
+    const {a, b} = l.buffers[part];
+    // Only the arrays of the program in use are on: one left on by the other program would point at a buffer of the
+    // wrong size.
+    for (let i = 0; i < 8; i++) gl.disableVertexAttribArray(i);
+    if (SHAPE_PARTS.has(part)) {
+      gl.useProgram(shapes);
+      set(shapes, u);
+      attribute(shapes, 'a_centre', a, SHAPE_STRIDE, 2, 0);
+      attribute(shapes, 'a_half', a, SHAPE_STRIDE, 2, 2);
+      attribute(shapes, 'a_corner', a, SHAPE_STRIDE, 2, 4);
+      attribute(shapes, 'a_colour', a, SHAPE_STRIDE, 4, 6);
+      attribute(shapes, 'a_kind', a, SHAPE_STRIDE, 1, 10);
+      attribute(shapes, 'a_centre2', b, SHAPE_STRIDE, 2, 0);
+      attribute(shapes, 'a_half2', b, SHAPE_STRIDE, 2, 2);
+    } else {
+      gl.useProgram(lines);
+      set(lines, u);
+      gl.uniform1f(gl.getUniformLocation(lines, 'u_alpha'), part === 'edges' ? u.edgeAlpha : 1);
+      attribute(lines, 'a_position', a, LINE_STRIDE, 2, 0);
+      attribute(lines, 'a_colour', a, LINE_STRIDE, 4, 2);
+      attribute(lines, 'a_position2', b, LINE_STRIDE, 2, 0);
+    }
+    gl.drawArrays(mode, 0, l.counts[part]);
+  };
+  return {
+    kind,
+    layer(from, to = from) {
+      const out = {buffers: {}, counts: from.count};
+      for (const p of PARTS) {
+        const a = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, a);
+        gl.bufferData(gl.ARRAY_BUFFER, from[p], gl.STATIC_DRAW);
+        let b = a;
+        if (to !== from) {
+          b = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, b);
+          gl.bufferData(gl.ARRAY_BUFFER, to[p], gl.STATIC_DRAW);
+        }
+        out.buffers[p] = {a, b};
+      }
+      return out;
+    },
+    drop(l) {
+      if (!l) return;
+      for (const p of PARTS) { gl.deleteBuffer(l.buffers[p].a); if (l.buffers[p].b !== l.buffers[p].a) gl.deleteBuffer(l.buffers[p].b); }
+    },
+    frame(draws, background, additive) {
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(...background);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, additive ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+      for (const {layer, uniforms} of draws) for (const [part, how] of DRAW_ORDER) drawPart(layer, part, how === 'lines' ? gl.LINES : gl.TRIANGLES, uniforms);
+    },
+    destroy() { gl.deleteProgram(shapes); gl.deleteProgram(lines); },
+  };
+}
+
+// WebGPU: the WGSL programs, 4× multisampling, a pipeline per program, topology and blend (additive in the galaxy
+// style), one uniform block per draw at a dynamic offset. The canvas is opaque: the WebGL canvas composites its alpha
+// over the page, which matters only where the page differs from the clear colour.
+function webgpuBackend(canvas, device) {
+  const context = canvas.getContext('webgpu');
+  if (!context) throw Error('WebGPU is not available on this canvas');
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  context.configure({device, format, alphaMode: 'opaque'});
+  const SLOT = 256, MAX_DRAWS = 2 * DRAW_ORDER.length;
+  const uniform = device.createBuffer({size: SLOT * MAX_DRAWS, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
+  const groupLayout = device.createBindGroupLayout({entries: [{binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: {hasDynamicOffset: true}}]});
+  const group = device.createBindGroup({layout: groupLayout, entries: [{binding: 0, resource: {buffer: uniform, size: 128}}]});
+  const layout = device.createPipelineLayout({bindGroupLayouts: [groupLayout]});
+  const attrs = (list, stride) => ({arrayStride: stride * 4, stepMode: 'vertex', attributes: list.map(([loc, size, offset]) => ({shaderLocation: loc, offset: offset * 4, format: size === 1 ? 'float32' : `float32x${size}`}))});
+  const shapeBuffers = [attrs([[0, 2, 0], [1, 2, 2], [2, 2, 4], [3, 4, 6], [4, 1, 10]], SHAPE_STRIDE), attrs([[5, 2, 0], [6, 2, 2]], SHAPE_STRIDE)];
+  const lineBuffers = [attrs([[0, 2, 0], [1, 4, 2]], LINE_STRIDE), attrs([[2, 2, 0]], LINE_STRIDE)];
+  const modules = {shapes: device.createShaderModule({code: SHAPE_WGSL}), lines: device.createShaderModule({code: LINE_WGSL})};
+  const blendOf = additive => {
+    const c = {srcFactor: 'src-alpha', dstFactor: additive ? 'one' : 'one-minus-src-alpha'};
+    return {color: c, alpha: c};
+  };
+  const pipelines = new Map();
+  const pipeline = (program, topology, additive) => {
+    const key = `${program}:${topology}:${additive}`;
+    if (!pipelines.has(key)) pipelines.set(key, device.createRenderPipeline({
+      layout,
+      vertex: {module: modules[program], entryPoint: 'vs', buffers: program === 'shapes' ? shapeBuffers : lineBuffers},
+      fragment: {module: modules[program], entryPoint: 'fs', targets: [{format, blend: blendOf(additive)}]},
+      primitive: {topology},
+      multisample: {count: 4},
+    }));
+    return pipelines.get(key);
+  };
+  let target = null;
+  const targetFor = (w, h) => {
+    if (target && target.w === w && target.h === h) return target;
+    target?.texture.destroy();
+    const texture = device.createTexture({size: [w, h], format, sampleCount: 4, usage: GPUTextureUsage.RENDER_ATTACHMENT});
+    target = {w, h, texture, view: texture.createView()};
+    return target;
+  };
+  const upload = data => {
+    const buffer = device.createBuffer({size: Math.max(4, Math.ceil(data.byteLength / 4) * 4), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST});
+    if (data.byteLength) device.queue.writeBuffer(buffer, 0, data);
+    return buffer;
+  };
+  const block = new Float32Array(SLOT / 4 * MAX_DRAWS);
+  return {
+    kind: 'webgpu',
+    layer(from, to = from) {
+      const out = {buffers: {}, counts: from.count};
+      for (const p of PARTS) { const a = upload(from[p]); out.buffers[p] = {a, b: to !== from ? upload(to[p]) : a}; }
+      return out;
+    },
+    drop(l) {
+      if (!l) return;
+      for (const p of PARTS) { l.buffers[p].a.destroy(); if (l.buffers[p].b !== l.buffers[p].a) l.buffers[p].b.destroy(); }
+    },
+    frame(draws, background, additive) {
+      const t = targetFor(canvas.width, canvas.height);
+      // All uniform blocks of the frame first, in one write; then the draws read them at their offsets.
+      const list = [];
+      for (const {layer, uniforms: u} of draws) for (const [part, how] of DRAW_ORDER) {
+        if (!layer.counts[part] || list.length >= MAX_DRAWS) continue;
+        const at = list.length * SLOT / 4;
+        block.set([u.centre[0], u.centre[1], u.size[0], u.size[1], u.scale, u.ratio, u.t, u.fade, ...u.lens, ...u.breath, 0, ...u.cosmic, 0, ...u.twinkle, 0, 0, ...u.orbit, u.extent, part === 'edges' ? u.edgeAlpha : 1, 0, 0], at);
+        list.push({layer, part, how});
+      }
+      if (list.length) device.queue.writeBuffer(uniform, 0, block, 0, list.length * SLOT / 4);
+      const encoder = device.createCommandEncoder();
+      const pass = encoder.beginRenderPass({colorAttachments: [{view: t.view, resolveTarget: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'discard',
+        clearValue: {r: background[0], g: background[1], b: background[2], a: background[3]}}]});
+      list.forEach(({layer, part, how}, k) => {
+        pass.setPipeline(pipeline(SHAPE_PARTS.has(part) ? 'shapes' : 'lines', how === 'lines' ? 'line-list' : 'triangle-list', additive));
+        pass.setBindGroup(0, group, [k * SLOT]);
+        pass.setVertexBuffer(0, layer.buffers[part].a);
+        pass.setVertexBuffer(1, layer.buffers[part].b);
+        pass.draw(layer.counts[part]);
+      });
+      pass.end();
+      device.queue.submit([encoder.finish()]);
+    },
+    destroy() { target?.texture.destroy(); uniform.destroy(); context.unconfigure(); },
+  };
+}
+
 /** Ease in and out: a move starts and ends gently. */
 const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
@@ -186,9 +483,9 @@ const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
  * clear colour (RGBA in 0..1).
  */
 export function createOverviewRenderer(canvas, initialModel, options = {}) {
-  const gl = canvas.getContext('webgl', {antialias: true, premultipliedAlpha: false});
-  if (!gl) throw Error('WebGL is not available');
-  const shapes = program(gl, SHAPE_VS, SHAPE_FS), lines = program(gl, LINE_VS, LINE_FS);
+  // WebGPU with a device (`options.device`, from `sceneBackend`), else WebGL 2, else WebGL 1; `options.backend: 'webgl'`
+  // keeps WebGL even with a device, `'webgl1'` forces WebGL 1 (the reference the others are checked against).
+  const backend = options.device && options.backend !== 'webgl' && options.backend !== 'webgl1' ? webgpuBackend(canvas, options.device) : webglBackend(canvas, options.backend === 'webgl1');
   let model = initialModel, expanded = new Map(), collapsed = new Set(), selected = -1, trace = null;
   // The fisheye lens (`setLens`), in CSS pixels of the canvas, or null.
   let lens = null;
@@ -203,26 +500,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     return {phase: 2 * Math.PI * (now - breath.start) / breath.period, amplitude: breath.amplitude * ease(into) * ease(out)};
   };
   // A layer: per part a buffer of the start and one of the end of a morph (the same buffer when nothing moves).
-  const layer = (from, to = from) => {
-    const out = {buffers: {}, counts: from.count};
-    for (const p of PARTS) {
-      const a = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, a);
-      gl.bufferData(gl.ARRAY_BUFFER, from[p], gl.STATIC_DRAW);
-      let b = a;
-      if (to !== from) {
-        b = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, b);
-        gl.bufferData(gl.ARRAY_BUFFER, to[p], gl.STATIC_DRAW);
-      }
-      out.buffers[p] = {a, b};
-    }
-    return out;
-  };
-  const drop = l => {
-    if (!l) return;
-    for (const p of PARTS) { gl.deleteBuffer(l.buffers[p].a); if (l.buffers[p].b !== l.buffers[p].a) gl.deleteBuffer(l.buffers[p].b); }
-  };
+  const layer = (from, to = from) => backend.layer(from, to);
+  const drop = l => backend.drop(l);
   let outlines = options.shapes ?? {};
   // Provisional: the galaxy style (`setGalaxy`): glows and stars instead of discs and rings, faint lines, light added.
   let galaxy = !!options.galaxy;
@@ -258,72 +537,25 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   // The running animation: a morph (`t` of the current layer, and the view) and a fade (of the previous layer).
   let morphing = null, fading = null, frame = 0;
 
-  const attribute = (p, name, buffer, stride, size, offset) => {
-    const at = gl.getAttribLocation(p, name);
-    if (at < 0) return;
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.enableVertexAttribArray(at);
-    gl.vertexAttribPointer(at, size, gl.FLOAT, false, stride * 4, offset * 4);
-  };
   const ratio = () => globalThis.devicePixelRatio || 1;
-  const uniforms = (p, view, t, fade) => {
-    gl.uniform2f(gl.getUniformLocation(p, 'u_centre'), view.centreX, view.centreY);
-    gl.uniform1f(gl.getUniformLocation(p, 'u_scale'), view.scale);
-    gl.uniform2f(gl.getUniformLocation(p, 'u_size'), canvas.width, canvas.height);
-    gl.uniform1f(gl.getUniformLocation(p, 'u_ratio'), ratio());
-    gl.uniform1f(gl.getUniformLocation(p, 'u_t'), t);
-    gl.uniform1f(gl.getUniformLocation(p, 'u_fade'), fade);
-    // The lens in device pixels from the canvas centre (y down, as the shaders compute before flipping).
-    const r = ratio();
-    gl.uniform4f(gl.getUniformLocation(p, 'u_lens'),
-      lens ? (lens.x - canvas.clientWidth / 2) * r : 0, lens ? (lens.y - canvas.clientHeight / 2) * r : 0,
-      lens ? lens.radius * r : 0, lens ? lens.magnification : 1);
-    const b = breathState();
+  // The uniform values of a draw, for every backend.
+  const uniformsOf = (view, t, fade) => {
+    const r = ratio(), b = breathState();
     // In the galaxy style the idle breath is cosmic motion instead (its strength fades in and out as the breath does).
     const strength = galaxy && breath ? b.amplitude / Math.max(breath.amplitude, 1e-9) : 0;
-    gl.uniform3f(gl.getUniformLocation(p, 'u_breath'), b.phase, galaxy ? 0 : b.amplitude, (breath?.wavelength ?? 600) * r);
     const seconds = breath ? (performance.now() - breath.start) / 1000 : 0;
-    gl.uniform3f(gl.getUniformLocation(p, 'u_cosmic'), seconds, strength, model.overview.rootRadius || 1);
-    // Wrapped, so that the fragment shader's lower precision stays fine over a long idle time.
-    gl.uniform2f(gl.getUniformLocation(p, 'u_twinkle'), seconds % 2732, strength);
-    gl.uniform4f(gl.getUniformLocation(p, 'u_orbit'), orbit?.yaw ?? 0, orbit?.pitch ?? 0, orbit?.depth ?? 0, orbit ? 1 : 0);
-    gl.uniform1f(gl.getUniformLocation(p, 'u_extent'), model.overview.rootRadius || 1);
-  };
-  const drawPart = (l, part, mode, view, t, fade) => {
-    if (!l.counts[part]) return;
-    const {a, b} = l.buffers[part];
-    // Only the arrays of the program in use are on: one left on by the other program would point at a buffer of the
-    // wrong size.
-    for (let i = 0; i < 8; i++) gl.disableVertexAttribArray(i);
-    if (SHAPE_PARTS.has(part)) {
-      gl.useProgram(shapes);
-      uniforms(shapes, view, t, fade);
-      attribute(shapes, 'a_centre', a, SHAPE_STRIDE, 2, 0);
-      attribute(shapes, 'a_half', a, SHAPE_STRIDE, 2, 2);
-      attribute(shapes, 'a_corner', a, SHAPE_STRIDE, 2, 4);
-      attribute(shapes, 'a_colour', a, SHAPE_STRIDE, 4, 6);
-      attribute(shapes, 'a_kind', a, SHAPE_STRIDE, 1, 10);
-      attribute(shapes, 'a_centre2', b, SHAPE_STRIDE, 2, 0);
-      attribute(shapes, 'a_half2', b, SHAPE_STRIDE, 2, 2);
-    } else {
-      gl.useProgram(lines);
-      uniforms(lines, view, t, fade);
-      gl.uniform1f(gl.getUniformLocation(lines, 'u_alpha'), part === 'edges' ? (options.edgeAlpha ?? 1) * edgeDim(view) : 1);
-      attribute(lines, 'a_position', a, LINE_STRIDE, 2, 0);
-      attribute(lines, 'a_colour', a, LINE_STRIDE, 4, 2);
-      attribute(lines, 'a_position2', b, LINE_STRIDE, 2, 0);
-    }
-    gl.drawArrays(mode, 0, l.counts[part]);
-  };
-  const drawLayer = (l, view, t, fade) => {
-    drawPart(l, 'edges', gl.LINES, view, t, fade);
-    // The bus connectors under the discs: the members sit on them.
-    drawPart(l, 'buses', gl.TRIANGLES, view, t, fade);
-    drawPart(l, 'discs', gl.TRIANGLES, view, t, fade);
-    drawPart(l, 'back', gl.TRIANGLES, view, t, fade);
-    drawPart(l, 'routes', gl.LINES, view, t, fade);
-    drawPart(l, 'arrows', gl.TRIANGLES, view, t, fade);
-    drawPart(l, 'front', gl.TRIANGLES, view, t, fade);
+    return {
+      centre: [view.centreX, view.centreY], scale: view.scale, size: [canvas.width, canvas.height], ratio: r, t, fade,
+      // The lens in device pixels from the canvas centre (y down, as the shaders compute before flipping).
+      lens: [lens ? (lens.x - canvas.clientWidth / 2) * r : 0, lens ? (lens.y - canvas.clientHeight / 2) * r : 0, lens ? lens.radius * r : 0, lens ? lens.magnification : 1],
+      breath: [b.phase, galaxy ? 0 : b.amplitude, (breath?.wavelength ?? 600) * r],
+      cosmic: [seconds, strength, model.overview.rootRadius || 1],
+      // Wrapped, so that the fragment shader's lower precision stays fine over a long idle time.
+      twinkle: [seconds % 2732, strength],
+      orbit: [orbit?.yaw ?? 0, orbit?.pitch ?? 0, orbit?.depth ?? 0, orbit ? 1 : 0],
+      extent: model.overview.rootRadius || 1,
+      edgeAlpha: (options.edgeAlpha ?? 1) * edgeDim(view),
+    };
   };
   const writeLabels = (view, show) => {
     const c = options.labels;
@@ -498,6 +730,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
       renderer.draw();
     },
+    /** The backend drawing it: 'webgpu', 'webgl2' or 'webgl'. */
+    get backend() { return backend.kind; },
     /** Whether the drawing breathes (see `breathe`), fading out included. */
     get breathing() { return !!breath; },
     /**
@@ -520,18 +754,15 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     },
     draw({labels = true} = {}) {
       const view = renderer.view;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clearColor(...(options.background ?? [0.047, 0.063, 0.094, 1]));
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.enable(gl.BLEND);
-      // Galaxy mode adds light: where many glows and lines meet it grows brighter.
-      gl.blendFunc(gl.SRC_ALPHA, galaxy ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
       const t = morphing ? ease(progress(morphing)) : 0;
       const f = fading ? ease(progress(fading)) : 1;
       // The old drawing fades out under the new one, which is drawn whole: what both have does not dim (a blend of two
       // half-transparent drawings would let the background through and flicker), what goes fades, what comes is there.
-      if (previous) drawLayer(previous, view, 0, 1 - f);
-      drawLayer(current, view, t, 1);
+      const draws = [];
+      if (previous) draws.push({layer: previous, uniforms: uniformsOf(view, 0, 1 - f)});
+      draws.push({layer: current, uniforms: uniformsOf(view, t, 1)});
+      // Galaxy mode adds light: where many glows and lines meet it grows brighter.
+      backend.frame(draws, options.background ?? [0.047, 0.063, 0.094, 1], galaxy);
       if (labels) writeLabels(view, !morphing);
     },
     /** The world point under a CSS pixel of the canvas. */
@@ -552,7 +783,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     destroy() {
       if (frame) cancelAnimationFrame(frame);
       drop(current); drop(previous);
-      gl.deleteProgram(shapes); gl.deleteProgram(lines);
+      backend.destroy();
       options.labels?.getContext('2d').clearRect(0, 0, options.labels.width, options.labels.height);
     },
   };

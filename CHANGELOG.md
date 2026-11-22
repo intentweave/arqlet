@@ -16,6 +16,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   (`bind`) and gains `[key]` selectors, `auto(field)`, the node property `radius` and `arrow: 'none'`.
 - The cluster overview reads a style (`overviewBuffers(…, {style})`, `setStyle`): trace, route, line and bus colours from
   its theme, cluster colours from its palette; unchanged without one.
+- The cluster overview draws with WebGPU (`createOverviewRenderer(…, {device})`, ADR 0025 O2), else WebGL 2, else WebGL 1,
+  with every mode (galaxy, orbit, lens, breathing, morph) as before; the playground's overview page uses WebGPU where
+  available.
 
 - Scene renderer for large views (ADR 0025 V1–V2, provisional) in `@arqlet/viewer`: a far layer on the GPU, WebGPU
   first and WebGL 2 as the fallback (`createSceneGpuRenderer`, `createSceneRenderer`, `sceneBackend`), drawing the
