@@ -41,7 +41,10 @@ for p in contracts engine-client viewer arqlet; do (cd packages/$p && pnpm pack 
 ```
 
 `prepack` (`tools/npm-prepack.mjs`) copies the license files, builds the WASM for `engine-client` (Rust with
-`wasm32-unknown-unknown`) and bundles the contract types. Check a tarball by installing it into an empty project.
+`wasm32-unknown-unknown`) and bundles the contract types. For `engine-client` it also writes `THIRD_PARTY_NOTICES.md`,
+the copyright and license notices of the Rust crates linked into the WASM (`tools/third-party-notices.mjs`; a crate
+without a license file fails `node tools/third-party-notices.mjs --check`, and a release waits for a decision on it).
+Check a tarball by installing it into an empty project.
 
 ## Publish
 
