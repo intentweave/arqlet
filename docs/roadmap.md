@@ -59,15 +59,19 @@ that belongs to a zone, a team and a security domain at once cannot be shown. De
 
 - Model: memberships separate from `parentId`, as groups with a dimension (`zone`, `team`, `layer`, …); the canonical
   graph keeps its hierarchy.
-- View: each dimension is shown as the hierarchy (containers, as now), as lanes (one dimension across the flow, a grid
-  like pools and lanes; in layered areas a partition of every rank's order), or as an overlay (hulls around the members,
-  kept together softly: adjacent order in layered areas, a group force in organic ones). Proxies (copies) only where a
-  group cannot be kept together.
-- Hard parts: contiguity is not always possible (Euler diagrams); hulls cross container borders and must not obstruct
-  the routing; a measure of group contiguity and overlap is needed before any default.
-- Still open after the ADR: the concrete dimensions of the exports (`tools/intentweave-export` emits none yet), how many
-  groups and dimensions a view can carry, and whether the extra memberships shape the layout or are only drawn at first
-  (the ADR draws in M2 and shapes in M3, and the M3 gate decides).
+- View (revised 2026-11-22): a ranked `groupingPriority` the user sets — the parent hierarchy is one criterion among the
+  dimensions, the default first one. The first criterion that assigns a node owns it (containers or lanes); every later
+  one is a containment that may be broken: held, else split into hulls, else marked. An organisation chart can thus be
+  read by project and a process by responsibility lanes. Multi-valued dimensions order their values (a person on two
+  projects).
+- Done: the model and its refusals, a hull per group drawn without moving anything (M0, M2), changes through `patch`.
+  Next without layout risk: the display stages (one hull per owner, marks), then `groupingPriority` as a projection
+  (M2b, M1). With layout risk and the quality gate: holding (M3), lanes (M4).
+- Hard parts: contiguity is not always possible in one order (Euler diagrams); hulls cross container borders and must
+  not obstruct the routing; where holding is switched off (its cost in crossings and bends, a budget per rank, a marking
+  threshold) is measured in M3, not chosen.
+- Still open: the concrete dimensions of the exports (`tools/intentweave-export` emits none yet) and how many criteria a
+  view can carry.
 
 ## 7. Scaling from 20K to 1M nodes (planned)
 
