@@ -168,7 +168,58 @@ fn node_details(
         incoming,
         outgoing,
         properties: BTreeMap::new(),
+        groupings: groupings(canonical, &snapshot.options.grouping_priority, &node.id),
     })
+}
+
+/// The groups of node `id` per criterion of a non-default grouping priority (ADR 0022 §7), in the order of the ranks:
+/// for `parent` its container in the source, for a dimension every group that lists it (declared order); the one that
+/// owns it in the view marked. Empty under the default priority.
+fn groupings(
+    canonical: &arqlet_model::Graph,
+    priority: &[arqlet_model::GroupingCriterion],
+    id: &str,
+) -> Vec<arqlet_model::NodeGrouping> {
+    use arqlet_model::grouping::{self, Owner, PARENT};
+    if grouping::is_default(priority) {
+        return Vec::new();
+    }
+    let ownership = grouping::owners(canonical, priority);
+    let owner = ownership.owners.get(id);
+    let mut out = Vec::new();
+    for criterion in priority {
+        if criterion.by == PARENT {
+            let parent = canonical
+                .nodes
+                .iter()
+                .find(|n| n.id == id)
+                .and_then(|n| n.parent_id.clone());
+            if let Some(parent) = parent {
+                out.push(arqlet_model::NodeGrouping {
+                    owner: matches!(owner, Some(Owner::Parent(Some(p))) if *p == parent),
+                    by: PARENT.into(),
+                    group: parent,
+                });
+            }
+            continue;
+        }
+        let Some(d) = canonical.memberships.dimension(&criterion.by) else {
+            continue;
+        };
+        for g in d
+            .groups
+            .iter()
+            .filter(|g| g.members.iter().any(|m| m == id))
+        {
+            out.push(arqlet_model::NodeGrouping {
+                owner: matches!(owner, Some(Owner::Group { dimension, group })
+                    if *dimension == criterion.by && *group == g.id),
+                by: criterion.by.clone(),
+                group: g.id.clone(),
+            });
+        }
+    }
+    out
 }
 
 /// The bounds of visible node `id` in the scene's coordinates: its box plus the boxes of the nodes above it (as the scene

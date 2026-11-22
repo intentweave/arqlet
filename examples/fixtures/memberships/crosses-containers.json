@@ -32,5 +32,8 @@
       }
     ]
   },
-  "membershipViews": { "focus": "overlay" }
+  "groupingPriority": [
+    { "by": "parent" },
+    { "by": "focus" }
+  ]
 }

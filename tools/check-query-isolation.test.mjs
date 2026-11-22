@@ -3,7 +3,7 @@
 // real workspace.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {crateNames, forbiddenIn, ownThirdParty, violations} from './check-query-isolation.mjs';
+import {QUERY_CRATES, crateNames, forbiddenIn, ownThirdParty, violations} from './check-query-isolation.mjs';
 
 const TREE = `arqlet-query v0.7.0 (/w/crates/query)
 arqlet-layout v0.7.0 (/w/crates/layout)
@@ -48,4 +48,10 @@ test('violations name the crate, the culprit and the target', () => {
 
 test('the query crates of this workspace are isolated, for the host and for wasm32', () => {
   assert.deepEqual(violations(), []);
+});
+
+test('the adapter, the JSON layer, the tool and the module are among the checked crates', () => {
+  for (const crate of ['arqlet-query-model', 'arqlet-query-json', 'arqlet-query-cli', 'arqlet-query-wasm']) {
+    assert.ok(QUERY_CRATES.includes(crate), crate);
+  }
 });

@@ -283,18 +283,51 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   const routesBefore=JSON.stringify(plain.routes.map(r=>r.points));
 
   get('membership-hulls').checked=true;get('membership-hulls').onchange();await flush();
-  assert.deepEqual(Object.keys(latest.options.membershipViews??{}),['layer','team','zone'],'every declared dimension is shown');
+  assert.deepEqual((latest.options.groupingPriority??[]).map(c=>c.by),['parent','zone','team','layer'],'the containment first, every dimension held softly after it');
   const drawn=sceneOf(engine,latest);
   assert.equal(drawn.membershipHulls.length,9,'three dimensions of three groups each');
-  assert.equal(drawn.membershipReport.length,3);
-  assert.ok(drawn.membershipReport.every(r=>r.applied&&r.drawn===3),'every dimension is applied and complete');
+  assert.equal(drawn.membershipReport.length,4,'one entry per criterion');
+  assert.equal(drawn.membershipReport[0].mode,'owner');
+  assert.ok(drawn.membershipReport.slice(1).every(r=>r.mode==='soft'&&r.applied&&r.drawn===3),'every dimension is applied and complete');
   assert.equal(JSON.stringify(drawn.nodes.map(n=>n.bounds)),boxesBefore,'a hull may not move a node');
   assert.equal(JSON.stringify(drawn.routes.map(r=>r.points)),routesBefore,'a hull is invisible to the router');
+  // The default shape is the rectangle: four corners, axis-parallel edges.
+  const axisParallel=h=>h.points.length===4&&h.points.every((p,i)=>{const q=h.points[(i+1)%4];return p.x===q.x||p.y===q.y;});
+  assert.equal(get('membership-hull').value,'rectangle');
+  assert.ok(drawn.membershipHulls.every(axisParallel),'rectangles by default');
+
+  // The polygon: the same groups, nothing moved, and a polygon never reaches outside its group's rectangle.
+  get('membership-hull').value='polygon';get('membership-hull').onchange();await flush();
+  assert.equal(latest.options.membershipHull,'polygon');
+  const polygons=sceneOf(engine,latest);
+  assert.equal(polygons.membershipHulls.length,9);
+  assert.deepEqual(polygons.membershipHulls.map(h=>h.group),drawn.membershipHulls.map(h=>h.group));
+  assert.equal(JSON.stringify(polygons.nodes.map(n=>n.bounds)),boxesBefore,'the shape moves no node');
+  assert.equal(JSON.stringify(polygons.routes.map(r=>r.points)),routesBefore,'the shape changes no route');
+  get('membership-hull').value='rectangle';get('membership-hull').onchange();await flush();
+  assert.equal(latest.options.membershipHull,undefined,'the default is omitted again');
 
   get('membership-hulls').checked=false;get('membership-hulls').onchange();await flush();
   assert.equal((sceneOf(engine,latest).membershipHulls??[]).length,0,'unticking removes them again');
+  assert.equal(latest.options?.groupingPriority,undefined,'the parent hierarchy alone is the default, omitted');
+
+  // M1: another structure first. The team becomes the containers; the containment comes second, drawn as hulls.
+  assert.deepEqual([...get('grouping-first').children].map(c=>c.value),['parent','zone','team','layer']);
+  get('grouping-first').value='team';get('grouping-first').onchange();await flush();
+  assert.deepEqual(latest.options.groupingPriority.map(c=>c.by),['team','parent']);
+  const byTeam=latest.graph.nodes;
+  assert.equal(byTeam.find(n=>n.id==='gateway').parentId,'membership:team/platform','the gateway sits in its team');
+  assert.ok(byTeam.some(n=>n.id==='membership:team/payments'));
+  assert.ok(!byTeam.some(n=>n.id==='front'),'a deployment the teams emptied is not a box of this view');
+  const teamScene=sceneOf(engine,latest);
+  assert.deepEqual(teamScene.membershipReport.map(r=>[r.dimension,r.mode]),[['team','owner'],['parent','soft']]);
+  assert.ok(teamScene.membershipHulls.length>0&&teamScene.membershipHulls.every(h=>h.dimension==='parent'),'the deployments as hulls');
+  assert.equal(get('grouping-first').value,'team','the control shows the view it asked for');
+  get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
+  assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','back to the containment');
+  assert.equal(latest.options?.groupingPriority,undefined);
   get('example').value='default';get('example').onchange();await flush();
-  console.log('Membership hulls passed: 9 hulls over 3 dimensions, boxes and routes unchanged.');
+  console.log('Membership hulls passed: 9 hulls over 3 dimensions in both shapes, boxes and routes unchanged.');
 }else console.log('Membership hulls skipped: the memberships example is not built.');
 
 // Options: preset and bundling go through `configure`; the page reflects bundling from the snapshot.

@@ -1109,7 +1109,19 @@ function syncDetails(){
  // show, so the control is disabled rather than silently doing nothing.
  const dimensions=membershipDimensions();
  $('membership-hulls').disabled=dimensions.length===0;
- $('membership-hulls').checked=Object.values(o.membershipViews??{}).some(mode=>mode==='overlay');
+ // Provisional (ADR 0022 §2): the grouping priority as two controls — which structure comes first, and whether the
+ // dimensions after it are drawn as hulls. The choices follow the graph's dimensions.
+ const priority=o.groupingPriority??[];
+ const wanted=['parent',...dimensions],first=$('grouping-first');
+ const shown=[...(first.children??[])].map(c=>c.value);
+ if(shown.length!==wanted.length||wanted.some((id,i)=>shown[i]!==id)){
+  first.replaceChildren(...wanted.map(id=>{const option=document.createElement('option');option.value=id;option.textContent=id==='parent'?'Parent (containment)':id;return option;}));
+ }
+ first.disabled=dimensions.length===0;
+ first.value=priority[0]?.by??'parent';
+ $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent');
+ $('membership-hull').disabled=dimensions.length===0;
+ $('membership-hull').value=o.membershipHull??'rectangle';
 }
 /** The ids of the membership dimensions the current graph declares, in their declared order. */
 function membershipDimensions(){
@@ -1188,11 +1200,23 @@ const FLAGS=[['component-packing','componentPacking'],['vpsc-overlap-removal','v
 for(const [id,key] of FLAGS)$(id).onchange=()=>setOption({[key]:$(id).checked},key);
 // Provisional (ADR 0022): show every declared dimension as an overlay, or none. The hulls are derived from the boxes the
 // layout already produced, so this never moves a node; one `configure` edit carries the option like any other.
-$('membership-hulls').onchange=()=>{
- const on=$('membership-hulls').checked,dimensions=membershipDimensions();
+// Provisional (ADR 0022 §2): the two controls make one grouping priority. The chosen structure first; the parent hierarchy
+// right after it when a dimension comes first (so every node keeps an owner); with hulls, the other dimensions after that,
+// held softly. The parent hierarchy alone is the default and is sent as the empty list.
+function applyGrouping(label){
+ const dimensions=membershipDimensions();
  if(!dimensions.length)return;
- setOption({membershipViews:on?Object.fromEntries(dimensions.map(id=>[id,'overlay'])):{}},'membershipViews');
-};
+ const first=$('grouping-first').value||'parent';
+ const order=[first];
+ if(first!=='parent')order.push('parent');
+ if($('membership-hulls').checked)order.push(...dimensions.filter(d=>d!==first));
+ setOption({groupingPriority:order.length===1?[]:order.map(by=>({by}))},label);
+}
+$('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
+$('grouping-first').onchange=()=>applyGrouping('Structure first');
+// Provisional (ADR 0022 §3): the hull's outline. Sent as it is; the engine omits the default (rectangle) when it writes
+// the options back, so a snapshot that never chose a shape stays unchanged.
+$('membership-hull').onchange=()=>setOption({membershipHull:$('membership-hull').value},'Hull shape');
 // Live needs force-directed behaviour: turning it on turns that on (the configure edit then starts the settling).
 $('live').onchange=()=>{
  if(!$('live').checked)return;

@@ -5,11 +5,27 @@
 //! (`shortestPath`, quantified paths, `WHERE` inside a pattern; upstream issues #132 to #134), so the guard walks the
 //! syntax tree, which still holds all of them, before anything is lowered.
 //!
-//! This is the first half of stage M1: the parser and the guard. The lowering into a plan IR and the executor come next.
+//! [`lower`] then turns a checked query into a plan of `arqlet-query`, and [`run`] lowers and executes it. The lowering
+//! reads decypher's HIR and takes what the HIR loses (the order of the columns) from the syntax tree.
 #![forbid(unsafe_code)]
 
-use arqlet_query::QueryError;
+mod lower;
+
+pub use lower::lower;
+
+use arqlet_query::{execute, GraphStore, Limits, QueryError, ResultSet, Value};
 use decypher::syntax::{SyntaxElement, SyntaxKind as K, SyntaxNode};
+use std::collections::BTreeMap;
+
+/// Checks, lowers and executes a query over a store. `params` are the values of the `$name` parameters.
+pub fn run(
+    query: &str,
+    store: &dyn GraphStore,
+    params: &BTreeMap<String, Value>,
+    limits: Limits,
+) -> Result<ResultSet, QueryError> {
+    execute(&lower(query)?, store, params, limits)
+}
 
 /// The longest query accepted, in bytes (provisional). decypher itself refuses expressions nested deeper than 128 levels.
 pub const MAX_QUERY_BYTES: usize = 64 * 1024;

@@ -3,10 +3,12 @@ set -eu
 cd "$(dirname "$0")/../.."
 input=${1:-exports/intentweave-initial/graph.json}
 mkdir -p apps/playground/generated
-cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --locked
+# `--features query`: the operation `query` (ADR 0021, M5b) in the browser engine and in the backend's binaries, so that it
+# runs in all three deployment modes. The feature is off by default; the npm artifact is built without it for now.
+cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --features query --locked
 # The native binaries the backend and the smoke test run: optimised like release, without LTO (`fast` profile), so the
 # backend answers about as fast as a release build and the build stays quick.
-cargo build -p arqlet-runtime --bins --locked --profile fast
+cargo build -p arqlet-runtime --bins --features query --locked --profile fast
 cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm apps/playground/generated/arqlet.wasm
 # The npm package ships the engine beside its loader (git-ignored copy); the package tests load it from there in Node.
 cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm packages/engine-client/arqlet.wasm
@@ -62,7 +64,7 @@ path = 'apps/playground/generated/examples/index.json'
 index = [e for e in json.load(open(path)) if e['name'] != 'memberships']
 index.append({'name': 'memberships', 'title': 'Memberships (zone, team, layer)',
               'nodes': len(graph['nodes']),
-              'description': 'Nine services in three containers, each also in a zone, a team and a layer. Tick "Membership hulls" to draw a hull per group; the drawing does not move.',
+              'description': 'Nine services in three containers, each also in a zone, a team and a layer. Tick "Membership hulls" to draw a hull per group (the drawing does not move), or choose a dimension under "Structure first" to read the services by team, zone or layer.',
               'source': 'examples/fixtures/memberships/three-dimensions.json'})
 json.dump(index, open(path, 'w'), indent=1, ensure_ascii=False)
 PY
