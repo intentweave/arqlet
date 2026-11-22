@@ -993,6 +993,35 @@ def can_bus():
                           {"id": "limiter-out", "edges": wired, "label": "Limiter outputs (wired)"}])
 
 
+def metro_map():
+    """A made-up city's metro: five lines as explicit buses, each a chain of stations in order (one edge per stretch,
+    named by its line), with interchanges where lines meet. Routed octilinear (45-degree corners). Drawn as a metro map
+    with the playground's Style field set to Metro: every line in its colour without arrowheads, stations in the line's
+    colour, interchanges in black."""
+    b = Builder("lr")
+    lines = [
+        ("red", "Red line", ["westfield", "mill-lane", "market", "old-town", "harbour", "eastgate"]),
+        ("blue", "Blue line", ["north-park", "hill-road", "market", "station-street", "riverside", "south-end"]),
+        ("green", "Green line", ["lakeview", "college", "old-town", "station-street", "docklands"]),
+        ("yellow", "Yellow line", ["west-cross", "mill-lane", "hill-road", "college"]),
+        ("purple", "Purple line", ["airport", "docklands", "harbour", "eastgate", "sea-view"]),
+    ]
+    names = {"westfield": "Westfield", "mill-lane": "Mill Lane", "market": "Market Square", "old-town": "Old Town",
+             "harbour": "Harbour", "eastgate": "Eastgate", "north-park": "North Park", "hill-road": "Hill Road",
+             "station-street": "Station Street", "riverside": "Riverside", "south-end": "South End", "lakeview": "Lakeview",
+             "college": "College", "docklands": "Docklands", "west-cross": "West Cross", "airport": "Airport",
+             "sea-view": "Sea View"}
+    for station in names:
+        b.node(station, names[station], "station")
+    buses = []
+    for line_id, label, stations in lines:
+        first = len(b.edges)
+        for source, target in zip(stations, stations[1:]):
+            b.edge(source, target, line_id)
+        buses.append({"id": line_id, "label": label, "edges": [e["id"] for e in b.edges[first:]]})
+    return b.graph(defaultRouting="octilinear", buses=buses)
+
+
 def git_state():
     def run(*args):
         result = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True)
@@ -1032,6 +1061,7 @@ def main():
         ("self-loops", self_loops, "Self-loops", "States with none, one, two and three self-loops, parallel and antiparallel edges, round and rectangular, organic root and a layered container.", "hand-authored", True),
         ("fixed-ports", fixed_ports, "Placed ports", "A hub whose four edges leave at ports placed on different sides; the optimisation keeps them.", "hand-authored", True),
         ("can-bus", can_bus, "CAN bus (vehicle)", "Vehicle speed limiter on a CAN bus: ECUs on one shared bus line, the limiter's wired outputs as a second bus; the limiter ECU holds a layered software diagram, the engine ECU an organic one, and two ECUs share a housing.", "hand-authored", True),
+        ("metro-map", metro_map, "Metro map (lines as buses)", "A made-up city's metro: five lines as explicit buses, stations in order along each line, interchanges where lines meet; routed octilinear. Choose Style: Metro to draw it as a metro map.", "hand-authored", True),
         ("vehicle-buses", vehicle_buses, "Vehicle buses (bus lines)", "Physical buses of a made-up vehicle as bars (shape busLine): four buses with their ECUs and a central gateway on three of them.", "hand-authored", True),
         ("vehicle-buses-organic", lambda: vehicle_buses("organic"), "Vehicle buses, organic", "The same buses placed organically: each bar runs along its ECUs.", "hand-authored", True),
         ("vehicle-trunk", vehicle_trunk, "Vehicle trunk bus (no gateway)", "One CAN trunk past every ECU of a made-up vehicle, without gateways; two body modules each head a LIN branch.", "hand-authored", True),
