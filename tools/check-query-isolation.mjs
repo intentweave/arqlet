@@ -7,14 +7,15 @@
 //
 //   node tools/check-query-isolation.mjs        exits 1 and says why when a rule is broken
 //
-// `arqlet-query-model`, the adapter, joins QUERY_CRATES when it is created (stage M5a of the ADR).
+// The adapter `arqlet-query-model` and the tool `arqlet-query-cli` (stage M5a) are checked like the others: both may use
+// `arqlet-model`, and the tool may read files, but neither may reach the layout engine.
 import {execFileSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = resolve(import.meta.dirname, '..');
 
-export const QUERY_CRATES = ['arqlet-query', 'arqlet-query-cypher'];
+export const QUERY_CRATES = ['arqlet-query', 'arqlet-query-cypher', 'arqlet-query-model', 'arqlet-query-cli'];
 export const FORBIDDEN = [
   'arqlet', 'arqlet-layout', 'arqlet-routing', 'arqlet-scene', 'arqlet-view', 'arqlet-topology', 'arqlet-elk',
   'arqlet-reference', 'arqlet-runtime', 'arqlet-wasm', 'arqlet-contracts', 'arqlet-node',

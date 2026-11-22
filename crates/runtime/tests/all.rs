@@ -106,6 +106,8 @@ mod pin_search;
 mod pinned_overlap;
 #[path = "pins.rs"]
 mod pins;
+#[path = "query.rs"]
+mod query;
 #[path = "reference.rs"]
 mod reference;
 #[path = "reference_corpus.rs"]
@@ -120,6 +122,8 @@ mod reproduce;
 mod route_crossings;
 #[path = "rows.rs"]
 mod rows;
+#[path = "session_store.rs"]
+mod session_store;
 #[path = "shape_change.rs"]
 mod shape_change;
 #[path = "shape_geometry.rs"]

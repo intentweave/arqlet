@@ -277,6 +277,8 @@ impl EngineSession {
             }
             Some("find") => crate::find::find_on_with(self.current()?, v, Some(&self.content)),
             Some("peek") => crate::peek::peek_on(self.current()?, v),
+            // Provisional (ADR 0021, M5b): a query over the source graph and the session's content.
+            Some("query") => crate::query::query_on(self.current()?, Some(&self.content), v),
             Some("digest") => Ok(crate::find::digest_on(self.current()?)),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))
@@ -289,6 +291,38 @@ impl EngineSession {
             // Everything that does not read the session's view.
             _ => serde_json::from_str(&crate::dispatch(&v.to_string())).map_err(|e| e.to_string()),
         }
+    }
+
+    /// What the session holds in heap bytes, estimated cheaply (no JSON text of any part): the source graph, the structure's
+    /// view and index, the view graph, boxes, routes, content, change log, columns and overview, without the layered plans
+    /// and the rest of the snapshot. For a store that weighs its sessions after every message (`SessionStore`).
+    pub fn heap_estimate(&self) -> usize {
+        use crate::memory;
+        let mut total = memory::properties(&self.content.nodes)
+            + memory::properties(&self.content.edges)
+            + self.log.heap_estimate()
+            + self.columns.as_ref().map_or(0, memory::columns)
+            + self.overview.heap_estimate();
+        if let Some(s) = &self.snapshot {
+            let source = s.source_graph.as_deref().unwrap_or(&s.graph);
+            total += memory::graph(source)
+                + memory::boxes(&s.boxes)
+                + memory::routes(&s.routes, s.routes.capacity());
+            if s.source_graph.is_some() {
+                total += memory::graph(&s.graph);
+            }
+            if let Some(structure) = &s.structure {
+                let shared = s
+                    .source_graph
+                    .as_ref()
+                    .is_some_and(|src| std::sync::Arc::ptr_eq(src, &structure.view));
+                if !shared {
+                    total += memory::graph(&structure.view);
+                }
+                total += memory::index(&structure.index);
+            }
+        }
+        total
     }
 
     /// What the session holds, part by part, in heap bytes estimated from sizes and lengths (`crate::memory`); a shared
