@@ -20,8 +20,10 @@ session store (`SessionStore`, ADR 0023 R7) is single-threaded: it takes one mes
 ### 1. Parallel between sessions, serial within one
 
 - **Within a session** the order stays fixed: every answer builds on the revision before. Each session has its own queue;
-  a queued request that a newer one of the same kind replaces (a move, a refinement) may be dropped before it runs, and
-  a result whose revision is stale is rejected, as everywhere else.
+  only a request that a newer one replaces completely may be dropped before it runs (a move to an absolute position
+  while dragging, a refinement, a read whose answer nobody waits for any more). A change of the graph or the content
+  (`patch`, `change`, `payload`: whatever enters the change log) is never dropped; each one builds on the one before.
+  A result whose revision is stale is rejected, as everywhere else.
 - **Between sessions** nothing is shared, so they run in parallel. Determinism is kept: no session sees another, so each
   answer is the same as in a serial run, for any number of threads.
 
