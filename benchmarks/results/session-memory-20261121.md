@@ -137,3 +137,24 @@ placement (`AreaPlan`) convert at their boundary.
 Since the start of this work on the 114k graph: 864.2 → 519.5 MB (−40 %). Output byte-identical: the refinement
 fingerprints of the 15 views (limit 100, threads 1 and 4) are identical to `main` on the same inputs. The import times
 of that run (one repetition each, machine under load, so no performance figure) sum to 176 ms before and 172 ms after.
+
+## Narrower channel preferences; where the peak stands (2026-11-22)
+
+A channel's ordering preferences are pairs of `u32` instead of `usize` (half the room) and are moved into their shared
+list (`Arc<Vec<_>>`) instead of copied into an `Arc<[_]>`, which held two lists for a moment.
+
+| Graph | Peak before | Peak after |
+|---|---|---|
+| 22 819 nodes | 50.6 MB | 49.8 MB |
+| 114 196 nodes | 519.5 MB | 511.8 MB |
+
+Output byte-identical (refinement fingerprints of the 15 views identical to `main`). Reserving the joint bends at their
+upper bound changed nothing and was left out.
+
+Since the start of this work on the 114k graph: 864.2 → 511.8 MB (−41 %). The heap profiles now show the placement and
+the completion at about the same height: each change on one side moves the peak to the other. In the placement the peak
+is spread over many small structures around the cross plans; in the completion it is the joint bends with their range
+trees, the assignments and sections, and the lane and bend reservations. Lower peaks need structural changes on both
+sides at once (releasing an area's working data after it is placed; working through the bends and reservations channel
+by channel instead of holding all of them), each a refactor of its own. The work rests here until the peak is the limit
+again.

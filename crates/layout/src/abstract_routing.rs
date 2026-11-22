@@ -88,9 +88,9 @@ pub struct Channel {
     /// Ordering preferences to avoid a departing segment meeting another arriving segment.
     /// Shared, not copied: a channel is cached and handed out again (`planning`), and on a wide channel this list grows
     /// with the square of its assignments; nothing changes it after the channel is built.
-    pub dependencies: std::sync::Arc<[(usize, usize)]>,
+    pub dependencies: std::sync::Arc<Vec<(u32, u32)>>,
     /// Preferences broken by deterministic cycle removal, not proven infeasibility.
-    pub broken_dependencies: std::sync::Arc<[(usize, usize)]>,
+    pub broken_dependencies: std::sync::Arc<Vec<(u32, u32)>>,
     pub order: Vec<usize>,
     /// Conservative abstract interval slots, not a physical width or a lower bound.
     pub tracks: usize,
@@ -422,9 +422,10 @@ pub(super) fn channel(area: String, rank: usize, mut assignments: Vec<Assignment
                 usize::from(between(&a.to, &b.from, &b.to))
                     + usize::from(between(&b.from, &a.from, &a.to))
             };
+            // As `u32`: half the room of a pair of `usize`, and a channel's assignments are far fewer than 2^32.
             match cost(a, b).cmp(&cost(b, a)) {
-                std::cmp::Ordering::Less => dependencies.push((i, j)),
-                std::cmp::Ordering::Greater => dependencies.push((j, i)),
+                std::cmp::Ordering::Less => dependencies.push((i as u32, j as u32)),
+                std::cmp::Ordering::Greater => dependencies.push((j as u32, i as u32)),
                 std::cmp::Ordering::Equal => {}
             }
         }
@@ -432,8 +433,8 @@ pub(super) fn channel(area: String, rank: usize, mut assignments: Vec<Assignment
     let mut incoming = vec![Vec::new(); assignments.len()];
     let mut outgoing = vec![Vec::new(); assignments.len()];
     for &(a, b) in &dependencies {
-        incoming[b].push(a);
-        outgoing[a].push(b);
+        incoming[b as usize].push(a as usize);
+        outgoing[a as usize].push(b as usize);
     }
     let mut indegree: Vec<_> = incoming.iter().map(Vec::len).collect();
     let mut remaining: BTreeSet<usize> = (0..assignments.len()).collect();
@@ -453,7 +454,7 @@ pub(super) fn channel(area: String, rank: usize, mut assignments: Vec<Assignment
                 incoming[next]
                     .iter()
                     .filter(|a| remaining.contains(a))
-                    .map(|&a| (a, next)),
+                    .map(|&a| (a as u32, next as u32)),
             );
             next
         };
@@ -473,8 +474,9 @@ pub(super) fn channel(area: String, rank: usize, mut assignments: Vec<Assignment
         area,
         rank,
         assignments,
-        dependencies: dependencies.into(),
-        broken_dependencies: broken.into(),
+        // Moved into the shared list, not copied (an `Arc<[_]>` from a `Vec` copies it, two lists alive for a moment).
+        dependencies: std::sync::Arc::new(dependencies),
+        broken_dependencies: std::sync::Arc::new(broken),
         order,
         tracks,
         crossings,
@@ -1066,7 +1068,8 @@ mod tests {
                 .collect();
             for &(a, b) in plan.dependencies.iter() {
                 assert!(
-                    positions[&a] < positions[&b] || plan.broken_dependencies.contains(&(a, b))
+                    positions[&(a as usize)] < positions[&(b as usize)]
+                        || plan.broken_dependencies.contains(&(a, b))
                 );
             }
             for (i, a) in plan.assignments.iter().enumerate() {

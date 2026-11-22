@@ -134,7 +134,7 @@ fn quality_order(mut channel: abstract_routing::Channel) -> abstract_routing::Ch
         .dependencies
         .iter()
         .copied()
-        .filter(|&(a, b)| position[a] > position[b])
+        .filter(|&(a, b)| position[a as usize] > position[b as usize])
         .collect::<Vec<_>>()
         .into();
     channel
@@ -441,7 +441,7 @@ mod tests {
             for &(a, b) in quality.dependencies.iter() {
                 assert_eq!(
                     quality.broken_dependencies.contains(&(a, b)),
-                    position[&a] > position[&b]
+                    position[&(a as usize)] > position[&(b as usize)]
                 );
             }
         }
