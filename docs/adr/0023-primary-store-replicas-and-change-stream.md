@@ -136,6 +136,19 @@ On this rule, a backend can precompute and the browser can start drawing before 
    `refine` option may point at the backend (`httpRun`), and a result that no longer fits is discarded (#82).
 5. **Back to the backend.** A local view can be handed back as a lean snapshot or a bookmark (#79), so the backend can
    continue from it (backend-only mode, another device, a saved view).
+6. **Precomputed on write, incrementally.** Where the first view of a graph version is computed when it is written (by
+   the writer or an ingest pipeline, so that the serving backend only hands it out), that computation follows the change
+   stream too: a layout session in the write path keeps the view of the previous version and applies each change group
+   as a patch (the engine's incremental relayout), instead of laying out every version from the start. It stores the
+   scene and the lean snapshot by the version's digest. Otherwise the cost of whole snapshots only moves from the
+   reading path into the writing one. The same holds where the writers are only pipelines and every client and server
+   reads: the stream starts at the pipeline, and a version that the pipeline builds as an overlay on a base (a commit
+   on a branch) is a change group on the base's version.
+7. **Scene changes for clients that only render.** A client in backend-only mode, or in the first moments of item 1,
+   does not get a new scene after every change: the backend sends what changed in the scene (boxes, routes and labels
+   added, moved or removed, by their ids, with the layout version they lead to), and the client applies it only to the
+   version it was computed from, the acceptance rule above. A gap or a mismatch is answered with the whole scene, as a
+   gap in the change log is answered with a resync (item 3).
 
 ### 6. Where a query runs
 
@@ -282,6 +295,14 @@ Each step is useful on its own, behind an option or a new operation, and measure
   sessions do not evict each other.
 - **S4 — concurrent sessions** (item 9): parallel between sessions, serial within one, admission by memory, active
   sessions never evicted; decided in [ADR 0024](0024-concurrent-sessions-in-a-backend.md) (its steps C1 to C3).
+- **W1 — a layout session in the write path** (item 5.6): a writer or ingest pipeline keeps a session per view it
+  precomputes, applies each change group as a patch and stores scene and lean snapshot by the version's digest. *Exit:*
+  for a sequence of change groups, the stored result equals laying out each version from its predecessor's snapshot
+  (byte for byte), and its cost per group is recorded against a full layout of the same version.
+- **D1 — scene changes** (item 5.7): an operation that answers with the difference between two scenes (by element id,
+  with the layout versions before and after), and its application in `engine-client` for a render-only client. *Exit:*
+  applying the difference to the earlier scene gives the later one byte for byte; a difference for another version is
+  refused; the size of the difference is recorded against the whole scene for the reference edits.
 - **H1 — scene first, engine on demand** (item 5), independent of R1 to R5 (it may move into an ADR of its own; neither
   blocks the other): the backend sends the scene and the lean
   layout state; the playground's split mode renders before the WASM engine has loaded and starts it at the first local
@@ -333,6 +354,10 @@ Also measured:
 - A database as the primary, its schema and pushdown (ADR 0021, "Not decided").
 - Which functions update their projections incrementally and which recompute; each decides with the "incremental equals
   recompute" test.
+- Graph variants (branches, overlays on a base): switching between them and comparing them. The change stream already
+  expresses a variant as change groups on a base; whether a session keeps several variants (sharing the unchanged part),
+  switches by applying and reverting groups, or draws a comparison (one layout of the union, elements marked by the
+  variants they belong to, as memberships of ADR 0022) is decided when a host needs it, by measurement.
 - Access control: who may read which graph and which keys is the host's decision (item 9 fixes only how the engine
   respects it: digests never authorize, content filtered by key before a session sees it, client-held view state
   untrusted). Signing shared view state and the key it uses are host choices.
