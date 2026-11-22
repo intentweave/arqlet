@@ -25,6 +25,10 @@ const CROSSES_CONTAINERS: &str =
     include_str!("../../../examples/fixtures/memberships/crosses-containers.json");
 const ONE_GROUP_PER_NODE: &str =
     include_str!("../../../examples/fixtures/memberships/one-group-per-node.json");
+const ORG_CHART: &str =
+    include_str!("../../../examples/fixtures/memberships/org-chart-projects.json");
+const OVERLAPPING_BOXES: &str =
+    include_str!("../../../examples/fixtures/memberships/overlapping-boxes.json");
 
 fn fixtures() -> Vec<(&'static str, &'static str)> {
     vec![
@@ -33,6 +37,8 @@ fn fixtures() -> Vec<(&'static str, &'static str)> {
         ("non-contiguous", NON_CONTIGUOUS),
         ("crosses-containers", CROSSES_CONTAINERS),
         ("one-group-per-node", ONE_GROUP_PER_NODE),
+        ("org-chart-projects", ORG_CHART),
+        ("overlapping-boxes", OVERLAPPING_BOXES),
     ]
 }
 
@@ -266,7 +272,116 @@ fn every_membership_fixture_follows_the_shape_the_adr_decides() {
             .collect();
         let dimensions = read_memberships(name, &raw, &node_ids);
         check_views(name, &raw, &dimensions, &node_ids);
+        if let Some(priority) = raw.get("groupingPriority") {
+            read_priority(name, priority, &dimensions);
+        }
     }
+}
+
+/// One criterion of a `groupingPriority` (ADR 0022 §2, revised 2026-11-22): `parent` or a dimension, with its value order
+/// (the listed groups first, then the rest in declared order) and its rendering.
+struct Criterion {
+    by: String,
+    values: Vec<String>,
+    lanes: bool,
+}
+
+/// Reads and checks a `groupingPriority` against §2 and the refusals of §5: each criterion is `parent` or a declared
+/// dimension and appears once, `values` only on dimensions and only declared groups, `as` is `containers` or `lanes`, at
+/// most two criteria as lanes, and no dimension may be called `parent`.
+fn read_priority(
+    name: &str,
+    priority: &serde_json::Value,
+    dimensions: &[Dimension],
+) -> Vec<Criterion> {
+    assert!(
+        dimensions.iter().all(|d| d.id != "parent"),
+        "{name}: `parent` is reserved and may not name a dimension"
+    );
+    let entries = priority
+        .as_array()
+        .unwrap_or_else(|| panic!("{name}: groupingPriority must be an array"));
+    assert!(
+        !entries.is_empty(),
+        "{name}: an empty priority has no owner for anything"
+    );
+    let mut criteria: Vec<Criterion> = Vec::new();
+    for entry in entries {
+        let by = entry["by"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{name}: a criterion without `by`"))
+            .to_string();
+        assert!(
+            !criteria.iter().any(|c| c.by == by),
+            "{name}: the criterion {by} is listed twice"
+        );
+        let dimension = dimensions.iter().find(|d| d.id == by);
+        assert!(
+            by == "parent" || dimension.is_some(),
+            "{name}: the criterion {by} is neither `parent` nor a declared dimension"
+        );
+        let values: Vec<String> = match entry.get("values") {
+            None => Vec::new(),
+            Some(v) => {
+                let d = dimension.unwrap_or_else(|| {
+                    panic!("{name}: `values` belong to a dimension, not to {by}")
+                });
+                v.as_array()
+                    .unwrap_or_else(|| panic!("{name}: values of {by} must be an array"))
+                    .iter()
+                    .map(|g| {
+                        let g = g.as_str().expect("a group id").to_string();
+                        assert!(d.order.contains(&g), "{name}: {by} declares no group {g}");
+                        g
+                    })
+                    .collect()
+            }
+        };
+        let lanes = match entry.get("as").and_then(|a| a.as_str()) {
+            None | Some("containers") => false,
+            Some("lanes") => true,
+            Some(other) => panic!("{name}: {by} is rendered as {other}, not containers or lanes"),
+        };
+        criteria.push(Criterion { by, values, lanes });
+    }
+    let lanes = criteria.iter().filter(|c| c.lanes).count();
+    assert!(
+        lanes <= 2,
+        "{name}: {lanes} criteria as lanes; §2 allows two"
+    );
+    criteria
+}
+
+/// The ownership rule of §2 as an oracle: a node is owned by its group in the first criterion, by rank, that assigns it
+/// one; `parent` assigns every node (its container, or the root); in a dimension, the value order picks among several
+/// groups. `None` is a node no criterion assigns. M1's projection must agree with this on every fixture.
+fn owner(
+    node: &str,
+    criteria: &[Criterion],
+    dimensions: &[Dimension],
+    parents: &BTreeMap<&str, Option<&str>>,
+) -> Option<(String, String)> {
+    for c in criteria {
+        if c.by == "parent" {
+            let container = parents[node].unwrap_or("<root>");
+            return Some(("parent".into(), container.into()));
+        }
+        let d = dimensions.iter().find(|d| d.id == c.by).expect("validated");
+        let groups = d.groups_of(node);
+        if groups.is_empty() {
+            continue;
+        }
+        let order = c
+            .values
+            .iter()
+            .chain(d.order.iter().filter(|g| !c.values.contains(g)));
+        let chosen = order
+            .into_iter()
+            .find(|g| groups.contains(&g.as_str()))
+            .expect("one of the node's groups");
+        return Some((c.by.clone(), chosen.clone()));
+    }
+    None
 }
 
 #[test]
@@ -554,4 +669,130 @@ fn the_overlapping_fixture_shares_a_node_and_names_one_unknown_member() {
         1,
         "the fixture carries exactly one unknown member id"
     );
+}
+
+#[test]
+fn the_org_chart_is_owned_by_project_first_with_the_value_priority_deciding() {
+    let raw: serde_json::Value = serde_json::from_str(ORG_CHART).expect("json");
+    let parents: BTreeMap<&str, Option<&str>> = raw["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| (n["id"].as_str().unwrap(), n["parentId"].as_str()))
+        .collect();
+    let node_ids: BTreeSet<String> = parents.keys().map(|k| k.to_string()).collect();
+    let dimensions = read_memberships("org-chart-projects", &raw, &node_ids);
+    let criteria = read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions);
+    let owned = |node: &str, criteria: &[Criterion]| owner(node, criteria, &dimensions, &parents);
+    let pair = |a: &str, b: &str| Some((a.to_string(), b.to_string()));
+
+    // The case of the revision: projects cut across departments, so they cannot be the reporting line's containers.
+    let project = dimensions.iter().find(|d| d.id == "project").unwrap();
+    let departments: BTreeSet<Option<&str>> = project.members["apollo"]
+        .iter()
+        .map(|m| parents[m.as_str()])
+        .collect();
+    assert!(departments.len() > 1, "apollo spans departments");
+
+    // Dora is on two projects; the value priority names zeus first, so zeus owns her and apollo holds her softly.
+    assert_eq!(project.groups_of("dora"), ["apollo", "zeus"]);
+    assert_eq!(owned("dora", &criteria), pair("project", "zeus"));
+    assert_eq!(owned("anna", &criteria), pair("project", "apollo"));
+    assert_eq!(owned("ben", &criteria), pair("project", "hermes"));
+    // Gus is on no project, so the next criterion, the reporting line, owns him.
+    assert_eq!(owned("gus", &criteria), pair("parent", "ops"));
+
+    // The value priority matters: with apollo first, apollo owns Dora.
+    let mut apollo_first =
+        read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions);
+    apollo_first[0].values = vec!["apollo".into(), "zeus".into()];
+    assert_eq!(owned("dora", &apollo_first), pair("project", "apollo"));
+
+    // Without `parent`, the next criterion that assigns Gus owns him: he is on no project, but at the Munich site.
+    let without_parent: Vec<Criterion> =
+        read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions)
+            .into_iter()
+            .filter(|c| c.by != "parent")
+            .collect();
+    assert_eq!(owned("gus", &without_parent), pair("site", "munich"));
+    assert_eq!(owned("dora", &without_parent), pair("project", "zeus"));
+
+    // Only when no listed criterion assigns a node is it left without owner: placed at the root and reported (§2, rule 3).
+    let projects_only: Vec<Criterion> =
+        read_priority("org-chart-projects", &raw["groupingPriority"], &dimensions)
+            .into_iter()
+            .filter(|c| c.by == "project")
+            .collect();
+    assert_eq!(owned("gus", &projects_only), None);
+    assert_eq!(owned("dora", &projects_only), pair("project", "zeus"));
+
+    // The default priority, `parent` alone, is today's view: everybody in their department.
+    let default = vec![Criterion {
+        by: "parent".into(),
+        values: Vec::new(),
+        lanes: false,
+    }];
+    assert_eq!(owned("dora", &default), pair("parent", "eng"));
+    assert_eq!(owned("gus", &default), pair("parent", "ops"));
+}
+
+#[test]
+fn the_target_picture_shares_exactly_one_node_between_a_container_and_a_soft_group() {
+    let raw: serde_json::Value = serde_json::from_str(OVERLAPPING_BOXES).expect("json");
+    let parents: BTreeMap<&str, Option<&str>> = raw["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| (n["id"].as_str().unwrap(), n["parentId"].as_str()))
+        .collect();
+    let node_ids: BTreeSet<String> = parents.keys().map(|k| k.to_string()).collect();
+    let dimensions = read_memberships("overlapping-boxes", &raw, &node_ids);
+    let criteria = read_priority("overlapping-boxes", &raw["groupingPriority"], &dimensions);
+
+    // The two groupings of the picture: the container A by containment, the group B by membership.
+    let in_a: BTreeSet<&str> = parents
+        .iter()
+        .filter(|(_, p)| **p == Some("A"))
+        .map(|(id, _)| *id)
+        .collect();
+    let team = dimensions.iter().find(|d| d.id == "team").unwrap();
+    let in_b: BTreeSet<&str> = team.members["B"].iter().map(String::as_str).collect();
+    let shared: Vec<&&str> = in_a.intersection(&in_b).collect();
+    assert_eq!(
+        shared,
+        [&"s"],
+        "exactly one node lies in both, which is the overlap of the picture"
+    );
+    assert!(
+        in_b.iter().any(|m| !in_a.contains(m)),
+        "B reaches outside A"
+    );
+    assert!(
+        in_a.iter().any(|m| !in_b.contains(m)),
+        "A holds nodes B does not"
+    );
+
+    // With the containment first, A owns s and B holds it softly: B can only be one box as a region across A's border.
+    assert_eq!(
+        owner("s", &criteria, &dimensions, &parents),
+        Some(("parent".to_string(), "A".to_string()))
+    );
+    assert_eq!(
+        owner("c", &criteria, &dimensions, &parents),
+        Some(("parent".to_string(), "<root>".to_string()))
+    );
+
+    // Edges run across both borders: from B outside A into A, and inside each.
+    let edges: Vec<(&str, &str)> = raw["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| (e["source"].as_str().unwrap(), e["target"].as_str().unwrap()))
+        .collect();
+    assert!(edges
+        .iter()
+        .any(|(s, t)| !in_a.contains(s) && in_a.contains(t) && !in_b.contains(t)));
+    assert!(edges
+        .iter()
+        .any(|(s, t)| in_b.contains(s) && in_b.contains(t)));
 }
