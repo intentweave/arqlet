@@ -61,10 +61,10 @@ pub fn query_on(
     v: &Value,
 ) -> Result<Value, String> {
     use arqlet_model::Graph;
-    use arqlet_query::{GraphStore, Limits, Value as Cell};
-    use arqlet_query_model::{value_of, ModelStore, PayloadSource};
+    use arqlet_query::Value as Cell;
+    use arqlet_query_model::{value_of, PayloadSource};
     use std::cell::Cell as Counter;
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeMap;
 
     /// The session's JSON content as a payload; a value the query layer has no type for (a map) reads as null and is
     /// counted, so the answer says that something was left out instead of changing it silently.
@@ -102,106 +102,16 @@ pub fn query_on(
         }
     }
 
-    let text = v["query"]
-        .as_str()
-        .ok_or("A query request needs the query text in `query`")?;
-    let mut params = BTreeMap::new();
-    match v.get("params") {
-        None | Some(Value::Null) => {}
-        Some(Value::Object(map)) => {
-            for (name, value) in map {
-                params.insert(
-                    name.clone(),
-                    value_of(value).map_err(|e| format!("query parameter ${name}: {e}"))?,
-                );
-            }
-        }
-        Some(_) => return Err("query `params` must be an object of values".into()),
-    }
-    let mut limits = Limits::default();
-    let limit = |key: &str| -> Result<Option<u64>, String> {
-        match v.get(key) {
-            None | Some(Value::Null) => Ok(None),
-            Some(n) => n
-                .as_u64()
-                .map(Some)
-                .ok_or_else(|| format!("query {key} must be a whole number")),
-        }
-    };
-    if let Some(n) = limit("maxSteps")? {
-        limits.max_steps = n;
-    }
-    if let Some(n) = limit("maxRows")? {
-        limits.max_rows = n.min(usize::MAX as u64) as usize;
-    }
-    if let Some(n) = limit("maxHops")? {
-        limits.max_hops = n.min(u32::MAX as u64) as u32;
-    }
-
     // The source graph as the export has it, the same one `payload` counts against.
     let graph: &Graph = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let source = ContentSource {
         content,
         skipped: Counter::new(0),
     };
-    let store = ModelStore::new(graph, &source);
-    let result = arqlet_query_cypher::run(text, &store, &params, limits)
-        .map_err(|e| format!("query {}: {}", e.class.as_str(), e.message))?;
-
-    /// The ids an answer names, each once, in the order they first appear.
-    #[derive(Default)]
-    struct Seen {
-        node_set: BTreeSet<String>,
-        nodes: Vec<String>,
-        edge_set: BTreeSet<String>,
-        edges: Vec<String>,
-    }
-    fn show(store: &ModelStore, v: &Cell, seen: &mut Seen) -> Value {
-        match v {
-            Cell::Null => Value::Null,
-            Cell::Bool(b) => json!(b),
-            Cell::Int(i) => json!(i),
-            Cell::Float(f) => json!(f),
-            Cell::String(s) => json!(s),
-            Cell::List(items) => Value::Array(items.iter().map(|i| show(store, i, seen)).collect()),
-            Cell::Node(n) => {
-                let id = store.node_id(*n);
-                if seen.node_set.insert(id.to_string()) {
-                    seen.nodes.push(id.to_string());
-                }
-                json!({ "node": id })
-            }
-            Cell::Edge(e) => {
-                let id = store.edge_id(*e);
-                if seen.edge_set.insert(id.to_string()) {
-                    seen.edges.push(id.to_string());
-                }
-                json!({ "edge": id })
-            }
-        }
-    }
-    let mut seen = Seen::default();
-    let rows: Vec<Value> = result
-        .rows
-        .iter()
-        .map(|row| Value::Array(row.iter().map(|c| show(&store, c, &mut seen)).collect()))
-        .collect();
-
-    let mut answer = json!({
-        "ok": true,
-        "columns": result.columns,
-        "rowCount": rows.len(),
-        "rows": rows,
-        "nodes": seen.nodes,
-        "edges": seen.edges,
-        // What the query could see: the session's source graph, which for a bounded import is the selection it kept.
-        "graph": {"nodes": graph.nodes.len(), "edges": store.edge_count()},
-    });
+    let outcome = arqlet_query_json::run(graph, &source, v)?;
+    let mut answer = outcome.answer;
     if let Some(c) = content.filter(|c| !c.is_empty()) {
         answer["contentRevision"] = json!(c.revision);
-    }
-    if store.ignored_payload() > 0 {
-        answer["ignoredContent"] = json!(store.ignored_payload());
     }
     if source.skipped.get() > 0 {
         answer["skippedValues"] = json!(source.skipped.get());
@@ -210,8 +120,8 @@ pub fn query_on(
         let navigable = crate::trace::navigable(snapshot);
         let map = crate::trace::ViewMap::new(snapshot, navigable.as_ref())?;
         let shown_nodes: BTreeMap<&String, Option<String>> =
-            seen.nodes.iter().map(|id| (id, map.owner(id))).collect();
-        let shown_edges: BTreeMap<&String, Option<String>> = seen
+            outcome.nodes.iter().map(|id| (id, map.owner(id))).collect();
+        let shown_edges: BTreeMap<&String, Option<String>> = outcome
             .edges
             .iter()
             .map(|id| (id, map.route_of(id, &None)))
