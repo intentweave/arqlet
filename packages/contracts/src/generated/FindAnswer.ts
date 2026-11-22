@@ -6,4 +6,8 @@ import type { FindMatch } from "./FindMatch";
  * query (ignoring case), best first: an exact match, then a prefix, then a word start, then anywhere; equal ones by label
  * and id. At most `limit` matches; `total` counts them all.
  */
-export type FindAnswer = { matches: Array<FindMatch>, total: number, };
+export type FindAnswer = { matches: Array<FindMatch>, total: number,
+/**
+ * Provisional (ADR 0023, R1): with `key`, the revision of the session's content that was searched.
+ */
+contentRevision?: bigint, };

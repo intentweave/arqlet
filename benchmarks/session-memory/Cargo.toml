@@ -1,0 +1,19 @@
+# Memory of a resident engine session per node: what it keeps after an import, what it peaks at during one, and which
+# parts the kept memory is made of. A standalone crate, not a workspace member: the CI does not build it.
+[package]
+name = "session-memory"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+arqlet-model = { path = "../../crates/model" }
+arqlet-runtime = { path = "../../crates/runtime" }
+serde_json = "1"
+dhat = { version = "=0.3.3", optional = true }
+
+[features]
+# Heap profile of one import (dhat-heap.json): which allocation sites hold the peak. Measurement only.
+profile = ["dhat"]
+
+[workspace]

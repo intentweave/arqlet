@@ -34,6 +34,9 @@ pub struct EngineSession {
     /// The scene as columns, built by a `columns` request; dropped when the snapshot changes.
     columns: Option<crate::columns::SceneColumns>,
     overview: crate::overview::OverviewSession,
+    /// Provisional (ADR 0023, R1): the properties of nodes and edges, beside the snapshot and never in it. A new import
+    /// starts it empty; `load` (a hand-over of the same graph) keeps it.
+    content: crate::content::Content,
 }
 
 impl EngineSession {
@@ -66,10 +69,43 @@ impl EngineSession {
 
     /// Runs one request given as JSON text and answers as JSON text.
     pub fn run(&mut self, input: &str) -> String {
+        // An import read in one pass, without a JSON value of the whole graph (which takes several times the graph's own
+        // memory and, in WASM, stays as the high-water mark of the linear memory). The same request as the general way;
+        // anything the one-pass reading refuses goes the general way, with the errors it has always given.
+        if let Some(answer) = self.import_text(input) {
+            return answer.to_string();
+        }
         match serde_json::from_str::<Value>(input) {
             Ok(v) => self.run_value(&v).to_string(),
             Err(e) => json!({"ok": false, "error": e.to_string()}).to_string(),
         }
+    }
+
+    /// `run` for a well-formed `import` without `timings`: the request read straight into its types.
+    fn import_text(&mut self, input: &str) -> Option<Value> {
+        // The fields this reading needs besides the import's own; everything else (the graph too) is skipped unparsed.
+        #[derive(serde::Deserialize)]
+        struct Head {
+            op: Option<String>,
+            scene: Option<Value>,
+            timings: Option<Value>,
+        }
+        if !input.contains("\"import\"") {
+            return None;
+        }
+        let head: Head = serde_json::from_str(input).ok()?;
+        if head.op.as_deref() != Some("import") || head.timings.is_some() {
+            return None;
+        }
+        let (request, _) = crate::protocol::Request::from_json_delivered(input).ok()?;
+        let with_scene = head.scene.as_ref().and_then(Value::as_bool) != Some(false);
+        Some(match self.apply(handle(request), with_scene) {
+            Ok(answer) => {
+                self.content = Default::default();
+                answer
+            }
+            Err(error) => json!({"ok": false, "error": error}),
+        })
     }
 
     /// Runs one request given as a JSON value.
@@ -95,7 +131,17 @@ impl EngineSession {
         match v["op"].as_str() {
             Some("import") => {
                 let request = Request::from_value(v)?;
-                self.apply(handle(request), with_scene)
+                let answer = self.apply(handle(request), with_scene)?;
+                self.content = Default::default();
+                Ok(answer)
+            }
+            // Provisional (ADR 0023, R1): set, unset or clear properties of nodes and edges, as one change.
+            Some("payload") => {
+                let graph = self
+                    .snapshot
+                    .as_ref()
+                    .map(|s| s.source_graph.as_deref().unwrap_or(&s.graph));
+                self.content.apply(v, graph)
             }
             Some("load") => {
                 let snapshot: Snapshot =
@@ -135,8 +181,10 @@ impl EngineSession {
             }
             Some("trace") => crate::trace::trace_on(self.current()?, v),
             Some("neighbourhood") => crate::trace::neighbourhood_on(self.current()?, v),
-            Some("details") => crate::details::details_on(self.current()?, v),
-            Some("find") => crate::find::find_on(self.current()?, v),
+            Some("details") => {
+                crate::details::details_on_with(self.current()?, v, Some(&self.content))
+            }
+            Some("find") => crate::find::find_on_with(self.current()?, v, Some(&self.content)),
             Some("peek") => crate::peek::peek_on(self.current()?, v),
             Some("digest") => Ok(crate::find::digest_on(self.current()?)),
             Some("intent") => {

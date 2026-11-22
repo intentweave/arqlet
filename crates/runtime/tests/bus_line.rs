@@ -686,3 +686,62 @@ fn a_bus_given_as_data_is_crossed_by_trace_and_neighbourhood() {
         4
     );
 }
+
+#[test]
+fn reveal_takes_the_id_of_a_bus_given_as_data() {
+    let run = |v: serde_json::Value| -> serde_json::Value {
+        serde_json::from_str(&arqlet_runtime::dispatch(&v.to_string())).unwrap()
+    };
+    // A zone with four ECUs on a bus given as data (no bus node), collapsed at the start; `reveal` by the bus's id opens
+    // the zone, so that the line is drawn.
+    let mut nodes = vec![
+        json!({"id": "zone", "kind": "zone", "label": "zone"}),
+        json!({"id": "x", "kind": "ecu", "label": "x"}),
+    ];
+    let mut taps = Vec::new();
+    for i in 0..4 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("e{i}"), "parentId": "zone"}));
+        taps.push(json!({"edge": format!("t{i}"), "node": format!("e{i}"), "toBus": true, "kind": "connects"}));
+    }
+    let graph = json!({"nodes": nodes, "edges": [],
+        "buses": [{"id": "can", "edges": [], "label": "CAN", "kind": "bus", "parentId": "zone", "taps": taps}]});
+    let imported = run(
+        json!({"op": "import", "graph": graph, "limit": 100, "options": {"levelOfDetail": {"depth": 0}}}),
+    );
+    assert_eq!(imported["ok"], true, "{imported}");
+    let s = imported["snapshot"].clone();
+    assert!(
+        s["collapsedIds"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("zone")),
+        "{}",
+        s["collapsedIds"]
+    );
+    let lines = |snapshot: &serde_json::Value| {
+        let scene = run(json!({"op": "scene", "snapshot": snapshot}));
+        scene["scene"]["busLines"].as_array().map_or(0, |a| a.len())
+    };
+    for partial in [false, true] {
+        let revealed = run(
+            json!({"op": "reveal", "snapshot": s, "nodeIds": ["can"], "partial": partial,
+            "expectedRevision": s["revision"], "expectedLayoutVersion": s["layoutVersion"]}),
+        );
+        assert_eq!(revealed["ok"], true, "partial {partial}: {revealed}");
+        let after = &revealed["snapshot"];
+        assert!(
+            !after["collapsedIds"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("zone")),
+            "partial {partial}: zone opened"
+        );
+        assert_eq!(lines(after), 1, "partial {partial}: the bus line is drawn");
+    }
+    // An id that is neither a node nor a bus is still refused.
+    let unknown = run(
+        json!({"op": "reveal", "snapshot": s, "nodeIds": ["nowhere"],
+        "expectedRevision": s["revision"], "expectedLayoutVersion": s["layoutVersion"]}),
+    );
+    assert_eq!(unknown["ok"], false);
+}

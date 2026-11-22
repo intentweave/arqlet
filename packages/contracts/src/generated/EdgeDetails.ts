@@ -7,4 +7,8 @@ export type EdgeDetails = { id: string, kind: string, source: string, target: st
 /**
  * The drawn line that carries it, or null when the view does not show it (an end hidden, both ends in one box).
  */
-route: string | null, };
+route: string | null,
+/**
+ * Provisional (ADR 0023, R1): the edge's properties from the session's content; omitted when it has none.
+ */
+properties?: Record<string, unknown>, };

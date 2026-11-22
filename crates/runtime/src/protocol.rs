@@ -520,7 +520,10 @@ impl Request {
         // An import, read in one pass when it is well formed; anything else (and any import the fast reading refuses) goes
         // the general way, which gives the errors the engine has always given.
         if input.contains("\"import\"") {
-            if let Ok(fast) = serde_json::from_str::<ImportText>(input) {
+            if let Ok(mut fast) = serde_json::from_str::<ImportText>(input) {
+                // Read from text, a list grows by doubling and keeps up to twice the room it needs; the source graph is
+                // kept by the snapshot (and a session) for its lifetime, so it is trimmed to its length.
+                fast.graph.shrink_to_fit();
                 let limit = fast.limit.as_u64();
                 if fast.op == "import" && limit.is_some_and(|l| usize::try_from(l).is_ok()) {
                     let delivery = Delivery {
@@ -579,6 +582,11 @@ impl Request {
             Some("find") => return Ok(Request::Find { body: body() }),
             Some("digest") => return Ok(Request::Digest { body: body() }),
             Some("peek") => return Ok(Request::Peek { body: body() }),
+            Some("payload") => {
+                return Err(
+                    "payload needs a resident session (the content is kept by the session)".into(),
+                )
+            }
             Some("componentRefine") => return Ok(Request::ComponentRefine { body: body() }),
             Some("elkLayout") => return Ok(Request::ElkLayout { body: body() }),
             Some("overview") => return Ok(Request::Overview { body: body() }),

@@ -1521,6 +1521,15 @@ impl StrategyConstraint {
 }
 
 impl Graph {
+    /// Trims every list of the graph to its length (after reading it from text, where lists grow by doubling).
+    pub fn shrink_to_fit(&mut self) {
+        self.nodes.shrink_to_fit();
+        self.edges.shrink_to_fit();
+        self.ports.shrink_to_fit();
+        self.edge_ports.shrink_to_fit();
+        self.buses.shrink_to_fit();
+    }
+
     /// Whether every area draws its edges on their orthogonal routes, plain or with rounded corners
     /// (`RoutingConstraint::orthogonal_only`); no routing declared is orthogonal.
     /// Whether every routing constraint lays its edges out orthogonally: orthogonal styles, and with `polyline` also the
@@ -3408,6 +3417,11 @@ pub struct DetailsAnswer {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub route: Option<LineDetails>,
+    /// Provisional (ADR 0023, R1): the revision of the session's content the properties were read at; omitted without
+    /// content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub content_revision: Option<u64>,
 }
 
 /// Provisional: a node of the source graph in the current view (`details`).
@@ -3437,6 +3451,10 @@ pub struct NodeDetails {
     /// Edges of the source graph that end and start at the node itself (a self-loop counts in both).
     pub incoming: usize,
     pub outgoing: usize,
+    /// Provisional (ADR 0023, R1): the node's properties from the session's content; omitted when it has none.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "Record<string, unknown>"))]
+    pub properties: BTreeMap<String, serde_json::Value>,
 }
 
 /// Provisional: an edge of the source graph (`details`).
@@ -3452,6 +3470,10 @@ pub struct EdgeDetails {
     /// The drawn line that carries it, or null when the view does not show it (an end hidden, both ends in one box).
     #[cfg_attr(feature = "ts", ts(type = "string | null"))]
     pub route: Option<String>,
+    /// Provisional (ADR 0023, R1): the edge's properties from the session's content; omitted when it has none.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "Record<string, unknown>"))]
+    pub properties: BTreeMap<String, serde_json::Value>,
 }
 
 /// Provisional: a drawn line (`details`): its visible ends, its shape, and the edges of the source graph it stands for in
@@ -3488,6 +3510,10 @@ pub struct LineDetails {
 pub struct FindAnswer {
     pub matches: Vec<FindMatch>,
     pub total: usize,
+    /// Provisional (ADR 0023, R1): with `key`, the revision of the session's content that was searched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub content_revision: Option<u64>,
 }
 
 /// Provisional: a node `find` found, with the containers above it (outermost first) and the visible box that shows it
@@ -3502,6 +3528,10 @@ pub struct FindMatch {
     pub parents: Vec<String>,
     #[cfg_attr(feature = "ts", ts(type = "string | null"))]
     pub shown_as: Option<String>,
+    /// Provisional (ADR 0023, R1): with `key`, the value of that property that matched.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "unknown"))]
+    pub value: Option<serde_json::Value>,
 }
 
 /// Provisional: the answer of `neighbourhood` (besides `ok`): the nodes within some hops of nodes, the edges they were

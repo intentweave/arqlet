@@ -7,6 +7,28 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Content in a resident session (provisional, ADR 0023 step R1): the operation `payload` sets, unsets or clears
+  properties of nodes and edges (JSON values; an integer stays an integer) as one change with its own
+  `contentRevision` (`expectedContentRevision` refuses a stale change). The content is kept beside the snapshot, never
+  in it, and layout never reads it: serialized snapshots are unchanged. Ids the structure does not have are kept and
+  counted; keys named like the model's own properties (`id`, `kind`, `label`, `parentId`, `weight`) are refused. `details`
+  answers a node's or edge's `properties` and the `contentRevision`; `find` with `key` searches that property and answers
+  the matched `value`. A new import starts the content empty, `load` keeps it. `session.payload`, `controller.payload`
+  (refreshes `state.details`). About 740 B per node with a few properties
+  (`benchmarks/results/content-memory-20261122.md`); typed columns per key are the next step if needed.
+- `elkLayout` packs components as ELK does (`separateConnectedComponents`, default true, towards `elk.aspectRatio`,
+  default 1.6, now read) when the top level has at least two components with edges and none holds more than half of
+  the linked nodes. Flat graphs with many small components no longer stand in one tall column: synthetic flat graphs
+  go from up to 4.5 to at most 1.9 times elk-rs's area, with fewer crossings (15 → 3 on one), and the 37 corpus views
+  are unchanged (`benchmarks/results/elk-flat-components-20261121.md`).
+- A resident session reads an import in one pass into its types, as `dispatch` already did, instead of a JSON value of
+  the whole graph first, and trims the graph's lists to their length. The peak of the import's heap drops by a third
+  to more than half (synthetic 2k/20k/100k: 8.2/130/1 184 MB to 2.4/69/886 MB), which in WASM is the memory that stays;
+  a session keeps about 0.8 KB per node (`benchmarks/results/session-memory-20261121.md`, tool
+  `benchmarks/session-memory`). Answers are unchanged. The rest of the peak is the layout of the first view.
+- `reveal` takes the id of a bus given as data (`Graph.buses` with `taps` and no node): it opens the containers above
+  the bus (`parentId`), so its line is drawn; with `partial` the bus's own container opens in part, its taps at the rest.
+  Before, such an id was refused as an unknown node.
 - The Cypher query layer runs queries (ADR 0021, stages M1 to M5a; provisional, `publish = false`, no `dispatch` operation yet): `arqlet-query` gains values, the store seam, the plan IR and a deterministic executor (three-valued logic, patterns with relationships, variable-length paths, `OPTIONAL MATCH`, `WITH`, `UNWIND`, `DISTINCT`, aggregation, `ORDER BY`, `SKIP`, `LIMIT`, checked integer arithmetic, a work budget in steps, a row limit and a hop limit); `arqlet-query-cypher` lowers decypher's HIR into the plan (the column order, which the HIR loses for aggregating queries, is read from the syntax tree); the new `arqlet-query-model` reads an `arqlet-model` graph in place with a payload table (unresolved edges are left out, payload for unknown ids is ignored and counted); the new tool `arqlet-query GRAPH.json 'QUERY' [--payload F] [--param N=JSON] [--json]` runs a query without the layout engine. All 40 supported cases of `examples/cypher/` give the oracle's rows, over a raw-JSON store and over the real model. Not yet: `UNION`, the power operator, a path variable, `RETURN *`.
 - The first two crates of the Cypher query layer (ADR 0021; provisional, `publish = false`, no operation yet):
   `arqlet-query` (error classes) and `arqlet-query-cypher`, which checks a query with decypher and rejects, from its

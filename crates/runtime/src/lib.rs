@@ -7,6 +7,7 @@ pub use arqlet_model::clock;
 pub mod columns;
 pub mod components;
 pub mod containers;
+pub mod content;
 pub mod coordinator;
 pub mod details;
 pub mod engine_session;
@@ -1163,17 +1164,30 @@ pub fn reveal_nodes(
     let mut partly = shown_in_part.clone();
     let mut opened = BTreeSet::new();
     for id in ids {
-        if !parent.contains_key(id.as_str()) {
-            return Err(format!("Unknown node: {id}"));
-        }
+        // A node of the view, or a bus given as data (`Graph.buses` with `taps` and no node of its own): its line is drawn
+        // once the container it belongs to (`parent_id`) is open, so revealing it opens the containers above it.
+        let (mut at, mut child_is_node) = match parent.get(id.as_str()) {
+            Some(up) => (*up, true),
+            None => match canonical
+                .buses
+                .iter()
+                .find(|b| b.id == *id && !b.taps.is_empty())
+            {
+                Some(bus) => (
+                    bus.parent_id.as_deref().filter(|p| parent.contains_key(p)),
+                    false,
+                ),
+                None => return Err(format!("Unknown node: {id}")),
+            },
+        };
         let mut child = id.as_str();
-        let mut at = parent[id.as_str()];
         while let Some(p) = at {
             let closed = collapsed.iter().any(|c| c == p);
             if closed || partly.contains_key(p) {
                 if partial {
                     let shown = partly.entry(p.to_string()).or_default();
-                    if !shown.iter().any(|c| c == child) {
+                    // A bus is not a child node: its container opens in part, its line drawn with the taps at the rest.
+                    if child_is_node && !shown.iter().any(|c| c == child) {
                         shown.push(child.to_string());
                     }
                 } else {
@@ -1184,6 +1198,7 @@ pub fn reveal_nodes(
                 }
             }
             child = p;
+            child_is_node = true;
             at = parent.get(p).copied().flatten();
         }
     }

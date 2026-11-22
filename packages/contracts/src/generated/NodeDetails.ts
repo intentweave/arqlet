@@ -24,4 +24,8 @@ children: number, descendants: number,
 /**
  * Edges of the source graph that end and start at the node itself (a self-loop counts in both).
  */
-incoming: number, outgoing: number, };
+incoming: number, outgoing: number,
+/**
+ * Provisional (ADR 0023, R1): the node's properties from the session's content; omitted when it has none.
+ */
+properties?: Record<string, unknown>, };

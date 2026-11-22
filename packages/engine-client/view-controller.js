@@ -482,6 +482,25 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
       });
     },
 
+    /**
+     * Provisional (ADR 0023, R1): changes the session's content (see `session.payload`) and asks the selection's details
+     * again, so that `state.details` shows the new properties. Not a step for `back`: content is not a view decision.
+     */
+    payload(change) {
+      return enqueue(async current => {
+        const answer = await session.payload(change);
+        if (!current()) return {ok: false, cancelled: true};
+        if (!answer.ok) {
+          publish({error: answer.error ?? 'The content was refused.'});
+          return answer;
+        }
+        const details = await detailsOf(state.selection);
+        if (!current()) return {ok: false, cancelled: true};
+        publish({details, contentRevision: answer.contentRevision, error: null});
+        return answer;
+      });
+    },
+
     /** Ends the look into a container. */
     closePeek() { if (state.peek) publish({peek: null}); },
 
