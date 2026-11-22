@@ -5001,6 +5001,9 @@ fn compute_once(
         );
         input.resolved_ports = resolved;
         let capacity_seeds = run.capacity_seeds.clone();
+        // The completion is where a large view peaks: the placement's memos (pure caches) are not needed during it and
+        // would only keep their copies alive; a placement after it computes what it needs again.
+        ordering.release_caches();
         let started = stage_timer_start();
         use constructive::abstract_realization::{completion, planning};
         let completed = completion::run_until(

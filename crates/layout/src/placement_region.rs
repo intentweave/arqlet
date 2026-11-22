@@ -99,6 +99,12 @@ pub(crate) struct Memo {
 }
 
 impl Memo {
+    /// Forgets what is kept for reuse (a pure cache: a later call computes the same again); see
+    /// `placement_order::Memo::release_caches`.
+    pub fn clear(&mut self) {
+        self.areas = BTreeMap::new();
+    }
+
     pub fn get(&self, area: &str, input: &Input) -> Option<Realization> {
         #[cfg(test)]
         if self.disabled {
