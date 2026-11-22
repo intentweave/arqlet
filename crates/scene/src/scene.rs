@@ -716,7 +716,8 @@ fn membership_overlays(
                 continue;
             }
             let rects: Vec<Rect> = boxes.iter().map(|id| positions[*id].clone()).collect();
-            let points = crate::hull::group_hull(&rects, HULL_PADDING);
+            let points =
+                crate::hull::group_shape(&rects, HULL_PADDING, snapshot.options.membership_hull);
             if points.len() < 3 {
                 continue;
             }

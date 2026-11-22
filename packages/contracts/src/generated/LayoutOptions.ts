@@ -7,6 +7,7 @@ import type { CommunityHubs } from "./CommunityHubs";
 import type { ContainerSizing } from "./ContainerSizing";
 import type { EdgeRouting } from "./EdgeRouting";
 import type { Hidden } from "./Hidden";
+import type { HullShape } from "./HullShape";
 import type { HybridCriterion } from "./HybridCriterion";
 import type { LabelSpec } from "./LabelSpec";
 import type { LevelOfDetail } from "./LevelOfDetail";
@@ -160,6 +161,12 @@ sharedTracks?: SharedTracks,
  * reported as not yet applied.
  */
 membershipViews?: { [key in string]: MembershipView },
+/**
+ * Provisional (ADR 0022 §3): the shape of a membership hull. `rectangle` (the default, omitted) draws the padded
+ * bounding box of the group's boxes, which looks like a container and may overlap one; `polygon` draws the padded
+ * convex hull. A criterion of `groupingPriority` may override it (M1).
+ */
+membershipHull?: HullShape,
 /**
  * Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
  * (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.

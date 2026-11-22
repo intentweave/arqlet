@@ -15,7 +15,9 @@ import {fileURLToPath} from 'node:url';
 
 const root = resolve(import.meta.dirname, '..');
 
-export const QUERY_CRATES = ['arqlet-query', 'arqlet-query-cypher', 'arqlet-query-model', 'arqlet-query-cli'];
+export const QUERY_CRATES = [
+  'arqlet-query', 'arqlet-query-cypher', 'arqlet-query-model', 'arqlet-query-json', 'arqlet-query-cli', 'arqlet-query-wasm',
+];
 export const FORBIDDEN = [
   'arqlet', 'arqlet-layout', 'arqlet-routing', 'arqlet-scene', 'arqlet-view', 'arqlet-topology', 'arqlet-elk',
   'arqlet-reference', 'arqlet-runtime', 'arqlet-wasm', 'arqlet-contracts', 'arqlet-node',

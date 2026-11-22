@@ -16,8 +16,11 @@ jobs:
       - run: python3 examples/cypher/oracle.py --check
       - run: cargo +stable test --workspace --locked
       # The operation `query` (ADR 0021, M5b) is a cargo feature of the runtime, off by default: test it too.
-      - run: cargo +stable test -p arqlet-runtime --features query --locked --test all query::
+      # Quoted: a plain YAML value ending in `:` is read as a mapping key, which invalidates the whole workflow.
+      - run: 'cargo +stable test -p arqlet-runtime --features query --locked --test all query::'
       - run: rustup target add wasm32-unknown-unknown --toolchain stable
+      # ADR 0021, M5c: the query-only WASM module against the oracle.
+      - run: cargo +stable build -p arqlet-query-wasm --target wasm32-unknown-unknown --release --locked
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -28,6 +31,7 @@ jobs:
       - run: node --test tools/check-query-isolation.test.mjs
         env:
           RUSTUP_TOOLCHAIN: stable
+      - run: node --test tools/query-wasm.test.mjs
       # The workspace must be installed before build.sh: its Node tests import @arqlet/* by package name.
       - run: corepack enable
       - run: pnpm install --frozen-lockfile --ignore-scripts
@@ -50,3 +54,4 @@ jobs:
       - run: cargo +1.94.0 check --workspace --locked
       # The browser adapter is built for WASM; check it with the minimum version too.
       - run: cargo +1.94.0 check -p arqlet-wasm --target wasm32-unknown-unknown --locked
+      - run: cargo +1.94.0 check -p arqlet-query-wasm --target wasm32-unknown-unknown --locked

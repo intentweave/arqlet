@@ -3,7 +3,7 @@
 Date: 2026-11-21; revised 2026-11-22 (grouping priority, §2–§4).
 Status: accepted for the first slice (2026-11-21): **M0 and a narrowed M2 are implemented** behind `membershipViews`, off
 by default — the model, the validation (the refusals of §5: duplicate dimension or group ids, an unknown or cyclic
-`parent`, `groups` together with a `hierarchy` view), the padded convex hull as scene geometry, the typed report, the SVG
+`parent`, `groups` together with a `hierarchy` view), the hull as scene geometry (a rectangle or a convex polygon, `membershipHull`), the typed report, the SVG
 viewer and the playground checkbox. Memberships through `patch` (§5b) are implemented too (2026-11-22, with the change log
 of ADR 0023 R2). **The revision of 2026-11-22 is proposed:** a view orders its structures by a priority the user chooses
 (§2), every structure after the first is a containment that may be broken (§3), and what cannot be held falls back to split
@@ -130,6 +130,7 @@ in the list is its rank, and there may be as many ranks as the graph has structu
 | `by` | `parent` (containment from `parentId`) or a declared dimension id. Each criterion appears at most once. |
 | `values` | The value priority of a dimension: which groups come first when a node is in several. Unlisted groups follow in their declared order. Only for dimensions. |
 | `as` | `containers` (the default: nested boxes) or `lanes` (bands; §3). |
+| `hull` | `rectangle` or `polygon`: the shape of this criterion's hulls (§3); without it, `membershipHull` applies. |
 
 Three rules make the list a projection:
 
@@ -182,12 +183,16 @@ in organic ones — and falls back step by step where that is not possible or no
    badge, no polygon). A group of thirty scattered members as thirty small hulls is noise; as marks it is not, and a mark
    never claims a shape the layout did not produce.
 
-**A hull is a rectangle where it can be.** A held group is placed compactly, so its hull is the padded bounding box of its
-members — a box that looks like a container and may overlap one. Where the bounding box would enclose a foreign node, the
-hull is the outline of the union of the padded member boxes (rectilinear, so it still matches boxes and orthogonal routes);
-the convex hull of the first slice is not the target. A hull is drawn behind the nodes and is **not an obstacle** — the
-router does not see it, routes may cross it, and it never makes a drawing invalid. All of it is comparison geometry, no
-trigonometry.
+**The shape of a hull is configurable**: `rectangle` (the default) is the padded bounding box of the group's boxes — a box
+that looks like a container and may overlap one, as in the target picture; `polygon` is the padded convex hull, tighter
+around scattered members, with diagonal edges. `LayoutOptions.membershipHull` sets it for every group, and a criterion's
+`hull` overrides it (M1). The rectangle always encloses the polygon, so it finds at least as many foreign nodes; where
+either shape would enclose one, the group is split (stage 2) rather than drawn in a third, more complicated outline.
+This is deliberate: the split does not depend on the shape chosen, so switching the shape changes outlines only and
+never how a group is divided; the price is that a view drawn with `polygon` also gets the splits that only the rectangle
+needs. A
+hull is drawn behind the nodes and is **not an obstacle** — the router does not see it, routes may cross it, and it never
+makes a drawing invalid. Both shapes are comparison geometry, no trigonometry.
 
 **Holding is a switch per piece, not a quality criterion.** The general quality criteria (ADR 0002, the published key) stay
 as they are and judge the drawing. Whether a piece is held is decided like a dynamic option: by the **marginal cost** of
@@ -336,7 +341,7 @@ Each step is behind an option and measured before the next. Nothing becomes a de
 - **Patch (§5b).** **Done** (2026-11-22), with the change log of ADR 0023 R2.
 - **M2b — the display stages of §3, still nothing held.** For each group the first form that encloses no foreign node:
   one hull, else one per owner, else by distance; marks above a piece count (a provisional threshold until M3 measures
-  it); hulls as rectangles where possible, else the rectilinear outline. *Exit:* geometry identical with and without;
+  it), in the configured shape. *Exit:* geometry identical with and without;
   no hull on the fixtures encloses a foreign node; the first slice's intruder count reported beside the new one for one
   version, because splitting lowers it by construction and that is not a layout gain.
 - **M1 — `groupingPriority` as a projection.** Ranked criteria, ownership, value priority, `parent` as a criterion that can
