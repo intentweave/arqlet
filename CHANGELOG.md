@@ -7,6 +7,19 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `elkLayout` packs components as ELK does (`separateConnectedComponents`, default true, towards `elk.aspectRatio`,
+  default 1.6, now read) when the top level has at least two components with edges and none holds more than half of
+  the linked nodes. Flat graphs with many small components no longer stand in one tall column: synthetic flat graphs
+  go from up to 4.5 to at most 1.9 times elk-rs's area, with fewer crossings (15 → 3 on one), and the 37 corpus views
+  are unchanged (`benchmarks/results/elk-flat-components-20261121.md`).
+- A resident session reads an import in one pass into its types, as `dispatch` already did, instead of a JSON value of
+  the whole graph first, and trims the graph's lists to their length. The peak of the import's heap drops by a third
+  to more than half (synthetic 2k/20k/100k: 8.2/130/1 184 MB to 2.4/69/886 MB), which in WASM is the memory that stays;
+  a session keeps about 0.8 KB per node (`benchmarks/results/session-memory-20261121.md`, tool
+  `benchmarks/session-memory`). Answers are unchanged. The rest of the peak is the layout of the first view.
+- `reveal` takes the id of a bus given as data (`Graph.buses` with `taps` and no node): it opens the containers above
+  the bus (`parentId`), so its line is drawn; with `partial` the bus's own container opens in part, its taps at the rest.
+  Before, such an id was refused as an unknown node.
 - The first two crates of the Cypher query layer (ADR 0021; provisional, `publish = false`, no operation yet):
   `arqlet-query` (error classes) and `arqlet-query-cypher`, which checks a query with decypher and rejects, from its
   syntax tree, what decypher drops silently (`shortestPath`, quantified paths, `WHERE` inside a pattern: upstream #132 to

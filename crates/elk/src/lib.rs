@@ -169,6 +169,66 @@ struct AreaOptions {
     /// `componentPacking`). Without it, Arqlet's layout already stacks unconnected parts across the flow, so ELK's
     /// default (yes) needs nothing; only an explicit `true` asks for the packing.
     separate: Option<bool>,
+    /// `aspectRatio`: the width over the height ELK packs components towards (its default 1.6).
+    aspect: Option<f64>,
+}
+
+/// The connected components of the top level that have at least one edge (every node counts as its top-level ancestor, and
+/// an edge joins the two ancestors it connects): how many there are, and how many top-level nodes the largest one holds
+/// out of all linked ones.
+fn linked_components(graph: &Value) -> (usize, usize, usize) {
+    let nodes = graph["nodes"].as_array().map_or(&[][..], Vec::as_slice);
+    let parent: BTreeMap<String, String> = nodes
+        .iter()
+        .filter_map(|n| {
+            Some((
+                n["id"].as_str()?.to_string(),
+                n["parentId"].as_str()?.to_string(),
+            ))
+        })
+        .collect();
+    let top = |id: &str| -> String {
+        let mut at = id.to_string();
+        let mut steps = 0usize;
+        while let Some(p) = parent.get(&at) {
+            at = p.clone();
+            steps += 1;
+            if steps > nodes.len() {
+                break;
+            }
+        }
+        at
+    };
+    // Union-find over the top-level ancestors the edges connect.
+    let mut root: BTreeMap<String, String> = BTreeMap::new();
+    fn find(root: &mut BTreeMap<String, String>, x: &str) -> String {
+        let mut at = x.to_string();
+        while let Some(next) = root.get(&at).filter(|n| **n != at).cloned() {
+            at = next;
+        }
+        root.insert(x.to_string(), at.clone());
+        at
+    }
+    for e in graph["edges"].as_array().into_iter().flatten() {
+        let (Some(s), Some(t)) = (e["source"].as_str(), e["target"].as_str()) else {
+            continue;
+        };
+        let (a, b) = (top(s), top(t));
+        root.entry(a.clone()).or_insert_with(|| a.clone());
+        root.entry(b.clone()).or_insert_with(|| b.clone());
+        let (ra, rb) = (find(&mut root, &a), find(&mut root, &b));
+        if ra != rb {
+            let (low, high) = if ra < rb { (ra, rb) } else { (rb, ra) };
+            root.insert(high, low);
+        }
+    }
+    let ids: Vec<String> = root.keys().cloned().collect();
+    let mut sizes: BTreeMap<String, usize> = BTreeMap::new();
+    for id in &ids {
+        *sizes.entry(find(&mut root, id)).or_default() += 1;
+    }
+    let largest = sizes.values().copied().max().unwrap_or(0);
+    (sizes.len(), largest, ids.len())
 }
 
 fn area_options(
@@ -181,6 +241,7 @@ fn area_options(
         routing: None,
         spacing: BTreeMap::new(),
         separate: None,
+        aspect: None,
     };
     for (key, value) in options {
         let value = value.trim_matches('"');
@@ -271,6 +332,14 @@ fn area_options(
                 other => {
                     diagnostics.insert(format!(
                         "separateConnectedComponents {other} is not true or false; not used"
+                    ));
+                }
+            },
+            "aspectRatio" => match value.parse::<f64>() {
+                Ok(v) if v.is_finite() && v > 0.0 => out.aspect = Some(v),
+                _ => {
+                    diagnostics.insert(format!(
+                        "aspectRatio {value} is not a positive number; not used"
                     ));
                 }
             },
@@ -661,6 +730,17 @@ pub fn translate(elk: &Value) -> Result<Translation, String> {
     };
     if root.separate != Some(false) && unconnected {
         options["isolatedGrid"] = json!(true);
+    }
+    // Components packed as boxes in rows (`packComponents`), as ELK packs them by default (`separateConnectedComponents`
+    // true, towards its `aspectRatio`, default 1.6), when the top level has at least two components that have edges and
+    // none of them holds more than half of the linked nodes: without it many small components stand one below the other
+    // (a flat graph of 1 000 nodes and 500 edges: 2 046 x 43 604 against elk-rs's 5 285 x 3 770). One dominant component
+    // sets the width anyway, and packing the small ones only adds height (seen on evaluation graphs kept outside the
+    // repository), so it is left out there (benchmarks/results/elk-flat-components-20261121.md). An explicit `false` or a
+    // request's own `packComponents` keeps it off or decides.
+    let (components, largest, linked) = linked_components(&graph);
+    if root.separate != Some(false) && components >= 2 && largest * 2 <= linked {
+        options["packComponents"] = json!({"aspect": root.aspect.unwrap_or(1.6)});
     }
     if !buses.is_empty() {
         graph["buses"] = Value::Array(buses);
@@ -1154,6 +1234,55 @@ mod tests {
             .diagnostics
             .iter()
             .any(|d| d.contains("separateConnectedComponents")));
+    }
+    #[test]
+    fn linked_components_are_packed_as_elk_packs_them() {
+        // Two pairs (two components with edges) and a lone node; nested ends count as their top-level ancestor.
+        let two = |options: Value| {
+            json!({"id": "root", "layoutOptions": options, "children": [
+                {"id": "a", "width": 10, "height": 10}, {"id": "b", "width": 10, "height": 10},
+                {"id": "g", "width": 40, "height": 40, "children": [{"id": "g1", "width": 10, "height": 10}]},
+                {"id": "d", "width": 10, "height": 10}, {"id": "lone", "width": 10, "height": 10}],
+            "edges": [{"id": "ab", "sources": ["a"], "targets": ["b"]}, {"id": "g1d", "sources": ["g1"], "targets": ["d"]}]})
+        };
+        assert_eq!(
+            translate(&two(json!({}))).unwrap().options["packComponents"],
+            json!({"aspect": 1.6})
+        );
+        assert_eq!(
+            translate(&two(json!({"elk.aspectRatio": 2.5})))
+                .unwrap()
+                .options["packComponents"],
+            json!({"aspect": 2.5})
+        );
+        assert!(
+            translate(&two(json!({"elk.separateConnectedComponents": false})))
+                .unwrap()
+                .options
+                .get("packComponents")
+                .is_none()
+        );
+        // One component with edges: nothing to pack (a lone node does not count).
+        let one = json!({"id": "root", "children": [{"id": "a", "width": 10, "height": 10},
+            {"id": "b", "width": 10, "height": 10}, {"id": "lone", "width": 10, "height": 10}],
+            "edges": [{"id": "ab", "sources": ["a"], "targets": ["b"]}]});
+        assert!(translate(&one)
+            .unwrap()
+            .options
+            .get("packComponents")
+            .is_none());
+        let bad = translate(&two(json!({"elk.aspectRatio": "wide"}))).unwrap();
+        assert!(bad.diagnostics.iter().any(|d| d.contains("aspectRatio")));
+        assert_eq!(bad.options["packComponents"], json!({"aspect": 1.6}));
+        // One dominant component (three of four linked nodes): it sets the width, so nothing is packed.
+        let dominant = json!({"id": "root", "children": (0..6).map(|i| json!({"id": format!("n{i}"), "width": 10, "height": 10})).collect::<Vec<_>>(),
+            "edges": [{"id": "a", "sources": ["n0"], "targets": ["n1"]}, {"id": "b", "sources": ["n1"], "targets": ["n2"]},
+                {"id": "c", "sources": ["n2"], "targets": ["n3"]}, {"id": "d", "sources": ["n4"], "targets": ["n5"]}]});
+        assert!(translate(&dominant)
+            .unwrap()
+            .options
+            .get("packComponents")
+            .is_none());
     }
 }
 
