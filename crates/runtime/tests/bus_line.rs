@@ -864,3 +864,50 @@ fn reveal_takes_the_id_of_a_bus_given_as_data() {
     );
     assert_eq!(unknown["ok"], false);
 }
+
+/// #149: the engine choice does not route a drawing again with both engines when the estimated work is too large (a
+/// meshed bus view, organic); it says so, and the conflicts stay reported. The graph is `benchmarks/experiments/bus-mesh.mjs
+/// 50 15`.
+#[test]
+fn the_engine_choice_skips_a_drawing_too_large_to_route_twice() {
+    let (units, count) = (50usize, 15usize);
+    // The generator's arithmetic in doubles, as JavaScript does it (IEEE, so the same graph).
+    let mut seed: f64 = 7.;
+    let mut rnd = || {
+        seed = (seed * 1103515245. + 12345.) % 2147483648.;
+        seed / 2147483648.
+    };
+    let mut taps: Vec<Vec<serde_json::Value>> = vec![Vec::new(); count];
+    let mut nodes = Vec::new();
+    for i in 0..units {
+        nodes.push(json!({"id": format!("u{i}"), "kind": "unit", "label": format!("U{i}")}));
+    }
+    for i in 0..units {
+        let k = 1 + (rnd() * 3.).floor() as usize;
+        for _ in 0..k {
+            let b = (rnd() * count as f64).floor() as usize;
+            let node = format!("u{i}");
+            if !taps[b].iter().any(|t| t["node"] == json!(node)) {
+                taps[b].push(json!({"edge": format!("tbus{b}-{i}"), "node": node, "toBus": true, "kind": "on"}));
+            }
+        }
+    }
+    let buses: Vec<serde_json::Value> = taps
+        .into_iter()
+        .enumerate()
+        .filter(|(_, t)| !t.is_empty())
+        .map(|(b, t)| json!({"id": format!("bus{b}"), "kind": "bus", "label": format!("Bus {b}"), "taps": t}))
+        .collect();
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": [], "buses": buses,
+        "defaultStrategy": "organic", "defaultDirection": "auto"}))
+    .unwrap();
+    let options: LayoutOptions = serde_json::from_value(json!({"busStyle": "lines"})).unwrap();
+    let s = import_graph_with(g, 10_000, &options).unwrap();
+    assert!(
+        s.layout_diagnostics
+            .iter()
+            .any(|d| d.starts_with("Engine choice not tried")),
+        "{:?}",
+        s.layout_diagnostics
+    );
+}

@@ -928,8 +928,14 @@ fn compute_counted_inner(
     // of a dense drawing) or the whole drawing with both engines is not bounded by their size (2000 children did not finish
     // in 30 minutes); the conflicts that remain are reported.
     let whole_reroute = !snapshot.options.scalable_stress;
-    // The engine choice routes the whole drawing again with both engines: not above `MAX_REROUTED_ROUTES` routes.
-    let engine_choice_fits = snapshot.routes.len() <= engine_choice::MAX_REROUTED_ROUTES;
+    // The engine choice routes the whole drawing again with both engines: not above `MAX_REROUTED_ROUTES` routes, nor above
+    // `MAX_REROUTE_WORK` estimated work (#149: a bus view of 189 routes took 20 s in the channel router).
+    let engine_choice_fits = engine_choice::fits(&snapshot);
+    let too_much_work = snapshot.routes.len() <= engine_choice::MAX_REROUTED_ROUTES
+        && !engine_choice_fits
+        && whole_reroute
+        && !dragging
+        && !snapshot.route_conflicts.is_empty();
     if whole_reroute
         && engine_choice_fits
         && !dragging
@@ -973,7 +979,17 @@ fn compute_counted_inner(
             }
         }
     }
-    finish(snapshot).map(|snapshot| (snapshot, stages))
+    finish(snapshot).map(|mut snapshot| {
+        if too_much_work && !snapshot.route_conflicts.is_empty() {
+            // The count of conflicts is left out: in a view with bus lines they belong to a drawing the bus lines replace (#156).
+            snapshot.layout_diagnostics.push(format!(
+                "Engine choice not tried: routing the drawing again with both engines would take too long (estimated work {} above {}); the remaining conflicts are reported in the routing issues",
+                engine_choice::work(&snapshot),
+                engine_choice::MAX_REROUTE_WORK
+            ));
+        }
+        (snapshot, stages)
+    })
 }
 
 /// The steps that give a complete layout its drawn routes, labels and diagnostics. The port search uses the same steps for

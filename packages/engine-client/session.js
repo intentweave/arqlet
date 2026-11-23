@@ -120,6 +120,9 @@ export function createSession(engine, {onChange, resident: wanted = 'auto'} = {}
   let run = engine;
   let snapshot = null;
   let generation = 0;
+  // Snapshots kept by mark when the session is not resident (#148); a resident session keeps them in the engine.
+  let kept = [];
+  let marks = 0;
   let queue = Promise.resolve();
   const scenes = new WeakMap();
   if (wanted === true && !run.openSession) throw Error('This engine has no resident sessions');
@@ -187,6 +190,7 @@ export function createSession(engine, {onChange, resident: wanted = 'auto'} = {}
       // A new view does not wait for the changes still under way: they resolve as stale.
       generation++;
       queue = Promise.resolve();
+      kept = [];
       return enqueue(() => call({op: 'import', graph, limit, ...(options ? {options} : {})}));
     },
 
@@ -196,17 +200,55 @@ export function createSession(engine, {onChange, resident: wanted = 'auto'} = {}
      */
     load(snapshot, {reset = false} = {}) {
       // With `reset` (another view) it does not wait for the changes still under way: they resolve as stale.
+      // The same graph keeps the snapshots kept for `recall` (#148); another one (`reset`) drops them.
       if (reset) {
         generation++;
         queue = Promise.resolve();
+        kept = [];
       }
-      return enqueue(() => (resident ? call({op: 'load', snapshot}) : {ok: true, snapshot}));
+      return enqueue(() => (resident ? call({op: 'load', snapshot, keep: !reset}) : {ok: true, snapshot}));
+    },
+
+    /**
+     * Provisional (#148): keeps the current snapshot under a mark, `{ok, mark}` (the same mark while it is unchanged), at
+     * most `limit` (default 32) of them, the oldest dropped first. With a resident session the engine keeps them (only the
+     * mark crosses); otherwise this session does. A new import drops them.
+     */
+    keep({limit = 32} = {}) {
+      return enqueue(async () => {
+        if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        if (resident) return call({op: 'keep', limit});
+        const last = kept.at(-1);
+        if (last && last.snapshot === snapshot) return {ok: true, mark: last.mark};
+        kept.push({mark: ++marks, snapshot});
+        if (kept.length > limit) kept.splice(0, kept.length - limit);
+        return {ok: true, mark: marks};
+      });
+    },
+
+    /**
+     * Provisional (#148): makes the snapshot kept under `mark` current again (its geometry as it was) under the next layout
+     * version. `{ok: false, evicted: true}` when it is no longer kept, `{ok: false, changed: true}` when the graph changed
+     * since (another revision); then lay out again from the decisions (`restore`).
+     */
+    recall(mark) {
+      return enqueue(async () => {
+        if (!snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        if (resident) return call({op: 'recall', mark});
+        const entry = kept.find(k => k.mark === mark);
+        if (!entry) return {ok: false, evicted: true, error: `The snapshot of mark ${mark} is no longer kept`};
+        if (entry.snapshot.revision !== snapshot.revision) {
+          return {ok: false, changed: true, error: `The graph changed since mark ${mark}`};
+        }
+        return {ok: true, snapshot: {...entry.snapshot, layoutVersion: snapshot.layoutVersion + 1}};
+      });
     },
 
     /** Drops the snapshot; changes still under way resolve as stale. */
     reset() {
       generation++;
       snapshot = null;
+      kept = [];
     },
 
     /** Whether container `id` is collapsed in the current snapshot. */

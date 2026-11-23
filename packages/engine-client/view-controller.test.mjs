@@ -432,3 +432,37 @@ test('a resident session moves to a new engine and the memory of the old one can
   assert.equal((await session.payload({set: {nodes: {'g3-7': {owner: 'Cid'}}}})).sequence, 3, 'the numbers go on');
   assert.match((await createSession(engine, {resident: false}).recycle(fresh)).error, /resident session/);
 });
+
+for (const resident of [false, true]) {
+  test(`back and forward restore the geometry they left (#148, resident ${resident})`, {skip: !engine || (resident && !engine.openSession)}, async () => {
+    const view = createViewController(createSession(engine, {resident}), {page: 10});
+    assert.equal((await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}})).ok, true);
+    const geometry = () => JSON.stringify(view.getState().scene.nodes.map(n => [n.id, n.bounds])) +
+      JSON.stringify(view.getState().scene.routes.map(r => [r.id, r.points]));
+    const start = geometry();
+    assert.equal((await view.open('box')).ok, true);
+    const opened = geometry();
+    assert.notEqual(opened, start);
+    const back = await view.back();
+    assert.equal(back.ok, true);
+    assert.equal(back.relaidOut, false, 'restored from the kept snapshot');
+    assert.equal(geometry(), start, 'every box and route where it was');
+    const forth = await view.forward();
+    assert.equal(forth.relaidOut, false);
+    assert.equal(geometry(), opened);
+    // A changed graph cannot come back from a snapshot of the earlier one: the decisions are laid out again.
+    assert.equal((await view.apply({op: 'patch', patch: {nodes: [{id: 'extra', kind: 'ecu', label: 'extra'}]}}, 'Add', {remember: false})).ok, true);
+    const relaid = await view.back();
+    assert.equal(relaid.ok, true);
+    assert.equal(relaid.relaidOut, true);
+  });
+}
+
+test('keepGeometry: false lays the view out again from the decisions, as before', {skip: !engine}, async () => {
+  const view = createViewController(createSession(engine, {resident: false}), {keepGeometry: false});
+  assert.equal((await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}})).ok, true);
+  assert.equal((await view.open('box')).ok, true);
+  const back = await view.back();
+  assert.equal(back.ok, true);
+  assert.equal(back.relaidOut, true);
+});

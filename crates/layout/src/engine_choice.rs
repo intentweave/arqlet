@@ -24,6 +24,42 @@ const MAX_SEARCH_NODES: usize = 60;
 /// minutes, routing everything again with the channel router.
 pub(crate) const MAX_REROUTED_ROUTES: usize = 500;
 
+/// The most work the engine choice may take on (#149): the routes times the cells of the grid over the boxes' edges, which
+/// the channel router searches for every route. Above it the conflicts are reported. Measured (native, fast profile): a
+/// bus view of 100 nodes on 30 buses given as data, organic, 189 routes on a grid of 225 × 229 (9.7 million) took 19.6 s
+/// in the channel router alone; one of 50 nodes on 15 buses (1.4 million) 0.9 s in all. The views of the stored
+/// fingerprints that reach the engine choice stay below it (workflow-dag 414 000, activity-order 54 080, petri-net 7 872).
+pub(crate) const MAX_REROUTE_WORK: usize = 1_000_000;
+
+/// Whether the engine choice may route `snapshot` again with both engines: at most `MAX_REROUTED_ROUTES` routes and
+/// `MAX_REROUTE_WORK` estimated work. The estimate is deterministic (box coordinates only), as the output must be.
+pub(crate) fn fits(snapshot: &Snapshot) -> bool {
+    snapshot.routes.len() <= MAX_REROUTED_ROUTES && work(snapshot) <= MAX_REROUTE_WORK
+}
+
+/// The estimated work of routing `snapshot` again: routes × distinct x × distinct y of the boxes' edges (absolute).
+pub(crate) fn work(snapshot: &Snapshot) -> usize {
+    let rects = super::absolute_all(&snapshot.graph, &snapshot.boxes);
+    let mut xs: Vec<i64> = Vec::with_capacity(rects.len() * 2);
+    let mut ys: Vec<i64> = Vec::with_capacity(rects.len() * 2);
+    for r in rects.values() {
+        xs.push(r.x.round() as i64);
+        xs.push((r.x + r.width).round() as i64);
+        ys.push(r.y.round() as i64);
+        ys.push((r.y + r.height).round() as i64);
+    }
+    xs.sort_unstable();
+    xs.dedup();
+    ys.sort_unstable();
+    ys.dedup();
+    // Saturating: `usize` is 32-bit in WASM.
+    snapshot
+        .routes
+        .len()
+        .saturating_mul(xs.len())
+        .saturating_mul(ys.len())
+}
+
 /// The Optimize-time budget: the crossing step may try more candidates than the layout, because it runs on the delivered
 /// drawing only and the published key decides whether a candidate is kept.
 const OPTIMIZE_EVALUATIONS: usize = 80;

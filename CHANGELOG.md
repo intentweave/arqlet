@@ -7,12 +7,23 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- The engine choice (routing a drawing that still runs routes through nodes again with both routing engines) is not
+  tried when its estimated work (routes × grid cells over the box edges) exceeds 1 million; the conflicts are reported
+  with a diagnostic (#149). A meshed bus view of 100 nodes on 30 buses given as data, organic, took 20 to 42 s and now
+  0.35 s with the same output (`benchmarks/results/engine-choice-work-20261123.md`); the stored default fingerprints are
+  unchanged.
 - Routing style `bus`: laid out by single pass like `orthogonal`, so the fans find their shared ways in its channels
   (on six public examples, fans drawn in part from 78 of 105 to 8); the `Bus style` diagnostic counts apart the fans whose
   edges leave to different sides.
 
 ### Fixed
 
+- Route repair: where a route's end faces a neighbour closer than its stub (narrow gaps in organic views with
+  containers), the repair tries shorter stubs instead of keeping the route through the boxes (#156). Generated organic
+  view, 100 nodes with 11 containers: 54 of 250 routes crossed foreign boxes, now none; with buses and 240 children, 518
+  of 1 159 routes, now 18. The overlap resolution became much faster with the same output (segment index by line,
+  counts per move, cached moves): 117 s to 3.5 s on 120 children; dense views still cost more than before
+  (`benchmarks/results/narrow-gap-repair-20261123.md`). Default fingerprints unchanged.
 - Buses given as data (`Graph.buses` with `taps`): `edges` is optional, and a bus with taps is a shared medium whatever
   `edges` holds (#145; before, listing edges beside the taps silently stopped trace and neighbourhood at the bus);
   `neighbourhood` shows a reached bus drawn as lines (`busStyle: 'lines'`) by its lines, as a bar by itself (#144);
@@ -23,6 +34,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Steps back restore the geometry (#148, provisional): the engine session keeps earlier snapshots under marks (`keep`,
+  `recall`; at most 32 by default, counted in `memory`), and the view controller's `back` and `forward` recall them, so
+  every box and route comes back where it was instead of being laid out again. An evicted mark or a changed graph falls
+  back to laying out the decisions again (`relaidOut: true`); `keepGeometry: false` keeps the old behaviour. Sessions
+  without a resident engine keep the snapshots in JS.
 - Routing style `bus` (#132, provisional): an area routed `bus` draws the fans of its edges as buses: the edges of one
   source share one port and one way until they branch off, then the edges left with one target (from two edges up).
   Choosing `bus` is the explicit request; `auto` and style lists never pick it, explicit buses come first, and the
