@@ -1,0 +1,171 @@
+# ADR 0027: Area inside single pass: ranks by span where they cost no quality, then free sibling areas along the flow
+
+Date: 2026-11-23.
+Status: proposed. Nothing is implemented; the default output is unchanged. Step 0 done (2026-11-23): the plan-crossing
+guard **fails**; the fallback for step 1 is open (see "Outcome of step 0").
+
+Related: [ADR 0016](0016-single-pass-default-gate.md) (single pass is the default), [ADR 0017](0017-area-border-legs.md)
+(edges between areas in legs, border nodes), [ADR 0020](0020-single-pass-for-every-area.md) (single pass for every area);
+issue #119; the measurements in
+[`placement-hierarchy-20261123.md`](../../benchmarks/results/placement-hierarchy-20261123.md).
+
+## Context
+
+On the task of the elk-rs comparison (17 layered views, one direction, no strategies, bounded to 150 nodes) Arqlet's
+default is ahead on every gate above area — crossings 3064 against elk-rs's 4983, bends 4272 against 4312, 26 % less
+edge length, no line through a node — and behind on area: 1.60 times elk-rs's at the median. Issue #119 reported the
+symptoms: nodes far out at the edges, tall layered views.
+
+Constraints (decided 2026-11-23): **single pass stays the default, and the drawing's quality must not get worse** —
+per view, in the order of `DEFAULT_OBJECTIVES` (overlaps, line–node hits, crossings, then bends, then length and area).
+As before, a change runs behind an option first, and the default output stays fingerprint-identical until a new default
+is accepted.
+
+Where single pass spends the extent (`benchmarks/eval/area-budget.mjs`, an exact breakdown of both axes):
+
+| | along the flow | across the flow |
+|---|---|---|
+| leaves | 55 % | 32 % |
+| container boundaries | 23 % (channel at a border rank 13 %, frames 8 %, border rank 2 %) | 20 % (gaps between stacked sibling areas 10 %, frames 10 %) |
+| edges | ordinary channels 21 % | long edges 34 % (dummy tracks and the gaps beside them) |
+
+Measured and ruled out under the constraints:
+
+- **`globalLayering`** (shared ranks across areas, ELK's `INCLUDE_CHILDREN`) would buy most of the gap (1.24× elk-rs),
+  but cannot run with single pass: abstract routing refuses a flattened placement, and the layout falls back to the
+  legacy pipeline.
+- **`packComponents`** repacks unlinked components as boxes and trades height for width: no area gain, more crossings
+  and bends, also under single pass.
+- **A narrower channel beside a border rank** (prototype `borderChannelGap`): four fifths of that channel are the two
+  margins the construction needs; below them routes fall back to the search and crossings triple; the free fifth buys
+  0.7 % area and costs bends.
+- **Tighter spacings and frames**: rejected on 2026-11-22 (more bends and crossings, line–node hits).
+- **Packing the long edges tighter across the flow**: they stand on the lines that keep them straight; packing costs
+  bends, which rank before area.
+
+What remains is the rank assignment inside an area. The existing experimental option `simplexRanks` (network simplex
+instead of longest paths, after Gansner, Koutsofios, North and Vo, IEEE TSE 1993; `crates/layout/src/ranking.rs`) was
+measured under single pass for the first time:
+
+| | crossings | bends | length | area | area / elk-rs (median) | views worse in objective order |
+|---|---:|---:|---:|---:|---:|---:|
+| uniform task, default | 3064 | 4272 | 2482075 | 227248 k | 1.60 | |
+| uniform task, `simplexRanks` | 2931 | 4290 | 2287983 | 206002 k (−9.3 %) | 1.39 | 3 of 17 |
+| configured datasets, default | 5310 | 4934 | 2676331 | 196959 k | | |
+| configured datasets, `simplexRanks` | 5213 | 4943 | 2570804 | 191298 k (−2.9 %) | | 4 of 17 |
+
+Longest paths put every element in its earliest rank, so an element whose edges leave the area stands in the first rank
+and its edges run as dummy chains through every rank to the border; minimising the summed spans moves it towards its
+targets and removes dummies (the length falls by 8 % and 4 %). The gain is concentrated (org-chart −33 %, mixed-large
+−18 %, synthetic-2k −8 %), and on 3 to 4 views it costs one to seven crossings. It does not resolve the stacking on
+layerweave-code (−3.7 %): its 19 unlinked areas move together towards the border rank but stay in one rank.
+
+## Decision (proposed)
+
+Two steps, each behind its own option, each measured and accepted before the next; step 1 starts with an offline check
+of its guard (step 0).
+
+### Step 0: test the guard offline, before any engine change
+
+The guard of step 1 is read from the plan, which the probes can already compute without an engine change
+(`benchmarks/eval/plan-crossings.mjs`). For every view of both poses, and per layered area: the plan's crossings and
+dummies with longest-path ranks and with simplex ranks, and the choice step 1 would make. The check passes when, on the
+3 (uniform) and 4 (configured) views where unguarded `simplexRanks` is worse in objective order, the guard rejects the
+simplex ranks on the areas that cause the loss, and keeps them on the areas that carry the area gain (org-chart,
+mixed-large, synthetic-2k). Recorded in a results file, per view and area.
+
+If it fails, the fallback is decided before step 1 is built: a guard on the constructed routes of the area, whose cost (a
+construction per area) is measured on the same views first; or no step 1.
+
+#### Outcome of step 0 (2026-11-23)
+
+Measured with `benchmarks/eval/simplex-guard.mjs` on both poses
+([results](../../benchmarks/results/simplex-guard-offline-20261123.md)); the attribution of drawn crossings and bends to
+areas adds up exactly to the `metrics` totals. The guard fails:
+
+- **Most regressions are not in the area whose ranks changed.** Of 16 loss areas on the 7 worse views, 11 lie outside
+  every changed area: 2 in ancestors, 5 in **children** (a parent's new ranks move where its edges enter a child) and 4
+  **apart** (siblings and cousins). The split into a local guard and a global acceptance assumed ancestors only; a guard
+  that compares two layouts of one area — from its plan or from its constructed routes — cannot see any of the 11.
+- **Inside the changed areas the plan predicts poorly**: the guard rejects simplex on 2 of the 5 loss areas there, and
+  its verdict agrees with the drawn one on 12 of 15 changed areas (uniform) and 11 of 17 (configured).
+
+So the listed fallback, a guard on the constructed routes of an area, could catch at most 5 of the 16 and cannot pass the
+acceptance. One fallback that sees every regression is a **choice per view**: lay the view out with both rankings and
+keep simplex only where the view is not worse in objective order (ties: the smaller area). From the gate runs, exactly:
+simplex on 7 of 17 views, crossings 3064 → 2929, area −9.4 % on the uniform task; 6 of 17, crossings 5310 → 5194, area
+−3.2 % on the configured datasets; no view worse by construction. Its cost is a second layout per view, and more on views
+that do not run single pass (configured mixed-large: `simplexRanks` 4.5 to 7 times slower on the legacy pipeline), so it
+would be limited to views that run single pass and timed on an idle machine first.
+
+Decision needed before step 1: **no step 1**, or **a choice per view** behind an option (limited to single pass, its time
+measured first). Step 2 does not depend on it and keeps its own order (ELK's `MIN_WIDTH`/`STRETCH_WIDTH` upper bound first).
+
+### Step 1: simplex ranks per area, kept only where they cost no crossings
+
+Single pass constructs every area on its own, so the ranking can be chosen per area. Each layered area is ranked both
+ways — longest paths and network simplex — and ordered both ways; the simplex ranks are kept for that area only when
+its ordered plan is **not worse in the objective order the plan can see**: first its crossings (the plan's crossings
+between neighbouring ranks, `layered_plan::order_crossings`, as `benchmarks/eval/plan-crossings.mjs` reads them), then
+its dummies (the plan's proxy for bends and length, which are not known before routing), ties broken by the longest-path
+ranks. Overlaps and line–node hits are not visible in the plan; they, and the drawn bends, are left to the acceptance. The choice must be deterministic and independent of the thread count, and an area whose
+choice is the longest-path ranks must lay out byte-identically to the default (a requirement of the implementation,
+checked against the stored fingerprints).
+
+The guard is a hypothesis, tested by step 0: the plan's crossings are known before routing and moved with the drawn
+crossings between the arms measured so far, but whether they catch the 3 to 4 views where `simplexRanks` costs
+crossings is what step 0 shows.
+
+**The guard is local, the acceptance global.** Choosing ranks per area changes that area's box (its extent along the
+flow), and with it the ranks, legs and border nodes of its parent (ADR 0017). A guard that compares two plans of one area
+cannot see crossings or bends that move into the parent. The acceptance per view sees them; for every view that gets
+worse, the results record whether the regression lies in an area whose ranks changed or in an ancestor of it. If the
+regressions lie in ancestors, the guard is extended to the parent's plan with the child's new box before step 1 is
+accepted.
+
+Cost: a second ranking and ordering per area; recorded with the measurement.
+
+### Step 2: unlinked sibling areas spread along the flow
+
+For the stacking that step 1 leaves (layerweave-code: gaps between stacked sibling areas 4235 of 9581 across the flow):
+an element whose links leave it slack between its earliest and its latest feasible rank takes, within that slack, the
+rank that balances the ranks' extents across the flow, counting an area by its box. This is width-bounded layering
+(Coffman and Graham, Acta Informatica 1972; the minimum-width heuristic of Healy and Nikolov, "How to layer a directed
+acyclic graph", GD 2001; ELK offers it as its `MIN_WIDTH` and `STRETCH_WIDTH` layerers). Only the ideas are taken, from
+the papers; no code is copied. It changes the ranks inside one area, so ADR 0017's legs and border nodes are untouched.
+
+It is not obviously a gain: on layerweave-code the unlinked areas are linked only to the border rank, so an area moved
+away from the border lengthens its chain again, and dummies also cost room across the flow. The trade has to be
+measured, not assumed. A cheap upper bound comes first: ELK's own `MIN_WIDTH` and `STRETCH_WIDTH` layerers, run through
+the pinned elk-rs (`benchmarks/eval`) on the same views and poses, against elk-rs's default layering; if they buy little
+area there, step 2 is not built.
+
+### Acceptance, for each step
+
+Run `benchmarks/eval/option-gates.mjs` on both poses (uniform and configured):
+
+1. **No view worse than the default in objective order** — overlaps, line–node hits, crossings, then bends — on either
+   pose. A view may trade bends for fewer crossings, as the objectives allow; it may not trade either for area.
+2. Area in sum and the median against the default and against elk-rs recorded; single pass and delegated routes
+   unchanged or better.
+3. Every view on which the option chooses the default ranks everywhere byte-identical to the default (the stored
+   fingerprints); times recorded on an idle machine.
+
+Only then the default question, with new reference fingerprints and the engine version raised as for earlier default
+changes.
+
+## Consequences
+
+- If step 1 is accepted, part of the measured 9.3 % (uniform task) stays — the part on the areas where simplex ranks do
+  not cost crossings. The upper bound is known; what the guard keeps is not.
+- Neither step changes spacings, frames, the construction's margins or the straightness of long edges, so the reasons
+  for which those were ruled out still hold.
+- The remaining gap to elk-rs after both steps is expected to be the containers' frames and channels and the straight
+  long edges — the cost of readability choices already made, not of placement.
+
+## Open questions
+
+- Does the plan-crossing guard predict the drawn regressions (step 1)? If not, is a per-area construction affordable?
+- Which views lose under step 2, and by how much length?
+- `layerweave-code` is generated from the repository's source and drifts (measured copy: 1105 nodes / 2461 edges);
+  record its size and hash with every figure.
