@@ -8,6 +8,7 @@ import type { SceneBusLine } from "./SceneBusLine";
 import type { SceneConflict } from "./SceneConflict";
 import type { SceneHubRef } from "./SceneHubRef";
 import type { SceneHull } from "./SceneHull";
+import type { SceneMark } from "./SceneMark";
 import type { SceneMembershipReport } from "./SceneMembershipReport";
 import type { SceneNode } from "./SceneNode";
 import type { SceneRoute } from "./SceneRoute";
@@ -48,6 +49,11 @@ membershipHulls?: Array<SceneHull>,
  * Omitted when there is none.
  */
 membershipReport?: Array<SceneMembershipReport>,
+/**
+ * Provisional (ADR 0022 §3, M2b): the members of the soft groups that fell into too many pieces to be drawn as hulls,
+ * marked one by one instead (a colour or a badge on the box, no polygon). Omitted when there is none.
+ */
+membershipMarks?: Array<SceneMark>,
 /**
  * Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
  */

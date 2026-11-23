@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- A soft membership group is no longer always one hull (provisional, ADR 0022 M2b): it is drawn whole where its hull
+  encloses no foreign node, else in pieces — one per container that holds its members, then by distance within one —
+  and a group that falls into more than three pieces is marked member by member instead (`Scene.membershipMarks`, a dot
+  in its dimension's hue in the SVG viewer). Hulls carry `piece` and `pieces`; the report adds `split`, `marked` and
+  `intrudersWhole` (what the group's whole hull would have enclosed). Drawing only: no node moves and no route changes.
+  The threshold of three pieces is a placeholder until it is measured (M3).
+
 - The engine choice (routing a drawing that still runs routes through nodes again with both routing engines) is not
   tried when its estimated work (routes × grid cells over the box edges) exceeds 1 million; the conflicts are reported
   with a diagnostic (#149). A meshed bus view of 100 nodes on 30 buses given as data, organic, took 20 to 42 s and now

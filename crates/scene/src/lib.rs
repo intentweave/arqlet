@@ -9,7 +9,8 @@ pub mod realize;
 mod scene;
 pub use scene::{
     build_corner_scene, build_scene, Scene, SceneBusLine, SceneConflict, SceneHubRef, SceneHull,
-    SceneMembershipReport, SceneNode, SceneRoute, SceneRow, SceneTap,
+    SceneMark, SceneMembershipReport, SceneNode, SceneRoute, SceneRow, SceneTap,
+    MARKS_ABOVE_PIECES,
 };
 
 #[derive(Clone, Copy)]

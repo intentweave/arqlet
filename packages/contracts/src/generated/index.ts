@@ -100,6 +100,7 @@ export * from './SceneBusLine';
 export * from './SceneConflict';
 export * from './SceneHubRef';
 export * from './SceneHull';
+export * from './SceneMark';
 export * from './SceneMembershipReport';
 export * from './SceneNode';
 export * from './SceneRoute';

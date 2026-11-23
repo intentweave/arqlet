@@ -1024,3 +1024,47 @@ fn m1_a_membership_patch_projects_again_where_the_dimension_owns_and_moves_nothi
         "but it is a new revision"
     );
 }
+
+#[test]
+fn m2b_no_hull_on_any_fixture_encloses_a_foreign_box_and_every_group_is_drawn_whole_or_in_pieces() {
+    // The exit of M2b: under each fixture's own priority, every soft group is drawn — whole, in pieces or as marks — with
+    // all the boxes that stand for its members, and no hull encloses a leaf that is not a member.
+    for (name, text) in fixtures() {
+        let raw: serde_json::Value = serde_json::from_str(text).expect("json");
+        let graph: Graph = serde_json::from_str(text).expect("a graph");
+        let snapshot = import_graph_with(graph, 500, &priority_of(&raw)).expect("imports");
+        let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
+        for hull in &scene.membership_hulls {
+            assert!(
+                hull.intruders.is_empty(),
+                "{name}: {}/{} piece {} of {} encloses {:?}",
+                hull.dimension,
+                hull.group,
+                hull.piece,
+                hull.pieces,
+                hull.intruders
+            );
+            assert!(hull.pieces <= arqlet_scene::MARKS_ABOVE_PIECES, "{name}");
+        }
+        for report in scene.membership_report.iter().filter(|r| r.mode == "soft") {
+            assert_eq!(report.intruders, 0, "{name}: {}", report.dimension);
+            assert!(
+                report.intruders_whole >= report.intruders,
+                "{name}: the whole-group count is the first slice's, never below the split one"
+            );
+            assert!(report.split + report.marked <= report.drawn, "{name}");
+        }
+        // A piece's boxes belong to its group: the same box is never in two pieces of one group.
+        let mut seen: BTreeSet<(String, String, String)> = BTreeSet::new();
+        for hull in &scene.membership_hulls {
+            for b in &hull.boxes {
+                assert!(
+                    seen.insert((hull.dimension.clone(), hull.group.clone(), b.clone())),
+                    "{name}: {b} in two pieces of {}/{}",
+                    hull.dimension,
+                    hull.group
+                );
+            }
+        }
+    }
+}
