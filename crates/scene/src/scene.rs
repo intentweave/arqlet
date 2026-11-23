@@ -905,10 +905,29 @@ fn membership_overlays(
                 label.clone()
             };
             // A foreign box is a leaf of the view that is not one of the group's boxes. A container that encloses members
-            // is not one: it is the drawing's own structure, not a node the hull swallowed.
+            // is not one: it is the drawing's own structure, not a node the hull swallowed. Nor is a leaf inside one of the
+            // group's boxes: a member may itself be a container (an interface and its properties), and its box holds its
+            // children wherever its hull is drawn — no split can take them out.
+            let within_member = |id: &str| -> bool {
+                let mut at = view_parent.get(id).copied().flatten();
+                let mut walked = 0usize;
+                while let Some(p) = at {
+                    if boxes.contains(&p) {
+                        return true;
+                    }
+                    walked += 1;
+                    if walked > view_parent.len() {
+                        return false; // the view's tree is acyclic; the bound only guards a broken one
+                    }
+                    at = view_parent.get(p).copied().flatten();
+                }
+                false
+            };
             let foreign: Vec<(&str, Point)> = positions
                 .iter()
-                .filter(|(id, _)| !containers.contains(**id) && !boxes.contains(*id))
+                .filter(|(id, _)| {
+                    !containers.contains(**id) && !boxes.contains(*id) && !within_member(id)
+                })
                 .map(|(id, rect)| (*id, crate::hull::centre(rect)))
                 .collect();
             let inside = |points: &[Point]| -> Vec<String> {

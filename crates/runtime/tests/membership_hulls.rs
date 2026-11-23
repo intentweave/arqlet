@@ -691,3 +691,42 @@ fn a_moved_down_parent_draws_no_hull_around_a_subtree_that_stayed_in_its_own_box
     assert!(!snapshot.graph.nodes.iter().any(|n| n.id == "other"));
     assert_eq!(report(&scene, "parent").overlapping_pairs, 0);
 }
+
+#[test]
+fn the_children_of_a_member_that_is_a_container_are_not_foreign() {
+    // Found on a real export: a document names an interface, which holds its properties. The interface's box encloses
+    // them wherever its hull is drawn, so counting them as foreign made the hull unsplittable and reported intruders no
+    // split can remove. A leaf inside one of the group's own boxes is part of what the group shows, not a stranger.
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr",
+        "nodes": [
+            {"id": "file", "kind": "file", "label": "file"},
+            {"id": "Shape", "kind": "symbol", "label": "Shape", "parentId": "file"},
+            {"id": "width", "kind": "symbol", "label": "width", "parentId": "Shape"},
+            {"id": "height", "kind": "symbol", "label": "height", "parentId": "Shape"},
+            {"id": "area", "kind": "symbol", "label": "area", "parentId": "file"}
+        ],
+        "edges": [{"id": "uses", "kind": "calls", "source": "area", "target": "width"}],
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "guide", "label": "Guide", "members": ["Shape"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("parent"), by("doc")];
+    let snapshot = import_graph_with(graph, 100, &options).expect("imports");
+    let scene = build_scene(&snapshot).expect("a scene");
+    let guide: Vec<&arqlet_scene::SceneHull> = scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.group == "guide")
+        .collect();
+    assert_eq!(guide.len(), 1, "one hull, around the interface");
+    assert_eq!(guide[0].boxes, ["Shape"]);
+    assert!(
+        guide[0].intruders.is_empty(),
+        "its own properties are not intruders: {:?}",
+        guide[0].intruders
+    );
+    assert_eq!(report(&scene, "doc").intruders_whole, 0);
+}
