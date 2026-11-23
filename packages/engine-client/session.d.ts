@@ -147,6 +147,13 @@ export interface Session {
    * view) at once, the changes still under way resolving as stale.
    */
   load(snapshot: Snapshot, options?: {reset?: boolean}): Promise<SessionResult>;
+  /** Provisional (#148): keeps the current snapshot under a mark (the same mark while it is unchanged); at most `limit` (default 32). */
+  keep(options?: {limit?: number}): Promise<{ok: boolean; mark?: number; error?: string}>;
+  /**
+   * Provisional (#148): the snapshot kept under `mark` becomes current again with its geometry (next layout version);
+   * `evicted` when it is no longer kept, `changed` when the graph changed since.
+   */
+  recall(mark: number): Promise<SessionResult & {evicted?: boolean; changed?: boolean}>;
   reset(): void;
   /** Whether container `id` is collapsed in the current snapshot. */
   isCollapsed(id: string): boolean;

@@ -154,9 +154,14 @@ export function decodeBookmark(text) {
  * `(request, {onPublication, signal}) => Promise<answer>` that runs a refinement request on a snapshot the controller
  * sends and calls `onPublication(publication)` for every intermediate result of a progressive one. It runs beside the
  * interactive steps, never in their queue; `publicationInterval` (ms) throttles how often intermediate results are shown.
+ *
+ * `keepGeometry` (default true, provisional, #148): every step keeps the snapshots before and after it (`session.keep`),
+ * so that `back` and `forward` restore the geometry as it was (`session.recall`) instead of laying the view out again;
+ * only when a snapshot is no longer kept or the graph changed since is the view laid out again from the decisions
+ * (the step's result then says `relaidOut: true`). With `false` only the decisions are kept, as before.
  */
 export function createViewController(session, {page = 12, historyLimit = 50, scenes = true, detailLimit, refine: refineRun,
-  publicationInterval = 120} = {}) {
+  publicationInterval = 120, keepGeometry = true} = {}) {
   let state = Object.freeze({
     snapshot: null, scene: null, diff: null, busy: false, error: null,
     highlight: null, selection: null, details: null, hover: null, search: null, focus: null, peek: null, refining: null, refined: null,
@@ -205,6 +210,12 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     return answer.ok ? answer.digest ?? null : null;
   };
 
+  // The current snapshot kept by the session for `back` (#148): its mark, or null without it.
+  const mark = async () => {
+    if (!keepGeometry || typeof session.keep !== 'function') return null;
+    const answer = await session.keep({limit: Math.min(historyLimit + 1, 1000)});
+    return answer?.ok ? answer.mark : null;
+  };
   const intent = async () => {
     const answer = await session.apply({op: 'intent'});
     if (!answer.ok) throw Error(answer.error ?? 'No intent');
@@ -293,6 +304,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
     stopRefinement('cancelled');
     const before = remember ? await intent() : null;
+    const beforeMark = remember ? await mark() : null;
     const result = await run();
     if (!current()) return {ok: false, cancelled: true};
     if (!result.ok) {
@@ -300,6 +312,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
       return result;
     }
     const after = remember ? await intent() : null;
+    const afterMark = remember ? await mark() : null;
     if (!current()) return {ok: false, cancelled: true};
     // A look into a container belongs to the view before the change.
     if (state.peek) state = Object.freeze({...state, peek: null});
@@ -307,10 +320,11 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
       // A follow-up of the last change (such as a container keeping the size a drop gave it): one entry for both.
       const last = back.at(-1);
       last.after = after;
+      last.afterMark = afterMark;
       if (same(last.before, last.after)) back.pop();
       forward = [];
     } else if (remember && !same(before, after)) {
-      back.push({label, before, after});
+      back.push({label, before, after, beforeMark, afterMark});
       if (back.length > historyLimit) back.shift();
       forward = [];
     }
@@ -318,13 +332,26 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     return result;
   });
 
-  // Back and forward: the engine restores the remembered decisions; a refused restore keeps the entry.
+  // Back and forward: the kept snapshot of that side comes back with its geometry (#148); when it is no longer kept or the
+  // graph changed since, the engine restores the remembered decisions and lays the view out again. A refused step keeps
+  // the entry.
   const step = direction => enqueue(async current => {
     stopRefinement('cancelled');
     const from = direction < 0 ? back : forward;
     const entry = from.at(-1);
     if (!entry) return {ok: false, error: direction < 0 ? 'Nothing to undo.' : 'Nothing to redo.'};
-    const result = await session.apply({op: 'restore', intent: direction < 0 ? entry.before : entry.after});
+    const kept = direction < 0 ? entry.beforeMark : entry.afterMark;
+    let result = kept == null ? null : await session.recall(kept);
+    if (result && !result.ok && !result.evicted && !result.changed) {
+      publish({error: result.error ?? 'The engine refused the step.'});
+      return result;
+    }
+    if (result?.ok) {
+      result = {...result, relaidOut: false};
+    } else {
+      result = await session.apply({op: 'restore', intent: direction < 0 ? entry.before : entry.after});
+      if (result.ok) result = {...result, relaidOut: true};
+    }
     if (!current()) return {ok: false, cancelled: true};
     if (!result.ok) {
       publish({error: result.error ?? 'The engine refused the restore.'});
@@ -649,6 +676,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         }
         stopRefinement('cancelled');
         const before = await intent();
+        const beforeMark = await mark();
         const result = await session.apply({op: 'restore', intent: bookmark.intent});
         if (!current()) return {ok: false, cancelled: true};
         if (!result.ok) {
@@ -657,7 +685,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         }
         const after = await intent();
         if (!same(before, after)) {
-          back.push({label: 'Open bookmark', before, after});
+          back.push({label: 'Open bookmark', before, after, beforeMark, afterMark: await mark()});
           if (back.length > historyLimit) back.shift();
           forward = [];
         }
@@ -700,6 +728,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         // With `remember` (a label) the change from the session's snapshot to this one is remembered for `back`.
         stopRefinement('cancelled');
         const before = remember && session.snapshot ? await intent() : null;
+        const beforeMark = before ? await mark() : null;
         const result = await session.load(snapshot, {reset: forget});
         if (!current()) return {ok: false, cancelled: true};
         if (!result.ok) {
@@ -714,7 +743,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         } else if (before) {
           const after = await intent();
           if (!same(before, after)) {
-            back.push({label: remember, before, after});
+            back.push({label: remember, before, after, beforeMark, afterMark: await mark()});
             if (back.length > historyLimit) back.shift();
             forward = [];
           }

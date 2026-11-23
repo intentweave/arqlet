@@ -82,7 +82,11 @@ export interface ViewState {
 }
 
 /** A step's answer: the engine's, or `cancelled` when `cancel()` dropped it before it started. */
-export type ViewResult = SessionResult & {cancelled?: boolean};
+export type ViewResult = SessionResult & {
+  cancelled?: boolean;
+  /** `back` / `forward` (#148): false when the kept snapshot came back with its geometry, true when the view was laid out again. */
+  relaidOut?: boolean;
+};
 
 /**
  * Provisional (request 31): a headless view controller over a layout session. `subscribe` and `getState` fit React's
@@ -155,6 +159,6 @@ export interface ViewController {
   cancel(): void;
 }
 
-export function createViewController(session: Session, options?: {page?: number; historyLimit?: number; scenes?: boolean; detailLimit?: number; refine?: RefineRun; publicationInterval?: number}): ViewController;
+export function createViewController(session: Session, options?: {page?: number; historyLimit?: number; scenes?: boolean; detailLimit?: number; refine?: RefineRun; publicationInterval?: number; keepGeometry?: boolean}): ViewController;
 
 export function sceneDiff(before: Scene | null, after: Scene | null): SceneDiff;
