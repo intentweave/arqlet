@@ -12,6 +12,12 @@
 //!   other ones is refused as stale;
 //! - `scene`, `trace`, `neighbourhood`, `intent`: read the session's snapshot;
 //! - `export`: the whole snapshot;
+//! - `keep` (provisional, #148): keeps the current snapshot under a mark (`{ok, mark}`; the same mark while the snapshot is
+//!   unchanged), at most `limit` (default 32, up to 1000) snapshots, the oldest dropped first; `recall` (`mark`) makes a
+//!   kept snapshot current again, so a step back restores the geometry instead of laying out again. A recall is refused
+//!   (`{ok: false, evicted: true}` or `{ok: false, changed: true}`) when the mark is no longer kept or the graph's
+//!   revision changed since; the restored snapshot gets the next layout version, so answers to the replaced one stay
+//!   stale. `import` and `load` drop the kept snapshots, `load` with `keep: true` (the same graph continued) keeps them;
 //! - `columns` (provisional, step 4): the scene as columns (`columns::SceneColumns`). The answer lists the id tables and
 //!   each column's name, type and length; the numbers stay in the session (`EngineSession::columns`, in WASM
 //!   `lw_session_column`) until the snapshot changes.
@@ -40,7 +46,13 @@ pub struct EngineSession {
     /// Provisional (ADR 0023, R2): the numbered changes of the source (`patch`, `payload`, `change`). A new import or a
     /// `load` clears it (a replica has to resync); the sequence goes on.
     log: crate::changes::ChangeLog,
+    /// Provisional (#148): earlier snapshots by mark (`keep`, `recall`), oldest first, and the next mark.
+    kept: Vec<(u64, Snapshot)>,
+    next_mark: u64,
 }
+
+/// How many snapshots `keep` holds unless the request names a limit.
+const KEEP_LIMIT: usize = 32;
 
 impl EngineSession {
     /// An empty session; `import` or `load` starts it.
@@ -57,6 +69,59 @@ impl EngineSession {
     pub fn load(&mut self, snapshot: Snapshot) {
         self.snapshot = Some(snapshot);
         self.columns = None;
+        self.kept.clear();
+    }
+
+    /// `keep`: the current snapshot under a mark (the last one again while the snapshot is unchanged).
+    fn keep(&mut self, v: &Value) -> Result<Value, String> {
+        let limit = match v.get("limit") {
+            None => KEEP_LIMIT,
+            Some(l) => l
+                .as_u64()
+                .filter(|l| (1..=1000).contains(l))
+                .ok_or("keep limit must be a whole number from 1 to 1000")?
+                as usize,
+        };
+        let current = self.current()?;
+        let same = self.kept.last().filter(|(_, s)| {
+            s.revision == current.revision && s.layout_version == current.layout_version
+        });
+        let mark = match same {
+            Some((mark, _)) => *mark,
+            None => {
+                let snapshot = current.clone();
+                self.next_mark = self.next_mark.wrapping_add(1);
+                self.kept.push((self.next_mark, snapshot));
+                self.next_mark
+            }
+        };
+        if self.kept.len() > limit {
+            let drop = self.kept.len() - limit;
+            self.kept.drain(..drop);
+        }
+        Ok(json!({"ok": true, "mark": mark, "kept": self.kept.len()}))
+    }
+
+    /// `recall`: the kept snapshot of `mark` becomes current, with the next layout version.
+    fn recall(&mut self, v: &Value, with_scene: bool) -> Result<Value, String> {
+        let mark = v["mark"].as_u64().ok_or("recall needs a mark")?;
+        let current = self.current()?;
+        let (revision, layout_version) = (current.revision, current.layout_version);
+        let Some((_, kept)) = self.kept.iter().find(|(m, _)| *m == mark) else {
+            return Ok(json!({"ok": false, "evicted": true,
+                "error": format!("The snapshot of mark {mark} is no longer kept")}));
+        };
+        if kept.revision != revision {
+            return Ok(json!({"ok": false, "changed": true,
+                "error": format!("The graph changed since mark {mark} (revision {} to {revision})", kept.revision)}));
+        }
+        let mut restored = kept.clone();
+        restored.layout_version = layout_version
+            .checked_add(1)
+            .ok_or("Layout version overflow")?;
+        self.snapshot = Some(restored);
+        self.columns = None;
+        self.summary(with_scene)
     }
 
     /// The scene's columns of the last `columns` request, valid until the snapshot changes (provisional, ADR 0019
@@ -98,6 +163,7 @@ impl EngineSession {
             content: Option<Value>,
             sequence: Option<u64>,
             scene: Option<Value>,
+            keep: Option<bool>,
         }
         if !input.contains("\"load\"") {
             return None;
@@ -120,6 +186,10 @@ impl EngineSession {
         }
         self.snapshot = Some(load.snapshot);
         self.columns = None;
+        // As the general `load`: the kept snapshots stay only with `keep: true` (#148).
+        if load.keep != Some(true) {
+            self.kept.clear();
+        }
         if let Some(content) = content {
             self.content = content;
         }
@@ -188,6 +258,7 @@ impl EngineSession {
                 let answer = self.apply(handle(request), with_scene)?;
                 self.content = Default::default();
                 self.log.clear();
+                self.kept.clear();
                 Ok(answer)
             }
             // Provisional (ADR 0023, R1): set, unset or clear properties of nodes and edges, as one change.
@@ -232,6 +303,11 @@ impl EngineSession {
                 };
                 self.snapshot = Some(snapshot);
                 self.columns = None;
+                // The kept snapshots (#148) stay only when the host says the snapshot continues the same graph (a drag,
+                // a refinement): a revision is a counter, not a name of the graph.
+                if v["keep"].as_bool() != Some(true) {
+                    self.kept.clear();
+                }
                 if let Some(content) = content {
                     self.content = content;
                 }
@@ -252,6 +328,8 @@ impl EngineSession {
                 Ok(answer)
             }
             Some("export") => Ok(json!({"ok": true, "snapshot": self.current()?})),
+            Some("keep") => self.keep(v),
+            Some("recall") => self.recall(v, with_scene),
             Some("scene") => Ok(json!({"ok": true, "scene": scene_of(self.current()?)?})),
             // Paths and neighbourhoods on the overview's graph: the session's, unless the request brings one.
             Some("overviewTrace" | "overviewNeighbourhood") if v.get("graph").is_none() => {
@@ -302,7 +380,8 @@ impl EngineSession {
             + memory::properties(&self.content.edges)
             + self.log.heap_estimate()
             + self.columns.as_ref().map_or(0, memory::columns)
-            + self.overview.heap_estimate();
+            + self.overview.heap_estimate()
+            + self.kept_estimate();
         if let Some(s) = &self.snapshot {
             let source = s.source_graph.as_deref().unwrap_or(&s.graph);
             total += memory::graph(source)
@@ -374,24 +453,50 @@ impl EngineSession {
             json!(self.columns.as_ref().map_or(0, memory::columns)),
         );
         parts.insert("overview".into(), json!(self.overview.heap_estimate()));
+        parts.insert("kept".into(), json!(self.kept_estimate()));
         let total: u64 = parts.values().filter_map(Value::as_u64).sum();
         json!({"ok": true, "estimated": true, "parts": parts, "total": total, "nodes": nodes,
             "perNode": if nodes == 0 { 0 } else { total / nodes as u64 }})
     }
 
-    /// `release`: gives parts back (`parts`: `content`, `changeLog`, `columns`, `overview`; `keys` with `content` forgets
-    /// only those keys). The snapshot stays. Releasing content is a change of the content and goes into the change log.
+    /// The kept snapshots (`keep`): their view graphs, boxes and routes, and a source graph only when it is not the one
+    /// of the current snapshot (it is shared while the graph is unchanged).
+    fn kept_estimate(&self) -> usize {
+        use crate::memory;
+        let current = self.snapshot.as_ref().and_then(|s| s.source_graph.as_ref());
+        self.kept
+            .iter()
+            .map(|(_, s)| {
+                let shared = match (&s.source_graph, current) {
+                    (Some(a), Some(b)) => std::sync::Arc::ptr_eq(a, b),
+                    _ => false,
+                };
+                memory::graph(&s.graph)
+                    + memory::boxes(&s.boxes)
+                    + memory::routes(&s.routes, s.routes.capacity())
+                    + match (&s.source_graph, shared) {
+                        (Some(source), false) => memory::graph(source),
+                        _ => 0,
+                    }
+            })
+            .sum()
+    }
+
+    /// `release`: gives parts back (`parts`: `content`, `changeLog`, `columns`, `overview`, `kept`; `keys` with `content`
+    /// forgets only those keys). The snapshot stays. Releasing content is a change of the content and goes into the change log.
     fn release(&mut self, v: &Value) -> Result<Value, String> {
         let parts: Vec<&str> = v["parts"]
             .as_array()
-            .ok_or("release needs parts: content, changeLog, columns, overview")?
+            .ok_or("release needs parts: content, changeLog, columns, overview, kept")?
             .iter()
             .map(|p| p.as_str().ok_or("release parts are strings"))
             .collect::<Result<_, _>>()?;
-        if let Some(unknown) = parts
-            .iter()
-            .find(|p| !matches!(**p, "content" | "changeLog" | "columns" | "overview"))
-        {
+        if let Some(unknown) = parts.iter().find(|p| {
+            !matches!(
+                **p,
+                "content" | "changeLog" | "columns" | "overview" | "kept"
+            )
+        }) {
             return Err(format!("release does not know the part {unknown}"));
         }
         let before = self.memory()["total"].as_u64().unwrap_or(0);
@@ -414,6 +519,9 @@ impl EngineSession {
         }
         if parts.contains(&"overview") {
             self.overview = Default::default();
+        }
+        if parts.contains(&"kept") {
+            self.kept.clear();
         }
         let mut answer = self.memory();
         answer["released"] = json!(before.saturating_sub(answer["total"].as_u64().unwrap_or(0)));
@@ -549,6 +657,102 @@ mod tests {
 
     fn fixture() -> Value {
         serde_json::from_str(include_str!("../../../examples/fixtures/small.json")).unwrap()
+    }
+
+    /// #148: `recall` makes a kept snapshot current again with its geometry, under the next layout version; a stale request
+    /// to the replaced snapshot stays refused, a changed graph or an evicted mark is refused, `import` drops what is kept.
+    #[test]
+    fn recall_restores_a_kept_snapshot_with_its_geometry() {
+        let mut session = EngineSession::new();
+        let first = session.run_value(&json!({"op": "import", "graph": fixture(), "limit": 100}));
+        assert_eq!(first["ok"], json!(true), "{first}");
+        let geometry = |session: &mut EngineSession| {
+            let s = session.run_value(&json!({"op": "export"}))["snapshot"].clone();
+            (
+                s["boxes"].clone(),
+                s["routes"].clone(),
+                s["collapsedIds"].clone(),
+            )
+        };
+        let start = geometry(&mut session);
+        let m0 = session.run_value(&json!({"op": "keep"}))["mark"].clone();
+        assert_eq!(
+            session.run_value(&json!({"op": "keep"}))["mark"],
+            m0,
+            "unchanged: the same mark"
+        );
+        let toggled = session.run_value(&json!({"op": "toggle", "nodeId": "root"}));
+        let closed = geometry(&mut session);
+        let m1 = session.run_value(&json!({"op": "keep"}))["mark"].clone();
+        assert_ne!(m0, m1);
+        let back = session.run_value(&json!({"op": "recall", "mark": m0}));
+        assert_eq!(back["ok"], json!(true), "{back}");
+        assert_eq!(
+            geometry(&mut session),
+            start,
+            "the geometry of the kept snapshot"
+        );
+        let v1 = toggled["layoutVersion"].as_u64().unwrap();
+        assert_eq!(
+            back["layoutVersion"].as_u64(),
+            Some(v1 + 1),
+            "the next layout version"
+        );
+        assert_eq!(back["scene"]["nodes"], first["scene"]["nodes"]);
+        assert_eq!(back["scene"]["routes"], first["scene"]["routes"]);
+        let stale = session.run_value(&json!({"op": "toggle", "nodeId": "root",
+            "expectedRevision": toggled["revision"], "expectedLayoutVersion": v1}));
+        assert_eq!(
+            stale["ok"],
+            json!(false),
+            "an answer to the replaced snapshot stays stale"
+        );
+        let forth = session.run_value(&json!({"op": "recall", "mark": m1}));
+        assert_eq!(forth["ok"], json!(true));
+        assert_eq!(geometry(&mut session), closed);
+        // The kept snapshots count in the memory and can be given back.
+        assert!(
+            session.run_value(&json!({"op": "memory"}))["parts"]["kept"]
+                .as_u64()
+                .unwrap()
+                > 0
+        );
+        // Only `limit` snapshots are kept: the oldest goes.
+        session.run_value(&json!({"op": "toggle", "nodeId": "root"}));
+        session.run_value(&json!({"op": "keep", "limit": 2}));
+        let gone = session.run_value(&json!({"op": "recall", "mark": m0}));
+        assert_eq!(
+            (gone["ok"].clone(), gone["evicted"].clone()),
+            (json!(false), json!(true)),
+            "{gone}"
+        );
+        // A changed graph (a patch, a new revision) is not restored from a snapshot of the earlier one.
+        let m2 = session.run_value(&json!({"op": "keep"}))["mark"].clone();
+        let patched = session.run_value(&json!({"op": "patch", "patch": {"nodes": [{"id": "extra", "kind": "k", "label": "extra"}]}}));
+        assert_eq!(patched["ok"], json!(true), "{patched}");
+        let changed = session.run_value(&json!({"op": "recall", "mark": m2}));
+        assert_eq!(
+            (changed["ok"].clone(), changed["changed"].clone()),
+            (json!(false), json!(true)),
+            "{changed}"
+        );
+        // A `load` of the same graph continued (`keep: true`) keeps them, one without it drops them.
+        let m3 = session.run_value(&json!({"op": "keep"}))["mark"].clone();
+        let current = session.run_value(&json!({"op": "export"}))["snapshot"].clone();
+        session.run(&json!({"op": "load", "snapshot": current, "keep": true}).to_string());
+        assert_eq!(
+            session.run_value(&json!({"op": "recall", "mark": m3}))["ok"],
+            json!(true)
+        );
+        session.run(&json!({"op": "load", "snapshot": current}).to_string());
+        assert_eq!(
+            session.run_value(&json!({"op": "recall", "mark": m3}))["evicted"],
+            json!(true)
+        );
+        // A new import starts without kept snapshots.
+        session.run_value(&json!({"op": "import", "graph": fixture(), "limit": 100}));
+        let after = session.run_value(&json!({"op": "recall", "mark": m1}));
+        assert_eq!(after["evicted"], json!(true));
     }
 
     /// A session answers like `dispatch` on the same snapshot: the scene of every step is the scene `dispatch` gives
