@@ -51,8 +51,8 @@ const SPARSE_PIVOTS: usize = 50;
 /// The iteration budget of the stress stage when the options do not set one.
 pub const DEFAULT_ITERATIONS: usize = 300;
 
-/// Spacing kept between two boxes that the separation step moves apart.
-const GAP: f64 = 24.;
+/// Spacing kept between two boxes that the separation step moves apart (`LayoutOptions::organic_gap` widens it).
+pub(crate) const GAP: f64 = 24.;
 
 /// The positions after each stage, in the order of the ids, with the stress before and after the majorization. The stage
 /// values are read by the tests and for diagnosis; the placement itself uses the separated positions.

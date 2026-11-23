@@ -34,6 +34,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `organicGap` (#156, provisional, off): the gap between the boxes of an organic area (default 24). On generated bus views
+  with containers, 36 or 48 left far fewer routes through boxes and often took much less time, at more area
+  (`benchmarks/results/organic-gap-20261123.md`); the default stays until the quality gates accept a change.
 - Steps back restore the geometry (#148, provisional): the engine session keeps earlier snapshots under marks (`keep`,
   `recall`; at most 32 by default, counted in `memory`), and the view controller's `back` and `forward` recall them, so
   every box and route comes back where it was instead of being laid out again. An evicted mark or a changed graph falls
