@@ -491,6 +491,266 @@ pub fn radial_arrange(
     (placed, size)
 }
 
+/// The eight compass directions on the lattice, counter-clockwise from east (y grows downwards).
+const COMPASS: [(i64, i64); 8] = [
+    (1, 0),
+    (1, -1),
+    (0, -1),
+    (-1, -1),
+    (-1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+];
+
+/// Octilinear star placement, for buses or metro lines: per connected group of the area's children (links taken in
+/// either direction), the node with the most links (ties by id) is the middle; a breadth-first spanning tree from it
+/// decides the branches. The middle's branches leave in distinct compass directions, the largest first and on the main
+/// axes; below it, a node's largest branch goes straight on in its parent's direction and the others bend off by 45
+/// degrees, then by 90 (alternating sides). Nodes sit on a square lattice whose step fits the largest box plus a gap, so a
+/// straight chain lies on one row, column or diagonal; a node whose cell is taken moves further out along its direction.
+/// Groups are placed side by side. Links outside the spanning tree are left to the router.
+///
+/// `lines` names the line of a link (key: the two ids in order; an explicit bus or an edge kind): a line runs straight
+/// through the nodes it passes, so at a node the branch on the line it came by goes straight on, and at the middle two
+/// branches of one line leave in opposite directions (as a metro line passes through an interchange). Returns the boxes
+/// and the area size.
+pub fn octilinear_arrange(
+    ids: &[String],
+    links: &BTreeSet<(String, String)>,
+    sizes: &BTreeMap<String, (f64, f64)>,
+    grid: f64,
+    lines: &BTreeMap<(String, String), String>,
+) -> (BTreeMap<String, Rect>, (f64, f64)) {
+    let line_of = |a: &str, b: &str| -> Option<&String> {
+        let key = if a < b {
+            (a.to_string(), b.to_string())
+        } else {
+            (b.to_string(), a.to_string())
+        };
+        lines.get(&key)
+    };
+    let snap = |v: f64| {
+        if grid > 0. {
+            (v / grid).round() * grid
+        } else {
+            v
+        }
+    };
+    const GAP_X: f64 = 48.;
+    const GAP_Y: f64 = 36.;
+    let mut neighbours: BTreeMap<&str, BTreeSet<&str>> =
+        ids.iter().map(|i| (i.as_str(), BTreeSet::new())).collect();
+    for (a, b) in links {
+        if a != b && neighbours.contains_key(a.as_str()) && neighbours.contains_key(b.as_str()) {
+            neighbours.get_mut(a.as_str()).unwrap().insert(b.as_str());
+            neighbours.get_mut(b.as_str()).unwrap().insert(a.as_str());
+        }
+    }
+    // A square lattice, so that a step along a diagonal is one at 45 degrees; its side fits the largest box plus a gap.
+    let step = ids.iter().fold(0f64, |m, id| {
+        let (bw, bh) = sizes[id];
+        m.max(bw + GAP_X).max(bh + GAP_Y)
+    });
+    let (step_x, step_y) = (step, step);
+    let mut seen: BTreeSet<&str> = BTreeSet::new();
+    let mut groups: Vec<BTreeMap<&str, (i64, i64)>> = Vec::new();
+    // The sum of the distances from a node to the nodes it reaches (smaller: more central).
+    let spread = |from: &str| -> usize {
+        let mut depth: BTreeMap<&str, usize> = BTreeMap::from([(from, 0)]);
+        let mut queue = std::collections::VecDeque::from([from]);
+        while let Some(node) = queue.pop_front() {
+            for &n in &neighbours[node] {
+                if !depth.contains_key(n) {
+                    depth.insert(n, depth[node] + 1);
+                    queue.push_back(n);
+                }
+            }
+        }
+        depth.values().sum()
+    };
+    // The middles in order: the most linked node of what is left, the more central of equals, then the smaller id;
+    // again and again for the groups left.
+    loop {
+        let middle = ids
+            .iter()
+            .map(String::as_str)
+            .filter(|i| !seen.contains(i))
+            .min_by(|a, b| {
+                neighbours[b]
+                    .len()
+                    .cmp(&neighbours[a].len())
+                    .then_with(|| spread(a).cmp(&spread(b)))
+                    .then(a.cmp(b))
+            });
+        let Some(middle) = middle else { break };
+        // The breadth-first spanning tree: each node's children in id order.
+        let mut children: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        let mut order = vec![middle];
+        seen.insert(middle);
+        let mut k = 0;
+        while k < order.len() {
+            let node = order[k];
+            k += 1;
+            let mut kids = Vec::new();
+            for &n in &neighbours[node] {
+                if seen.insert(n) {
+                    kids.push(n);
+                    order.push(n);
+                }
+            }
+            children.insert(node, kids);
+        }
+        fn size_of<'a>(
+            node: &'a str,
+            children: &BTreeMap<&'a str, Vec<&'a str>>,
+            memo: &mut BTreeMap<&'a str, usize>,
+        ) -> usize {
+            if let Some(&n) = memo.get(node) {
+                return n;
+            }
+            let n = 1 + children[node]
+                .iter()
+                .map(|c| size_of(c, children, memo))
+                .sum::<usize>();
+            memo.insert(node, n);
+            n
+        }
+        let mut weight: BTreeMap<&str, usize> = BTreeMap::new();
+        size_of(middle, &children, &mut weight);
+        // Largest branch first; ties by id.
+        let ranked = |node: &str| -> Vec<&str> {
+            let mut kids = children[node].clone();
+            kids.sort_by(|a, b| weight[b].cmp(&weight[a]).then(a.cmp(b)));
+            kids
+        };
+        let mut cell: BTreeMap<&str, (i64, i64)> = BTreeMap::new();
+        let mut taken: BTreeSet<(i64, i64)> = BTreeSet::new();
+        cell.insert(middle, (0, 0));
+        taken.insert((0, 0));
+        // A node's place: one step from its parent in its direction, further while the cell is taken.
+        let place = |from: (i64, i64), d: (i64, i64), taken: &mut BTreeSet<(i64, i64)>| {
+            let mut at = (from.0 + d.0, from.1 + d.1);
+            while taken.contains(&at) {
+                at = (at.0 + d.0, at.1 + d.1);
+            }
+            taken.insert(at);
+            at
+        };
+        // The middle's branches: east, west, north, south, then the diagonals. Two branches of one line take a pair of
+        // opposite directions (largest line first), the others the free directions in that order.
+        const FIRST: [usize; 8] = [0, 4, 2, 6, 1, 5, 3, 7];
+        let mut stack: Vec<(&str, usize)> = Vec::new();
+        let kids = ranked(middle);
+        let mut used = [false; 8];
+        let mut assigned: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut pairs: Vec<(&str, &str)> = Vec::new();
+        for (i, &a) in kids.iter().enumerate() {
+            if assigned.contains_key(a) || pairs.iter().any(|p| p.0 == a || p.1 == a) {
+                continue;
+            }
+            let Some(line) = line_of(middle, a) else {
+                continue;
+            };
+            if let Some(&b) = kids[i + 1..].iter().find(|&&b| {
+                line_of(middle, b) == Some(line) && !pairs.iter().any(|p| p.0 == b || p.1 == b)
+            }) {
+                pairs.push((a, b));
+            }
+        }
+        for (a, b) in pairs {
+            if let Some(&d) = FIRST.iter().find(|&&d| !used[d] && !used[(d + 4) % 8]) {
+                used[d] = true;
+                used[(d + 4) % 8] = true;
+                assigned.insert(a, d);
+                assigned.insert(b, (d + 4) % 8);
+            }
+        }
+        let mut next = FIRST.iter().copied().cycle();
+        for kid in kids {
+            let d = match assigned.get(kid) {
+                Some(&d) => d,
+                None => {
+                    let free = FIRST.iter().copied().find(|&d| !used[d]);
+                    let d = free.unwrap_or_else(|| next.next().unwrap());
+                    used[d] = true;
+                    d
+                }
+            };
+            let at = place((0, 0), COMPASS[d], &mut taken);
+            cell.insert(kid, at);
+            stack.push((kid, d));
+        }
+        // Then breadth first: straight on (the branch on the line the node came by first), then 45 degrees to either
+        // side, then 90.
+        const TURNS: [i64; 5] = [0, 1, -1, 2, -2];
+        let parent_of: BTreeMap<&str, &str> = children
+            .iter()
+            .flat_map(|(p, ks)| ks.iter().map(move |k| (*k, *p)))
+            .collect();
+        let mut queue: std::collections::VecDeque<(&str, usize)> = stack.into_iter().collect();
+        while let Some((node, d)) = queue.pop_front() {
+            let mut kids = ranked(node);
+            if let Some(came) = parent_of.get(node).and_then(|p| line_of(p, node)) {
+                if let Some(i) = kids.iter().position(|k| line_of(node, k) == Some(came)) {
+                    let k = kids.remove(i);
+                    kids.insert(0, k);
+                }
+            }
+            for (i, kid) in kids.into_iter().enumerate() {
+                let turn = TURNS[i % TURNS.len()];
+                let nd = (d as i64 + turn).rem_euclid(8) as usize;
+                let at = place(cell[node], COMPASS[nd], &mut taken);
+                cell.insert(kid, at);
+                queue.push_back((kid, nd));
+            }
+        }
+        groups.push(cell);
+    }
+    // Groups side by side, each from its own left edge.
+    let mut centre: BTreeMap<String, (f64, f64)> = BTreeMap::new();
+    let mut offset = 0.;
+    for cell in &groups {
+        let min_i = cell.values().map(|c| c.0).min().unwrap_or(0);
+        let max_i = cell.values().map(|c| c.0).max().unwrap_or(0);
+        for (id, (i, j)) in cell {
+            centre.insert(
+                id.to_string(),
+                (offset + (i - min_i) as f64 * step_x, *j as f64 * step_y),
+            );
+        }
+        offset += (max_i - min_i + 1) as f64 * step_x;
+    }
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for id in ids {
+        let (cx, cy) = centre[id];
+        let (w, h) = sizes[id];
+        min_x = min_x.min(cx - w / 2.);
+        min_y = min_y.min(cy - h / 2.);
+        max_x = max_x.max(cx + w / 2.);
+        max_y = max_y.max(cy + h / 2.);
+    }
+    let mut placed = BTreeMap::new();
+    for id in ids {
+        let (cx, cy) = centre[id];
+        let (w, h) = sizes[id];
+        placed.insert(
+            id.clone(),
+            Rect {
+                x: snap(cx - w / 2. - min_x + 24.),
+                y: snap(cy - h / 2. - min_y + 48.),
+                width: w,
+                height: h,
+            },
+        );
+    }
+    let size = (snap(max_x - min_x + 48.), snap(max_y - min_y + 72.));
+    (placed, size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -510,6 +770,124 @@ mod tests {
 
     fn sizes(names: &[&str]) -> BTreeMap<String, (f64, f64)> {
         names.iter().map(|n| (n.to_string(), (100., 40.))).collect()
+    }
+
+    #[test]
+    fn an_octilinear_star_puts_the_hub_in_the_middle_and_chains_straight_out() {
+        // A gateway on four buses (chains in either link direction), one bus with a branch at its second node.
+        let names = ["gw", "a1", "a2", "a3", "b1", "b2", "c1", "c2", "d1", "x"];
+        let links = links_of(&[
+            ("a1", "gw"),
+            ("a2", "a1"),
+            ("a3", "a2"),
+            ("gw", "b1"),
+            ("b1", "b2"),
+            ("c1", "gw"),
+            ("c2", "c1"),
+            ("gw", "d1"),
+            ("a1", "x"),
+        ]);
+        let (placed, size) =
+            octilinear_arrange(&ids(&names), &links, &sizes(&names), 0., &BTreeMap::new());
+        let c = |id: &str| {
+            let r = &placed[id];
+            (r.x + r.width / 2., r.y + r.height / 2.)
+        };
+        assert!(size.0 > 0. && size.1 > 0.);
+        // The largest branch (a, with x) leaves east, the next west: a chain lies on one row.
+        let gw = c("gw");
+        assert!(c("a1").0 > gw.0 && c("a2").0 > c("a1").0 && c("a3").0 > c("a2").0);
+        assert!((c("a1").1 - gw.1).abs() < 1e-9 && (c("a3").1 - gw.1).abs() < 1e-9);
+        assert!(c("b1").0 < gw.0 || c("c1").0 < gw.0);
+        // The branch at a1 bends off by 45 degrees: one step along and one across.
+        let (dx, dy) = (c("x").0 - c("a1").0, c("x").1 - c("a1").1);
+        assert!(dx > 0. && dy.abs() > 0.);
+        // No two boxes overlap.
+        let all: Vec<&Rect> = placed.values().collect();
+        for (i, a) in all.iter().enumerate() {
+            for b in &all[i + 1..] {
+                assert!(
+                    a.x + a.width <= b.x
+                        || b.x + b.width <= a.x
+                        || a.y + a.height <= b.y
+                        || b.y + b.height <= a.y
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_line_runs_straight_through_the_middle_and_the_nodes_it_passes() {
+        // Two lines through a hub h: red a-h-b, blue c-h-d-e; d also starts a branch f on another line.
+        let names = ["h", "a", "b", "c", "d", "e", "f"];
+        let links = links_of(&[
+            ("a", "h"),
+            ("h", "b"),
+            ("c", "h"),
+            ("h", "d"),
+            ("d", "e"),
+            ("d", "f"),
+        ]);
+        let mut lines = BTreeMap::new();
+        for (a, b, l) in [
+            ("a", "h", "red"),
+            ("b", "h", "red"),
+            ("c", "h", "blue"),
+            ("d", "h", "blue"),
+            ("d", "e", "blue"),
+            ("d", "f", "green"),
+        ] {
+            let key = if a < b {
+                (a.to_string(), b.to_string())
+            } else {
+                (b.to_string(), a.to_string())
+            };
+            lines.insert(key, l.to_string());
+        }
+        let (placed, _) = octilinear_arrange(&ids(&names), &links, &sizes(&names), 0., &lines);
+        let c = |id: &str| {
+            let r = &placed[id];
+            (r.x + r.width / 2., r.y + r.height / 2.)
+        };
+        let collinear = |p: (f64, f64), q: (f64, f64), r: (f64, f64)| {
+            ((q.0 - p.0) * (r.1 - p.1) - (q.1 - p.1) * (r.0 - p.0)).abs() < 1e-6
+        };
+        // Each line passes straight through the hub, and blue goes on straight through d.
+        assert!(collinear(c("a"), c("h"), c("b")), "red");
+        assert!(collinear(c("c"), c("h"), c("d")), "blue");
+        assert!(collinear(c("h"), c("d"), c("e")), "blue through d");
+        assert!(!collinear(c("h"), c("d"), c("f")), "green bends off");
+    }
+
+    #[test]
+    fn of_two_equally_linked_nodes_the_more_central_is_the_middle() {
+        // A chain a-b-c-d-e: b, c and d have two links each; c is the centre.
+        let names = ["a", "b", "c", "d", "e"];
+        let links = links_of(&[("a", "b"), ("b", "c"), ("c", "d"), ("d", "e")]);
+        let (placed, _) =
+            octilinear_arrange(&ids(&names), &links, &sizes(&names), 0., &BTreeMap::new());
+        let x = |id: &str| placed[id].x;
+        // c in the middle, the chain straight east and west of it.
+        assert!(
+            x("a") < x("b") && x("b") < x("c") && x("c") < x("d") && x("d") < x("e")
+                || x("e") < x("d") && x("d") < x("c") && x("c") < x("b") && x("b") < x("a")
+        );
+        assert!(placed.values().all(|r| (r.y - placed["c"].y).abs() < 1e-9));
+    }
+
+    #[test]
+    fn an_octilinear_star_takes_a_cycle_and_separate_groups() {
+        let names = ["a", "b", "c", "d", "e"];
+        let links = links_of(&[("a", "b"), ("b", "c"), ("c", "a"), ("d", "e")]);
+        let (placed, _) =
+            octilinear_arrange(&ids(&names), &links, &sizes(&names), 0., &BTreeMap::new());
+        assert_eq!(placed.len(), 5);
+        // The second group sits right of the first.
+        let right = |id: &str| placed[id].x + placed[id].width;
+        assert!(
+            placed["d"].x.min(placed["e"].x)
+                >= ["a", "b", "c"].iter().map(|i| right(i)).fold(0., f64::max)
+        );
     }
 
     fn links_of(pairs: &[(&str, &str)]) -> BTreeSet<(String, String)> {

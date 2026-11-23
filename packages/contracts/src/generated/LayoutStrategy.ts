@@ -5,4 +5,4 @@
  * `shortest` choose an orientation per area; `tree` places a tree or forest along the area's direction; `radial` places a
  * tree or forest on rings. Compatible with the values `hybrid` and `shortest` of earlier graphs.
  */
-export type LayoutStrategy = "none" | "shortest" | "tree" | "radial" | "organic";
+export type LayoutStrategy = "none" | "shortest" | "tree" | "radial" | "organic" | "octilinear";

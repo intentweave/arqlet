@@ -36,7 +36,7 @@ pub(crate) fn split(graph: &Graph) -> Option<(Graph, BTreeMap<String, Moved>)> {
         .filter(|c| {
             matches!(
                 graph.area_mode(Some(c)),
-                Ok(Mode::Organic | Mode::Radial | Mode::Tree(_))
+                Ok(Mode::Organic | Mode::Radial | Mode::Tree(_) | Mode::Octilinear)
             ) && matches!(
                 graph.area_mode(parent.get(c).copied().flatten()),
                 Ok(Mode::Orientation(_))

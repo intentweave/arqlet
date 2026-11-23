@@ -8196,6 +8196,39 @@ fn place(
             let link_set: BTreeSet<(String, String)> = id::pair_strings(&links);
             tree::radial_arrange(&ids, &link_set, &sizes, grid)
         }
+        Mode::Octilinear => {
+            let ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
+            let link_set: BTreeSet<(String, String)> = id::pair_strings(&links);
+            // The line of each link between two children: its explicit bus, else its edge kind; a line runs straight
+            // through the nodes it passes.
+            let child_ids: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
+            let bus_of: BTreeMap<&str, &str> = graph
+                .buses
+                .iter()
+                .flat_map(|b| b.edges.iter().map(move |e| (e.as_str(), b.id.as_str())))
+                .collect();
+            let mut lines: BTreeMap<(String, String), String> = BTreeMap::new();
+            for edge in &graph.edges {
+                let Some(target) = edge.target.as_deref() else {
+                    continue;
+                };
+                if child_ids.contains(edge.source.as_str())
+                    && child_ids.contains(target)
+                    && edge.source != target
+                {
+                    let key = if edge.source.as_str() < target {
+                        (edge.source.clone(), target.to_string())
+                    } else {
+                        (target.to_string(), edge.source.clone())
+                    };
+                    let line = bus_of
+                        .get(edge.id.as_str())
+                        .map_or(edge.kind.clone(), |b| format!("bus:{b}"));
+                    lines.entry(key).or_insert(line);
+                }
+            }
+            tree::octilinear_arrange(&ids, &link_set, &sizes, grid, &lines)
+        }
     };
     // A pinned child keeps its position in this container's frame whatever the arrangement (ADR 0009), and the container
     // grows to hold it with the geometry padding. The layered arrangement does the same itself; this covers the others.

@@ -7,7 +7,7 @@
 /** The fields of a container's layout settings and the operation that changes each one. */
 export const SETTING_FIELDS = {
   direction: {map: 'containerDirections', root: 'defaultDirection', choices: ['lr', 'rl', 'tb', 'bt'], name: 'Direction'},
-  strategy: {map: 'containerStrategies', root: 'defaultStrategy', choices: ['none', 'tree', 'radial', 'organic'], name: 'Strategy'},
+  strategy: {map: 'containerStrategies', root: 'defaultStrategy', choices: ['none', 'tree', 'radial', 'organic', 'octilinear'], name: 'Strategy'},
   routing: {map: 'containerRouting', root: 'defaultRouting', choices: ['orthogonal', 'roundedOrthogonal', 'polyline', 'roundedPolyline', 'octilinear', 'curve', 'straight'], name: 'Routing'},
 };
 

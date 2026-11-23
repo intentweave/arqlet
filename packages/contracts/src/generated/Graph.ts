@@ -10,7 +10,7 @@ import type { Port } from "./Port";
  * A graph: the canonical data of a view. Direction and layout strategy are two constraints, each set for the root and for
  * containers and inherited by containers that declare nothing (docs/adr/0003-container-direction-constraints.md).
  */
-export type Graph = { defaultDirection?: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt">, containerDirections?: { [key in string]: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt"> }, defaultStrategy?: "none" | "tree" | "radial" | "auto" | Array<"none" | "tree" | "radial">, containerStrategies?: { [key in string]: "none" | "tree" | "radial" | "auto" | Array<"none" | "tree" | "radial"> },
+export type Graph = { defaultDirection?: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt">, containerDirections?: { [key in string]: "lr" | "rl" | "tb" | "bt" | "auto" | Array<"lr" | "rl" | "tb" | "bt"> }, defaultStrategy?: "none" | "tree" | "radial" | "octilinear" | "auto" | Array<"none" | "tree" | "radial" | "octilinear">, containerStrategies?: { [key in string]: "none" | "tree" | "radial" | "octilinear" | "auto" | Array<"none" | "tree" | "radial" | "octilinear"> },
 /**
  * The edge routing of the root and its containers (docs/adr/0005-routing-constraints.md).
  */
