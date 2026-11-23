@@ -4,6 +4,7 @@ Date: 2026-11-13.
 Status: accepted (2026-11-14, S1-4): `regionPorts`, `straightDetours` and `singlePassReversed` are on by default;
 `singlePassMixed` and `regionChildPorts` stay options. Steps S1-0 to S1-4 below, each behind an option and measured before
 the next.
+Amendment (2026-11-23, proposed): routes planned inside organic regions, see the end.
 
 ## Context
 
@@ -112,3 +113,139 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
   and other engines as regions.
 - Mirroring keeps the drawing's ranks and orders, so a reversed view is the mirror image of the positive one, not a layout
   of its own.
+
+## Amendment: routes planned inside organic regions (2026-11-23)
+
+Status: proposed (#156). Nothing below is built yet; each step comes behind the option `organicCorridors` (off, omitted)
+and is accepted only by the quality gate of decision 6.
+
+### Context
+
+Decision 3 leaves the edges inside a region to the region's routing. For an organic region whose edges are orthogonal
+(the default routing) that is still the pipeline before single pass: the region is placed by stress and separation with a
+fixed gap of 24 between boxes, the router draws the routes afterwards, and a repair and an overlap resolution correct
+them. Measured on generated views (`benchmarks/experiments/bus-mesh.mjs`, #156,
+`benchmarks/results/narrow-gap-repair-20261123.md`, `organic-gap-20261123.md`):
+
+- The gap leaves no room for a route. The router keeps its clearance (12) from a foreign box and starts at a port with a
+  stub of the own clearance (12): 24, so a route that has to leave a node toward a neighbour touches the neighbour's grown
+  box. Until #158 the repair gave up there, and the route went straight through the boxes between (54 of 250 routes on a
+  view of 100 nodes with 11 containers; 518 of 1 159 on a bus view with 240 children).
+- Repairing afterwards squeezes the routes into the gaps, where they share segments; resolving those took 117 s on 120
+  children before #158 made it 3.5 s, and dense views still cost 7 to 14 times the time before the repair.
+- A wider fixed gap (`organicGap`, #159) helps on average but guesses: it is not monotone (36 better than 48 on one
+  view, worse on another) and costs area everywhere, up to 2.5 times the width, also between boxes no route passes.
+
+Single pass solved the same problem for layered areas by planning before placing: the channels between ranks grow by the
+routes that pass them (`channelsByDemand`), and the routes are drawn into the room reserved for them, without a repair.
+This amendment carries that principle into organic regions.
+
+### Decision
+
+An organic region with orthogonal routing is laid out in four phases, each deterministic and without a correction pass:
+
+1. **Arrangement.** Stress placement as today, read only as an arrangement: which boxes are neighbours, and on which
+   side of each other. Its coordinates are the targets of phase 3, not the result.
+2. **Corridor plan.** The free space between neighbouring boxes is a graph: one corridor per pair of neighbours (found as
+   the separation finds overlaps, `vpsc::scanline_pairs`, with a search radius instead of the gap), one junction where
+   corridors meet. Every edge of the region gets a port side on each end (the side facing the other end in the
+   arrangement, as border nodes choose theirs, S1-3) and a path through the corridor graph: the shortest by length, then
+   by turns, with a cost per route already in a corridor, so that routes spread over parallel corridors. Edges leave in
+   a fixed order (by edge id), so the plan is the same on every platform and for any thread count. The **demand** of a
+   corridor is the number of routes it carries.
+3. **Separation by demand.** Every pair of neighbours gets as its minimum distance what passes between them: the
+   router's clearance on both sides, one track per route, and the stub where a port of either box faces the corridor. A
+   pair without routes between them keeps the gap of 24. `vpsc::solve` takes these distances as they are: it accepts one
+   `Separation` per pair; today every pair gets `GAP`. The boxes move by the least displacement that satisfies all pairs,
+   so the arrangement of phase 1 is kept.
+4. **Routes in their corridors.** Each route is drawn along its planned path: one track per route in each corridor, in
+   the order that avoids crossings inside the corridor (the order of the routes' other ends, as single pass orders a
+   channel), stubs on the planned port sides. The room exists by construction, so the repair has nothing to do, and the
+   overlap resolution only sees routes that share a corridor by plan, which it does not move.
+
+The contract of the region to its parent (border ports, decision 4) is unchanged: the region's box grows by what phase 3
+adds, and its border ports are placed after phase 4 as today.
+
+**Containers inside the region** (the drill-down case of #156) take part as boxes: their own children are laid out
+first, as today. An edge from a child inside a container to a node outside leaves the container by a port on the side
+its plan uses, so the container's outer corridors carry it; the container's inner routing ends at that port. Phase 3
+grows the corridors around the container, never its inside.
+
+**Straight routing** in an organic region (decision 3, `straightDetours`) is not affected: the corridors are for
+orthogonal routes.
+
+### Prior work (read 2026-11-23)
+
+- **libavoid** (Wybrow, Marriott, Stuckey: *Orthogonal Connector Routing*, GD 2009; *Orthogonal Hyperedge Routing*,
+  Diagrams 2012; open PDFs, read in full): nodes are fixed ("each i ∈ N has a fixed position, width and height"). Routes
+  are searched on an orthogonal visibility graph (O(n²) vertices, A*, length plus bend penalty). Then routes are
+  **nudged**: first the order of the connectors in shared segments is chosen so that they cross least (minimal when the
+  shared segments form a tree), then per axis the segment positions are variables under separation constraints (keep the
+  order, keep the minimum distance, do not pass through objects), projected with VPSC; the desired position is the middle
+  of the alley, or the corner a route bends around. A channel too narrow for its connectors is not addressed; the paper
+  notes that a compact graph ("many of the nodes in this graph are close together") routes worse and slower.
+- **libtopology** (Adaptagrams, the implementation of Dwyer, Marriott, Wybrow: *Topology Preserving Constrained Graph
+  Layout*, GD 2008; the paper itself is not openly available, its source is): routes are the input, their bends pinned to
+  node corners; a `TriConstraint` keeps a route point on one side of the line through two others, which fixes the side of
+  a node a route passes, with the node's half size as the distance; node positions come from stress majorization under
+  these and the non-overlap constraints, solved with VPSC. Nothing about room for several parallel routes.
+- **ELK and elk-rs** `force` and `stress` draw every edge as one straight segment and give an edge that leaves a
+  container no route at all; d3-force has only node collision; Graphviz and yFiles keep fixed margins (`sep`/`esep`; an
+  organic edge router that needs nodes at least twice its distance apart). None reserves room for routes.
+
+Neither prior method moves nodes and routes together: libtopology moves nodes around fixed routes, libavoid moves routes
+between fixed nodes. That combination is what this amendment needs, and it changes phases 3 and 4 as follows.
+
+### Phases 3 and 4 as one constraint system (refinement)
+
+Instead of counting demand and separating nodes before the routes are drawn, phases 3 and 4 become one projection per
+axis, as libavoid's nudging with the nodes free:
+
+- **Variables:** the position of every node, and of every interior route segment across its axis (a horizontal segment's
+  y, a vertical segment's x), from the corridor plan of phase 2.
+- **Constraints:** node to node, no overlap (the gap of 24, as today); segment to node, the router's clearance, on the
+  side the plan fixed (the `TriConstraint` idea of libtopology, here for axis-parallel segments); segment to segment in
+  one corridor, one track, in the order chosen as libavoid orders shared segments (fewest crossings).
+- **Desired positions:** nodes at their arrangement (phase 1), segments in the middle of their corridor or at the corner
+  they bend around.
+
+A corridor then gets exactly its width from the constraints themselves (clearance, tracks, clearance), and pairs of
+nodes with no route between them stay at the gap of 24. Separating by counted demand (phase 3 as written) is the
+fallback if the joint system turns out too large; C1 measures both sizes.
+
+### What is reused, and what is new
+
+- Reused: the stress placement and its pivot start (phase 1), `vpsc::scanline_pairs` and `vpsc::solve` (phases 2 and 3),
+  the port sides of S1-3, the track spacing and clearances of the router, the border ports of S1-2.
+- New: the corridor graph over an arrangement, the routing on it with capacity costs, the ordering of shared segments
+  (as libavoid's), and the joint projection of nodes and segments (VPSC with segment variables). The shadow routing of the layered single pass (`abstract_routing.rs`) works on ranks and orders, not on an
+  arrangement, so it is a model for the cost rules, not code to share.
+
+### Steps
+
+- **C1: corridor plan as a measurement only.** Build phases 1 and 2 behind the option and report per region the
+  corridors, their demand and the gap each would need, without changing the layout. Measured against the routes the
+  current pipeline draws on the generated views: does the planned demand predict where routes go through boxes today?
+- **C2: separation by demand** (phase 3), routes still drawn by the current router. Expected: the repair finds room
+  everywhere, so no route goes through a box, with less area than a fixed wider gap. Measured against the default,
+  `organicGap` 36 and 48 on the generated views and the organic curated views.
+- **C3: routes drawn in their corridors** (phase 4); the repair and the overlap resolution are skipped for the region.
+  Measured: time, crossings, bends, area, lines through nodes.
+- **C4: containers inside the region**, then the default decision on the mixed corpus as in S1-4.
+
+### Quality gate and measurements
+
+As decision 6: valid geometry, every edge in logical direction, no line through a node, crossings and bends against the
+default and elk-rs on the same views, recorded time and area, results files with machine and revision. The default
+fingerprints stay identical while the option is off. Views: `bus-mesh.mjs` with and without buses and containers, the
+organic playground examples, mixed-large and the other organic views of the corpus.
+
+### Risks and open questions
+
+- Phase 3 moves boxes away from the stress result; how far is part of every measurement (displacement against phase 1).
+- The plan can be wrong where the arrangement is: two boxes that are not neighbours in phase 1 can become neighbours
+  after phase 3. One more round of phases 2 and 3 on the separated boxes is the bounded answer if C2 shows it matters.
+- Capacity cost against length: a cost that spreads routes too eagerly makes long detours; the weight is measured in C1
+  and C2, not set by intuition.
+- Large regions (above 300 children the scalable stress takes over): the corridor graph is linear in the neighbour pairs,
+  but the routing on it is not free; the time is part of every step.

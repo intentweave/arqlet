@@ -12,6 +12,10 @@ second edit while refinement is pending; stale results must not overwrite it.
 Evaluate reusable hierarchical phases; implement container boundary coordination,
 ports and orthogonal routing. Add constraint diagnostics and stable placement.
 
+- Proposed (ADR 0020, amendment of 2026-11-23, #156): routes planned inside organic regions. Arrangement by stress, a
+  corridor plan over neighbouring boxes, separation by the demand of each corridor, routes drawn in their corridors,
+  without repair. Steps C1 (plan as a measurement) to C4 (containers, default decision), behind `organicCorridors`.
+
 ## 3. Scale and exploration
 
 Compact long-edge representation, aggregation, drill-down, cut-out, cache
