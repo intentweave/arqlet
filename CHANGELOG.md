@@ -23,6 +23,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Steps back restore the geometry (#148, provisional): the engine session keeps earlier snapshots under marks (`keep`,
+  `recall`; at most 32 by default, counted in `memory`), and the view controller's `back` and `forward` recall them, so
+  every box and route comes back where it was instead of being laid out again. An evicted mark or a changed graph falls
+  back to laying out the decisions again (`relaidOut: true`); `keepGeometry: false` keeps the old behaviour. Sessions
+  without a resident engine keep the snapshots in JS.
 - Routing style `bus` (#132, provisional): an area routed `bus` draws the fans of its edges as buses: the edges of one
   source share one port and one way until they branch off, then the edges left with one target (from two edges up).
   Choosing `bus` is the explicit request; `auto` and style lists never pick it, explicit buses come first, and the
