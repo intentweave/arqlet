@@ -238,7 +238,7 @@ const ROUNDED_POLYLINE_CLEARANCE: f64 = 10.;
 fn junctions_of(snapshot: &Snapshot, routes: &[SceneRoute]) -> Vec<Point> {
     const EPS: f64 = 1e-6;
     let mut out: Vec<Point> = Vec::new();
-    for bus in &snapshot.graph.buses {
+    for bus in snapshot.graph.effective_buses().iter() {
         let lines: Vec<&Vec<Point>> = routes
             .iter()
             .filter(|r| bus.edges.contains(&r.id))
@@ -602,10 +602,9 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     // share their lines and never hop over each other. Only in the drawn scene, as the arcs.
     let mut routes = routes;
     if arcs && snapshot.options.appearance.bridges {
+        let effective = snapshot.graph.effective_buses();
         let bus_of: BTreeMap<&str, Vec<usize>> =
-            snapshot
-                .graph
-                .buses
+            effective
                 .iter()
                 .enumerate()
                 .fold(BTreeMap::new(), |mut m, (b, bus)| {
@@ -639,7 +638,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
         conflicts: conflicts_of(snapshot),
         buses: snapshot
             .graph
-            .buses
+            .effective_buses()
             .iter()
             .map(|b| b.edges.clone())
             .collect(),

@@ -3780,7 +3780,7 @@ pub fn published_drawing(snapshot: &Snapshot) -> arqlet_scene::metrics::Drawing 
     );
     drawing.buses = snapshot
         .graph
-        .buses
+        .effective_buses()
         .iter()
         .map(|b| b.edges.clone())
         .collect();
@@ -9406,7 +9406,9 @@ fn draw_buses_on(snapshot: &mut Snapshot, routes: &mut [Route]) {
     snapshot
         .layout_diagnostics
         .retain(|d| !d.starts_with("Bus "));
-    if snapshot.graph.buses.is_empty() {
+    // The explicit buses and the fans of areas routed `bus` (`Graph::effective_buses`).
+    let buses = snapshot.graph.effective_buses().into_owned();
+    if buses.is_empty() {
         return;
     }
     let rects = absolute_all(&snapshot.graph, &snapshot.boxes);
@@ -9415,17 +9417,40 @@ fn draw_buses_on(snapshot: &mut Snapshot, routes: &mut [Route]) {
         &snapshot.graph,
         &rects,
         routes,
-        &snapshot.graph.buses,
+        &buses,
         routing_margin(&snapshot.options),
         &trunks,
     );
-    snapshot.layout_diagnostics.extend(found);
+    // The fans of the `bus` style (the buses after the explicit ones) are asked for by area, not one by one: their
+    // findings become one summary line. Ids may hold colons (node ids do), so findings are matched by the fans' ids.
+    let fans: Vec<String> = buses[snapshot.graph.buses.len()..]
+        .iter()
+        .map(|b| format!("Bus {}: ", b.id))
+        .collect();
+    let mut partly = BTreeSet::new();
+    let mut own = 0;
+    for finding in found {
+        match fans.iter().position(|head| finding.starts_with(head)) {
+            Some(fan) => {
+                partly.insert(fan);
+                own += usize::from(finding.contains("keeps its own route"));
+            }
+            None => snapshot.layout_diagnostics.push(finding),
+        }
+    }
+    if !partly.is_empty() {
+        snapshot.layout_diagnostics.push(format!(
+            "Bus style: {} of {} fans drawn only in part or apart; {own} edges keep their own routes (a shared way would enter a node or share a line with another edge)",
+            partly.len(),
+            fans.len()
+        ));
+    }
 }
 
 /// Explicit buses on a finished snapshot (the single-pass completion, which does not run `finish_routes`): the routes get
 /// their trunks, the automatic ports move to the routes' new ends, and the boundary crossings and route diagnostics follow.
 fn apply_buses(snapshot: &mut Snapshot) {
-    if snapshot.graph.buses.is_empty() {
+    if snapshot.graph.effective_buses().is_empty() {
         return;
     }
     let mut routes = std::mem::take(&mut snapshot.routes);
@@ -11594,6 +11619,38 @@ mod routing_declaration_tests {
         .unwrap()
     }
 
+    /// The routing style `bus` draws the edges of one source as one fan (ADR 0005, amendment C): they leave it by one
+    /// port and share the way to where they branch off; the graph keeps no bus, the scene shows the fan's junction.
+    #[test]
+    fn the_bus_style_draws_a_fan_on_one_trunk() {
+        let graph: Graph = serde_json::from_str(
+            r#"{"nodes":[{"id":"a","kind":"node","label":"A","parentId":null},{"id":"x","kind":"node","label":"X","parentId":null},{"id":"y","kind":"node","label":"Y","parentId":null},{"id":"z","kind":"node","label":"Z","parentId":null}],"edges":[{"id":"ax","kind":"flow","source":"a","target":"x"},{"id":"ay","kind":"flow","source":"a","target":"y"},{"id":"az","kind":"flow","source":"a","target":"z"}],"defaultRouting":"bus"}"#,
+        )
+        .unwrap();
+        let buses = graph.effective_buses();
+        assert_eq!(buses.len(), 1);
+        assert_eq!(buses[0].id, "fan:source:a");
+        assert!(graph.buses.is_empty(), "the graph keeps no bus");
+        let s = compute(&graph, None, &BTreeSet::new(), &LayoutOptions::default()).unwrap();
+        let starts: BTreeSet<(i64, i64)> = s
+            .routes
+            .iter()
+            .map(|r| (r.points[0].x.round() as i64, r.points[0].y.round() as i64))
+            .collect();
+        assert_eq!(starts.len(), 1, "one port for the fan: {:?}", s.routes);
+        assert!(
+            !s.layout_diagnostics.iter().any(|d| d.starts_with("Bus ")),
+            "{:?}",
+            s.layout_diagnostics
+        );
+        let scene = arqlet_scene::build_scene(&s).unwrap();
+        assert_eq!(scene.buses.len(), 1);
+        assert!(
+            !scene.junctions.is_empty(),
+            "the fan branches at a junction"
+        );
+    }
+
     /// A declared straight root draws each edge as one segment, with the layout option left at its default.
     #[test]
     fn a_declared_straight_root_draws_straight_segments() {
@@ -12057,17 +12114,17 @@ mod routing_declaration_tests {
         }
     }
 
-    /// A style the layout does not draw is refused with its name.
+    /// Every named style is drawn: `bus` was the last one refused as undrawn.
     #[test]
-    fn an_undrawn_style_is_refused() {
+    fn every_named_style_is_drawn() {
         let err = compute(
             &pair("bus"),
             None,
             &BTreeSet::new(),
             &LayoutOptions::default(),
-        )
-        .unwrap_err();
-        assert!(err.contains("bus is not drawn yet"), "{err}");
+        );
+        // Every named style is drawn now (`bus` since #132): none is refused as undrawn.
+        assert!(err.is_ok(), "{err:?}");
     }
 }
 

@@ -176,3 +176,17 @@ free, beside the longest stretches of its members' routes (its trunk first), whe
 bus rule of its own: the view moves the members' ends onto the collapsed container and keeps the edge ids, so the bus is laid out
 and drawn with the visible ends; a bus that becomes a fan this way (all members from one collapsed ECU) is drawn as a fan. Fans
 as layout elements of their own were measured and not kept (three times the crossings on the corpus).
+
+### Amendment C: the routing style `bus` (2026-11-23)
+
+Status: provisional (#132). Choosing `bus` as the routing of an area is an explicit request for buses in it, so it is
+not a case of `auto` or a list introducing membership: those never pick `bus`. In such an area the fans of the edges
+become buses: first the edges with one source (`fan:source:<id>`), then the edges left with one target
+(`fan:target:<id>`), each from two edges up; self-loops, edges without a target and members of an explicit bus stay out,
+and an edge belongs to its area as in `Graph::edge_area`. They are derived (`Graph::effective_buses`), never written to
+the graph, and every consumer of buses (the layout's bus drawing, the shared metrics, the scene's buses, junctions and
+bridges) reads the derived list. Geometry stays orthogonal: the fans are drawn by `bus::draw_buses` on the finished
+routes, so a member whose shared way would enter a node or share a line with another edge keeps its own route; the
+findings of the fans become one diagnostic (`Bus style: …`) instead of one per member. Open: planning the fans in the
+routing's channels so fewer members fall back, and fans over other base geometries.
+

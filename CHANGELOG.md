@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Routing style `bus` (#132, provisional): an area routed `bus` draws the fans of its edges as buses: the edges of one
+  source share one port and one way until they branch off, then the edges left with one target (from two edges up).
+  Choosing `bus` is the explicit request; `auto` and style lists never pick it, explicit buses come first, and the
+  graph keeps no new bus (`Graph::effective_buses`). Drawn by the existing bus mechanism on the finished orthogonal
+  routes, so a member whose shared way would enter a node or share a line keeps its own route; one diagnostic line
+  (`Bus style: …`) counts them. Selectable in the playground's routing choices.
 - Bridges at route crossings (#131, provisional, `appearance.bridges`, off): where two routes cross, the later one
   passes over the other in a small half circle, computed in the scene as points, so every renderer (SVG, both GPU
   backends, React Flow, the overview) draws it alike; members of one explicit bus never hop over each other, and the
