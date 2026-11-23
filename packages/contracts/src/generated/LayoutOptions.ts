@@ -246,6 +246,12 @@ forceDirected?: boolean,
  */
 organicIterations?: number | null,
 /**
+ * Provisional (#156): the gap between two boxes of an organic area, in layout units. Omitted when unset; the default
+ * is 24. A route between two boxes needs the router's clearance on both sides and a stub at its port, so a gap wider
+ * than the default leaves a route room to leave a node that faces a neighbour.
+ */
+organicGap?: number | null,
+/**
  * Experimental minimum-displacement overlap constraints for organic placement and repair. Off by default.
  */
 vpscOverlapRemoval?: boolean,
