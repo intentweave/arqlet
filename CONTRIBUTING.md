@@ -93,3 +93,11 @@ By making a contribution to this project, I certify that:
     maintained indefinitely and may be redistributed consistent with
     this project or the open source license(s) involved.
 ```
+
+## CI and platforms
+
+A pull request runs the Rust checks, the export package checks, the sign-off check and the platform parity on Linux
+x64. All four platforms (Linux x64 and arm64, macOS arm64, Windows x64) run on `main` after a merge, on a pull request
+labelled `all-platforms`, and automatically when a pull request changes `crates/model/src/math.rs`, `Cargo.lock`, the
+platforms workflow or `tools/platform-parity.mjs`. Add the label when a change could compute differently per platform
+(floating-point math outside `PortableMath`, `usize` arithmetic, hashing) and you want to know before the merge.
