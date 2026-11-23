@@ -5,6 +5,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- Routing style `bus`: laid out by single pass like `orthogonal`, so the fans find their shared ways in its channels
+  (on six public examples, fans drawn in part from 78 of 105 to 8); the `Bus style` diagnostic counts apart the fans whose
+  edges leave to different sides.
+
 ### Added
 
 - Routing style `bus` (#132, provisional): an area routed `bus` draws the fans of its edges as buses: the edges of one
