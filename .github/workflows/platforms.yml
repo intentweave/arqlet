@@ -3,23 +3,58 @@ name: Platforms
 # browser (WASM) continue each other's layouts. Each job runs the Rust tests and checks that the native build of that
 # platform gives the same responses as the WASM engine (tools/platform-parity.mjs); the last job compares the response
 # digests of all platforms with each other.
+#
+# Every platform runs on `main` after a merge, on demand (`workflow_dispatch`), on a pull request labelled
+# `all-platforms`, and on a pull request that changes what makes platforms differ: the portable math
+# (crates/model/src/math.rs), the lock file, this workflow or the parity check. Any other pull request runs Linux x64
+# only, whose parity check still compares the native build with WASM; a difference on another platform then shows on
+# `main` right after the merge.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # No Intel macOS: Apple has sold only Apple silicon since 2020; Intel Macs build from source if needed.
+          all='[{"os":"ubuntu-latest","name":"linux-x64"},{"os":"ubuntu-24.04-arm","name":"linux-arm64"},{"os":"macos-latest","name":"macos-arm64"},{"os":"windows-latest","name":"windows-x64"}]'
+          one='[{"os":"ubuntu-latest","name":"linux-x64"}]'
+          full=no
+          reason="a pull request without platform-sensitive changes"
+          if [ "$EVENT" != pull_request ]; then full=yes; reason="$EVENT"; fi
+          if echo "$LABELS" | grep -q '"all-platforms"'; then full=yes; reason="label all-platforms"; fi
+          if [ "$EVENT" = pull_request ] && git diff --name-only "$BASE...$HEAD" \
+              | grep -qE '^(crates/model/src/math\.rs|Cargo\.lock|\.github/workflows/platforms\.yml|tools/platform-parity\.mjs)$'; then
+            full=yes; reason="platform-sensitive files changed"
+          fi
+          if [ "$full" = yes ]; then m="$all"; else m="$one"; fi
+          echo "Platforms: $([ "$full" = yes ] && echo all || echo linux-x64 only) ($reason)" >> "$GITHUB_STEP_SUMMARY"
+          echo "matrix={\"include\":$m}" >> "$GITHUB_OUTPUT"
   platform:
+    needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - {os: ubuntu-latest, name: linux-x64}
-          - {os: ubuntu-24.04-arm, name: linux-arm64}
-          - {os: macos-latest, name: macos-arm64}
-          # No Intel macOS: Apple has sold only Apple silicon since 2020; Intel Macs build from source if needed.
-          - {os: windows-latest, name: windows-x64}
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -27,6 +62,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal && rustup target add wasm32-unknown-unknown --toolchain stable
+      - uses: Swatinem/rust-cache@v2.7.3
+        with:
+          key: ${{ matrix.name }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
