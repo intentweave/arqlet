@@ -3,4 +3,9 @@
 /**
  * Renderer settings never change graph topology or explicit port contracts.
  */
-export type AppearanceConfig = { showPorts: boolean, };
+export type AppearanceConfig = { showPorts: boolean,
+/**
+ * Provisional: bridges (line hops) where two routes cross: the route drawn later passes over the other in a small
+ * half circle; drawn by every renderer from the scene's points. Off by default (omitted).
+ */
+bridges?: boolean, };

@@ -1,6 +1,7 @@
 //! The geometry a route is drawn with, computed once so that the scene, the exports and the renderers show the same path.
 //! Pure and deterministic. Provisional: the corner rule below is the one the viewer used to apply itself.
 use crate::geom::{self, Rect};
+use arqlet_model::math::PortableMath;
 use arqlet_model::Point;
 
 /// The largest radius of a rounded corner (layout units).
@@ -70,6 +71,130 @@ fn catmull_rom(p0: &Point, p1: &Point, p2: &Point, p3: &Point, t: f64) -> Point 
     let b1 = lerp(&a1, &a2, t0, t2);
     let b2 = lerp(&a2, &a3, t1, t3);
     lerp(&b1, &b2, t1, t2)
+}
+
+/// The radius of a bridge (line hop) over a crossing route (layout units).
+pub const BRIDGE_RADIUS: f64 = 5.;
+const BRIDGE_STEPS: usize = 6;
+
+/// Bridges where routes cross: at every proper crossing of two segments of different routes (not on the same explicit
+/// bus, not within a bridge's reach of a segment's end), the route that comes later in `routes` passes over the earlier
+/// one in a half circle of `radius`, bulging up (or left on an upright segment). Two crossings on one segment closer than
+/// a bridge's width keep the first. `skip(i, j)` tells pairs of routes that never bridge (members of one bus). Changes
+/// only the routes' points; a grid over the segments finds the candidate pairs.
+pub fn add_bridges(routes: &mut [Vec<Point>], radius: f64, skip: &dyn Fn(usize, usize) -> bool) {
+    struct Seg {
+        route: usize,
+        index: usize,
+        a: Point,
+        b: Point,
+    }
+    let mut segs: Vec<Seg> = Vec::new();
+    for (route, points) in routes.iter().enumerate() {
+        for index in 0..points.len().saturating_sub(1) {
+            let (a, b) = (points[index].clone(), points[index + 1].clone());
+            if geom::dist(&a, &b) > 2. * radius + 2. {
+                segs.push(Seg { route, index, a, b });
+            }
+        }
+    }
+    const CELL: f64 = 64.;
+    let mut cells: std::collections::BTreeMap<(i64, i64), Vec<usize>> =
+        std::collections::BTreeMap::new();
+    for (k, s) in segs.iter().enumerate() {
+        let (x0, x1) = (s.a.x.min(s.b.x), s.a.x.max(s.b.x));
+        let (y0, y1) = (s.a.y.min(s.b.y), s.a.y.max(s.b.y));
+        for gx in (x0 / CELL).floor() as i64..=(x1 / CELL).floor() as i64 {
+            for gy in (y0 / CELL).floor() as i64..=(y1 / CELL).floor() as i64 {
+                cells.entry((gx, gy)).or_default().push(k);
+            }
+        }
+    }
+    // Per hopping segment, the crossings along it: (t along the segment, the crossing point).
+    let mut hops: std::collections::BTreeMap<(usize, usize), Vec<f64>> =
+        std::collections::BTreeMap::new();
+    let mut seen: std::collections::BTreeSet<(usize, usize)> = std::collections::BTreeSet::new();
+    for list in cells.values() {
+        for (x, &i) in list.iter().enumerate() {
+            for &j in &list[x + 1..] {
+                let (p, q) = (&segs[i], &segs[j]);
+                if p.route == q.route
+                    || skip(p.route, q.route)
+                    || !seen.insert((i.min(j), i.max(j)))
+                {
+                    continue;
+                }
+                let (dx1, dy1, dx2, dy2) =
+                    (p.b.x - p.a.x, p.b.y - p.a.y, q.b.x - q.a.x, q.b.y - q.a.y);
+                let den = dx1 * dy2 - dy1 * dx2;
+                if den.abs() < 1e-9 {
+                    continue;
+                }
+                let (ex, ey) = (q.a.x - p.a.x, q.a.y - p.a.y);
+                let t = (ex * dy2 - ey * dx2) / den;
+                let u = (ex * dy1 - ey * dx1) / den;
+                let (lp, lq) = (geom::dist(&p.a, &p.b), geom::dist(&q.a, &q.b));
+                let reach = radius + 1.;
+                if t * lp < reach
+                    || (1. - t) * lp < reach
+                    || u * lq < reach
+                    || (1. - u) * lq < reach
+                {
+                    continue;
+                }
+                // The later route hops.
+                let (over, along) = if p.route > q.route { (p, t) } else { (q, u) };
+                hops.entry((over.route, over.index))
+                    .or_default()
+                    .push(along);
+            }
+        }
+    }
+    let mut by_route: std::collections::BTreeMap<usize, Vec<(usize, Vec<f64>)>> =
+        std::collections::BTreeMap::new();
+    for ((route, index), mut ts) in hops {
+        ts.sort_by(|a, b| a.total_cmp(b));
+        by_route.entry(route).or_default().push((index, ts));
+    }
+    for (route, segments) in by_route {
+        let points = &routes[route];
+        let mut out: Vec<Point> =
+            Vec::with_capacity(points.len() + segments.len() * (BRIDGE_STEPS + 1));
+        let mut next = segments.into_iter().peekable();
+        for index in 0..points.len() {
+            out.push(points[index].clone());
+            if next.peek().is_some_and(|(i, _)| *i == index) {
+                let (_, ts) = next.next().unwrap();
+                let (a, b) = (&points[index], &points[index + 1]);
+                let length = geom::dist(a, b);
+                let (ux, uy) = ((b.x - a.x) / length, (b.y - a.y) / length);
+                // The bulge: up, or left on an upright segment.
+                let (mut nx, mut ny) = (uy, -ux);
+                if ny > 1e-9 || (ny.abs() <= 1e-9 && nx > 0.) {
+                    nx = -nx;
+                    ny = -ny;
+                }
+                let mut last = f64::NEG_INFINITY;
+                for t in ts {
+                    let at = t * length;
+                    if at - last < 2. * radius + 1. {
+                        continue;
+                    }
+                    last = at;
+                    let (cx, cy) = (a.x + ux * at, a.y + uy * at);
+                    for k in 0..=BRIDGE_STEPS {
+                        let angle = std::f64::consts::PI * (1. - k as f64 / BRIDGE_STEPS as f64);
+                        let (c, s) = (angle.p_cos(), angle.p_sin());
+                        out.push(Point {
+                            x: cx + ux * radius * c + nx * radius * s,
+                            y: cy + uy * radius * c + ny * radius * s,
+                        });
+                    }
+                }
+            }
+        }
+        routes[route] = out;
+    }
 }
 
 /// The longest cut of an octilinear corner along each of its two segments (layout units): the diagonal is this times √2.
@@ -236,6 +361,66 @@ mod tests {
             assert!(!geom::enters(&w[0], &w[1], &block));
         }
         assert!(kept.iter().any(|q| q == &p(100., 0.)));
+    }
+
+    #[test]
+    fn the_later_route_bridges_the_earlier_one_with_a_half_circle() {
+        let mut routes = vec![
+            vec![p(0., 50.), p(100., 50.)],
+            vec![p(50., 0.), p(50., 100.)],
+        ];
+        add_bridges(&mut routes, BRIDGE_RADIUS, &|_, _| false);
+        assert_eq!(
+            routes[0],
+            vec![p(0., 50.), p(100., 50.)],
+            "the earlier route stays"
+        );
+        let hop = &routes[1];
+        assert_eq!(hop.len(), 2 + 7);
+        // The half circle starts and ends on the line, a radius before and after the crossing, and bulges left.
+        assert!(
+            (hop[1].x - 50.).abs() < 1e-9 && (hop[1].y - 45.).abs() < 1e-9,
+            "{:?}",
+            hop[1]
+        );
+        assert!(
+            (hop[7].x - 50.).abs() < 1e-9 && (hop[7].y - 55.).abs() < 1e-9,
+            "{:?}",
+            hop[7]
+        );
+        assert!(
+            (hop[4].x - 45.).abs() < 1e-9 && (hop[4].y - 50.).abs() < 1e-9,
+            "{:?}",
+            hop[4]
+        );
+    }
+
+    #[test]
+    fn no_bridge_near_an_end_between_bus_members_or_on_one_route() {
+        // A crossing 3 units from an end is too near it.
+        let mut near = vec![
+            vec![p(0., 50.), p(100., 50.)],
+            vec![p(50., 47.), p(50., 100.)],
+        ];
+        add_bridges(&mut near, BRIDGE_RADIUS, &|_, _| false);
+        assert_eq!(near[1].len(), 2);
+        // Members of one bus share their lines.
+        let mut bus = vec![
+            vec![p(0., 50.), p(100., 50.)],
+            vec![p(50., 0.), p(50., 100.)],
+        ];
+        add_bridges(&mut bus, BRIDGE_RADIUS, &|_, _| true);
+        assert_eq!(bus[1].len(), 2);
+        // A route crossing itself does not hop.
+        let mut own = vec![vec![
+            p(0., 50.),
+            p(100., 50.),
+            p(100., 0.),
+            p(50., 0.),
+            p(50., 100.),
+        ]];
+        add_bridges(&mut own, BRIDGE_RADIUS, &|_, _| false);
+        assert_eq!(own[0].len(), 5);
     }
 
     #[test]

@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Bridges at route crossings (#131, provisional, `appearance.bridges`, off): where two routes cross, the later one
+  passes over the other in a small half circle, computed in the scene as points, so every renderer (SVG, both GPU
+  backends, React Flow, the overview) draws it alike; members of one explicit bus never hop over each other, and the
+  metrics see the routes without bridges. Playground: *Bridges at crossings* in the Display group.
 - Metro stations: a style may draw a node as a glyph (`glyph: 'dot'`, `glyphSize`): a station dot in the middle of its
   box, its name outside, right of and below the dot, its lines running on to the dot's middle (straight routes from
   dot to dot) and no port marks; in renderSvg, the GPU far layer (also its labels from afar) and React Flow. The
