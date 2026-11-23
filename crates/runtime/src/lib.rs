@@ -1831,8 +1831,9 @@ pub fn configure_snapshot(
     recompute_with(snapshot, &options)
 }
 
-/// A drag of one node on a drawing that single pass made (`single_pass_auto`), which has no pins. Its steps only move the
-/// node, as a preview, so that the drawing stays a single-pass one. A release turns the drop into an order hint: the node
+/// A drag of one node on a drawing that single pass made (`single_pass_auto`), which has no pins. Its steps move the node
+/// and route again only what the move touches (its edges, and the routes into its old or new box), as a preview, so that
+/// the edges follow the node and the drawing stays a single-pass one (`arqlet_layout::preview_move`). A release turns the drop into an order hint: the node
 /// stands after the sibling whose place across the flow is before the drop's, in its rank, and the layout is made again
 /// with single pass. A finish without release pins the node where it was dropped, which leaves single pass. A cancel puts
 /// the node back. `None` for every other gesture, which the pins handle.
@@ -1840,13 +1841,11 @@ fn move_on_single_pass(snapshot: &Snapshot, step: &MoveStep) -> Option<Result<Sn
     let options = &snapshot.options;
     let active = snapshot.gesture.as_ref().filter(|g| g.active);
     let preview = |position: &Point, gesture: Gesture| -> Result<Snapshot, String> {
-        let mut result = snapshot.clone();
-        let rect = result
-            .boxes
-            .get_mut(&step.node)
-            .ok_or_else(|| format!("Unknown node: {}", step.node))?;
-        rect.x = position.x;
-        rect.y = position.y;
+        if !snapshot.boxes.contains_key(&step.node) {
+            return Err(format!("Unknown node: {}", step.node));
+        }
+        // The node at the pointer, and its edges routed again around the drawing as it is.
+        let mut result = arqlet_layout::preview_move(snapshot, &step.node, position);
         result.base_revision = Some(snapshot.revision);
         result.layout_version = snapshot
             .layout_version
