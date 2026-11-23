@@ -8,6 +8,7 @@ is not yet provided.
 ```sh
 npm test
 npm run export -- --db /path/to/.iw/index.db --out /path/to/new-export --claims
+npm run export -- --db /path/to/.iw/index.db --out /path/to/new-export --memberships [--doc-confidence 0.8]
 ```
 
 ## Contract v1
@@ -21,6 +22,28 @@ npm run export -- --db /path/to/.iw/index.db --out /path/to/new-export --claims
   evidence, assessment, review and supporting observation tables. Missing tables
   are listed. This is a raw relational payload, not a resolved visual overlay.
   Discovery candidates and portable YAML policies are not exported.
+
+With `--memberships`, `graph.json` also carries `memberships` (Arqlet ADR 0022): groupings
+a symbol belongs to besides its file, as dimensions of groups. Only what the index states:
+
+- `doc` (Documented in): one group per document of the index, holding the symbols its
+  `annotations` mention at or above `--doc-confidence` (default 0.8; identifier matches
+  score 0.8–1.0, code spans, bold text and headings often 0.5). A symbol may be in several
+  documents, and a document's symbols lie in many files: the cross-cutting case.
+- `kind` (Symbol kind) and `visibility` (`symbols.export`): one group per value, so each is
+  a partition.
+
+Groups and members are sorted; a dimension whose table or column the index lacks is left
+out and named in `manifest.json` (`memberships.missing`), together with the threshold and
+the counts per dimension. Members are always nodes of the same graph, and the validator
+refuses what Arqlet refuses on import (a dimension called `parent`, a duplicate dimension
+or group). Without the flag, `graph.json` is unchanged. Doc memberships are annotation
+matches, not verified references; see `limitations` in the manifest.
+
+The index has no namespace column (`symbols` carries `kind`, `container`, `export`,
+`implements` and `decorators`; in schema 23 the last two are rarely set), and file
+membership is the containment itself. Claim candidates mostly bind one subject each, so
+they make no useful grouping; claims stay a raw payload under `--claims`.
 
 All core table rows are read without query limits in a single read transaction.
 The SQLite source is opened read-only; no migration, discovery or indexing runs.
@@ -53,5 +76,7 @@ validation is implemented. No layout computation or direct Rust dependency.
 ## Provenance
 
 Adapter authored for Arqlet using the Intentweave storage contract inspected
-in local checkout `ced1639` (`packages/index/src/schema.ts`). No implementation code
+in local checkout `ced1639` (`packages/index/src/schema.ts`). The memberships read
+`symbols.kind`, `symbols.export` and `annotations` as defined in that file at local checkout
+`45ae94715ce0` (branch `feat/generalized-repository-claims`). No implementation code
 was copied. Intentweave: https://github.com/intentweave/intentweave

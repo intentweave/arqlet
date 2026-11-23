@@ -2,16 +2,18 @@ import { parseArgs } from 'node:util';
 import { mkdir, mkdtemp, writeFile, rename, rm, lstat } from 'node:fs/promises';
 import { resolve, dirname, basename, join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { exportIndex } from './export.ts';
+import { exportIndex, DOC_CONFIDENCE } from './export.ts';
 
 try {
-  const {values} = parseArgs({options:{db:{type:'string'},out:{type:'string'},claims:{type:'boolean',default:false},help:{type:'boolean'}}});
-  if(values.help) console.log('Usage: npm run export -- --db /path/index.db --out /new/export-directory [--claims]');
+  const {values} = parseArgs({options:{db:{type:'string'},out:{type:'string'},claims:{type:'boolean',default:false},memberships:{type:'boolean',default:false},'doc-confidence':{type:'string'},help:{type:'boolean'}}});
+  if(values.help) console.log('Usage: npm run export -- --db /path/index.db --out /new/export-directory [--claims] [--memberships [--doc-confidence 0.8]]');
   else {
     if(!values.db || !values.out) throw new Error('--db and --out are required');
+    const docConfidence=values['doc-confidence']===undefined ? DOC_CONFIDENCE : Number(values['doc-confidence']);
+    if(values['doc-confidence']!==undefined && !values.memberships) throw new Error('--doc-confidence needs --memberships');
     const out=resolve(values.out);
     try {await lstat(out); throw new Error(`Output already exists: ${out}`);} catch(e) {if(e.code!=='ENOENT') throw e;}
-    const result=exportIndex(resolve(values.db),{includeClaims:values.claims});
+    const result=exportIndex(resolve(values.db),{includeClaims:values.claims,memberships:values.memberships,docConfidence});
     await mkdir(dirname(out),{recursive:true});
     const staging=await mkdtemp(join(dirname(out),`.${basename(out)}-`));
     try {
