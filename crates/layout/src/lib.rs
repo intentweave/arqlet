@@ -10110,6 +10110,31 @@ fn local_channel_candidate(
 /// How many times a local transaction releases conflicting fixed routes before it gives up (explicit fallback).
 const ESCALATION_ROUNDS: usize = 2;
 
+/// Provisional (drag preview): `base` with `node` at `at` (in its parent's frame), and the routes the move touches routed
+/// again around the rest of the drawing, which stays as it was: the node's edges and every route that runs into its old or
+/// new box (`local_candidate`). For the steps of a drag on a single-pass drawing, which only show where the node would go;
+/// the drop lays the view out. The layout version is the next of `base`; nothing else of the snapshot changes.
+pub fn preview_move(base: &Snapshot, node: &str, at: &Point) -> Snapshot {
+    let mut boxes = base.boxes.clone();
+    let Some(rect) = boxes.get_mut(node) else {
+        return base.clone();
+    };
+    rect.x = at.x;
+    rect.y = at.y;
+    let port_context = ports::PortContext::new(&base.graph)
+        .with_flow_sides(base.options.layered_construction)
+        .with_loop_space(base.options.loop_space);
+    let mut search = arqlet_routing::channel::SearchCounters::default();
+    local_candidate(base, &boxes, &[node], &|| false, &mut search, &port_context).unwrap_or_else(
+        || {
+            let mut moved = base.clone();
+            moved.boxes = boxes;
+            moved.layout_version = base.layout_version + 1;
+            moved
+        },
+    )
+}
+
 fn local_candidate(
     base: &Snapshot,
     boxes: &BTreeMap<String, Rect>,

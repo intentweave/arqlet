@@ -581,6 +581,82 @@ fn a_released_drag_stays_on_single_pass_and_its_drop_orders_the_rank() {
     assert!(on_single_pass(next));
 }
 
+/// A drag step on single pass shows the node at the pointer with its edges routed to it, and keeps every route the move
+/// does not touch; the drawing stays a single-pass one and gets no pin.
+#[test]
+fn a_drag_step_on_single_pass_routes_the_node_edges_to_it() {
+    let snapshot = import(&nested(), json!({"singlePassAuto": true}));
+    let (steps, _, first, _) = drag_past(&snapshot, "finish", true);
+    let step = &steps[1];
+    assert!(on_single_pass(step), "{}", step["layoutDiagnostics"]);
+    assert!(step["options"]["pins"].is_null(), "a preview sets no pin");
+    // Absolute boxes (boxes are relative to their parents).
+    let absolute = |s: &Value, id: &str| -> (f64, f64, f64, f64) {
+        let (mut x, mut y) = (0., 0.);
+        let mut at = Some(id.to_string());
+        let mut size = (0., 0.);
+        while let Some(n) = at {
+            let b = &s["boxes"][&n];
+            if n == id {
+                size = (b["width"].as_f64().unwrap(), b["height"].as_f64().unwrap());
+            }
+            x += b["x"].as_f64().unwrap();
+            y += b["y"].as_f64().unwrap();
+            at = s["graph"]["nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|m| m["id"] == json!(n))
+                .and_then(|m| m["parentId"].as_str())
+                .map(str::to_string);
+        }
+        (x, y, size.0, size.1)
+    };
+    let (x, y, w, h) = absolute(step, &first);
+    let on_box = |p: &Value| {
+        let (px, py) = (p["x"].as_f64().unwrap(), p["y"].as_f64().unwrap());
+        px >= x - 1. && px <= x + w + 1. && py >= y - 1. && py <= y + h + 1.
+    };
+    let edges: Vec<&Value> = step["graph"]["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["source"] == json!(first) || e["target"] == json!(first))
+        .collect();
+    assert!(!edges.is_empty());
+    for edge in &edges {
+        let route = step["routes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == edge["id"])
+            .unwrap();
+        let points = route["points"].as_array().unwrap();
+        let end = if edge["source"] == json!(first) {
+            &points[0]
+        } else {
+            points.last().unwrap()
+        };
+        assert!(
+            on_box(end),
+            "{} ends on the dragged node: {end} not on {:?}",
+            edge["id"],
+            (x, y, w, h)
+        );
+    }
+    // A route far from the node and not its own stays as it was.
+    let before = &steps[0];
+    let untouched = before["routes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| !edges.iter().any(|e| e["id"] == r["id"]));
+    let kept = untouched
+        .filter(|r| step["routes"].as_array().unwrap().iter().any(|q| q == *r))
+        .count();
+    assert!(kept > 0, "routes the move does not touch are kept");
+}
+
 #[test]
 fn a_cancelled_drag_on_single_pass_puts_the_node_back() {
     let snapshot = import(&nested(), json!({"singlePassAuto": true}));

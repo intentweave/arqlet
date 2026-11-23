@@ -41,6 +41,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- Dragging on a single-pass drawing: the edges follow the node. A drag step moved only the node's box and kept every
+  route, so the edges stayed at the old place until the drop; it now routes again what the move touches (the node's
+  edges and the routes into its old or new box) around the drawing as it is (`arqlet_layout::preview_move`), which stays
+  a single-pass one. The drop lays the view out as before.
 - Route repair: where a route's end faces a neighbour closer than its stub (narrow gaps in organic views with
   containers), the repair tries shorter stubs instead of keeping the route through the boxes (#156). Generated organic
   view, 100 nodes with 11 containers: 54 of 250 routes crossed foreign boxes, now none; with buses and 240 children, 518
