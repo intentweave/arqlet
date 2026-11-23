@@ -730,3 +730,60 @@ fn the_children_of_a_member_that_is_a_container_are_not_foreign() {
     );
     assert_eq!(report(&scene, "doc").intruders_whole, 0);
 }
+
+#[test]
+fn a_container_that_kept_its_box_draws_only_the_members_that_left() {
+    // Found on a real export: a document taken first took 12 symbols out of a large file that kept its box, and the
+    // file's soft group was marked whole — about 146 marks for 12 moves. The box shows the members inside it; only the
+    // ones that left need drawing, joined to the box where that encloses nothing foreign.
+    let mut nodes = vec![serde_json::json!({"id": "file", "kind": "file", "label": "file"})];
+    let mut edges = Vec::new();
+    for i in 0..6 {
+        nodes.push(serde_json::json!({"id": format!("s{i}"), "kind": "symbol", "label": format!("s{i}"), "parentId": "file"}));
+        if i > 0 {
+            edges.push(serde_json::json!({"id": format!("e{i}"), "kind": "calls", "source": format!("s{}", i - 1), "target": format!("s{i}")}));
+        }
+    }
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr", "nodes": nodes, "edges": edges,
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "guide", "label": "Guide", "members": ["s0"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("doc"), by("parent")];
+    let snapshot = import_graph_with(graph, 100, &options).expect("imports");
+    // s0 moved into the guide's box; the file kept s1 to s5 and its box.
+    assert!(snapshot.graph.nodes.iter().any(|n| n.id == "file"));
+    let scene = build_scene(&snapshot).expect("a scene");
+
+    assert!(
+        !scene.membership_marks.iter().any(|m| m.group == "file"),
+        "the file is not marked member by member"
+    );
+    let drawn: std::collections::BTreeSet<&str> = scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.group == "file")
+        .flat_map(|h| h.boxes.iter().map(String::as_str))
+        .collect();
+    assert!(
+        drawn.contains("s0"),
+        "the member that left is drawn: {drawn:?}"
+    );
+    assert!(
+        drawn.iter().all(|b| *b == "s0" || *b == "file"),
+        "nothing inside the box is drawn again: {drawn:?}"
+    );
+    let parent = report(&scene, "parent");
+    assert_eq!((parent.kept_box, parent.marked), (1, 0));
+    for hull in &scene.membership_hulls {
+        assert!(
+            hull.intruders.is_empty(),
+            "{}: {:?}",
+            hull.group,
+            hull.intruders
+        );
+    }
+}

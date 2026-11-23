@@ -8,7 +8,7 @@ ranks the parent hierarchy and the dimensions, the first criterion that assigns 
 the value order decides among several groups, every later criterion is drawn as hulls, `details` names the groups per
 criterion, and the playground offers *Structure first*. `membershipViews` is gone. And **the display stages** (M2b): a soft
 group is drawn whole where its hull encloses no foreign node, else in pieces — one per owner, then by distance — and a
-group in more than three pieces is marked member by member. A criterion can `consider` only some of its groups (one document among hundreds). Proposed still: holding with a measured switch (M3), lanes
+group in more than three pieces is marked member by member, and a group that is still a box draws only the members that left it. A criterion can `consider` only some of its groups (one document among hundreds). Proposed still: holding with a measured switch (M3), lanes
 (M4) and the later display options (M5).
 
 Related: [ADR 0003](0003-container-direction-constraints.md) (direction and strategy per area), [ADR 0005](0005-routing-constraints.md)
@@ -398,6 +398,12 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   `three-dimensions.json` reports what it cannot satisfy.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
 
+A group that is still a box — a source container that kept some members, or a dimension's container that owns some
+nodes — draws only the members that left it to an earlier criterion: the box already shows the others. They are joined
+to the box by one hull where that hull encloses no foreign leaf, else they go through the stages above on their own.
+Found on the real export: a document taken first moved 12 symbols out of a file that kept its box, and the file was
+marked whole (~146 marks); now the same view draws 11 hulls and no mark. The report counts these groups as `keptBox`.
+
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.
 
 ### The first slice: M0 plus M2, narrowed
@@ -431,10 +437,6 @@ proved by brute force over all orders.
   `visibility` with `--memberships`; the index has no namespace, and claim candidates bind one subject each. Which further
   dimensions are worth exporting, and how many criteria a view can carry, come from use; how many *groups* is answered
   by `consider`.
-- **A group that is still a box, moved down.** When a dimension first takes a few members out of a source container that
-  keeps its box, the container's soft group falls into pieces and is marked whole — on the real package, a file's ~146
-  members marked because 12 moved out. Drawing only the members that left, joined to the box, would be the honest form;
-  it belongs to the display stages and is open.
 - **A dimension at several ranks.** `values` lets a dimension order its groups; whether one dimension may also appear at two
   ranks (`[project: apollo, parent, project: the rest]`, one project first and the others after the reporting line) is
   open. The list's shape allows it later without a change of format.

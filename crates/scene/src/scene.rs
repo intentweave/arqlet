@@ -136,6 +136,9 @@ pub struct SceneMembershipReport {
     /// The foreign leaf boxes the groups' hulls would enclose if each group were drawn whole, as the first slice drew them.
     /// Kept beside `intruders` for one version: splitting lowers `intruders` by construction, which is not a layout gain.
     pub intruders_whole: usize,
+    /// Groups the view still draws as a box that lost some members to another criterion: only those members are drawn,
+    /// joined to the box where that encloses nothing foreign (ADR 0022 §3). The box shows the rest.
+    pub kept_box: usize,
     pub summary: String,
 }
 
@@ -851,6 +854,7 @@ fn membership_overlays(
         let mut split = 0usize;
         let mut marked = 0usize;
         let mut intruders_whole = 0usize;
+        let mut kept_box = 0usize;
         let mut drawn = 0usize;
         let first = hulls.len();
         for (group, label, members) in &groups {
@@ -912,11 +916,18 @@ fn membership_overlays(
             // is not one: it is the drawing's own structure, not a node the hull swallowed. Nor is a leaf inside one of the
             // group's boxes: a member may itself be a container (an interface and its properties), and its box holds its
             // children wherever its hull is drawn — no split can take them out.
+            // The group's own box, if the view still draws it: a source container that kept some of its members (parent),
+            // or the container of a group that owns some nodes (a dimension). Its box already shows the members inside it.
+            let own_box: Option<&str> = if criterion.by == PARENT {
+                visible(group)
+            } else {
+                visible(&grouping::container_id(&criterion.by, group))
+            };
             let within_member = |id: &str| -> bool {
                 let mut at = view_parent.get(id).copied().flatten();
                 let mut walked = 0usize;
                 while let Some(p) = at {
-                    if boxes.contains(&p) {
+                    if boxes.contains(&p) || own_box == Some(p) {
                         return true;
                     }
                     walked += 1;
@@ -944,6 +955,64 @@ fn membership_overlays(
             let rects: Vec<Rect> = boxes.iter().map(|id| positions[*id].clone()).collect();
             // What the first slice drew: the whole group, and what it would enclose.
             intruders_whole += inside(&crate::hull::group_shape(&rects, HULL_PADDING, shape)).len();
+            // A group that is still a box draws only the members that left it: the box shows the others. A member box is
+            // inside when it is the own box or lies below it in the view.
+            let in_own_box = |id: &str| -> bool {
+                let Some(own) = own_box else {
+                    return false;
+                };
+                let mut at = Some(id);
+                let mut walked = 0usize;
+                while let Some(c) = at {
+                    if c == own {
+                        return true;
+                    }
+                    walked += 1;
+                    if walked > view_parent.len() {
+                        return false;
+                    }
+                    at = view_parent.get(c).copied().flatten();
+                }
+                false
+            };
+            let (boxes, rects): (Vec<&str>, Vec<Rect>) = if own_box.is_some() {
+                boxes
+                    .iter()
+                    .zip(&rects)
+                    .filter(|(id, _)| !in_own_box(id))
+                    .map(|(id, r)| (*id, r.clone()))
+                    .unzip()
+            } else {
+                (boxes.clone(), rects.clone())
+            };
+            if boxes.is_empty() {
+                continue;
+            }
+            let centres: Vec<Point> = foreign.iter().map(|(_, c)| c.clone()).collect();
+            drawn += 1;
+            // Joined to the box: one hull over the box and the members that left, where that encloses nothing foreign.
+            if let Some(own) = own_box {
+                kept_box += 1;
+                let mut joined = rects.clone();
+                joined.push(positions[own].clone());
+                let points = crate::hull::group_shape(&joined, HULL_PADDING, shape);
+                if points.len() >= 3 && inside(&points).is_empty() {
+                    let mut listed: Vec<String> = boxes.iter().map(|id| id.to_string()).collect();
+                    listed.push(own.to_string());
+                    hulls.push(SceneHull {
+                        dimension: criterion.by.clone(),
+                        dimension_label: dimension_label.clone(),
+                        group: group.clone(),
+                        label: shown.clone(),
+                        points,
+                        boxes: listed,
+                        intruders: Vec::new(),
+                        piece: 0,
+                        pieces: 1,
+                    });
+                    continue;
+                }
+            }
             // The pieces (M2b): whole if clean, else per owner, else by distance within an owner.
             let members: Vec<crate::hull::Member> = boxes
                 .iter()
@@ -953,9 +1022,7 @@ fn membership_overlays(
                     owner: view_parent.get(id).copied().flatten(),
                 })
                 .collect();
-            let centres: Vec<Point> = foreign.iter().map(|(_, c)| c.clone()).collect();
             let pieces = crate::hull::pieces(&members, &centres, HULL_PADDING, shape);
-            drawn += 1;
             if pieces.len() > MARKS_ABOVE_PIECES {
                 // Too scattered for hulls: every member is marked instead, and no polygon claims a shape.
                 marked += 1;
@@ -1019,7 +1086,7 @@ fn membership_overlays(
             )
         } else {
             format!(
-                "{}: holds softly, {drawn} of {} groups drawn ({split} split, {marked} marked), {intruders} foreign boxes \
+                "{}: holds softly, {drawn} of {} groups drawn ({split} split, {marked} marked, {kept_box} drawn by the members that left their box), {intruders} foreign boxes \
                  inside a hull ({intruders_whole} if drawn whole), {overlapping} overlapping pairs",
                 criterion.by,
                 groups.len()
@@ -1052,6 +1119,7 @@ fn membership_overlays(
             split,
             marked,
             intruders_whole,
+            kept_box,
             summary,
         });
     }

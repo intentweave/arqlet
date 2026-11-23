@@ -7,6 +7,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- A membership group that is still a box (a source container that kept some members, or a dimension's container)
+  draws only the members that left it, joined to the box where that encloses nothing foreign, instead of falling into
+  pieces and marks (provisional, ADR 0022 §3). The report counts them as `keptBox`.
 - `consider` on a criterion of `groupingPriority` (provisional, ADR 0022): a dimension works with the listed groups only
   — one document among hundreds. As the first criterion only those groups become boxes and every other node falls to the
   next criterion; held softly only they draw hulls or marks. A member of a nested group belongs to the deepest considered
