@@ -25,6 +25,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- Route repair: where a route's end faces a neighbour closer than its stub (narrow gaps in organic views with
+  containers), the repair tries shorter stubs instead of keeping the route through the boxes (#156). Generated organic
+  view, 100 nodes with 11 containers: 54 of 250 routes crossed foreign boxes, now none; with buses and 240 children, 518
+  of 1 159 routes, now 18. The overlap resolution became much faster with the same output (segment index by line,
+  counts per move, cached moves): 117 s to 3.5 s on 120 children; dense views still cost more than before
+  (`benchmarks/results/narrow-gap-repair-20261123.md`). Default fingerprints unchanged.
 - Buses given as data (`Graph.buses` with `taps`): `edges` is optional, and a bus with taps is a shared medium whatever
   `edges` holds (#145; before, listing edges beside the taps silently stopped trace and neighbourhood at the bus);
   `neighbourhood` shows a reached bus drawn as lines (`busStyle: 'lines'`) by its lines, as a bar by itself (#144);
