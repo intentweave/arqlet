@@ -1,5 +1,13 @@
 name: Export package checks
-on: [push, pull_request]
+on:
+  # A pull request is checked as a pull request; a branch push without one is not built twice. `main` after a merge.
+  push:
+    branches: [main]
+  pull_request:
+# A newer push to a pull request stops its older runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
