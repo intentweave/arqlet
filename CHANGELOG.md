@@ -7,10 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
-- `show` on a criterion of `groupingPriority` (provisional, ADR 0022): a dimension shows only the listed groups — one
-  document among hundreds. As the first criterion only those groups become boxes and every other node falls to the next
-  criterion; held softly only they draw hulls or marks. A member of a nested group belongs to the deepest shown group on
-  its path. Refused on `parent` and for a group the dimension does not declare. Playground: *Show only*.
+- `consider` on a criterion of `groupingPriority` (provisional, ADR 0022): a dimension works with the listed groups only
+  — one document among hundreds. As the first criterion only those groups become boxes and every other node falls to the
+  next criterion; held softly only they draw hulls or marks. A member of a nested group belongs to the deepest considered
+  group on its path. Refused on `parent` and for a group the dimension does not declare. Playground: *Only group*.
 
 ### Changed
 

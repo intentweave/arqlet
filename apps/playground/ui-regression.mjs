@@ -357,20 +357,20 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','back to the containment');
   assert.equal(latest.options?.groupingPriority,undefined);
 
-  // Show only one group (ADR 0022 §2, show): held softly it is the only hull; first, the only box of its dimension.
+  // Only one group (ADR 0022 §2, consider): held softly it is the only hull; first, the only box of its dimension.
   const payments=JSON.stringify(['team','payments']);
-  assert.ok([...get('grouping-show').children].some(c=>c.value===payments),'every group of every dimension is offered');
-  get('grouping-show').value=payments;get('grouping-show').onchange();await flush();
-  assert.deepEqual(latest.options.groupingPriority,[{by:'parent'},{by:'team',show:['payments']}],'the team joins softly, showing one group');
+  assert.ok([...get('grouping-consider').children].some(c=>c.value===payments),'every group of every dimension is offered');
+  get('grouping-consider').value=payments;get('grouping-consider').onchange();await flush();
+  assert.deepEqual(latest.options.groupingPriority,[{by:'parent'},{by:'team',consider:['payments']}],'the team joins softly, considering one group');
   const one=sceneOf(engine,latest);
   assert.deepEqual([...new Set([...one.membershipHulls,...(one.membershipMarks??[])].map(h=>h.group))],['payments'],'one group drawn');
   get('grouping-first').value='team';get('grouping-first').onchange();await flush();
-  assert.deepEqual(latest.options.groupingPriority,[{by:'team',show:['payments']},{by:'parent'}]);
-  assert.equal(latest.graph.nodes.find(n=>n.id==='orders').parentId,'membership:team/payments','the shown group is a box');
-  assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','a node of a group not shown stays where it was');
-  assert.ok(!latest.graph.nodes.some(n=>n.id==='membership:team/platform'),'no box for a group not shown');
-  assert.equal(get('grouping-show').value,payments,'the control shows the view it asked for');
-  get('grouping-show').value='';get('grouping-show').onchange();await flush();
+  assert.deepEqual(latest.options.groupingPriority,[{by:'team',consider:['payments']},{by:'parent'}]);
+  assert.equal(latest.graph.nodes.find(n=>n.id==='orders').parentId,'membership:team/payments','the considered group is a box');
+  assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','a node of a group not considered stays where it was');
+  assert.ok(!latest.graph.nodes.some(n=>n.id==='membership:team/platform'),'no box for a group not considered');
+  assert.equal(get('grouping-consider').value,payments,'the control shows the view it asked for');
+  get('grouping-consider').value='';get('grouping-consider').onchange();await flush();
   get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
   assert.equal(latest.options?.groupingPriority,undefined,'back to the default');
   get('example').value='default';get('example').onchange();await flush();

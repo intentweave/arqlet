@@ -55,20 +55,20 @@ pub fn with_grouping_priority(
             (d.id.as_str(), of)
         })
         .collect();
-    // Whether a group is shown: its criterion's `show` lists it, or the criterion lists none.
-    let shown = |dimension: &str, group: &str| -> bool {
+    // Whether a group is considered: its criterion's `consider` lists it, or the criterion lists none.
+    let considered = |dimension: &str, group: &str| -> bool {
         priority
             .iter()
             .find(|c| c.by == dimension)
-            .is_none_or(|c| grouping::shows(c, group))
+            .is_none_or(|c| grouping::considers(c, group))
     };
-    // The nearest shown ancestor of a group: the container a shown group nests in. Bounded like every walk up here.
-    let shown_parent = |dimension: &str, group: &str| -> Option<String> {
+    // The nearest considered ancestor of a group: the container a considered group nests in. Bounded like every walk up here.
+    let considered_parent = |dimension: &str, group: &str| -> Option<String> {
         let parent_of = parents.get(dimension)?;
         let mut at = parent_of.get(group).copied().flatten();
         let mut walked = 0usize;
         while let Some(p) = at {
-            if shown(dimension, p) {
+            if considered(dimension, p) {
                 return Some(p.to_string());
             }
             walked += 1;
@@ -79,9 +79,9 @@ pub fn with_grouping_priority(
         }
         None
     };
-    // The groups that own a node, with their shown ancestors in the dimension: they become containers. A walk stops at a
+    // The groups that own a node, with their considered ancestors in the dimension: they become containers. A walk stops at a
     // group met already (its ancestors are in), and after as many steps as the dimension has groups (a cycle, refused
-    // earlier). A group the criterion does not show is passed over, never made a container.
+    // earlier). A group the criterion does not consider is passed over, never made a container.
     let mut needed: std::collections::BTreeSet<(String, String)> = Default::default();
     for owner in ownership.owners.values() {
         if let Owner::Group { dimension, group } = owner {
@@ -94,7 +94,7 @@ pub fn with_grouping_priority(
                 if walked > parent_of.len() {
                     break;
                 }
-                if shown(dimension, g) && !needed.insert((dimension.clone(), g.to_string())) {
+                if considered(dimension, g) && !needed.insert((dimension.clone(), g.to_string())) {
                     break;
                 }
                 walked += 1;
@@ -123,7 +123,7 @@ pub fn with_grouping_priority(
                 } else {
                     g.label.clone()
                 },
-                parent_id: shown_parent(&d.id, &g.id).map(|p| container_id(&d.id, &p)),
+                parent_id: considered_parent(&d.id, &g.id).map(|p| container_id(&d.id, &p)),
                 shape: Default::default(),
             });
         }

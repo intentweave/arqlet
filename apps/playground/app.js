@@ -1188,21 +1188,21 @@ function syncDetails(){
  first.disabled=dimensions.length===0;
  first.value=priority[0]?.by??'parent';
  // Hulls are on when a dimension after the first is listed for its own sake; one listed only to show a single group
- // (`show`, the control below) does not turn them on.
- $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent'&&!c.show?.length);
- // Provisional (ADR 0022 §2, show): one group of one dimension, or all. A value is the JSON pair [dimension, group], since
+ // (`consider`, the control below) does not turn them on.
+ $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent'&&!c.consider?.length);
+ // Provisional (ADR 0022 §2, consider): one group of one dimension, or all. A value is the JSON pair [dimension, group], since
  // group ids may hold any character (documents are paths).
  const graphDims=(snapshot?.sourceGraph??snapshot?.graph)?.memberships?.dimensions??[];
- const showChoices=graphDims.flatMap(d=>d.groups.map(g=>({value:JSON.stringify([d.id,g.id]),text:`${d.label||d.id}: ${g.label||g.id}`})));
- const showSelect=$('grouping-show');
- const shownNow=[...(showSelect.children??[])].map(c=>c.value).slice(1);
- if(shownNow.length!==showChoices.length||showChoices.some((c,i)=>shownNow[i]!==c.value)){
+ const considerChoices=graphDims.flatMap(d=>d.groups.map(g=>({value:JSON.stringify([d.id,g.id]),text:`${d.label||d.id}: ${g.label||g.id}`})));
+ const considerSelect=$('grouping-consider');
+ const offeredNow=[...(considerSelect.children??[])].map(c=>c.value).slice(1);
+ if(offeredNow.length!==considerChoices.length||considerChoices.some((c,i)=>offeredNow[i]!==c.value)){
   const all=document.createElement('option');all.value='';all.textContent='All groups';
-  showSelect.replaceChildren(all,...showChoices.map(c=>{const option=document.createElement('option');option.value=c.value;option.textContent=c.text;return option;}));
+  considerSelect.replaceChildren(all,...considerChoices.map(c=>{const option=document.createElement('option');option.value=c.value;option.textContent=c.text;return option;}));
  }
- showSelect.disabled=dimensions.length===0;
- const showing=priority.find(c=>c.show?.length);
- showSelect.value=showing?JSON.stringify([showing.by,showing.show[0]]):'';
+ considerSelect.disabled=dimensions.length===0;
+ const considering=priority.find(c=>c.consider?.length);
+ considerSelect.value=considering?JSON.stringify([considering.by,considering.consider[0]]):'';
  $('membership-hull').disabled=dimensions.length===0;
  $('membership-hull').value=o.membershipHull??'rectangle';
 }
@@ -1293,15 +1293,15 @@ function applyGrouping(label){
  const order=[first];
  if(first!=='parent')order.push('parent');
  if($('membership-hulls').checked)order.push(...dimensions.filter(d=>d!==first));
- // Show only one group: its dimension keeps its rank, or joins as a soft criterion when it is not listed yet.
- const chosen=$('grouping-show').value?JSON.parse($('grouping-show').value):null;
+ // Only one group: its dimension keeps its rank, or joins as a soft criterion when it is not listed yet.
+ const chosen=$('grouping-consider').value?JSON.parse($('grouping-consider').value):null;
  if(chosen&&!order.includes(chosen[0]))order.push(chosen[0]);
- const criteria=order.map(by=>chosen&&by===chosen[0]?{by,show:[chosen[1]]}:{by});
- setOption({groupingPriority:criteria.length===1&&!criteria[0].show?[]:criteria},label);
+ const criteria=order.map(by=>chosen&&by===chosen[0]?{by,consider:[chosen[1]]}:{by});
+ setOption({groupingPriority:criteria.length===1&&!criteria[0].consider?[]:criteria},label);
 }
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
 $('grouping-first').onchange=()=>applyGrouping('Structure first');
-$('grouping-show').onchange=()=>applyGrouping('Show only');
+$('grouping-consider').onchange=()=>applyGrouping('Only group');
 // Provisional (ADR 0022 §3): the hull's outline. Sent as it is; the engine omits the default (rectangle) when it writes
 // the options back, so a snapshot that never chose a shape stays unchanged.
 $('membership-hull').onchange=()=>setOption({membershipHull:$('membership-hull').value},'Hull shape');

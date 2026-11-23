@@ -25,9 +25,10 @@ as?: GroupingRendering,
  */
 hull?: HullShape,
 /**
- * The groups of a dimension this criterion shows; empty (the default) shows them all. A shown group owns or holds
- * its members as usual, and a member of a nested group belongs to the deepest shown group on its path. Groups not
- * shown neither become containers nor draw hulls, so the nodes they would own fall to the next criterion. Not
- * allowed on `parent`. Lets a view show one document among hundreds (ADR 0022 §2).
+ * The groups of a dimension this criterion considers; empty (the default) considers them all. Considered groups take
+ * part in everything the criterion does — they own nodes as containers, are held softly in the layout (M3) and are
+ * drawn — and a member of a nested group belongs to the deepest considered group on its path. A group not considered
+ * takes part in none of it, so the nodes it would own fall to the next criterion. Not allowed on `parent`. Lets a
+ * view work with one document among hundreds (ADR 0022 §2).
  */
-show?: Array<string>, };
+consider?: Array<string>, };

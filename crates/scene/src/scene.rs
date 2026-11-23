@@ -829,8 +829,8 @@ fn membership_overlays(
                 }
             }
             for group in &d.groups {
-                // A group the criterion does not show (`show`) is neither drawn nor counted.
-                if !grouping::shows(criterion, &group.id) {
+                // A group the criterion does not consider (`consider`) is neither drawn nor counted.
+                if !grouping::considers(criterion, &group.id) {
                     continue;
                 }
                 for m in &group.members {

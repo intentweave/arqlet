@@ -1069,7 +1069,7 @@ fn m2b_no_hull_on_any_fixture_encloses_a_foreign_box_and_every_group_is_drawn_wh
     }
 }
 
-/// A priority from JSON, for the `show` tests.
+/// A priority from JSON, for the `consider` tests.
 fn with_priority(priority: serde_json::Value) -> LayoutOptions {
     LayoutOptions {
         grouping_priority: serde_json::from_value(priority).expect("a priority"),
@@ -1078,11 +1078,11 @@ fn with_priority(priority: serde_json::Value) -> LayoutOptions {
 }
 
 #[test]
-fn show_as_the_owner_makes_containers_of_the_shown_groups_only() {
+fn consider_as_the_owner_makes_containers_of_the_considered_groups_only() {
     // One project among several: Zeus becomes a box; whoever is on another project only stays in their department.
     let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
     let options = with_priority(serde_json::json!([
-        {"by": "project", "show": ["zeus"]}, {"by": "parent"}
+        {"by": "project", "consider": ["zeus"]}, {"by": "parent"}
     ]));
     let snapshot = import_graph_with(graph, 500, &options).expect("imports");
     let view = view_parents(&snapshot);
@@ -1096,14 +1096,14 @@ fn show_as_the_owner_makes_containers_of_the_shown_groups_only() {
     assert_eq!(
         view["anna"].as_deref(),
         Some("sales"),
-        "Apollo is not shown"
+        "Apollo is not considered"
     );
     assert_eq!(view["carl"].as_deref(), Some("eng"));
     assert!(
         !view
             .keys()
             .any(|id| id == "membership:project/apollo" || id == "membership:project/hermes"),
-        "a group not shown is no container"
+        "a group not considered is no container"
     );
     let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
     let project = &scene.membership_report[0];
@@ -1114,10 +1114,10 @@ fn show_as_the_owner_makes_containers_of_the_shown_groups_only() {
 }
 
 #[test]
-fn show_as_a_soft_criterion_draws_the_shown_groups_only() {
+fn consider_as_a_soft_criterion_draws_the_considered_groups_only() {
     let graph: Graph = serde_json::from_str(THREE_DIMENSIONS).expect("a graph");
     let options = with_priority(serde_json::json!([
-        {"by": "parent"}, {"by": "team", "show": ["payments"]}
+        {"by": "parent"}, {"by": "team", "consider": ["payments"]}
     ]));
     let snapshot = import_graph_with(graph.clone(), 500, &options).expect("imports");
     let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
@@ -1151,15 +1151,16 @@ fn show_as_a_soft_criterion_draws_the_shown_groups_only() {
 }
 
 #[test]
-fn show_is_refused_on_parent_and_for_an_undeclared_group() {
+fn consider_is_refused_on_parent_and_for_an_undeclared_group() {
     let error = arqlet_runtime::options_from_patch(&serde_json::json!({
-        "groupingPriority": [{"by": "parent", "show": ["eng"]}]
+        "groupingPriority": [{"by": "parent", "consider": ["eng"]}]
     }))
-    .expect_err("show on parent");
+    .expect_err("consider on parent");
     assert!(error.contains("not to parent"), "{error}");
     let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
-    let options =
-        with_priority(serde_json::json!([{"by": "project", "show": ["ares"]}, {"by": "parent"}]));
+    let options = with_priority(
+        serde_json::json!([{"by": "project", "consider": ["ares"]}, {"by": "parent"}]),
+    );
     let error = import_graph_with(graph, 500, &options).expect_err("an undeclared group");
     assert!(error.contains("declares no group"), "{error}");
 }

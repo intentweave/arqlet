@@ -8,7 +8,7 @@ ranks the parent hierarchy and the dimensions, the first criterion that assigns 
 the value order decides among several groups, every later criterion is drawn as hulls, `details` names the groups per
 criterion, and the playground offers *Structure first*. `membershipViews` is gone. And **the display stages** (M2b): a soft
 group is drawn whole where its hull encloses no foreign node, else in pieces — one per owner, then by distance — and a
-group in more than three pieces is marked member by member. A criterion can `show` only some of its groups (one document among hundreds). Proposed still: holding with a measured switch (M3), lanes
+group in more than three pieces is marked member by member. A criterion can `consider` only some of its groups (one document among hundreds). Proposed still: holding with a measured switch (M3), lanes
 (M4) and the later display options (M5).
 
 Related: [ADR 0003](0003-container-direction-constraints.md) (direction and strategy per area), [ADR 0005](0005-routing-constraints.md)
@@ -132,13 +132,15 @@ in the list is its rank, and there may be as many ranks as the graph has structu
 | `values` | The value priority of a dimension: which groups come first when a node is in several. Unlisted groups follow in their declared order. Only for dimensions. |
 | `as` | `containers` (the default: nested boxes) or `lanes` (bands; §3). |
 | `hull` | `rectangle` or `polygon`: the shape of this criterion's hulls (§3); without it, `membershipHull` applies. |
-| `show` | The groups of a dimension the criterion shows; empty shows all. Shown groups own and hold as usual (a member of a nested group belongs to the deepest shown group on its path); a group not shown makes no container and draws no hull, so the nodes it would own fall to the next criterion. Not on `parent`. |
+| `consider` | The groups of a dimension the criterion considers; empty considers all. Considered groups take part in everything the criterion does — owning as containers, holding (M3), drawing — and a member of a nested group belongs to the deepest considered group on its path; a group not considered takes part in none of it, so the nodes it would own fall to the next criterion. Not on `parent`. |
 
-**Why `show`.** A real dimension has hundreds of groups — on the Intentweave index, 301 documents. Drawn all at once, even
-correct hulls are noise (on one package of 292 symbols: 182 hulls, 108 marks, 1234 overlapping pairs). A reader asks about
-one document, so the view shows one: the same package with one document shows 12 marks and no overlap. `show` answers the
-question of how many groups a view can carry by letting the reader choose, instead of a limit the engine would guess. It is
-named for its effect on the view; `values` orders, `show` restricts.
+**Why `consider`.** A real dimension has hundreds of groups — on the Intentweave index, 301 documents. Drawn all at once,
+even correct hulls are noise (on one package of 292 symbols: 182 hulls, 108 marks, 1234 overlapping pairs). A reader asks
+about one document, so the view works with one: the same package with one document shows 12 marks and no overlap.
+`consider` answers the question of how many groups a view can carry by letting the reader choose, instead of a limit the
+engine would guess. The name says what the field does to the criterion, not only to the drawing: a group not considered
+makes no container and, once M3 holds groups, is not held in the layout either. `values` orders, `consider` selects. (It
+was briefly called `show`, unreleased.)
 
 Three rules make the list a projection:
 
@@ -428,7 +430,7 @@ proved by brute force over all orders.
 - **The dimensions real exports carry.** The exporter emits `doc` (Documented in, from the index's annotations), `kind` and
   `visibility` with `--memberships`; the index has no namespace, and claim candidates bind one subject each. Which further
   dimensions are worth exporting, and how many criteria a view can carry, come from use; how many *groups* is answered
-  by `show`.
+  by `consider`.
 - **A group that is still a box, moved down.** When a dimension first takes a few members out of a source container that
   keeps its box, the container's soft group falls into pieces and is marked whole — on the real package, a file's ~146
   members marked because 12 moved out. Drawing only the members that left, joined to the box, would be the honest form;
