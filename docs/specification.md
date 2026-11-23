@@ -444,10 +444,13 @@ Area against elk-rs inside single pass (issue #119, ADR 0027 proposed, 2026-11-2
 no view may get worse in objective order. The area is 1.60 times elk-rs's at the median on the comparison task, with
 fewer crossings and bends; where it goes is measured in `benchmarks/results/placement-hierarchy-20261123.md` (container
 boundaries 23 % along the flow and 20 % across, straight long edges 34 % across). `globalLayering` cannot run with
-single pass, and `packComponents` and a narrower channel beside a border rank do not pay. Next: an offline check that
-the plan predicts the regressions (step 0), then `simplexRanks` kept per
-area only where its plan is not worse (crossings, then dummies) (unguarded it saves 9.3 % area in sum but costs crossings on 3 of 17
-views), then unlinked sibling areas spread along the flow; each behind an option, accepted only if no view gets worse.
+single pass, and `packComponents` and a narrower channel beside a border rank do not pay. `simplexRanks` unguarded saves
+9.3 % area in sum but costs crossings on 3 of 17 views. Step 0 (2026-11-23,
+`benchmarks/results/simplex-guard-offline-20261123.md`): a guard per area cannot keep it safe — 11 of 16 regressions lie
+outside the area whose ranks changed (in children, siblings and ancestors). Open decision: no step 1, or a choice per
+view between the two rankings (no view worse by construction; −9.4 % area on the comparison task, −3.2 % on the configured
+datasets; a second layout per view, to be timed). Then unlinked sibling areas spread along the flow (step 2), its upper
+bound first; each behind an option, accepted only if no view gets worse.
 
 `ENGINE_VERSION` follows the release (`0.6.0` with release 0.6.0; it stayed `0.2.0-prototype` from 0.2 to 0.4): the
 defaults changed in 0.5.0 and 0.6.0, and edits refuse snapshots of another engine version.

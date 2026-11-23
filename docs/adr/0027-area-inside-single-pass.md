@@ -1,7 +1,8 @@
 # ADR 0027: Area inside single pass: ranks by span where they cost no quality, then free sibling areas along the flow
 
 Date: 2026-11-23.
-Status: proposed. Nothing is implemented; the default output is unchanged.
+Status: proposed. Nothing is implemented; the default output is unchanged. Step 0 done (2026-11-23): the plan-crossing
+guard **fails**; the fallback for step 1 is open (see "Outcome of step 0").
 
 Related: [ADR 0016](0016-single-pass-default-gate.md) (single pass is the default), [ADR 0017](0017-area-border-legs.md)
 (edges between areas in legs, border nodes), [ADR 0020](0020-single-pass-for-every-area.md) (single pass for every area);
@@ -75,6 +76,30 @@ mixed-large, synthetic-2k). Recorded in a results file, per view and area.
 
 If it fails, the fallback is decided before step 1 is built: a guard on the constructed routes of the area, whose cost (a
 construction per area) is measured on the same views first; or no step 1.
+
+#### Outcome of step 0 (2026-11-23)
+
+Measured with `benchmarks/eval/simplex-guard.mjs` on both poses
+([results](../../benchmarks/results/simplex-guard-offline-20261123.md)); the attribution of drawn crossings and bends to
+areas adds up exactly to the `metrics` totals. The guard fails:
+
+- **Most regressions are not in the area whose ranks changed.** Of 16 loss areas on the 7 worse views, 11 lie outside
+  every changed area: 2 in ancestors, 5 in **children** (a parent's new ranks move where its edges enter a child) and 4
+  **apart** (siblings and cousins). The split into a local guard and a global acceptance assumed ancestors only; a guard
+  that compares two layouts of one area — from its plan or from its constructed routes — cannot see any of the 11.
+- **Inside the changed areas the plan predicts poorly**: the guard rejects simplex on 2 of the 5 loss areas there, and
+  its verdict agrees with the drawn one on 12 of 15 changed areas (uniform) and 11 of 17 (configured).
+
+So the listed fallback, a guard on the constructed routes of an area, could catch at most 5 of the 16 and cannot pass the
+acceptance. One fallback that sees every regression is a **choice per view**: lay the view out with both rankings and
+keep simplex only where the view is not worse in objective order (ties: the smaller area). From the gate runs, exactly:
+simplex on 7 of 17 views, crossings 3064 → 2929, area −9.4 % on the uniform task; 6 of 17, crossings 5310 → 5194, area
+−3.2 % on the configured datasets; no view worse by construction. Its cost is a second layout per view, and more on views
+that do not run single pass (configured mixed-large: `simplexRanks` 4.5 to 7 times slower on the legacy pipeline), so it
+would be limited to views that run single pass and timed on an idle machine first.
+
+Decision needed before step 1: **no step 1**, or **a choice per view** behind an option (limited to single pass, its time
+measured first). Step 2 does not depend on it and keeps its own order (ELK's `MIN_WIDTH`/`STRETCH_WIDTH` upper bound first).
 
 ### Step 1: simplex ranks per area, kept only where they cost no crossings
 
