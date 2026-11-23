@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- The engine choice (routing a drawing that still runs routes through nodes again with both routing engines) is not
+  tried when its estimated work (routes × grid cells over the box edges) exceeds 1 million; the conflicts are reported
+  with a diagnostic (#149). A meshed bus view of 100 nodes on 30 buses given as data, organic, took 20 to 42 s and now
+  0.35 s with the same output (`benchmarks/results/engine-choice-work-20261123.md`); the stored default fingerprints are
+  unchanged.
 - Routing style `bus`: laid out by single pass like `orthogonal`, so the fans find their shared ways in its channels
   (on six public examples, fans drawn in part from 78 of 105 to 8); the `Bus style` diagnostic counts apart the fans whose
   edges leave to different sides.
