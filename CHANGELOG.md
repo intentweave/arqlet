@@ -17,6 +17,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- Phase timings (#152): `timings` also reports the single-pass parts of the routing (`plan`, `channelGrowth`,
+  `construction`, `fallbackRouting`, `finalization`), `buses`, and for `elkLayout` the translation (`elkTranslation`) and
+  a refinement (`refinement`). The ELK drop-in takes `timings: true` and exposes them as `elk.timings` after each call.
+- `sharedTracks`: when shared tracks make the lane orders cyclic and the layout falls back to one without them, the
+  drawing is no longer completed a second time before that fallback; same result, 1.5 s instead of 1.9–2.0 s on a dense
+  flat graph (`benchmarks/results/phase-timings-shared-tracks-20261123.md`).
 - A soft membership group is no longer always one hull (provisional, ADR 0022 M2b): it is drawn whole where its hull
   encloses no foreign node, else in pieces — one per container that holds its members, then by distance within one —
   and a group that falls into more than three pieces is marked member by member instead (`Scene.membershipMarks`, a dot

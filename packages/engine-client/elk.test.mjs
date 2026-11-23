@@ -24,3 +24,23 @@ test('the WASM engine lays out an ELK graph',{skip:existsSync(wasmPath)?false:'r
   assert.equal(section.incomingShape,'a');assert.equal(section.outgoingShape,'b');
   assert.ok(laid.children[1].x>laid.children[0].x,'flows to the right, as ELK by default');
 });
+
+test('timings: true reports where each call went (#152)',async()=>{
+  const requests=[];
+  const elk=createElkLayout(request=>{requests.push(request);return {ok:true,graph:{id:'root'},diagnostics:[],timings:{total:2,layout:1}};},{timings:true});
+  await elk.layout({id:'root'});
+  assert.equal(requests[0].timings,true);
+  assert.deepEqual(elk.timings,{total:2,layout:1});
+  const plain=createElkLayout(request=>{requests.push(request);return {ok:true,graph:{id:'root'},diagnostics:[]};});
+  await plain.layout({id:'root'});
+  assert.equal('timings' in requests[1],false);
+  assert.equal(plain.timings,null);
+});
+
+test('the WASM engine reports phase timings for an ELK graph',{skip:existsSync(wasmPath)?false:'run apps/playground/build.sh first'},async()=>{
+  const elk=createElkLayout(await createEngine(readFileSync(wasmPath)),{timings:true});
+  await elk.layout({id:'root',children:[{id:'a',width:40,height:30},{id:'b',width:40,height:30}],
+    edges:[{id:'ab',sources:['a'],targets:['b']}]});
+  for(const key of ['total','layout','routing','plan','construction','elkTranslation']) assert.equal(typeof elk.timings[key],'number',key);
+  assert.ok(elk.timings.total>=elk.timings.layout);
+});

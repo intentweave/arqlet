@@ -229,6 +229,7 @@ fn side_search(
             Ok(routes) => routes,
             Err(super::Abort::Failed(message)) => return Err(message),
             Err(super::Abort::Stopped) => return Err("the side search was interrupted".into()),
+            Err(super::Abort::SharedTracksCyclic) => return Err(super::SHARED_TRACKS_CYCLIC.into()),
         };
         // The searched edges take their new routes; every other edge keeps the route of the drawing being improved.
         let searched = |id: &str| endpoints.iter().any(|(edge, _)| edge == id);

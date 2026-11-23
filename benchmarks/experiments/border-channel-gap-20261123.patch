@@ -1,0 +1,138 @@
+diff --git a/crates/layout/src/lib.rs b/crates/layout/src/lib.rs
+index f0cf167..9652417 100644
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -2124,6 +2124,19 @@ fn channel_tracks_by_edges(
+         .collect()
+ }
+ 
++/// A rank of border nodes (step 6). Experimental (`sharedBorderRanks`): a rank of border nodes and side nodes only counts as
++/// a border rank too.
++fn is_border_level(ids: &[id::Id], shared_border_ranks: bool) -> bool {
++    ids.iter().all(|id| id.starts_with(BORDER_PREFIX))
++        || shared_border_ranks
++            && ids.iter().any(|id| id.starts_with(BORDER_PREFIX))
++            && ids.iter().all(|id| {
++                id.starts_with(BORDER_PREFIX)
++                    || id.starts_with(SIDE_IN_PREFIX)
++                    || id.starts_with(SIDE_OUT_PREFIX)
++            })
++}
++
+ fn realize_channel_widths(
+     placed: &mut BTreeMap<String, Rect>,
+     level_list: &[&Vec<id::Id>],
+@@ -2158,8 +2171,23 @@ fn realize_channel_widths(
+             .fold(f64::MAX, f64::min);
+         // What the construction found missing in this channel (`channel_key`), on top of the tracks counted here.
+         let reported = gaps.get(&channel_key(area, k)).copied().unwrap_or(0.);
++        // Experimental (`borderChannelGap`, issue #119): beside a border rank, a channel in which no edge changes lane holds
++        // only straight runs between the border nodes and the children, so it does not need the margin on both sides and
++        // the track every channel keeps. Not where the construction reported it short (`reported`), and not beside a
++        // self-loop (its track is counted in `tracks`).
++        let straight_border = options
++            .border_channel_gap
++            .filter(|g| g.is_finite() && *g >= 0.)
++            .filter(|_| {
++                tracks[k] == 0
++                    && reported <= 0.
++                    && (is_border_level(this, options.shared_border_ranks)
++                        || is_border_level(next, options.shared_border_ranks))
++            });
+         // With `hubRefs` a channel also holds the references' stubs and names (`hub_ref_room`).
+-        let need = (tracks[k] as f64 * track + 2. * margin + reported).max(options.hub_ref_room);
++        let need = straight_border
++            .unwrap_or(tracks[k] as f64 * track + 2. * margin + reported)
++            .max(options.hub_ref_room);
+         // Experimental (`channelsByDemand`): a channel also narrows to what its tracks need, at least the margin on both
+         // sides and a track (as a border rank keeps), instead of keeping the layer gap. The order and the places across the
+         // flow were chosen before, on the layer gap, so the lanes stay as planned.
+@@ -2169,7 +2197,8 @@ fn realize_channel_widths(
+         let widened = (need - (near - far)).max(0.);
+         let change = if options.channels_by_demand {
+             let reserve = if tracks[k] > 0 { track } else { 0. };
+-            ((need + reserve).max(2. * margin + track) - (near - far)).min(widened)
++            let floor = straight_border.unwrap_or(2. * margin + track);
++            ((need + reserve).max(floor) - (near - far)).min(widened)
+         } else {
+             widened
+         };
+@@ -7390,17 +7419,7 @@ fn place(
+             };
+             // A border rank (step 6) needs only the margin and a track before or after it; the channel widening adds what its
+             // lane changes need.
+-            // Experimental (`sharedBorderRanks`): a rank of border nodes and side nodes only counts as a border rank too.
+-            let border_level = |ids: &Vec<id::Id>| {
+-                ids.iter().all(|id| id.starts_with(BORDER_PREFIX))
+-                    || options.shared_border_ranks
+-                        && ids.iter().any(|id| id.starts_with(BORDER_PREFIX))
+-                        && ids.iter().all(|id| {
+-                            id.starts_with(BORDER_PREFIX)
+-                                || id.starts_with(SIDE_IN_PREFIX)
+-                                || id.starts_with(SIDE_OUT_PREFIX)
+-                        })
+-            };
++            let border_level = |ids: &Vec<id::Id>| is_border_level(ids, options.shared_border_ranks);
+             let gap = if options.layered_construction
+                 && (border_level(ids)
+                     || level_list
+diff --git a/crates/model/src/lib.rs b/crates/model/src/lib.rs
+index ea8431f..792466b 100644
+--- a/crates/model/src/lib.rs
++++ b/crates/model/src/lib.rs
+@@ -2231,6 +2231,13 @@ pub struct LayoutOptions {
+     /// when turned off.
+     #[serde(default = "default_true", skip_serializing_if = "is_true")]
+     pub channels_by_demand: bool,
++    /// Experimental (issue #119; single pass, with `channelsByDemand`): how wide a channel beside a border rank becomes when
++    /// no edge changes lane in it, so that its edges only run straight from the border nodes to the children (or back),
++    /// instead of the margin on both sides and a track that every channel keeps. A channel the construction reports short,
++    /// or one with a self-loop beside it, keeps that floor. `None` (the default, omitted): the floor, as before.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    #[cfg_attr(feature = "ts", ts(optional))]
++    pub border_channel_gap: Option<f64>,
+     /// With `straightDetours`, the geometric repair of an organic area that cannot clear every straight line within a
+     /// bounded budget clears the lines between children of organic areas first and those into its containers within a
+     /// bounded budget of their own; their detours draw what remains around the nodes in its way. A repair that finishes
+@@ -2831,6 +2838,7 @@ impl Default for LayoutOptions {
+             region_ports: true,
+             region_child_ports: false,
+             channels_by_demand: true,
++            border_channel_gap: None,
+             nested_edges_by_detour: true,
+             region_child_sides: BTreeMap::new(),
+             settle_cooling: None,
+diff --git a/crates/runtime/src/lib.rs b/crates/runtime/src/lib.rs
+index bd9a098..864e0f7 100644
+--- a/crates/runtime/src/lib.rs
++++ b/crates/runtime/src/lib.rs
+@@ -3240,6 +3240,11 @@ fn validate_requirements(snapshot: &Snapshot) -> Result<(), String> {
+             return Err("Maximum extent must be a positive number".into());
+         }
+     }
++    if let Some(gap) = snapshot.options.border_channel_gap {
++        if !(gap.is_finite() && gap >= 0.) {
++            return Err("Border channel gap must be a finite number of at least 0".into());
++        }
++    }
+     Ok(())
+ }
+ 
+diff --git a/packages/contracts/src/generated/LayoutOptions.ts b/packages/contracts/src/generated/LayoutOptions.ts
+index bdfa0a9..ca8a8e3 100644
+--- a/packages/contracts/src/generated/LayoutOptions.ts
++++ b/packages/contracts/src/generated/LayoutOptions.ts
+@@ -214,6 +214,13 @@ regionChildPorts?: boolean,
+  * when turned off.
+  */
+ channelsByDemand?: boolean,
++/**
++ * Experimental (issue #119; single pass, with `channelsByDemand`): how wide a channel beside a border rank becomes when
++ * no edge changes lane in it, so that its edges only run straight from the border nodes to the children (or back),
++ * instead of the margin on both sides and a track that every channel keeps. A channel the construction reports short,
++ * or one with a self-loop beside it, keeps that floor. `None` (the default, omitted): the floor, as before.
++ */
++borderChannelGap?: number,
+ /**
+  * With `straightDetours`, the geometric repair of an organic area that cannot clear every straight line within a
+  * bounded budget clears the lines between children of organic areas first and those into its containers within a

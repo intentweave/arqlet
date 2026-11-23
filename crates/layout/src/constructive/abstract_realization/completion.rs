@@ -254,16 +254,9 @@ fn run_impl(
                 let edges = selected.as_ref().map_or(0, |p| p.edges.len());
                 if cyclic > 16.max(edges / 100) {
                     // The placement already made room for shared tracks: the whole layout is computed again without them
-                    // (`compute_counted`, on this diagnostic); this pass only completes the drawing it has.
-                    session.shared_off = true;
-                    let again = run_impl(snapshot, method, session, stop);
-                    session.shared_off = false;
-                    return again.map(|mut done| {
-                        done.drawing
-                            .layout_diagnostics
-                            .push(crate::SHARED_TRACKS_FALLBACK.into());
-                        done
-                    });
+                    // (`compute_counted`). Completing this drawing again without groups first only to drop it cost a second
+                    // completion for nothing (#152), so it stops here.
+                    return Err(crate::Abort::SharedTracksCyclic);
                 }
             }
             search.construction.add(&trial.work);

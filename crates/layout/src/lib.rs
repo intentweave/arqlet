@@ -69,7 +69,13 @@ pub(crate) fn elapsed_nanos(start: Option<f64>) -> u64 {
 enum Abort {
     Stopped,
     Failed(String),
+    /// Provisional (`sharedTracks`, #152): shared tracks made the lane orders cyclic for many edges. The layout is computed
+    /// again without them in `compute_counted`; nothing on the way catches this, so nothing is completed twice.
+    SharedTracksCyclic,
 }
+
+/// The error text `SharedTracksCyclic` travels as where errors are strings, recognised by `compute_counted`.
+const SHARED_TRACKS_CYCLIC: &str = "internal: shared tracks made lane orders cyclic";
 
 impl From<String> for Abort {
     fn from(message: String) -> Self {
@@ -262,6 +268,7 @@ fn uninterrupted<T>(result: Result<T, Abort>) -> Result<T, String> {
         Ok(snapshot) => Ok(snapshot),
         Err(Abort::Failed(message)) => Err(message),
         Err(Abort::Stopped) => Err(UNINTERRUPTED.into()),
+        Err(Abort::SharedTracksCyclic) => Err(SHARED_TRACKS_CYCLIC.into()),
     }
 }
 
@@ -351,15 +358,18 @@ pub fn compute_counted(
 ) -> Result<(Snapshot, SearchCounters), String> {
     let started = stage_timer_start();
     let mut result = compute_counted_unclocked(graph, previous, dirty, options);
+    // The completion found the lane orders cyclic and stopped at once (#152): the same as the fallback below.
+    let cyclic = matches!(&result, Err(message) if message == SHARED_TRACKS_CYCLIC);
     // Provisional (`sharedTracks`): shared tracks made the lane orders cyclic for many edges; the placement had already made
     // room for them, so the whole layout is computed again without them (the options keep the request, the diagnostic says
     // what happened).
     if options.shared_tracks.is_some()
-        && result.as_ref().is_ok_and(|(s, _)| {
-            s.layout_diagnostics
-                .iter()
-                .any(|d| d == SHARED_TRACKS_FALLBACK)
-        })
+        && (cyclic
+            || result.as_ref().is_ok_and(|(s, _)| {
+                s.layout_diagnostics
+                    .iter()
+                    .any(|d| d == SHARED_TRACKS_FALLBACK)
+            }))
     {
         let plain = LayoutOptions {
             shared_tracks: None,
@@ -383,6 +393,12 @@ pub fn compute_counted(
             repair: ms(stages.repair_nanos),
             port_resolution: ms(stages.port_resolution_nanos),
             routing: ms(stages.routing_nanos),
+            plan: ms(stages.abstract_completion.abstract_plan_nanos),
+            channel_growth: ms(stages.abstract_completion.growth_nanos),
+            construction: ms(stages.abstract_completion.construction_nanos),
+            fallback_routing: ms(stages.abstract_completion.fallback_nanos),
+            finalization: ms(stages.abstract_completion.finalization_nanos),
+            ..Default::default()
         });
     }
     result
@@ -8787,6 +8803,7 @@ pub fn candidate_from(
         Ok(snapshot) => Some(snapshot),
         Err(Abort::Stopped) => None,
         Err(Abort::Failed(message)) => return Err(message),
+        Err(Abort::SharedTracksCyclic) => return Err(SHARED_TRACKS_CYCLIC.into()),
     };
     Ok((snapshot, run.search))
 }
@@ -9449,6 +9466,16 @@ fn reroute_with(
 /// Explicit buses (provisional, `bus::draw_buses`) on `routes`, with their diagnostics in the snapshot (replacing earlier
 /// ones).
 fn draw_buses_on(snapshot: &mut Snapshot, routes: &mut [Route]) {
+    let started = stage_timer_start();
+    draw_buses_timed(snapshot, routes);
+    // Provisional (phase timings, #152): only reported.
+    arqlet_model::clock::add(arqlet_model::clock::Phases {
+        buses: elapsed_nanos(started) as f64 / 1e6,
+        ..Default::default()
+    });
+}
+
+fn draw_buses_timed(snapshot: &mut Snapshot, routes: &mut [Route]) {
     snapshot
         .layout_diagnostics
         .retain(|d| !d.starts_with("Bus "));
