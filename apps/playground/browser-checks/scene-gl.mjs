@@ -72,9 +72,11 @@ try {
       }
       if (${JSON.stringify(name)} === 'workflow-dag') {
         for (const [op, value] of [['strategy', 'tree'], ['strategy', 'radial'], ['strategy', 'organic'], ['strategy', 'none'],
-          ['routing', 'straight'], ['routing', 'roundedOrthogonal'], ['routing', 'polyline'], ['routing', 'roundedPolyline'], ['routing', 'octilinear'], ['routing', 'curve'], ['routing', 'bus'], ['bundling', 'complete']]) {
+          ['routing', 'straight'], ['routing', 'roundedOrthogonal'], ['routing', 'polyline'], ['routing', 'roundedPolyline'], ['routing', 'octilinear'], ['routing', 'curve'], ['routing', 'bus'], ['bundling', 'complete'], ['bridges', true]]) {
           const base = {snapshot, expectedRevision: snapshot.revision, expectedLayoutVersion: snapshot.layoutVersion ?? 0};
-          const changed = op === 'bundling' ? window.__engine({op: 'configure', ...base, options: {bundling: value}}) : window.__engine({op, ...base, nodeId: null, [op]: value});
+          const changed = op === 'bundling' ? window.__engine({op: 'configure', ...base, options: {bundling: value}})
+            : op === 'bridges' ? window.__engine({op: 'configure', ...base, options: {appearance: {...(snapshot.options?.appearance ?? {showPorts: true}), bridges: true}}})
+            : window.__engine({op, ...base, nodeId: null, [op]: value});
           if (!changed.ok) { window.__variantErrors = [...(window.__variantErrors ?? []), op + '=' + value + ': ' + changed.error]; continue; }
           const drawn = window.__engine({op: 'scene', snapshot: changed.snapshot});
           if (drawn.ok) window.__scenes['workflow-dag ' + op + '=' + value] = drawn.scene;

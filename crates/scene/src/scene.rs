@@ -598,6 +598,34 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     }
 
     let junctions = junctions_of(snapshot, &routes);
+    // Bridges (`appearance.bridges`): the later of two crossing routes hops over the other; members of one explicit bus
+    // share their lines and never hop over each other. Only in the drawn scene, as the arcs.
+    let mut routes = routes;
+    if arcs && snapshot.options.appearance.bridges {
+        let bus_of: BTreeMap<&str, Vec<usize>> =
+            snapshot
+                .graph
+                .buses
+                .iter()
+                .enumerate()
+                .fold(BTreeMap::new(), |mut m, (b, bus)| {
+                    for e in &bus.edges {
+                        m.entry(e.as_str()).or_insert_with(Vec::new).push(b);
+                    }
+                    m
+                });
+        let buses: Vec<Vec<usize>> = routes
+            .iter()
+            .map(|r| bus_of.get(r.id.as_str()).cloned().unwrap_or_default())
+            .collect();
+        let mut points: Vec<Vec<Point>> = routes.iter().map(|r| r.points.clone()).collect();
+        realize::add_bridges(&mut points, realize::BRIDGE_RADIUS, &|i, j| {
+            buses[i].iter().any(|b| buses[j].contains(b))
+        });
+        for (route, p) in routes.iter_mut().zip(points) {
+            route.points = p;
+        }
+    }
     Ok(Scene {
         schema_version: 1,
         revision: snapshot.revision,
@@ -1117,6 +1145,45 @@ mod tests {
         assert!(curve.len() >= polyline.len());
         // The corner scene, which the metrics measure, has the polyline's corners.
         assert_eq!(build_corner_scene(&s).unwrap().routes[0].points, polyline);
+    }
+
+    #[test]
+    fn bridges_are_drawn_only_when_asked_and_the_metrics_keep_the_plain_routes() {
+        let mut s = snapshot(json!({
+            "graph": {
+                "nodes": [
+                    {"id": "group", "kind": "container", "label": "Group", "parentId": null},
+                    {"id": "child", "kind": "symbol", "label": "Child", "parentId": "group"},
+                    {"id": "other", "kind": "symbol", "label": "Other", "parentId": null}
+                ],
+                "edges": [
+                    {"id": "e", "kind": "calls", "source": "child", "target": "other"},
+                    {"id": "f", "kind": "calls", "source": "other", "target": "child"}
+                ]
+            },
+            "routes": [
+                {"id": "e", "points": [{"x": 220, "y": 175}, {"x": 450, "y": 175}]},
+                {"id": "f", "points": [{"x": 335, "y": 100}, {"x": 335, "y": 260}]}
+            ]
+        }));
+        let plain = build_scene(&s).unwrap();
+        let count = |sc: &Scene| sc.routes.iter().map(|r| r.points.len()).sum::<usize>();
+        s.options.appearance.bridges = true;
+        let bridged = build_scene(&s).unwrap();
+        assert!(
+            count(&bridged) > count(&plain),
+            "a bridge adds the half circle's points"
+        );
+        assert_eq!(
+            count(&build_corner_scene(&s).unwrap()),
+            count(&plain),
+            "the metrics see no bridge"
+        );
+        // Off, the option is not written.
+        s.options.appearance.bridges = false;
+        assert!(!serde_json::to_string(&s.options)
+            .unwrap()
+            .contains("bridges"));
     }
 
     #[test]

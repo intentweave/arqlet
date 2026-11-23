@@ -1166,7 +1166,7 @@ function syncDetails(){
  $('placement-grid').value=o.placementGrid;$('placement-search').value=o.placementSearch;$('min-port-spacing').value=o.minPortSpacing;
  $('free-placement').checked=!!o.freePlacement;$('routing-clearance').value=o.routingClearance;$('track-spacing').value=o.trackSpacing;
  $('routing-corridors').checked=!!o.routingCorridors;$('routing-track-separation').checked=!!o.routingTrackSeparation;
- $('show-ports').checked=o.appearance.showPorts!==false;
+ $('show-ports').checked=o.appearance.showPorts!==false;$('bridges').checked=!!o.appearance.bridges;
  $('layered-construction').checked=!!o.layeredConstruction&&!!o.hierarchicalOrdering;
  for(const [id,key] of FLAGS)$(id).checked=!!o[key];
  for(const [id,key] of OPTIONAL_NUMBERS)$(id).value=o[key]??'';
@@ -1502,6 +1502,7 @@ $('port-labels').onchange=()=>{
 // shared lines, a layout option like any other (undo takes it back).
 $('style-preset').onchange=()=>{makeViewStyle();if(snapshot)draw();if($('style-preset').value==='metro'&&snapshot&&(effectiveOptions().busStyle??'bar')==='bar'&&!pending)setOption({busStyle:'lines'},'Bus style for Metro');};
 $('show-ports').onchange=()=>setOption({appearance:{...effectiveOptions().appearance,showPorts:$('show-ports').checked}},'port markers');
+$('bridges').onchange=()=>setOption({appearance:{...effectiveOptions().appearance,bridges:$('bridges').checked}},'Bridges at crossings');
 
 bindNavigation($('canvas'),()=>scale,value=>{autoFit=false;scale=value;if(snapshot)draw();});
 $('zoom-out').onclick=()=>{if(sceneView){const v=sceneView.view;sceneView.setView({...v,scale:v.scale/1.5});return;}autoFit=false;scale=Math.max(.02,scale/1.5);if(snapshot)draw();};

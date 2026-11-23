@@ -3338,10 +3338,17 @@ pub struct PlacedLabel {
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct AppearanceConfig {
     pub show_ports: bool,
+    /// Provisional: bridges (line hops) where two routes cross: the route drawn later passes over the other in a small
+    /// half circle; drawn by every renderer from the scene's points. Off by default (omitted).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub bridges: bool,
 }
 impl Default for AppearanceConfig {
     fn default() -> Self {
-        Self { show_ports: true }
+        Self {
+            show_ports: true,
+            bridges: false,
+        }
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
