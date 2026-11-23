@@ -16,6 +16,10 @@ ports and orthogonal routing. Add constraint diagnostics and stable placement.
   corridor plan over neighbouring boxes, separation by the demand of each corridor, routes drawn in their corridors,
   without repair. Steps C1 (plan as a measurement) to C4 (containers, default decision), behind `organicCorridors`.
 
+- Proposed (ADR 0016, amendment of 2026-11-24): pins in single pass. A pinned node in a layered area holds its rank, its
+  order and its coordinate across the flow (fixed in the placement); along the flow it stands in its rank's band. Steps P1
+  (leaf pins, behind `pinsInSinglePass`) to P3 (exact along the flow, only if needed).
+
 ## 3. Scale and exploration
 
 Compact long-edge representation, aggregation, drill-down, cut-out, cache
