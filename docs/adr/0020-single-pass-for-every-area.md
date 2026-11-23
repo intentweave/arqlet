@@ -174,12 +174,51 @@ grows the corridors around the container, never its inside.
 **Straight routing** in an organic region (decision 3, `straightDetours`) is not affected: the corridors are for
 orthogonal routes.
 
+### Prior work (read 2026-11-23)
+
+- **libavoid** (Wybrow, Marriott, Stuckey: *Orthogonal Connector Routing*, GD 2009; *Orthogonal Hyperedge Routing*,
+  Diagrams 2012; open PDFs, read in full): nodes are fixed ("each i ∈ N has a fixed position, width and height"). Routes
+  are searched on an orthogonal visibility graph (O(n²) vertices, A*, length plus bend penalty). Then routes are
+  **nudged**: first the order of the connectors in shared segments is chosen so that they cross least (minimal when the
+  shared segments form a tree), then per axis the segment positions are variables under separation constraints (keep the
+  order, keep the minimum distance, do not pass through objects), projected with VPSC; the desired position is the middle
+  of the alley, or the corner a route bends around. A channel too narrow for its connectors is not addressed; the paper
+  notes that a compact graph ("many of the nodes in this graph are close together") routes worse and slower.
+- **libtopology** (Adaptagrams, the implementation of Dwyer, Marriott, Wybrow: *Topology Preserving Constrained Graph
+  Layout*, GD 2008; the paper itself is not openly available, its source is): routes are the input, their bends pinned to
+  node corners; a `TriConstraint` keeps a route point on one side of the line through two others, which fixes the side of
+  a node a route passes, with the node's half size as the distance; node positions come from stress majorization under
+  these and the non-overlap constraints, solved with VPSC. Nothing about room for several parallel routes.
+- **ELK and elk-rs** `force` and `stress` draw every edge as one straight segment and give an edge that leaves a
+  container no route at all; d3-force has only node collision; Graphviz and yFiles keep fixed margins (`sep`/`esep`; an
+  organic edge router that needs nodes at least twice its distance apart). None reserves room for routes.
+
+Neither prior method moves nodes and routes together: libtopology moves nodes around fixed routes, libavoid moves routes
+between fixed nodes. That combination is what this amendment needs, and it changes phases 3 and 4 as follows.
+
+### Phases 3 and 4 as one constraint system (refinement)
+
+Instead of counting demand and separating nodes before the routes are drawn, phases 3 and 4 become one projection per
+axis, as libavoid's nudging with the nodes free:
+
+- **Variables:** the position of every node, and of every interior route segment across its axis (a horizontal segment's
+  y, a vertical segment's x), from the corridor plan of phase 2.
+- **Constraints:** node to node, no overlap (the gap of 24, as today); segment to node, the router's clearance, on the
+  side the plan fixed (the `TriConstraint` idea of libtopology, here for axis-parallel segments); segment to segment in
+  one corridor, one track, in the order chosen as libavoid orders shared segments (fewest crossings).
+- **Desired positions:** nodes at their arrangement (phase 1), segments in the middle of their corridor or at the corner
+  they bend around.
+
+A corridor then gets exactly its width from the constraints themselves (clearance, tracks, clearance), and pairs of
+nodes with no route between them stay at the gap of 24. Separating by counted demand (phase 3 as written) is the
+fallback if the joint system turns out too large; C1 measures both sizes.
+
 ### What is reused, and what is new
 
 - Reused: the stress placement and its pivot start (phase 1), `vpsc::scanline_pairs` and `vpsc::solve` (phases 2 and 3),
   the port sides of S1-3, the track spacing and clearances of the router, the border ports of S1-2.
-- New: the corridor graph over an arrangement, the routing on it with capacity costs, and drawing routes from corridor
-  paths. The shadow routing of the layered single pass (`abstract_routing.rs`) works on ranks and orders, not on an
+- New: the corridor graph over an arrangement, the routing on it with capacity costs, the ordering of shared segments
+  (as libavoid's), and the joint projection of nodes and segments (VPSC with segment variables). The shadow routing of the layered single pass (`abstract_routing.rs`) works on ranks and orders, not on an
   arrangement, so it is a model for the cost rules, not code to share.
 
 ### Steps
