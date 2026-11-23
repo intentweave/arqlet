@@ -5,6 +5,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- A membership group that is still a box (a source container that kept some members, or a dimension's container)
+  draws only the members that left it, joined to the box where that encloses nothing foreign, instead of falling into
+  pieces and marks (provisional, ADR 0022 §3). The report counts them as `keptBox`.
+- `consider` on a criterion of `groupingPriority` (provisional, ADR 0022): a dimension works with the listed groups only
+  — one document among hundreds. As the first criterion only those groups become boxes and every other node falls to the
+  next criterion; held softly only they draw hulls or marks. A member of a nested group belongs to the deepest considered
+  group on its path. Refused on `parent` and for a group the dimension does not declare. Playground: *Only group*.
+
 ### Changed
 
 - Phase timings (#152): `timings` also reports the single-pass parts of the routing (`plan`, `channelGrowth`,
@@ -13,6 +23,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - `sharedTracks`: when shared tracks make the lane orders cyclic and the layout falls back to one without them, the
   drawing is no longer completed a second time before that fallback; same result, 1.5 s instead of 1.9–2.0 s on a dense
   flat graph (`benchmarks/results/phase-timings-shared-tracks-20261123.md`).
+- A soft membership group is no longer always one hull (provisional, ADR 0022 M2b): it is drawn whole where its hull
+  encloses no foreign node, else in pieces — one per container that holds its members, then by distance within one —
+  and a group that falls into more than three pieces is marked member by member instead (`Scene.membershipMarks`, a dot
+  in its dimension's hue in the SVG viewer). Hulls carry `piece` and `pieces`; the report adds `split`, `marked` and
+  `intrudersWhole` (what the group's whole hull would have enclosed). Drawing only: no node moves and no route changes.
+  The threshold of three pieces is a placeholder until it is measured (M3).
+
 - The engine choice (routing a drawing that still runs routes through nodes again with both routing engines) is not
   tried when its estimated work (routes × grid cells over the box edges) exceeds 1 million; the conflicts are reported
   with a diagnostic (#149). A meshed bus view of 100 nodes on 30 buses given as data, organic, took 20 to 42 s and now

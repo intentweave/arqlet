@@ -1024,3 +1024,143 @@ fn m1_a_membership_patch_projects_again_where_the_dimension_owns_and_moves_nothi
         "but it is a new revision"
     );
 }
+
+#[test]
+fn m2b_no_hull_on_any_fixture_encloses_a_foreign_box_and_every_group_is_drawn_whole_or_in_pieces() {
+    // The exit of M2b: under each fixture's own priority, every soft group is drawn — whole, in pieces or as marks — with
+    // all the boxes that stand for its members, and no hull encloses a leaf that is not a member.
+    for (name, text) in fixtures() {
+        let raw: serde_json::Value = serde_json::from_str(text).expect("json");
+        let graph: Graph = serde_json::from_str(text).expect("a graph");
+        let snapshot = import_graph_with(graph, 500, &priority_of(&raw)).expect("imports");
+        let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
+        for hull in &scene.membership_hulls {
+            assert!(
+                hull.intruders.is_empty(),
+                "{name}: {}/{} piece {} of {} encloses {:?}",
+                hull.dimension,
+                hull.group,
+                hull.piece,
+                hull.pieces,
+                hull.intruders
+            );
+            assert!(hull.pieces <= arqlet_scene::MARKS_ABOVE_PIECES, "{name}");
+        }
+        for report in scene.membership_report.iter().filter(|r| r.mode == "soft") {
+            assert_eq!(report.intruders, 0, "{name}: {}", report.dimension);
+            assert!(
+                report.intruders_whole >= report.intruders,
+                "{name}: the whole-group count is the first slice's, never below the split one"
+            );
+            assert!(report.split + report.marked <= report.drawn, "{name}");
+        }
+        // A piece's boxes belong to its group: the same box is never in two pieces of one group.
+        let mut seen: BTreeSet<(String, String, String)> = BTreeSet::new();
+        for hull in &scene.membership_hulls {
+            for b in &hull.boxes {
+                assert!(
+                    seen.insert((hull.dimension.clone(), hull.group.clone(), b.clone())),
+                    "{name}: {b} in two pieces of {}/{}",
+                    hull.dimension,
+                    hull.group
+                );
+            }
+        }
+    }
+}
+
+/// A priority from JSON, for the `consider` tests.
+fn with_priority(priority: serde_json::Value) -> LayoutOptions {
+    LayoutOptions {
+        grouping_priority: serde_json::from_value(priority).expect("a priority"),
+        ..LayoutOptions::default()
+    }
+}
+
+#[test]
+fn consider_as_the_owner_makes_containers_of_the_considered_groups_only() {
+    // One project among several: Zeus becomes a box; whoever is on another project only stays in their department.
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let options = with_priority(serde_json::json!([
+        {"by": "project", "consider": ["zeus"]}, {"by": "parent"}
+    ]));
+    let snapshot = import_graph_with(graph, 500, &options).expect("imports");
+    let view = view_parents(&snapshot);
+    for person in ["dora", "emil", "fay"] {
+        assert_eq!(
+            view[person].as_deref(),
+            Some("membership:project/zeus"),
+            "{person} is on Zeus"
+        );
+    }
+    assert_eq!(
+        view["anna"].as_deref(),
+        Some("sales"),
+        "Apollo is not considered"
+    );
+    assert_eq!(view["carl"].as_deref(), Some("eng"));
+    assert!(
+        !view
+            .keys()
+            .any(|id| id == "membership:project/apollo" || id == "membership:project/hermes"),
+        "a group not considered is no container"
+    );
+    let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
+    let project = &scene.membership_report[0];
+    assert_eq!(
+        (project.owned, project.groups, project.multiple_owners),
+        (3, 1, 0)
+    );
+}
+
+#[test]
+fn consider_as_a_soft_criterion_draws_the_considered_groups_only() {
+    let graph: Graph = serde_json::from_str(THREE_DIMENSIONS).expect("a graph");
+    let options = with_priority(serde_json::json!([
+        {"by": "parent"}, {"by": "team", "consider": ["payments"]}
+    ]));
+    let snapshot = import_graph_with(graph.clone(), 500, &options).expect("imports");
+    let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
+    let groups: BTreeSet<&str> = scene
+        .membership_hulls
+        .iter()
+        .map(|h| h.group.as_str())
+        .chain(scene.membership_marks.iter().map(|m| m.group.as_str()))
+        .collect();
+    assert_eq!(
+        groups,
+        ["payments"].into_iter().collect(),
+        "one team, not three"
+    );
+    let drawn: BTreeSet<&str> = scene
+        .membership_hulls
+        .iter()
+        .flat_map(|h| h.boxes.iter().map(String::as_str))
+        .chain(scene.membership_marks.iter().map(|m| m.node.as_str()))
+        .collect();
+    assert_eq!(drawn, ["billing", "ledger", "orders"].into_iter().collect());
+    let team = scene
+        .membership_report
+        .iter()
+        .find(|r| r.dimension == "team")
+        .expect("a team entry");
+    assert_eq!((team.groups, team.drawn), (1, 1));
+    // Drawing only: the boxes are the plain view's.
+    let plain = import_graph_with(graph, 500, &LayoutOptions::default()).expect("imports");
+    assert_eq!(snapshot.boxes, plain.boxes);
+}
+
+#[test]
+fn consider_is_refused_on_parent_and_for_an_undeclared_group() {
+    let error = arqlet_runtime::options_from_patch(&serde_json::json!({
+        "groupingPriority": [{"by": "parent", "consider": ["eng"]}]
+    }))
+    .expect_err("consider on parent");
+    assert!(error.contains("not to parent"), "{error}");
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let options = with_priority(
+        serde_json::json!([{"by": "project", "consider": ["ares"]}, {"by": "parent"}]),
+    );
+    let error = import_graph_with(graph, 500, &options).expect_err("an undeclared group");
+    assert!(error.contains("declares no group"), "{error}");
+}

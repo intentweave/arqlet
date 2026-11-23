@@ -23,4 +23,12 @@ as?: GroupingRendering,
 /**
  * The shape of this criterion's hulls where it holds nodes softly; `LayoutOptions::membership_hull` without it.
  */
-hull?: HullShape, };
+hull?: HullShape,
+/**
+ * The groups of a dimension this criterion considers; empty (the default) considers them all. Considered groups take
+ * part in everything the criterion does — they own nodes as containers, are held softly in the layout (M3) and are
+ * drawn — and a member of a nested group belongs to the deepest considered group on its path. A group not considered
+ * takes part in none of it, so the nodes it would own fall to the next criterion. Not allowed on `parent`. Lets a
+ * view work with one document among hundreds (ADR 0022 §2).
+ */
+consider?: Array<string>, };

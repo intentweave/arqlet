@@ -84,3 +84,40 @@ test('a scene without hulls draws none, and a degenerate hull is skipped', () =>
   renderSvg(thin, sceneWith([hull('zone', 'dmz', [{x: 0, y: 0}, {x: 10, y: 0}])]), {document});
   assert.equal(thin.find('polygon').length, 0, 'two points are not a polygon');
 });
+
+// Provisional (ADR 0022 §3, M2b): a group too scattered for hulls is marked member by member.
+test('marks sit on their boxes in the hue of their dimension, step left when several, and take no pointer events', () => {
+  const svg = new Element('svg');
+  const scene = sceneWith([hull('zone', 'dmz', square(0, 0, 100, 60))]);
+  scene.membershipMarks = [
+    {dimension: 'team', dimensionLabel: 'Team', group: 'spread', label: 'Spread', node: 'a'},
+    {dimension: 'zone', dimensionLabel: 'Zone', group: 'far', label: 'Far', node: 'a'},
+    {dimension: 'team', dimensionLabel: 'Team', group: 'spread', label: 'Spread', node: 'b'},
+    {dimension: 'team', dimensionLabel: 'Team', group: 'spread', label: 'Spread', node: 'missing'},
+  ];
+  renderSvg(svg, scene, {document});
+  const marks = svg.find('circle').filter(c => c.attrs.class === 'lw-mark');
+  assert.equal(marks.length, 3, 'a mark on a box the scene does not have is skipped');
+  assert.ok(marks.every(m => m.attrs['pointer-events'] === 'none'));
+  const onA = marks.filter(m => m.attrs['data-mark-node'] === 'a');
+  assert.equal(onA.length, 2);
+  assert.ok(Number(onA[1].attrs.cx) < Number(onA[0].attrs.cx), 'the second mark on a box steps to the left');
+  // Node a is at x 10..90: the first mark sits inside its top right corner.
+  assert.ok(Number(onA[0].attrs.cx) < 90 && Number(onA[0].attrs.cx) > 70);
+  // The zone's mark has the hue of the zone's hull, the team's another.
+  const zoneHull = svg.find('polygon')[0];
+  const hueOf = s => s.match(/hsl\((\d+)/)[1];
+  const zoneMark = onA.find(m => m.attrs['data-mark-dimension'] === 'zone');
+  const teamMark = onA.find(m => m.attrs['data-mark-dimension'] === 'team');
+  assert.equal(hueOf(zoneMark.attrs.fill), hueOf(zoneHull.attrs.stroke), 'one hue per dimension, hulls and marks alike');
+  assert.notEqual(hueOf(teamMark.attrs.fill), hueOf(zoneMark.attrs.fill));
+  const titles = svg.find('title').map(t => t.textContent);
+  assert.ok(titles.includes('Team: Spread'));
+});
+
+test('a hull drawn in pieces says which piece it is', () => {
+  const svg = new Element('svg');
+  renderSvg(svg, sceneWith([hull('zone', 'dmz', square(0, 0, 50, 50), {piece: 1, pieces: 2})]), {document});
+  const titles = svg.find('title').map(t => t.textContent ?? '');
+  assert.ok(titles.some(t => t.includes('piece 2 of 2')), titles.join(' | '));
+});

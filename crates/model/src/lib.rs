@@ -2666,6 +2666,14 @@ pub struct GroupingCriterion {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub hull: Option<HullShape>,
+    /// The groups of a dimension this criterion considers; empty (the default) considers them all. Considered groups take
+    /// part in everything the criterion does — they own nodes as containers, are held softly in the layout (M3) and are
+    /// drawn — and a member of a nested group belongs to the deepest considered group on its path. A group not considered
+    /// takes part in none of it, so the nodes it would own fall to the next criterion. Not allowed on `parent`. Lets a
+    /// view work with one document among hundreds (ADR 0022 §2).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub consider: Vec<String>,
 }
 
 /// Provisional (ADR 0022 §3): how an owning criterion's groups are drawn.
@@ -2918,6 +2926,11 @@ impl LayoutOptions {
             }
             if c.by == grouping::PARENT && !c.values.is_empty() {
                 return Err("groupingPriority: values belong to a dimension, not to parent".into());
+            }
+            if c.by == grouping::PARENT && !c.consider.is_empty() {
+                return Err(
+                    "groupingPriority: consider belongs to a dimension, not to parent".into(),
+                );
             }
         }
         let lanes = self

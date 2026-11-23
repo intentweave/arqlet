@@ -21,6 +21,12 @@ label: string, points: Array<Point>,
 boxes: Array<string>,
 /**
  * Leaf boxes inside the hull that are not members of the group. The honest cost of drawing a hull around nodes the
- * layout kept apart, and one of the two numbers a later default depends on (ADR 0022 §6).
+ * layout kept apart, and one of the two numbers a later default depends on (ADR 0022 §6). Empty once a group is split
+ * (M2b): a group is split exactly so that no piece encloses a foreign box.
  */
-intruders: Array<string>, };
+intruders: Array<string>,
+/**
+ * Provisional (ADR 0022 §3, M2b): this hull is piece `piece` (from 0) of `pieces` of its group. A group whose whole
+ * hull would enclose a foreign box is drawn in pieces — one per owner, then by distance within an owner.
+ */
+piece: number, pieces: number, };

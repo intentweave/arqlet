@@ -155,8 +155,28 @@ pub fn owners(graph: &Graph, priority: &[GroupingCriterion]) -> Ownership {
             let Some(d) = prepared[rank].as_ref() else {
                 continue; // a dimension the graph does not declare assigns nothing
             };
-            let Some(groups) = d.groups_of.get(node.id.as_str()) else {
+            let Some(listed) = d.groups_of.get(node.id.as_str()) else {
                 continue;
+            };
+            // With `consider`, the candidates are the considered groups on the node's paths — its groups and, since membership in a
+            // nested group implies the ancestors, their ancestors. A node in no considered group is left to the next criterion.
+            let considered: Vec<&str>;
+            let groups: &Vec<&str> = if c.consider.is_empty() {
+                listed
+            } else {
+                let mut candidates: Vec<&str> = Vec::new();
+                for g in listed {
+                    for a in d.chain(g) {
+                        if c.consider.iter().any(|s| s == a) && !candidates.contains(&a) {
+                            candidates.push(a);
+                        }
+                    }
+                }
+                if candidates.is_empty() {
+                    continue;
+                }
+                considered = candidates;
+                &considered
             };
             // One path (a group and its ancestors): the deepest owns. Otherwise the value order decides.
             let deepest = groups
@@ -203,7 +223,7 @@ pub fn validate(priority: &[GroupingCriterion], memberships: &Memberships) -> Re
                 c.by
             )
         })?;
-        for v in &c.values {
+        for v in c.values.iter().chain(&c.consider) {
             if !d.groups.iter().any(|g| &g.id == v) {
                 return Err(format!(
                     "groupingPriority: {} declares no group {v:?}",
@@ -213,6 +233,11 @@ pub fn validate(priority: &[GroupingCriterion], memberships: &Memberships) -> Re
         }
     }
     Ok(())
+}
+
+/// Whether a criterion considers a group: every group of its dimension when `consider` is empty, else the listed ones.
+pub fn considers(criterion: &GroupingCriterion, group: &str) -> bool {
+    criterion.consider.is_empty() || criterion.consider.iter().any(|s| s == group)
 }
 
 #[cfg(test)]
@@ -296,6 +321,44 @@ mod tests {
         assert!(only.unassigned.contains("gus") && only.unassigned.contains("sales"));
     }
 
+    fn considering(name: &str, consider: &[&str]) -> GroupingCriterion {
+        GroupingCriterion {
+            consider: consider.iter().map(|s| s.to_string()).collect(),
+            ..by(name, &[])
+        }
+    }
+
+    #[test]
+    fn consider_restricts_a_dimension_to_its_listed_groups() {
+        let g = graph();
+        // Only zeus is considered: Dora (apollo and zeus) is owned by zeus without a choice to make; Anna (apollo, core) is
+        // in no considered group and falls to the next criterion.
+        let o = owners(&g, &[considering("project", &["zeus"]), by("parent", &[])]);
+        assert_eq!(o.owners["dora"], group("project", "zeus"));
+        assert!(
+            !o.multiple.contains("dora"),
+            "with one considered group there is nothing to decide"
+        );
+        assert_eq!(o.owners["anna"], Owner::Parent(Some("sales".into())));
+        assert_eq!(o.rank["anna"], 1);
+        // Considering a parent group: a member of a nested group belongs to the deepest considered group on its path.
+        let nested = owners(
+            &g,
+            &[considering("project", &["apollo"]), by("parent", &[])],
+        );
+        assert_eq!(
+            nested.owners["anna"],
+            group("project", "apollo"),
+            "core is not considered, apollo is"
+        );
+        assert!(considers(&considering("project", &["zeus"]), "zeus"));
+        assert!(!considers(&considering("project", &["zeus"]), "apollo"));
+        assert!(
+            considers(&by("project", &[]), "apollo"),
+            "an empty consider takes every group"
+        );
+    }
+
     #[test]
     fn validation_refuses_unknown_dimensions_and_values() {
         let g = graph();
@@ -306,5 +369,7 @@ mod tests {
         .is_ok());
         assert!(validate(&[by("team", &[])], &g.memberships).is_err());
         assert!(validate(&[by("project", &["hermes"])], &g.memberships).is_err());
+        assert!(validate(&[considering("project", &["hermes"])], &g.memberships).is_err());
+        assert!(validate(&[considering("project", &["zeus"])], &g.memberships).is_ok());
     }
 }

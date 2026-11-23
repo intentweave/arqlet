@@ -113,14 +113,16 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  // polygon around the boxes of one group; it takes no pointer events, because it is not a thing to select and because a
  // node under it must stay reachable. One hue per dimension, so two dimensions over the same nodes stay apart; the
  // group's name sits at the hull's topmost point.
- const hulls=scene.membershipHulls??[];
+ const hulls=scene.membershipHulls??[],marks=scene.membershipMarks??[];
+ // One hue per dimension, shared by its hulls and its marks (ADR 0022 §3, M2b).
+ const membershipDimensions=[...new Set([...hulls,...marks].map(h=>h.dimension))];
+ const hueOf=dimension=>(membershipDimensions.indexOf(dimension)*67+191)%360;
  if(hulls.length){
-  const dimensions=[...new Set(hulls.map(h=>h.dimension))];
   for(const h of hulls){
    if(!(h.points?.length>=3))continue;
-   const hue=(dimensions.indexOf(h.dimension)*67+191)%360,points=h.points.map(p=>`${p.x},${p.y}`).join(' ');
+   const hue=hueOf(h.dimension),points=h.points.map(p=>`${p.x},${p.y}`).join(' ');
    const shape=element('polygon',{points,fill:`hsl(${hue} 60% 55% / .12)`,stroke:`hsl(${hue} 60% 65% / .55)`,'stroke-width':1.4,'stroke-dasharray':'6 4','pointer-events':'none',class:'lw-hull','data-hull-dimension':h.dimension,'data-hull-group':h.group});
-   shape.append(element('title',{},`${h.dimensionLabel||h.dimension}: ${h.label}${h.intruders?.length?` (${h.intruders.length} foreign inside)`:''}`));
+   shape.append(element('title',{},`${h.dimensionLabel||h.dimension}: ${h.label}${(h.pieces??1)>1?` (piece ${(h.piece??0)+1} of ${h.pieces})`:''}${h.intruders?.length?` (${h.intruders.length} foreign inside)`:''}`));
    svg.append(shape);
    const at=h.points.reduce((a,b)=>b.y<a.y||(b.y===a.y&&b.x<a.x)?b:a);
    svg.append(element('text',{x:at.x+6,y:at.y-5,fill:`hsl(${hue} 55% 78%)`,'font-size':11,'pointer-events':'none',class:'lw-hull-label'},h.label));
@@ -244,6 +246,18 @@ if(n.rows?.length){
   if(n.rows.length>1)g.append(element('line',{x1:r.x,y1:t.y+t.height+2,x2:r.x+r.width,y2:t.y+t.height+2,stroke:T.frameStroke,'pointer-events':'none'}));
 }
 if(onPin&&n.kind!=='attribute')g.append(glyph?pinControl(n,glyph.cx+glyph.r,glyph.cy-glyph.r-size,size):pinControl(n,round?cx+rad*.62-size/2:r.x+r.width-size-4,round?cy-rad*.62-size/2:r.y+4,size));g.append(element('title',{},n.id));const select=e=>choose(n,e);g.onclick=select;g.onkeydown=e=>{if(e.key==='Enter')select(e);};if(onNodeDragStart&&!parents.has(n.id))g.onpointerdown=e=>onNodeDragStart(n,e);if(active&&!endpoints.has(n.id))g.setAttribute('opacity','.4');svg.append(g);}
+ // Provisional (ADR 0022 §3, M2b): marks of the groups too scattered for hulls. A dot at the top right of the member's
+ // box, in its dimension's hue, after the nodes so that it sits on them; several marks on one box step to the left.
+ // Like hulls, marks take no pointer events: the node under them stays reachable.
+ const markCount=new Map();
+ for(const m of marks){
+  const r=absolute.get(m.node);if(!r)continue;
+  const k=markCount.get(m.node)??0;markCount.set(m.node,k+1);
+  const hue=hueOf(m.dimension),radius=4;
+  const dot=element('circle',{cx:r.x+r.width-radius-2-k*(2*radius+2),cy:r.y+radius+2,r:radius,fill:`hsl(${hue} 65% 58%)`,stroke:T.frameFill,'stroke-width':1,'pointer-events':'none',class:'lw-mark','data-mark-dimension':m.dimension,'data-mark-group':m.group,'data-mark-node':m.node});
+  dot.append(element('title',{},`${m.dimensionLabel||m.dimension}: ${m.label}`));
+  svg.append(dot);
+ }
  // A glyph's ports are not marked: its lines run on to the dot.
  for(const port of (scene.showPorts?scene.ports:[]).filter(p=>!glyphs.has(p.nodeId))){const dot=element('circle',{'data-port-id':port.id,cx:port.position.x,cy:port.position.y,r:3,fill:port.endpoint==='source'?T.portSource:T.portTarget,stroke:T.frameFill,'stroke-width':1,'pointer-events':'none'});dot.append(element('title',{},`${port.id} · ${port.side}${onPortDragStart?' (drag along the border to place it)':''}`));svg.append(dot);
   // A port can be dragged along the border of its node: a larger invisible circle gives it a target that is easy to hit.

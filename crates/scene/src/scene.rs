@@ -52,8 +52,26 @@ pub struct Scene {
     /// Omitted when there is none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub membership_report: Vec<SceneMembershipReport>,
+    /// Provisional (ADR 0022 §3, M2b): the members of the soft groups that fell into too many pieces to be drawn as hulls,
+    /// marked one by one instead (a colour or a badge on the box, no polygon). Omitted when there is none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub membership_marks: Vec<SceneMark>,
     /// Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
     pub bounds: Rect,
+}
+
+/// Provisional (ADR 0022 §3, M2b): one member of a marked group — the box to mark, and the group it belongs to.
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct SceneMark {
+    pub dimension: String,
+    pub dimension_label: String,
+    pub group: String,
+    /// What to write in the mark's tooltip or legend: the group's label, or its id where it has none.
+    pub label: String,
+    /// The box that carries the mark: the member's own box, or the box that stands for it.
+    pub node: String,
 }
 
 /// Provisional (ADR 0022, first slice): the hull of one membership group, drawn behind the nodes. `points` is a closed
@@ -73,8 +91,13 @@ pub struct SceneHull {
     /// The boxes the hull was built from: a member's own box, or the box that stands for it (a collapsed container).
     pub boxes: Vec<String>,
     /// Leaf boxes inside the hull that are not members of the group. The honest cost of drawing a hull around nodes the
-    /// layout kept apart, and one of the two numbers a later default depends on (ADR 0022 §6).
+    /// layout kept apart, and one of the two numbers a later default depends on (ADR 0022 §6). Empty once a group is split
+    /// (M2b): a group is split exactly so that no piece encloses a foreign box.
     pub intruders: Vec<String>,
+    /// Provisional (ADR 0022 §3, M2b): this hull is piece `piece` (from 0) of `pieces` of its group. A group whose whole
+    /// hull would enclose a foreign box is drawn in pieces — one per owner, then by distance within an owner.
+    pub piece: usize,
+    pub pieces: usize,
 }
 
 /// Provisional (ADR 0022 §5): what one membership dimension did in this drawing. Typed, because one line of text per
@@ -106,6 +129,16 @@ pub struct SceneMembershipReport {
     pub multiple_owners: usize,
     /// Nodes no listed criterion assigns (rule 3), placed at the root. Counted on the first criterion's entry only.
     pub unassigned: usize,
+    /// Provisional (ADR 0022 §3, M2b): groups drawn in more than one piece (`grouping-split`), and groups drawn as marks
+    /// because they fell into more pieces than `MARKS_ABOVE_PIECES` (`grouping-marked`).
+    pub split: usize,
+    pub marked: usize,
+    /// The foreign leaf boxes the groups' hulls would enclose if each group were drawn whole, as the first slice drew them.
+    /// Kept beside `intruders` for one version: splitting lowers `intruders` by construction, which is not a layout gain.
+    pub intruders_whole: usize,
+    /// Groups the view still draws as a box that lost some members to another criterion: only those members are drawn,
+    /// joined to the box where that encloses nothing foreign (ADR 0022 §3). The box shows the rest.
+    pub kept_box: usize,
     pub summary: String,
 }
 
@@ -532,7 +565,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     }
     // Provisional (ADR 0022): the membership hulls, which are derived from the boxes above and so cannot move anything.
     // Their points still widen the extent, because a hull reaches a padding beyond its outermost members.
-    let (membership_hulls, membership_report) =
+    let (membership_hulls, membership_report, membership_marks) =
         membership_overlays(snapshot, &positions, &containers);
     for hull in &membership_hulls {
         for p in &hull.points {
@@ -647,6 +680,7 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
         hub_refs,
         membership_hulls,
         membership_report,
+        membership_marks,
         bounds: Rect {
             x: left - 30.,
             y: top - 30.,
@@ -659,11 +693,17 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
 /// How far a hull reaches beyond the boxes it encloses, in layout units.
 const HULL_PADDING: f64 = 10.;
 
-/// Provisional (ADR 0022 §2–§3, M1): the hulls of the soft criteria of the grouping priority, and the report of every
-/// criterion it lists. The first criterion owns: its groups are the view's containers (`with_grouping_priority`), so it
-/// draws no hull. Every later criterion holds its members softly and draws a hull per group — the parent hierarchy too,
-/// once it is moved down, as a hull per source container around its descendants. A hull that would only trace a box the
-/// view already draws (every member owned by that very group) is left out.
+/// Provisional (ADR 0022 §3, M2b): a group that falls into more pieces than this is marked member by member instead of
+/// drawn as hulls. A placeholder until M3 measures where the switch lies.
+pub const MARKS_ABOVE_PIECES: usize = 3;
+
+/// Provisional (ADR 0022 §2–§3, M1 and M2b): the hulls and marks of the soft criteria of the grouping priority, and the
+/// report of every criterion it lists. The first criterion owns: its groups are the view's containers
+/// (`with_grouping_priority`), so it draws no hull. Every later criterion holds its members softly — the parent hierarchy
+/// too, once it is moved down, around the descendants of each source container — and draws each group in the first form
+/// that encloses no foreign box (`hull::pieces`): one hull, else one per owner, else pieces by distance; a group in more
+/// than `MARKS_ABOVE_PIECES` pieces is marked instead. A hull that would only trace a box the view already draws (every
+/// member owned by that very group) is left out.
 ///
 /// Everything here is derived from boxes that are already placed, so this function cannot move a node: a drawing with
 /// hulls has the same node boxes and the same routes as the same drawing without them.
@@ -675,14 +715,21 @@ fn membership_overlays(
     snapshot: &Snapshot,
     positions: &BTreeMap<&str, Rect>,
     containers: &BTreeSet<&str>,
-) -> (Vec<SceneHull>, Vec<SceneMembershipReport>) {
+) -> (Vec<SceneHull>, Vec<SceneMembershipReport>, Vec<SceneMark>) {
     use arqlet_model::grouping::{self, Owner, PARENT};
     let priority = &snapshot.options.grouping_priority;
     if grouping::is_default(priority) {
-        return (Vec::new(), Vec::new());
+        return (Vec::new(), Vec::new(), Vec::new());
     }
     let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let ownership = grouping::owners(source, priority);
+    // The container of every box of the view: the owner a group is split by (M2b).
+    let view_parent: BTreeMap<&str, Option<&str>> = snapshot
+        .graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
     let parent_of: BTreeMap<&str, Option<&str>> = source
         .nodes
         .iter()
@@ -735,6 +782,7 @@ fn membership_overlays(
     };
 
     let mut hulls = Vec::new();
+    let mut marks = Vec::new();
     let mut reports = Vec::new();
     for (rank, criterion) in priority.iter().enumerate() {
         let owning = rank == 0;
@@ -784,6 +832,10 @@ fn membership_overlays(
                 }
             }
             for group in &d.groups {
+                // A group the criterion does not consider (`consider`) is neither drawn nor counted.
+                if !grouping::considers(criterion, &group.id) {
+                    continue;
+                }
                 for m in &group.members {
                     if !parent_of.contains_key(m.as_str()) {
                         unknown += 1;
@@ -799,6 +851,11 @@ fn membership_overlays(
             }
         }
         let mut hidden = 0usize;
+        let mut split = 0usize;
+        let mut marked = 0usize;
+        let mut intruders_whole = 0usize;
+        let mut kept_box = 0usize;
+        let mut drawn = 0usize;
         let first = hulls.len();
         for (group, label, members) in &groups {
             let mut boxes: Vec<&str> = Vec::new();
@@ -807,8 +864,29 @@ fn membership_overlays(
                 if !parent_of.contains_key(member.as_str()) {
                     continue;
                 }
+                // Already inside the group's own box: owned by this group, or — for the parent hierarchy, whose groups hold
+                // their descendants — owned by the parent hierarchy through a container at or below the group.
                 let here = match ownership.owners.get(member) {
-                    Some(Owner::Parent(Some(p))) => criterion.by == PARENT && p == group,
+                    Some(Owner::Parent(Some(p))) => {
+                        criterion.by == PARENT && {
+                            let mut at = Some(p.as_str());
+                            let mut walked = 0usize;
+                            let mut found = false;
+                            while let Some(c) = at {
+                                if c == group.as_str() {
+                                    found = true;
+                                    break;
+                                }
+                                // The parent hierarchy of the source is a tree; the bound only guards against a broken one.
+                                walked += 1;
+                                if walked > parent_of.len() {
+                                    break;
+                                }
+                                at = parent_of.get(c).copied().flatten();
+                            }
+                            found
+                        }
+                    }
                     Some(Owner::Group {
                         dimension,
                         group: g,
@@ -826,42 +904,171 @@ fn membership_overlays(
             if owning || all_owned_here || boxes.is_empty() {
                 continue;
             }
+            let shown = if criterion.by == PARENT {
+                label_of
+                    .get(group.as_str())
+                    .map(|l| l.to_string())
+                    .unwrap_or_else(|| label.clone())
+            } else {
+                label.clone()
+            };
+            // A foreign box is a leaf of the view that is not one of the group's boxes. A container that encloses members
+            // is not one: it is the drawing's own structure, not a node the hull swallowed. Nor is a leaf inside one of the
+            // group's boxes: a member may itself be a container (an interface and its properties), and its box holds its
+            // children wherever its hull is drawn — no split can take them out.
+            // The group's own box, if the view still draws it: a source container that kept some of its members (parent),
+            // or the container of a group that owns some nodes (a dimension). Its box already shows the members inside it.
+            let own_box: Option<&str> = if criterion.by == PARENT {
+                visible(group)
+            } else {
+                visible(&grouping::container_id(&criterion.by, group))
+            };
+            let within_member = |id: &str| -> bool {
+                let mut at = view_parent.get(id).copied().flatten();
+                let mut walked = 0usize;
+                while let Some(p) = at {
+                    if boxes.contains(&p) || own_box == Some(p) {
+                        return true;
+                    }
+                    walked += 1;
+                    if walked > view_parent.len() {
+                        return false; // the view's tree is acyclic; the bound only guards a broken one
+                    }
+                    at = view_parent.get(p).copied().flatten();
+                }
+                false
+            };
+            let foreign: Vec<(&str, Point)> = positions
+                .iter()
+                .filter(|(id, _)| {
+                    !containers.contains(**id) && !boxes.contains(*id) && !within_member(id)
+                })
+                .map(|(id, rect)| (*id, crate::hull::centre(rect)))
+                .collect();
+            let inside = |points: &[Point]| -> Vec<String> {
+                foreign
+                    .iter()
+                    .filter(|(_, c)| crate::hull::contains(points, c))
+                    .map(|(id, _)| id.to_string())
+                    .collect()
+            };
             let rects: Vec<Rect> = boxes.iter().map(|id| positions[*id].clone()).collect();
-            let points = crate::hull::group_shape(&rects, HULL_PADDING, shape);
-            if points.len() < 3 {
+            // What the first slice drew: the whole group, and what it would enclose.
+            intruders_whole += inside(&crate::hull::group_shape(&rects, HULL_PADDING, shape)).len();
+            // A group that is still a box draws only the members that left it: the box shows the others. A member box is
+            // inside when it is the own box or lies below it in the view.
+            let in_own_box = |id: &str| -> bool {
+                let Some(own) = own_box else {
+                    return false;
+                };
+                let mut at = Some(id);
+                let mut walked = 0usize;
+                while let Some(c) = at {
+                    if c == own {
+                        return true;
+                    }
+                    walked += 1;
+                    if walked > view_parent.len() {
+                        return false;
+                    }
+                    at = view_parent.get(c).copied().flatten();
+                }
+                false
+            };
+            let (boxes, rects): (Vec<&str>, Vec<Rect>) = if own_box.is_some() {
+                boxes
+                    .iter()
+                    .zip(&rects)
+                    .filter(|(id, _)| !in_own_box(id))
+                    .map(|(id, r)| (*id, r.clone()))
+                    .unzip()
+            } else {
+                (boxes.clone(), rects.clone())
+            };
+            if boxes.is_empty() {
                 continue;
             }
-            // A leaf box inside the hull that is not one of its own boxes. A container that encloses members is not an
-            // intruder: it is the drawing's own structure, not a node the hull swallowed.
-            let intruders: Vec<String> = positions
+            let centres: Vec<Point> = foreign.iter().map(|(_, c)| c.clone()).collect();
+            drawn += 1;
+            // Joined to the box: one hull over the box and the members that left, where that encloses nothing foreign.
+            if let Some(own) = own_box {
+                kept_box += 1;
+                let mut joined = rects.clone();
+                joined.push(positions[own].clone());
+                let points = crate::hull::group_shape(&joined, HULL_PADDING, shape);
+                if points.len() >= 3 && inside(&points).is_empty() {
+                    let mut listed: Vec<String> = boxes.iter().map(|id| id.to_string()).collect();
+                    listed.push(own.to_string());
+                    hulls.push(SceneHull {
+                        dimension: criterion.by.clone(),
+                        dimension_label: dimension_label.clone(),
+                        group: group.clone(),
+                        label: shown.clone(),
+                        points,
+                        boxes: listed,
+                        intruders: Vec::new(),
+                        piece: 0,
+                        pieces: 1,
+                    });
+                    continue;
+                }
+            }
+            // The pieces (M2b): whole if clean, else per owner, else by distance within an owner.
+            let members: Vec<crate::hull::Member> = boxes
                 .iter()
-                .filter(|(id, _)| !containers.contains(**id) && !boxes.contains(*id))
-                .filter(|(_, rect)| crate::hull::contains(&points, &crate::hull::centre(rect)))
-                .map(|(id, _)| id.to_string())
+                .zip(&rects)
+                .map(|(id, rect)| crate::hull::Member {
+                    rect: rect.clone(),
+                    owner: view_parent.get(id).copied().flatten(),
+                })
                 .collect();
-            hulls.push(SceneHull {
-                dimension: criterion.by.clone(),
-                dimension_label: dimension_label.clone(),
-                group: group.clone(),
-                label: if criterion.by == PARENT {
-                    label_of
-                        .get(group.as_str())
-                        .map(|l| l.to_string())
-                        .unwrap_or_else(|| label.clone())
-                } else {
-                    label.clone()
-                },
-                points,
-                boxes: boxes.iter().map(|id| id.to_string()).collect(),
-                intruders,
-            });
+            let pieces = crate::hull::pieces(&members, &centres, HULL_PADDING, shape);
+            if pieces.len() > MARKS_ABOVE_PIECES {
+                // Too scattered for hulls: every member is marked instead, and no polygon claims a shape.
+                marked += 1;
+                for id in &boxes {
+                    marks.push(SceneMark {
+                        dimension: criterion.by.clone(),
+                        dimension_label: dimension_label.clone(),
+                        group: group.clone(),
+                        label: shown.clone(),
+                        node: id.to_string(),
+                    });
+                }
+                continue;
+            }
+            if pieces.len() > 1 {
+                split += 1;
+            }
+            let count = pieces.len();
+            for (index, piece) in pieces.into_iter().enumerate() {
+                let piece_rects: Vec<Rect> = piece.iter().map(|&i| rects[i].clone()).collect();
+                let points = crate::hull::group_shape(&piece_rects, HULL_PADDING, shape);
+                if points.len() < 3 {
+                    continue;
+                }
+                let intruders = inside(&points);
+                hulls.push(SceneHull {
+                    dimension: criterion.by.clone(),
+                    dimension_label: dimension_label.clone(),
+                    group: group.clone(),
+                    label: shown.clone(),
+                    points,
+                    boxes: piece.iter().map(|&i| boxes[i].to_string()).collect(),
+                    intruders,
+                    piece: index,
+                    pieces: count,
+                });
+            }
         }
-        let drawn = hulls.len() - first;
         let intruders: usize = hulls[first..].iter().map(|h| h.intruders.len()).sum();
+        // Pairs of hulls of two different groups of this criterion that overlap; the pieces of one group are not a pair.
         let mut overlapping = 0usize;
         for i in first..hulls.len() {
             for j in (i + 1)..hulls.len() {
-                if crate::hull::overlap(&hulls[i].points, &hulls[j].points) {
+                if hulls[i].group != hulls[j].group
+                    && crate::hull::overlap(&hulls[i].points, &hulls[j].points)
+                {
                     overlapping += 1;
                 }
             }
@@ -879,7 +1086,8 @@ fn membership_overlays(
             )
         } else {
             format!(
-                "{}: holds softly, {drawn} of {} groups drawn, {intruders} foreign boxes inside a hull, {overlapping} overlapping pairs",
+                "{}: holds softly, {drawn} of {} groups drawn ({split} split, {marked} marked, {kept_box} drawn by the members that left their box), {intruders} foreign boxes \
+                 inside a hull ({intruders_whole} if drawn whole), {overlapping} overlapping pairs",
                 criterion.by,
                 groups.len()
             )
@@ -908,10 +1116,14 @@ fn membership_overlays(
             owned,
             multiple_owners: multiple,
             unassigned,
+            split,
+            marked,
+            intruders_whole,
+            kept_box,
             summary,
         });
     }
-    (hulls, reports)
+    (hulls, reports, marks)
 }
 
 /// Absolute rectangle of a node, computed once per node. Cycles and invalid rectangles are errors.

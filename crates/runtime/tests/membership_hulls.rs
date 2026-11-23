@@ -41,6 +41,23 @@ fn overlay_all(graph: &Graph) -> LayoutOptions {
     options
 }
 
+/// The boxes a group is drawn with, over all its pieces and marks (ADR 0022 §3, M2b).
+fn drawn_boxes(scene: &Scene, criterion: &str, group: &str) -> std::collections::BTreeSet<String> {
+    scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.dimension == criterion && h.group == group)
+        .flat_map(|h| h.boxes.iter().cloned())
+        .chain(
+            scene
+                .membership_marks
+                .iter()
+                .filter(|m| m.dimension == criterion && m.group == group)
+                .map(|m| m.node.clone()),
+        )
+        .collect()
+}
+
 /// The report entry of one criterion.
 fn report<'a>(scene: &'a Scene, criterion: &str) -> &'a arqlet_scene::SceneMembershipReport {
     scene
@@ -126,33 +143,44 @@ fn both_hull_shapes_draw_the_same_groups_and_move_nothing() {
         let (_, boxes) = laid_out(text, &rectangle);
         let (_, hulls) = laid_out(text, &polygon);
 
-        // The shape is drawing only: the same nodes, the same routes, the same groups and the same boxes per group.
+        // The shape is drawing only: the same nodes and routes, and every group drawn with the same boxes. The pieces may
+        // differ: a rectangle encloses more than the polygon, so it can need more pieces to stay clean (M2b).
         assert_eq!(geometry(&plain), geometry(&boxes));
         assert_eq!(geometry(&plain), geometry(&hulls));
-        let groups = |s: &Scene| -> Vec<(String, String, Vec<String>)> {
-            s.membership_hulls
-                .iter()
-                .map(|h| (h.dimension.clone(), h.group.clone(), h.boxes.clone()))
-                .collect()
-        };
-        assert_eq!(groups(&boxes), groups(&hulls));
+        let covered =
+            |s: &Scene| -> BTreeMap<(String, String), std::collections::BTreeSet<String>> {
+                let mut out: BTreeMap<_, std::collections::BTreeSet<String>> = BTreeMap::new();
+                for h in &s.membership_hulls {
+                    out.entry((h.dimension.clone(), h.group.clone()))
+                        .or_default()
+                        .extend(h.boxes.iter().cloned());
+                }
+                for m in &s.membership_marks {
+                    out.entry((m.dimension.clone(), m.group.clone()))
+                        .or_default()
+                        .insert(m.node.clone());
+                }
+                out
+            };
+        assert_eq!(covered(&boxes), covered(&hulls));
 
-        for (r, p) in boxes.membership_hulls.iter().zip(&hulls.membership_hulls) {
+        for r in &boxes.membership_hulls {
             // The default is a rectangle: four corners, every edge axis-parallel.
             assert_eq!(r.points.len(), 4, "{}: a rectangle", r.group);
             for i in 0..4 {
                 let (a, b) = (&r.points[i], &r.points[(i + 1) % 4]);
                 assert!(a.x == b.x || a.y == b.y, "{}: a slanted edge", r.group);
             }
-            // The rectangle encloses the polygon, so it can only find as many intruders or more, never fewer.
+        }
+        // In either shape no piece encloses a foreign box.
+        for h in boxes.membership_hulls.iter().chain(&hulls.membership_hulls) {
             assert!(
-                p.points
-                    .iter()
-                    .all(|q| arqlet_scene::hull::contains(&r.points, q)),
-                "{}: the polygon reaches outside the rectangle",
-                r.group
+                h.intruders.is_empty(),
+                "{}/{}: {:?}",
+                h.dimension,
+                h.group,
+                h.intruders
             );
-            assert!(r.intruders.len() >= p.intruders.len(), "{}", r.group);
         }
     }
     // The default is omitted: options that only set the polygon mention it, the default does not.
@@ -241,37 +269,29 @@ fn the_three_dimensions_are_all_drawn_and_reported() {
         );
     }
     // Membership in a nested group implies the ancestors (ADR 0022 §1): `restricted` sits inside `internal`, so the
-    // `internal` hull must also enclose ledger and audit, which only `restricted` lists.
-    let internal = scene
-        .membership_hulls
-        .iter()
-        .find(|h| h.group == "internal")
-        .expect("internal is drawn");
+    // `internal` hulls must also enclose ledger and audit, which only `restricted` lists.
+    let internal = drawn_boxes(&scene, "zone", "internal");
     for id in ["ledger", "audit"] {
         assert!(
-            internal.boxes.iter().any(|b| b == id),
-            "{id} is a member of restricted, which is nested in internal: {:?}",
-            internal.boxes
+            internal.contains(id),
+            "{id} is a member of restricted, which is nested in internal: {internal:?}"
         );
     }
-    let restricted = scene
-        .membership_hulls
-        .iter()
-        .find(|h| h.group == "restricted")
-        .expect("restricted is drawn");
     assert_eq!(
-        restricted.boxes.len(),
+        drawn_boxes(&scene, "zone", "restricted").len(),
         2,
         "the nested group itself holds only its own members"
     );
 
-    // Hulls of one dimension carry the group labels, not the ids, where the fixture gives labels.
-    let zone: Vec<&str> = scene
+    // Hulls of one dimension carry the group labels, not the ids, where the fixture gives labels; every piece of a group
+    // carries its group's label.
+    let mut zone: Vec<&str> = scene
         .membership_hulls
         .iter()
         .filter(|h| h.dimension == "zone")
         .map(|h| h.label.as_str())
         .collect();
+    zone.dedup();
     assert_eq!(zone, ["DMZ", "Internal", "Restricted"]);
 }
 
@@ -299,31 +319,54 @@ fn two_groups_sharing_a_node_overlap_and_say_so() {
 }
 
 #[test]
-fn a_group_across_a_container_border_is_drawn_as_one_hull() {
+fn a_group_whose_hull_would_swallow_a_foreign_node_is_split_and_every_piece_is_clean() {
+    // ADR 0022 §3, M2b: one hull where it encloses nothing foreign, else one per owner, else pieces by distance.
     let g = graph(CROSSES_CONTAINERS);
     let (_, scene) = laid_out(CROSSES_CONTAINERS, &overlay_all(&g));
-    let hot = scene
-        .membership_hulls
-        .iter()
-        .find(|h| h.group == "hot-path")
-        .expect("the crossing group is drawn");
+    let pieces = |group: &str| -> Vec<Vec<String>> {
+        scene
+            .membership_hulls
+            .iter()
+            .filter(|h| h.group == group)
+            .map(|h| h.boxes.clone())
+            .collect()
+    };
+    // `hot-path` spans `left` and `right`; its whole hull would enclose foreign nodes, so it is drawn per owner.
     assert_eq!(
-        hot.boxes.len(),
-        3,
-        "one hull covers members of two containers (ADR 0022 §3): {:?}",
-        hot.boxes
+        pieces("hot-path"),
+        [
+            vec!["l2".to_string()],
+            vec!["r1".to_string(), "r2".to_string()]
+        ],
+        "one piece per container"
     );
-    // `local` is l1 and l3 and skips l2, which lies between them, so the hull reports an intruder.
-    let local = scene
-        .membership_hulls
-        .iter()
-        .find(|h| h.group == "local")
-        .expect("the local group is drawn");
+    // `local` is l1 and l3 and skips l2, which lies between them: drawn whole, it would swallow l2, so it is two pieces.
+    assert_eq!(
+        pieces("local"),
+        [vec!["l1".to_string()], vec!["l3".to_string()]]
+    );
+    for hull in &scene.membership_hulls {
+        assert!(
+            hull.intruders.is_empty(),
+            "{}/{} piece {} of {} encloses {:?}",
+            hull.dimension,
+            hull.group,
+            hull.piece,
+            hull.pieces,
+            hull.intruders
+        );
+        assert!(hull.piece < hull.pieces);
+    }
+    // The report says so, and keeps what the first slice would have drawn beside it.
+    let focus = report(&scene, "focus");
+    assert_eq!(focus.split, 2, "both groups are split");
+    assert_eq!(focus.marked, 0);
+    assert_eq!(focus.intruders, 0);
     assert!(
-        local.intruders.contains(&"l2".to_string()),
-        "l2 sits between l1 and l3 but is not a member, so it is an intruder: {:?}",
-        local.intruders
+        focus.intruders_whole > 0,
+        "drawn whole, l2 would be inside local's hull"
     );
+    assert!(focus.summary.contains("2 split"), "{}", focus.summary);
 }
 
 #[test]
@@ -540,4 +583,207 @@ fn the_removed_membership_views_are_refused_wherever_they_arrive() {
     assert!(!serde_json::to_string(&LayoutOptions::default())
         .unwrap()
         .contains("membershipViews"));
+}
+
+#[test]
+fn a_group_scattered_over_more_containers_than_the_threshold_is_marked_not_hulled() {
+    // Four containers in a left-to-right flow, each with a member `a` and a foreign `x` after it: drawn whole, the group's
+    // hull would swallow every `x` between the `a`s, so it falls into one piece per container — four, more than
+    // MARKS_ABOVE_PIECES — and is marked member by member instead (ADR 0022 §3, M2b).
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    for i in 0..4 {
+        nodes.push(
+            serde_json::json!({"id": format!("c{i}"), "kind": "group", "label": format!("C{i}")}),
+        );
+        nodes.push(serde_json::json!({"id": format!("a{i}"), "kind": "node", "label": format!("a{i}"), "parentId": format!("c{i}")}));
+        nodes.push(serde_json::json!({"id": format!("x{i}"), "kind": "node", "label": format!("x{i}"), "parentId": format!("c{i}")}));
+        edges.push(serde_json::json!({"id": format!("ax{i}"), "kind": "flow", "source": format!("a{i}"), "target": format!("x{i}")}));
+        if i > 0 {
+            edges.push(serde_json::json!({"id": format!("xa{i}"), "kind": "flow", "source": format!("x{}", i - 1), "target": format!("a{i}")}));
+        }
+    }
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr", "nodes": nodes, "edges": edges,
+        "memberships": {"dimensions": [{"id": "team", "groups": [
+            {"id": "spread", "label": "Spread", "members": ["a0", "a1", "a2", "a3"]},
+            {"id": "pair", "label": "Pair", "members": ["a0", "x0"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("parent"), by("team")];
+    let snapshot = import_graph_with(graph, 100, &options).expect("imports");
+    let scene = build_scene(&snapshot).expect("a scene");
+
+    let marked: Vec<&str> = scene
+        .membership_marks
+        .iter()
+        .filter(|m| m.group == "spread")
+        .map(|m| m.node.as_str())
+        .collect();
+    assert_eq!(marked, ["a0", "a1", "a2", "a3"], "every member marked");
+    assert!(
+        scene
+            .membership_marks
+            .iter()
+            .all(|m| m.label == "Spread" && m.dimension == "team"),
+        "a mark names its group"
+    );
+    assert!(
+        !scene.membership_hulls.iter().any(|h| h.group == "spread"),
+        "a marked group draws no polygon"
+    );
+    // The pair inside one container stays a hull: one group's marks do not turn the dimension into marks.
+    assert!(scene.membership_hulls.iter().any(|h| h.group == "pair"));
+    let team = report(&scene, "team");
+    assert_eq!((team.marked, team.drawn), (1, 2));
+    assert!(team.summary.contains("1 marked"), "{}", team.summary);
+    assert!(
+        arqlet_scene::MARKS_ABOVE_PIECES < 4,
+        "the case stays above the threshold"
+    );
+}
+
+#[test]
+fn a_moved_down_parent_draws_no_hull_around_a_subtree_that_stayed_in_its_own_box() {
+    // Found on a real export: with a dimension first that owns nothing below a directory, the parent hierarchy held its
+    // nested containers softly and drew a hull around each directory's descendants — a hull tracing the very box the view
+    // already draws, and overlaps with every nested one. A member owned by the parent hierarchy through a container at or
+    // below the group is inside the group's box; such a group needs no hull.
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr",
+        "nodes": [
+            {"id": "dir", "kind": "directory", "label": "dir"},
+            {"id": "file", "kind": "file", "label": "file", "parentId": "dir"},
+            {"id": "f", "kind": "symbol", "label": "f", "parentId": "file"},
+            {"id": "g", "kind": "symbol", "label": "g", "parentId": "file"},
+            {"id": "other", "kind": "file", "label": "other"},
+            {"id": "h", "kind": "symbol", "label": "h", "parentId": "other"}
+        ],
+        "edges": [
+            {"id": "fg", "kind": "calls", "source": "f", "target": "g"},
+            {"id": "gh", "kind": "calls", "source": "g", "target": "h"}
+        ],
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "notes", "label": "Notes", "members": ["h"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("doc"), by("parent")];
+    let snapshot = import_graph_with(graph, 100, &options).expect("imports");
+    let scene = build_scene(&snapshot).expect("a scene");
+    // `dir` and `file` kept every member in their own boxes: no hull traces them.
+    let parent_hulls: Vec<&str> = scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.dimension == "parent")
+        .map(|h| h.group.as_str())
+        .collect();
+    assert!(
+        !parent_hulls.contains(&"dir") && !parent_hulls.contains(&"file"),
+        "no parent hull traces a box the view draws: {parent_hulls:?}"
+    );
+    // `other` lost its only member to the doc's container, so it is no box of this view: that is exactly when the
+    // moved-down hierarchy is drawn as a hull, around where its member went.
+    assert_eq!(parent_hulls, ["other"]);
+    assert!(!snapshot.graph.nodes.iter().any(|n| n.id == "other"));
+    assert_eq!(report(&scene, "parent").overlapping_pairs, 0);
+}
+
+#[test]
+fn the_children_of_a_member_that_is_a_container_are_not_foreign() {
+    // Found on a real export: a document names an interface, which holds its properties. The interface's box encloses
+    // them wherever its hull is drawn, so counting them as foreign made the hull unsplittable and reported intruders no
+    // split can remove. A leaf inside one of the group's own boxes is part of what the group shows, not a stranger.
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr",
+        "nodes": [
+            {"id": "file", "kind": "file", "label": "file"},
+            {"id": "Shape", "kind": "symbol", "label": "Shape", "parentId": "file"},
+            {"id": "width", "kind": "symbol", "label": "width", "parentId": "Shape"},
+            {"id": "height", "kind": "symbol", "label": "height", "parentId": "Shape"},
+            {"id": "area", "kind": "symbol", "label": "area", "parentId": "file"}
+        ],
+        "edges": [{"id": "uses", "kind": "calls", "source": "area", "target": "width"}],
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "guide", "label": "Guide", "members": ["Shape"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("parent"), by("doc")];
+    let snapshot = import_graph_with(graph, 100, &options).expect("imports");
+    let scene = build_scene(&snapshot).expect("a scene");
+    let guide: Vec<&arqlet_scene::SceneHull> = scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.group == "guide")
+        .collect();
+    assert_eq!(guide.len(), 1, "one hull, around the interface");
+    assert_eq!(guide[0].boxes, ["Shape"]);
+    assert!(
+        guide[0].intruders.is_empty(),
+        "its own properties are not intruders: {:?}",
+        guide[0].intruders
+    );
+    assert_eq!(report(&scene, "doc").intruders_whole, 0);
+}
+
+#[test]
+fn a_container_that_kept_its_box_draws_only_the_members_that_left() {
+    // Found on a real export: a document taken first took 12 symbols out of a large file that kept its box, and the
+    // file's soft group was marked whole — about 146 marks for 12 moves. The box shows the members inside it; only the
+    // ones that left need drawing, joined to the box where that encloses nothing foreign.
+    let mut nodes = vec![serde_json::json!({"id": "file", "kind": "file", "label": "file"})];
+    let mut edges = Vec::new();
+    for i in 0..6 {
+        nodes.push(serde_json::json!({"id": format!("s{i}"), "kind": "symbol", "label": format!("s{i}"), "parentId": "file"}));
+        if i > 0 {
+            edges.push(serde_json::json!({"id": format!("e{i}"), "kind": "calls", "source": format!("s{}", i - 1), "target": format!("s{i}")}));
+        }
+    }
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr", "nodes": nodes, "edges": edges,
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "guide", "label": "Guide", "members": ["s0"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("doc"), by("parent")];
+    let snapshot = import_graph_with(graph, 100, &options).expect("imports");
+    // s0 moved into the guide's box; the file kept s1 to s5 and its box.
+    assert!(snapshot.graph.nodes.iter().any(|n| n.id == "file"));
+    let scene = build_scene(&snapshot).expect("a scene");
+
+    assert!(
+        !scene.membership_marks.iter().any(|m| m.group == "file"),
+        "the file is not marked member by member"
+    );
+    let drawn: std::collections::BTreeSet<&str> = scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.group == "file")
+        .flat_map(|h| h.boxes.iter().map(String::as_str))
+        .collect();
+    assert!(
+        drawn.contains("s0"),
+        "the member that left is drawn: {drawn:?}"
+    );
+    assert!(
+        drawn.iter().all(|b| *b == "s0" || *b == "file"),
+        "nothing inside the box is drawn again: {drawn:?}"
+    );
+    let parent = report(&scene, "parent");
+    assert_eq!((parent.kept_box, parent.marked), (1, 0));
+    for hull in &scene.membership_hulls {
+        assert!(
+            hull.intruders.is_empty(),
+            "{}: {:?}",
+            hull.group,
+            hull.intruders
+        );
+    }
 }

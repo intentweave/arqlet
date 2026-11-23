@@ -70,8 +70,8 @@ that belongs to a zone, a team and a security domain at once cannot be shown. De
   projects).
 - Done: the model and its refusals, a hull per group drawn without moving anything, as a rectangle or a polygon (M0,
   M2), changes through `patch`, and `groupingPriority` as a projection with `details` per criterion and *Structure
-  first* in the playground (M1). Next without layout risk: the display stages (split, marked; M2b). With layout risk and
-  the quality gate: holding (M3), lanes (M4).
+  first* in the playground (M1), and the display stages: whole, else in pieces, else marked (M2b); a criterion can consider only some of its groups (`consider`). Next, with layout risk
+  and the quality gate: holding (M3), lanes (M4); and memberships from the exporter, which emits none yet.
 - Hard parts: contiguity is not always possible in one order (Euler diagrams); hulls cross container borders and must
   not obstruct the routing; where holding is switched off (its cost in crossings and bends, a budget per rank, a marking
   threshold) is measured in M3, not chosen.

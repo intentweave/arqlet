@@ -1,13 +1,15 @@
 # ADR 0022: Memberships across the hierarchy
 
 Date: 2026-11-21; revised 2026-11-22 (grouping priority, §2–§4).
-Status: accepted and implemented through M1 (2026-11-22), off by default. Implemented: the model and its refusals (M0),
+Status: accepted and implemented through M2b (2026-11-23), off by default. Implemented: the model and its refusals (M0),
 the hull drawn from boxes already placed, as a rectangle or a convex polygon (M2, `membershipHull`), memberships through
 `patch` (§5b, with the change log of ADR 0023 R2), and **the grouping priority as a projection** (M1): `groupingPriority`
 ranks the parent hierarchy and the dimensions, the first criterion that assigns a node owns it (its container in the view),
 the value order decides among several groups, every later criterion is drawn as hulls, `details` names the groups per
-criterion, and the playground offers *Structure first*. `membershipViews` is gone. Proposed still: the display stages
-split and marked (M2b), holding with a measured switch (M3), lanes (M4) and the later display options (M5).
+criterion, and the playground offers *Structure first*. `membershipViews` is gone. And **the display stages** (M2b): a soft
+group is drawn whole where its hull encloses no foreign node, else in pieces — one per owner, then by distance — and a
+group in more than three pieces is marked member by member, and a group that is still a box draws only the members that left it. A criterion can `consider` only some of its groups (one document among hundreds). Proposed still: holding with a measured switch (M3), lanes
+(M4) and the later display options (M5).
 
 Related: [ADR 0003](0003-container-direction-constraints.md) (direction and strategy per area), [ADR 0005](0005-routing-constraints.md)
 (routing per container, the outline contract), [ADR 0007](0007-recursive-strategy-orchestration.md) (containment, optimization
@@ -130,6 +132,15 @@ in the list is its rank, and there may be as many ranks as the graph has structu
 | `values` | The value priority of a dimension: which groups come first when a node is in several. Unlisted groups follow in their declared order. Only for dimensions. |
 | `as` | `containers` (the default: nested boxes) or `lanes` (bands; §3). |
 | `hull` | `rectangle` or `polygon`: the shape of this criterion's hulls (§3); without it, `membershipHull` applies. |
+| `consider` | The groups of a dimension the criterion considers; empty considers all. Considered groups take part in everything the criterion does — owning as containers, holding (M3), drawing — and a member of a nested group belongs to the deepest considered group on its path; a group not considered takes part in none of it, so the nodes it would own fall to the next criterion. Not on `parent`. |
+
+**Why `consider`.** A real dimension has hundreds of groups — on the Intentweave index, 301 documents. Drawn all at once,
+even correct hulls are noise (on one package of 292 symbols: 182 hulls, 108 marks, 1234 overlapping pairs). A reader asks
+about one document, so the view works with one: the same package with one document shows 12 marks and no overlap.
+`consider` answers the question of how many groups a view can carry by letting the reader choose, instead of a limit the
+engine would guess. The name says what the field does to the criterion, not only to the drawing: a group not considered
+makes no container and, once M3 holds groups, is not held in the layout either. `values` orders, `consider` selects. (It
+was briefly called `show`, unreleased.)
 
 Three rules make the list a projection:
 
@@ -248,7 +259,7 @@ thousands of lines on a real graph, and a host would have to parse them back. So
 only prints diagnostics still learns that something is wrong, and a host that acts on them reads the typed field. As built
 in M1, the report is the scene's `membershipReport`, one entry per criterion with its `mode` (`owner` or `soft`) and
 `summary`: `owned`, `multipleOwners` (rule 2) and `unassigned` (rule 3, on the first entry) carry `grouping-multiple-owners`
-and `grouping-unassigned`; `grouping-split` and `grouping-marked` arrive with the stages of M2b.
+and `grouping-unassigned`; since M2b, `split`, `marked` and `intrudersWhole` carry `grouping-split` and `grouping-marked`.
 
 Refused outright (an error, not a diagnostic): a `parent` cycle, a duplicate dimension or group id, a dimension named
 `parent`; in `groupingPriority`, a criterion listed twice, a dimension or value that is not declared, `values` on `parent`,
@@ -347,6 +358,17 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   it), in the configured shape. *Exit:* geometry identical with and without;
   no hull on the fixtures encloses a foreign node; the first slice's intruder count reported beside the new one for one
   version, because splitting lowers it by construction and that is not a layout gain.
+  **Done** (2026-11-23). `arqlet_scene::hull::pieces` decides the pieces from boxes already placed: the whole group if
+  its hull is clean, else one piece per owner (the box's container in the view), else, within an owner, the closest
+  pieces joined as long as their joint hull stays clean (squared gaps, ties by index; owners larger than 64 members are
+  not merged but fall apart, and so as a rule into marks). A group in more than `MARKS_ABOVE_PIECES` (3, a placeholder for
+  M3) pieces becomes `Scene.membershipMarks` — one per member box, a dot in its dimension's hue in the SVG viewer. Hulls
+  carry `piece` and `pieces`; the report adds `split`, `marked` and `intrudersWhole` (what the first slice would have
+  enclosed). Overlapping pairs are counted between different groups only, not between the pieces of one. Tests: the
+  piece rules in `arqlet_scene::hull`; no hull on any of the seven fixtures, under its own priority, encloses a foreign
+  box, and no box is in two pieces of one group; a group over four containers is marked, a pair inside one is not; both
+  shapes cover each group with the same boxes. On the three-dimension example the nine groups are drawn in more than nine
+  clean pieces: they cut across the deployments, which is what the stages are for.
 - **M1 — `groupingPriority` as a projection.** Ranked criteria, ownership, value priority, `parent` as a criterion that can
   be moved down, the refusals and diagnostics of §5, `details` per criterion; `membershipViews` removed. No change to the
   layout algorithm: a non-default priority hands the engine a different container tree. *Exit:* the default view
@@ -375,6 +397,12 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   *Exit:* the gate; `pools-and-lanes.json` with its `groupingPriority` draws as the 2×3 grid with no lane violation;
   `three-dimensions.json` reports what it cannot satisfy.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
+
+A group that is still a box — a source container that kept some members, or a dimension's container that owns some
+nodes — draws only the members that left it to an earlier criterion: the box already shows the others. They are joined
+to the box by one hull where that hull encloses no foreign leaf, else they go through the stages above on their own.
+Found on the real export: a document taken first moved 12 symbols out of a file that kept its box, and the file was
+marked whole (~146 marks); now the same view draws 11 hulls and no mark. The report counts these groups as `keptBox`.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.
 
@@ -405,8 +433,10 @@ proved by brute force over all orders.
 ## Open
 
 - **Where the switches lie** (§6): the cost of holding, the budget per rank and the marking threshold are measured in M3.
-- **The dimensions real exports carry.** `tools/intentweave-export` emits no memberships today; the dimensions and their
-  cardinality, and how many criteria a view can carry, come from the exporter and from measurement.
+- **The dimensions real exports carry.** The exporter emits `doc` (Documented in, from the index's annotations), `kind` and
+  `visibility` with `--memberships`; the index has no namespace, and claim candidates bind one subject each. Which further
+  dimensions are worth exporting, and how many criteria a view can carry, come from use; how many *groups* is answered
+  by `consider`.
 - **A dimension at several ranks.** `values` lets a dimension order its groups; whether one dimension may also appear at two
   ranks (`[project: apollo, parent, project: the rest]`, one project first and the others after the reporting line) is
   open. The list's shape allows it later without a change of format.

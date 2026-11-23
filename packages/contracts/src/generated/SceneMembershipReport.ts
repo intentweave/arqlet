@@ -45,4 +45,19 @@ multipleOwners: number,
 /**
  * Nodes no listed criterion assigns (rule 3), placed at the root. Counted on the first criterion's entry only.
  */
-unassigned: number, summary: string, };
+unassigned: number,
+/**
+ * Provisional (ADR 0022 §3, M2b): groups drawn in more than one piece (`grouping-split`), and groups drawn as marks
+ * because they fell into more pieces than `MARKS_ABOVE_PIECES` (`grouping-marked`).
+ */
+split: number, marked: number,
+/**
+ * The foreign leaf boxes the groups' hulls would enclose if each group were drawn whole, as the first slice drew them.
+ * Kept beside `intruders` for one version: splitting lowers `intruders` by construction, which is not a layout gain.
+ */
+intrudersWhole: number,
+/**
+ * Groups the view still draws as a box that lost some members to another criterion: only those members are drawn,
+ * joined to the box where that encloses nothing foreign (ADR 0022 §3). The box shows the rest.
+ */
+keptBox: number, summary: string, };

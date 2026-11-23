@@ -112,6 +112,122 @@ pub fn group_shape(boxes: &[Rect], padding: f64, shape: arqlet_model::HullShape)
     }
 }
 
+/// One member of a group as the splitting sees it: its box and the container that holds the box in the view.
+pub struct Member<'a> {
+    pub rect: Rect,
+    pub owner: Option<&'a str>,
+}
+
+/// How many members a piece may have for the splitting by distance to be tried; a larger piece that is not clean falls
+/// apart into its members (and so, as a rule, into marks). Bounds the work: the merging is cubic in this number.
+pub const SPLIT_BY_DISTANCE_UP_TO: usize = 64;
+
+/// Provisional (ADR 0022 §3, M2b): the pieces a group is drawn in, as lists of member indices, so that no piece's hull
+/// encloses a foreign point (the centre of a leaf box that is not a member). Drawing only: the members stay where the
+/// layout put them. In order:
+///
+/// 1. the whole group, if its hull is clean;
+/// 2. else one piece per owner (the container that holds the member's box), in the order the owners first appear;
+/// 3. an owner's piece that is still not clean is split by distance: its members start apart, and the two closest pieces
+///    whose joint hull is clean are joined, again and again, until no join is clean.
+///
+/// Deterministic: ties are broken by index, and the result depends only on the members' order and boxes.
+pub fn pieces(
+    members: &[Member],
+    foreign: &[Point],
+    padding: f64,
+    shape: arqlet_model::HullShape,
+) -> Vec<Vec<usize>> {
+    let clean = |piece: &[usize]| -> bool {
+        let rects: Vec<Rect> = piece.iter().map(|&i| members[i].rect.clone()).collect();
+        let hull = group_shape(&rects, padding, shape);
+        !foreign.iter().any(|p| contains(&hull, p))
+    };
+    let all: Vec<usize> = (0..members.len()).collect();
+    if all.is_empty() || clean(&all) {
+        return if all.is_empty() {
+            Vec::new()
+        } else {
+            vec![all]
+        };
+    }
+    let mut owners: Vec<Option<&str>> = Vec::new();
+    for m in members {
+        if !owners.contains(&m.owner) {
+            owners.push(m.owner);
+        }
+    }
+    let mut out = Vec::new();
+    for owner in owners {
+        let piece: Vec<usize> = (0..members.len())
+            .filter(|&i| members[i].owner == owner)
+            .collect();
+        if clean(&piece) {
+            out.push(piece);
+        } else if piece.len() > SPLIT_BY_DISTANCE_UP_TO {
+            out.extend(piece.into_iter().map(|i| vec![i]));
+        } else {
+            out.extend(split_by_distance(members, &piece, &clean));
+        }
+    }
+    out
+}
+
+/// The bounding box of some members.
+fn bounds_of(members: &[Member], piece: &[usize]) -> (f64, f64, f64, f64) {
+    let mut b = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    for &i in piece {
+        let r = &members[i].rect;
+        b = (
+            b.0.min(r.x),
+            b.1.min(r.y),
+            b.2.max(r.x + r.width),
+            b.3.max(r.y + r.height),
+        );
+    }
+    b
+}
+
+/// The squared gap between two bounding boxes (0 when they touch or overlap). Squared, so no square root is needed to
+/// compare: comparison geometry only.
+fn gap(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> f64 {
+    let dx = (b.0 - a.2).max(a.0 - b.2).max(0.);
+    let dy = (b.1 - a.3).max(a.1 - b.3).max(0.);
+    dx * dx + dy * dy
+}
+
+/// Stage 3 of `pieces`: join the closest pieces as long as the joint hull stays clean.
+fn split_by_distance(
+    members: &[Member],
+    piece: &[usize],
+    clean: &dyn Fn(&[usize]) -> bool,
+) -> Vec<Vec<usize>> {
+    let mut parts: Vec<Vec<usize>> = piece.iter().map(|&i| vec![i]).collect();
+    loop {
+        let mut pairs: Vec<(f64, usize, usize)> = Vec::new();
+        for i in 0..parts.len() {
+            for j in (i + 1)..parts.len() {
+                let d = gap(bounds_of(members, &parts[i]), bounds_of(members, &parts[j]));
+                pairs.push((d, i, j));
+            }
+        }
+        pairs.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+        let joined = pairs.into_iter().find_map(|(_, i, j)| {
+            let mut joint = parts[i].clone();
+            joint.extend(parts[j].iter().copied());
+            joint.sort_unstable();
+            clean(&joint).then_some((i, j, joint))
+        });
+        match joined {
+            Some((i, j, joint)) => {
+                parts[i] = joint;
+                parts.remove(j);
+            }
+            None => return parts,
+        }
+    }
+}
+
 /// Whether `point` lies inside the polygon `hull` (ray casting; a point on the border counts as inside). A hull of fewer
 /// than three points encloses nothing.
 pub fn contains(hull: &[Point], point: &Point) -> bool {
@@ -281,5 +397,73 @@ mod tests {
                 .all(|(p, q)| p.x == q.x && p.y == q.y),
             "the same boxes must give the same hull, whatever their order"
         );
+    }
+
+    fn member(x: f64, y: f64, owner: Option<&str>) -> Member<'_> {
+        Member {
+            rect: rect(x, y),
+            owner,
+        }
+    }
+
+    const R: arqlet_model::HullShape = arqlet_model::HullShape::Rectangle;
+
+    #[test]
+    fn a_clean_group_is_one_piece() {
+        let members = [member(0., 0., Some("a")), member(40., 0., Some("b"))];
+        let far = [Point { x: 500., y: 500. }];
+        assert_eq!(pieces(&members, &far, 4., R), [vec![0, 1]]);
+        assert!(pieces(&[], &far, 4., R).is_empty());
+    }
+
+    #[test]
+    fn a_foreign_node_between_owners_splits_the_group_per_owner() {
+        // Two members in container a, one in b, and a foreign node between a and b.
+        let members = [
+            member(0., 0., Some("a")),
+            member(0., 30., Some("a")),
+            member(200., 0., Some("b")),
+        ];
+        let between = [Point { x: 100., y: 5. }];
+        assert_eq!(pieces(&members, &between, 4., R), [vec![0, 1], vec![2]]);
+    }
+
+    #[test]
+    fn inside_one_owner_the_closest_clean_members_are_joined() {
+        // Four members in one container in a row, a foreign node between the second and the third.
+        let members = [
+            member(0., 0., Some("a")),
+            member(20., 0., Some("a")),
+            member(100., 0., Some("a")),
+            member(120., 0., Some("a")),
+        ];
+        let foreign = [Point { x: 60., y: 5. }];
+        assert_eq!(pieces(&members, &foreign, 4., R), [vec![0, 1], vec![2, 3]]);
+        // The polygon shape splits the same way here: the foreign node lies on the line between the pairs.
+        let polygon = pieces(&members, &foreign, 4., arqlet_model::HullShape::Polygon);
+        assert_eq!(polygon, [vec![0, 1], vec![2, 3]]);
+    }
+
+    #[test]
+    fn no_piece_encloses_a_foreign_point_and_every_member_is_in_one() {
+        // A scattered group around foreign nodes: whatever the split, the invariants hold.
+        let members: Vec<Member> = (0..9)
+            .map(|i| member((i % 3) as f64 * 60., (i / 3) as f64 * 60., Some("a")))
+            .collect();
+        let foreign = [Point { x: 35., y: 35. }, Point { x: 95., y: 95. }];
+        let parts = pieces(&members, &foreign, 4., R);
+        let mut seen: Vec<usize> = parts.iter().flatten().copied().collect();
+        seen.sort_unstable();
+        assert_eq!(seen, (0..9).collect::<Vec<_>>(), "each member exactly once");
+        for part in &parts {
+            let rects: Vec<Rect> = part.iter().map(|&i| members[i].rect.clone()).collect();
+            let hull = group_rectangle(&rects, 4.);
+            assert!(
+                !foreign.iter().any(|p| contains(&hull, p)),
+                "{part:?} encloses a foreign point"
+            );
+        }
+        // Deterministic: the same input gives the same pieces.
+        assert_eq!(parts, pieces(&members, &foreign, 4., R));
     }
 }
