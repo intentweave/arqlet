@@ -2273,6 +2273,11 @@ pub struct LayoutOptions {
     /// Iteration budget of the organic (stress) placement. Omitted when unset; the default is 300.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_iterations: Option<usize>,
+    /// Provisional (#156): the gap between two boxes of an organic area, in layout units. Omitted when unset; the default
+    /// is 24. A route between two boxes needs the router's clearance on both sides and a stub at its port, so a gap wider
+    /// than the default leaves a route room to leave a node that faces a neighbour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organic_gap: Option<f64>,
     /// Experimental minimum-displacement overlap constraints for organic placement and repair. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub vpsc_overlap_removal: bool,
@@ -2839,6 +2844,7 @@ impl Default for LayoutOptions {
             force_directed: false,
             edge_routing: None,
             organic_iterations: None,
+            organic_gap: None,
             vpsc_overlap_removal: false,
             directed_repair: false,
             organic_forces: true,

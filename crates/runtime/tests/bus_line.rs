@@ -911,3 +911,47 @@ fn the_engine_choice_skips_a_drawing_too_large_to_route_twice() {
         s.layout_diagnostics
     );
 }
+
+/// #156: `organicGap` widens the gap between the boxes of an organic area (default 24, omitted when unset).
+#[test]
+fn organic_gap_keeps_boxes_apart_and_is_omitted_by_default() {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    for i in 0..12 {
+        nodes.push(json!({"id": format!("n{i}"), "kind": "k", "label": format!("N{i}")}));
+        if i > 0 {
+            edges.push(json!({"id": format!("e{i}"), "kind": "k", "source": format!("n{}", i / 2), "target": format!("n{i}")}));
+        }
+    }
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": edges,
+        "defaultStrategy": "organic", "defaultDirection": "auto"}))
+    .unwrap();
+    let gap_of = |s: &Snapshot| {
+        let b: Vec<&Rect> = s.boxes.values().collect();
+        let mut min = f64::INFINITY;
+        for i in 0..b.len() {
+            for j in i + 1..b.len() {
+                let dx = (b[j].x - (b[i].x + b[i].width)).max(b[i].x - (b[j].x + b[j].width));
+                let dy = (b[j].y - (b[i].y + b[i].height)).max(b[i].y - (b[j].y + b[j].height));
+                min = min.min(dx.max(dy));
+            }
+        }
+        min
+    };
+    let plain = import_graph_with(g.clone(), 100, &LayoutOptions::default()).unwrap();
+    assert!(!serde_json::to_string(&plain.options)
+        .unwrap()
+        .contains("organicGap"));
+    let wide: LayoutOptions = serde_json::from_value(json!({"organicGap": 60})).unwrap();
+    let s = import_graph_with(g, 100, &wide).unwrap();
+    assert!(
+        gap_of(&s) >= 60. - 1e-6,
+        "every two boxes at least 60 apart: {}",
+        gap_of(&s)
+    );
+    assert!(
+        gap_of(&plain) < 60.,
+        "the default packs tighter: {}",
+        gap_of(&plain)
+    );
+}
