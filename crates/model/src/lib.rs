@@ -259,7 +259,7 @@ pub struct Graph {
     #[cfg_attr(
         feature = "ts",
         ts(
-            type = "\"none\" | \"tree\" | \"radial\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\">"
+            type = "\"none\" | \"tree\" | \"radial\" | \"octilinear\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\" | \"octilinear\">"
         )
     )]
     #[cfg_attr(feature = "ts", ts(rename = "defaultStrategy"))]
@@ -268,7 +268,7 @@ pub struct Graph {
     #[cfg_attr(
         feature = "ts",
         ts(
-            type = "{ [key in string]: \"none\" | \"tree\" | \"radial\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\"> }"
+            type = "{ [key in string]: \"none\" | \"tree\" | \"radial\" | \"octilinear\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\" | \"octilinear\"> }"
         )
     )]
     #[cfg_attr(feature = "ts", ts(rename = "containerStrategies"))]
@@ -1090,6 +1090,11 @@ pub enum LayoutStrategy {
     /// The children are placed by stress majorization on their graph distances, then separated by their real sizes. The
     /// area's direction must be free: a ranked layout cannot be replaced silently by a stress placement.
     Organic,
+    /// An octilinear star: per connected group the node with the most links in the middle, its branches running out in
+    /// the eight compass directions, a chain going straight on and a branch bending off by 45 degrees, as the lines of a
+    /// metro map leave an interchange. The links need not form a tree (a spanning tree by breadth decides the branches);
+    /// the area's direction must be free.
+    Octilinear,
 }
 
 /// The two ways a free direction chooses an orientation per area: by compactness (the default of a free direction), or by the
@@ -1110,6 +1115,8 @@ pub enum Mode {
     Radial,
     /// The children placed by stress majorization; no orientation applies.
     Organic,
+    /// The children placed as an octilinear star (`LayoutStrategy::Octilinear`); no orientation applies.
+    Octilinear,
 }
 
 impl Mode {
@@ -1117,7 +1124,7 @@ impl Mode {
     pub fn orientation(self) -> Option<Orientation> {
         match self {
             Self::Orientation(o) | Self::Tree(o) => Some(o),
-            Self::Chooser(_) | Self::Radial | Self::Organic => None,
+            Self::Chooser(_) | Self::Radial | Self::Organic | Self::Octilinear => None,
         }
     }
 }
@@ -1701,6 +1708,15 @@ impl Graph {
                     ));
                 }
                 Ok(Mode::Radial)
+            }
+            LayoutStrategy::Octilinear => {
+                // As radial: a star has no direction, so a fixed or listed one would be dropped silently.
+                if !matches!(direction, DirectionConstraint::Free) {
+                    return Err(format!(
+                        "octilinear cannot take the fixed or allowed direction of {area}: set the direction to auto"
+                    ));
+                }
+                Ok(Mode::Octilinear)
             }
             LayoutStrategy::Shortest => {
                 check("shortest")?;
@@ -3066,14 +3082,14 @@ pub struct Intent {
     #[cfg_attr(
         feature = "ts",
         ts(
-            type = "\"none\" | \"tree\" | \"radial\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\">"
+            type = "\"none\" | \"tree\" | \"radial\" | \"octilinear\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\" | \"octilinear\">"
         )
     )]
     pub default_strategy: StrategyConstraint,
     #[cfg_attr(
         feature = "ts",
         ts(
-            type = "{ [key in string]: \"none\" | \"tree\" | \"radial\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\"> }"
+            type = "{ [key in string]: \"none\" | \"tree\" | \"radial\" | \"octilinear\" | \"auto\" | Array<\"none\" | \"tree\" | \"radial\" | \"octilinear\"> }"
         )
     )]
     pub container_strategies: BTreeMap<String, StrategyConstraint>,

@@ -1025,9 +1025,10 @@ def metro_map():
 def vehicle_metro():
     """The physical buses of a made-up vehicle drawn as metro lines: each bus an explicit bus that runs through its ECUs in
     the order of the wiring harness (one edge per stretch, named by the bus), the central gateway on five buses and the
-    body controller on two as interchanges. Routed octilinear; with the playground's Style field set to Metro every bus
-    is a line in its colour, its ECUs stations, the gateways interchanges."""
-    b = Builder("lr")
+    body controller on two as interchanges. Placed as an octilinear star (the gateway in the middle, each bus running out
+    in a compass direction) and routed octilinear; with the playground's Style field set to Metro every bus is a line in
+    its colour, its ECUs stations, the gateways interchanges."""
+    b = Builder("auto")
     names = {
         "engine": "Engine ECU", "transmission": "Transmission ECU", "gateway": "Central gateway", "battery": "Battery management",
         "thermal": "Thermal management", "brake": "Brake ECU", "steering": "Steering ECU", "suspension": "Suspension ECU",
@@ -1053,7 +1054,7 @@ def vehicle_metro():
         for source, target in zip(stations, stations[1:]):
             b.edge(source, target, bus_id)
         explicit.append({"id": bus_id, "label": label, "edges": [e["id"] for e in b.edges[first:]]})
-    return b.graph(defaultRouting="octilinear", buses=explicit)
+    return b.graph(defaultStrategy="octilinear", defaultRouting="straight", buses=explicit)
 
 
 def git_state():
@@ -1096,7 +1097,7 @@ def main():
         ("fixed-ports", fixed_ports, "Placed ports", "A hub whose four edges leave at ports placed on different sides; the optimisation keeps them.", "hand-authored", True),
         ("can-bus", can_bus, "CAN bus (vehicle)", "Vehicle speed limiter on a CAN bus: ECUs on one shared bus line, the limiter's wired outputs as a second bus; the limiter ECU holds a layered software diagram, the engine ECU an organic one, and two ECUs share a housing.", "hand-authored", True),
         ("metro-map", metro_map, "Metro map (lines as buses)", "A made-up city's metro: five lines as explicit buses, stations in order along each line, interchanges where lines meet; routed octilinear. Choose Style: Metro to draw it as a metro map.", "hand-authored", True),
-        ("vehicle-metro", vehicle_metro, "Vehicle buses as metro lines", "The physical buses of a made-up vehicle as metro lines: each bus runs through its ECUs in the order of the wiring harness, the central gateway (five buses) and the body controller (two) are interchanges; routed octilinear. Choose Style: Metro.", "hand-authored", True),
+        ("vehicle-metro", vehicle_metro, "Vehicle buses as metro lines", "The physical buses of a made-up vehicle as metro lines: each bus runs through its ECUs in the order of the wiring harness, the central gateway (five buses) and the body controller (two) are interchanges; placed as an octilinear star around the gateway and routed octilinear. Choose Style: Metro.", "hand-authored", True),
         ("vehicle-buses", vehicle_buses, "Vehicle buses (bus lines)", "Physical buses of a made-up vehicle as bars (shape busLine): four buses with their ECUs and a central gateway on three of them.", "hand-authored", True),
         ("vehicle-buses-organic", lambda: vehicle_buses("organic"), "Vehicle buses, organic", "The same buses placed organically: each bar runs along its ECUs.", "hand-authored", True),
         ("vehicle-trunk", vehicle_trunk, "Vehicle trunk bus (no gateway)", "One CAN trunk past every ECU of a made-up vehicle, without gateways; two body modules each head a LIN branch.", "hand-authored", True),
