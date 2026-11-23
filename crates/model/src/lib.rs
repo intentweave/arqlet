@@ -1267,14 +1267,15 @@ impl RoutingConstraint {
         }
     }
 
-    /// Whether every edge of the area is drawn on its orthogonal route: a fixed `orthogonal` or `roundedOrthogonal`, or a list
-    /// of only these two. Rounded corners are drawn by the scene on the same route, so a layout that only builds orthogonal
-    /// routes (single pass) can take both. `auto` and lists with other styles may draw some edges otherwise.
+    /// Whether every edge of the area is drawn on its orthogonal route: a fixed `orthogonal`, `roundedOrthogonal` or `bus`,
+    /// or a list of only these. Rounded corners are drawn by the scene on the same route, and the fans of `bus` are drawn on
+    /// the orthogonal routes (ADR 0005, amendment C), so a layout that only builds orthogonal routes (single pass) can take
+    /// them. `auto` and lists with other styles may draw some edges otherwise.
     pub fn orthogonal_only(&self) -> bool {
         let orthogonal = |s: &RoutingStyle| {
             matches!(
                 s,
-                RoutingStyle::Orthogonal | RoutingStyle::RoundedOrthogonal
+                RoutingStyle::Orthogonal | RoutingStyle::RoundedOrthogonal | RoutingStyle::Bus
             )
         };
         match self {

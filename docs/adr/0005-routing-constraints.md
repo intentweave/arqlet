@@ -187,6 +187,9 @@ and an edge belongs to its area as in `Graph::edge_area`. They are derived (`Gra
 the graph, and every consumer of buses (the layout's bus drawing, the shared metrics, the scene's buses, junctions and
 bridges) reads the derived list. Geometry stays orthogonal: the fans are drawn by `bus::draw_buses` on the finished
 routes, so a member whose shared way would enter a node or share a line with another edge keeps its own route; the
-findings of the fans become one diagnostic (`Bus style: …`) instead of one per member. Open: planning the fans in the
-routing's channels so fewer members fall back, and fans over other base geometries.
+findings of the fans become one diagnostic (`Bus style: …`) instead of one per member, counting apart the fans whose
+edges leave their node to different sides (nothing to share, as in a cycle). An area routed `bus` is laid out by single
+pass like `orthogonal` (`RoutingConstraint::orthogonal_only`): its channels and ports give the fans their shared ways, and
+on six public examples the fans drawn in part fell from 78 of 105 to 8 (edges keeping their own routes from 136 to 4) with
+this alone. Open: fans over other base geometries.
 
