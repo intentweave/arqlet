@@ -8,7 +8,7 @@
 //   hysteresis.
 // - `sceneExcerpt`: the part of a scene in a rectangle, which the near layer hands to `renderSvg`.
 import {isSceneColumns, sceneOfColumns} from './scene-columns.js';
-import {createStyle} from './style.js';
+import {createStyle, glyphOf, routeToGlyphs} from './style.js';
 
 /** Floats per box instance: x, y, width, height, corner radius, kind (0 rect, 1 circle), stroke width, dash (0/1),
  * fill RGBA, stroke RGBA (premultiplied later in the shader). */
@@ -222,6 +222,9 @@ export function sceneBuffers(input, state = {}) {
 
   // Routes, then bus taps and hub stubs; each line has its own depth so that its overlapping segments blend once.
   const active = scene.routes.find(r => r.id === selectedRoute);
+  // Leaves drawn as glyphs (a style's `glyph: 'dot'`): their routes run on to the dot's middle.
+  const glyphs = new Map();
+  for (const n of scene.nodes) if (!parents.has(n.id) && n.kind !== 'attribute' && !n.rows?.length) { const g = glyphOf(looks.node(n), n.bounds); if (g) glyphs.set(n.id, g); }
   const endpoints = new Set(active ? [active.source, active.target] : []);
   const lines = [];
   for (const route of scene.routes) {
@@ -230,7 +233,7 @@ export function sceneBuffers(input, state = {}) {
     const width = (look.width ?? (aggregated ? Math.min(7, 1 + 1.2 * Math.log2(total + 1)) : Math.min(4, 1.6 + 0.4 * (weight - 1)))) + (isActive ? 1.5 : 0);
     const opacity = dim ? 0.2 : isActive ? 1 : look.opacity ?? (aggregated ? 0.3 + 0.55 * Math.min(1, Math.log2(total + 1) / 6) : 0.75);
     const colour = route.invalid || conflictedRoutes.has(route.id) ? COLOURS.invalid : isActive ? COLOURS.activeRoute : look.stroke ? hex(look.stroke) : COLOURS.route;
-    lines.push({points: route.points, ...traced(route.id, colour, width, opacity), start: back > 0, arrow: look.arrow === 'none' || noArrow.has(route.id) ? null : look.arrow ? hex(look.arrow) : COLOURS.arrow, dash: dashOf(look.dash)});
+    lines.push({points: routeToGlyphs(route.points, glyphs.get(route.source), glyphs.get(route.target)), ...traced(route.id, colour, width, opacity), start: back > 0, arrow: look.arrow === 'none' || noArrow.has(route.id) ? null : look.arrow ? hex(look.arrow) : COLOURS.arrow, dash: dashOf(look.dash)});
     if ((aggregated && total > 1) || weight > 1) {
       const mid = route.points[Math.floor(route.points.length / 2)];
       text({x: mid.x + 6, y: mid.y - 6, text: aggregated && back ? `${weight} ⇄ ${back}` : String(weight), size: 12, colour: COLOURS.text});
@@ -280,7 +283,9 @@ export function sceneBuffers(input, state = {}) {
     const attribute = n.kind === 'attribute', round = n.shape === 'circle' && !attribute && !n.rows?.length;
     const dash = n.kind === 'rest' || look.dash ? 1 : 0;
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-    if (!attribute) {
+    const glyph = glyphs.get(n.id);
+    if (glyph) box(leafLayer, n.id, {x: glyph.cx - glyph.r, y: glyph.cy - glyph.r, width: 2 * glyph.r, height: 2 * glyph.r}, glyph.r, 1, strokeWidth, fill, stroke, dash);
+    else if (!attribute) {
       if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, n.id, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, strokeWidth, fill, stroke, dash); }
       else box(leafLayer, n.id, r, radiusOf(look, r, 7), 0, strokeWidth, fill, stroke, dash);
     }
@@ -290,7 +295,10 @@ export function sceneBuffers(input, state = {}) {
       box(leafLayer, 'pin:' + n.id, {x: px - 4, y: py - 4, width: 8, height: 8}, 4, 1, 0, withAlpha(COLOURS.pin, faded), NONE);
     }
     const own = look.text ?? COLOURS.text, colour = faded < 1 ? fadeCss(own, faded) : own;
-    if (!n.rows?.length) {
+    if (glyph) {
+      // A glyph's name outside it, right of and below the dot; from afar a label of a fixed size beside the dot.
+      text({x: glyph.labelX, y: glyph.labelY, text: n.label.slice(0, 32), size: 12, colour, lod: {kind: 'leaf', box: r, dot: glyph}});
+    } else if (!n.rows?.length) {
       const label = (n.collapsed ? '▸ ' : '') + n.label.slice(0, 23);
       // `lod`: where the name goes when the box is too small on screen for the text at its own size (the renderer's
       // labels of a fixed screen size).
@@ -304,7 +312,8 @@ export function sceneBuffers(input, state = {}) {
   }
 
   // Marks: ports, crossings, edge labels.
-  for (const port of scene.showPorts ? scene.ports : []) {
+  // A glyph's ports are not marked: its lines run on to the dot.
+  for (const port of (scene.showPorts ? scene.ports : []).filter(p => !glyphs.has(p.nodeId))) {
     const p = port.position;
     box(markLayer, 'port:' + port.id, {x: p.x - 3, y: p.y - 3, width: 6, height: 6}, 3, 1, 1, port.endpoint === 'source' ? COLOURS.portSource : COLOURS.portTarget, COLOURS.frame);
   }

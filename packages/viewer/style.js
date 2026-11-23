@@ -58,7 +58,7 @@ function matches(selector, type, item) {
   return selector.tests.every(([k, v]) => (v === undefined ? item[k] !== undefined && item[k] !== null && item[k] !== false : String(item[k] ?? '') === v));
 }
 
-const NODE_PROPERTIES = ['fill', 'stroke', 'strokeWidth', 'text', 'dash', 'radius'];
+const NODE_PROPERTIES = ['fill', 'stroke', 'strokeWidth', 'text', 'dash', 'radius', 'glyph', 'glyphSize'];
 const EDGE_PROPERTIES = ['stroke', 'arrow', 'width', 'opacity', 'dash'];
 
 /**
@@ -125,6 +125,29 @@ function busData(scene) {
   return {routeBus, nodeBuses};
 }
 
+/**
+ * Provisional: a node drawn as a glyph (`glyph: 'dot'`): a dot of radius `glyphSize` (default 7) in the middle of its box
+ * instead of the box, its name outside, right of and below the dot (where lines running across or along do not cross
+ * it). `null` for a node drawn as its box.
+ */
+export function glyphOf(look, bounds) {
+  if (look?.glyph !== 'dot') return null;
+  const r = look.glyphSize ?? 7, cx = bounds.x + bounds.width / 2, cy = bounds.y + bounds.height / 2;
+  return {cx, cy, r, labelX: cx + r + 3, labelY: cy + r + 11};
+}
+
+/**
+ * The points a route is drawn with when an end is a glyph: a straight route (two points) runs from the middle of one
+ * dot to the middle of the other, so lines placed on a lattice stay octilinear; a longer route gets a connector from its
+ * end to the dot's middle. Unchanged when neither end is a glyph.
+ */
+export function routeToGlyphs(points, sourceGlyph, targetGlyph) {
+  if (!points?.length || (!sourceGlyph && !targetGlyph)) return points;
+  const centre = g => ({x: g.cx, y: g.cy});
+  if (points.length === 2) return [sourceGlyph ? centre(sourceGlyph) : points[0], targetGlyph ? centre(targetGlyph) : points[1]];
+  return [...(sourceGlyph ? [centre(sourceGlyph)] : []), ...points, ...(targetGlyph ? [centre(targetGlyph)] : [])];
+}
+
 const kebab = name => name.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
 /**
  * The theme tokens a page sets as CSS custom properties on `element` (or inherits): `--arqlet-<token in kebab case>`,
@@ -155,8 +178,8 @@ export const STYLE_PRESETS = Object.freeze({
       junctionFill: '#ffffff', junctionStroke: '#1b1b1b', hover: '#0019a8', trace: '#e32017', pin: '#ee7c0e', crossing: '#ee7c0e'},
     rules: [
       {selector: 'edge[bus]', style: {stroke: 'auto(bus)', arrow: 'none', width: 5, opacity: 1}},
-      {selector: 'leaf[bus]', style: {fill: '#ffffff', stroke: 'auto(bus)', strokeWidth: 3, text: '#1b1b1b', radius: 'pill'}},
-      {selector: 'leaf[interchange]', style: {fill: '#ffffff', stroke: '#1b1b1b', strokeWidth: 4, text: '#1b1b1b', radius: 'pill'}},
+      {selector: 'leaf[bus]', style: {fill: '#ffffff', stroke: 'auto(bus)', strokeWidth: 3, text: '#1b1b1b', radius: 'pill', glyph: 'dot', glyphSize: 7}},
+      {selector: 'leaf[interchange]', style: {fill: '#ffffff', stroke: '#1b1b1b', strokeWidth: 4, text: '#1b1b1b', radius: 'pill', glyph: 'dot', glyphSize: 10}},
     ],
   },
   // A light theme (the host's background must be light too).

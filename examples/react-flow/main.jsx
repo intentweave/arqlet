@@ -15,7 +15,13 @@ import {createStyle,STYLE_PRESETS} from '@arqlet/viewer/style.js';
 const sides={left:Position.Left,right:Position.Right,top:Position.Top,bottom:Position.Bottom};
 // With a style (`toReactFlow(…, {style})`), the node's resolved look (style.js) sets its colours, as in the SVG and GPU views.
 function DiagramNode({data,selected}){
- const look=data.look,colours=look?{background:selected?look.selectedFill:look.fill,borderColor:data.invalid?look.invalid:selected?look.selectedStroke:look.stroke,color:look.text,borderWidth:look.strokeWidth,borderStyle:look.dash?'dashed':'solid',...(look.radius!==undefined?{borderRadius:look.radius==='pill'?9999:look.radius}:{})}:undefined;
+ const look=data.look;
+ // A glyph (metro style): a station dot in the middle of the node, its name outside, right of and below it.
+ if(look?.glyph==='dot'){const r=look.glyphSize,w=data.bounds.width,h=data.bounds.height;return <div style={{width:'100%',height:'100%',position:'relative',pointerEvents:'auto'}}>
+  <div style={{position:'absolute',left:w/2-r,top:h/2-r,width:2*r,height:2*r,borderRadius:'50%',boxSizing:'border-box',background:selected?look.selectedFill:look.fill,border:`${look.strokeWidth}px solid ${selected?look.selectedStroke:look.stroke}`}}/>
+  <div style={{position:'absolute',left:w/2+r+3,top:h/2+r,fontSize:12,whiteSpace:'nowrap',color:look.text}}>{data.label}</div>
+  {data.handles.map(hd=><Handle key={hd.id} id={hd.id} type={hd.type} position={sides[hd.side]} isConnectable={false} style={{left:hd.x,top:hd.y,right:'auto',bottom:'auto',transform:'translate(-50%,-50%)',opacity:0}}/>)}</div>;}
+ const colours=look?{background:selected?look.selectedFill:look.fill,borderColor:data.invalid?look.invalid:selected?look.selectedStroke:look.stroke,color:look.text,borderWidth:look.strokeWidth,borderStyle:look.dash?'dashed':'solid',...(look.radius!==undefined?{borderRadius:look.radius==='pill'?9999:look.radius}:{})}:undefined;
  return <div className={`lw-node ${data.container?'container':''} ${selected?'selected':''} ${data.invalid?'invalid':''}`} style={colours}>
   <div className="title">{data.container?'▾ ':data.collapsed?'▸ ':''}{data.label}</div>
   {data.handles.map(h=><Handle key={h.id} id={h.id} type={h.type} position={sides[h.side]} isConnectable={false} style={{left:h.x,top:h.y,right:'auto',bottom:'auto',transform:'translate(-50%,-50%)',opacity:data.showPorts?1:0,background:h.type==='source'?'#7ee1bc':'#9dbaff'}}/>)}
@@ -25,7 +31,7 @@ function DiagramNode({data,selected}){
 const markerId=colour=>colour?`lw-rf-arrow-${colour.replace(/[^a-z0-9]/gi,'')}`:'lw-rf-arrow';
 function DiagramEdge({id,data}){
  const look=data.look;
- return <BaseEdge id={id} path={routePath(data.points)} markerEnd={look?.arrow==='none'?undefined:`url(#${markerId(look?.arrow)})`} style={{stroke:data.invalid?(look?.invalid??'#f08f80'):(look?.stroke??'#73bba7'),strokeWidth:look?.width??Math.min(4,1.6+.4*(data.weight-1)),strokeOpacity:look?.opacity,strokeDasharray:look?.dash}}/>;
+ return <BaseEdge id={id} path={routePath(look?.points??data.points)} markerEnd={look?.arrow==='none'?undefined:`url(#${markerId(look?.arrow)})`} style={{stroke:data.invalid?(look?.invalid??'#f08f80'):(look?.stroke??'#73bba7'),strokeWidth:look?.width??Math.min(4,1.6+.4*(data.weight-1)),strokeOpacity:look?.opacity,strokeDasharray:look?.dash}}/>;
 }
 // What is neither node nor edge (toReactFlow's overlays, with `overlayNode`): membership hulls behind everything, bus bars
 // with their taps, junction dots and hub-reference stubs, in renderSvg's colours, inside one inert node over the scene.

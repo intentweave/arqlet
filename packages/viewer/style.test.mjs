@@ -95,7 +95,7 @@ test('a scene\'s buses become data for the rules: a bus per route, stations and 
   assert.equal(style.bind(sc), b, 'bound once per scene');
 });
 
-test('metro: no arrowheads and pill corners in renderSvg, the GPU buffers and React Flow', () => {
+test('metro: no arrowheads, stations as dots with their names outside, lines to the dots, in every renderer', () => {
   const s = scene('bpmn-pools');
   const routes = s.routes.slice(0, 2).map(r => r.id);
   const withBus = {...s, buses: [routes]};
@@ -105,13 +105,23 @@ test('metro: no arrowheads and pill corners in renderSvg, the GPU buffers and Re
   walk(host, e => { if (e.tag === 'polyline' && routes.includes(e.attrs['data-route-id']) && e.attrs.class !== 'route-hit') lines.push(e); });
   assert.ok(lines.length === 2 && lines.every(l => !l.attrs['marker-end'] && l.attrs['stroke-width'] === 5), 'bus routes: thick, no marker');
   const station = s.routes.find(r => r.id === routes[0]).source;
-  let rx = null;
-  walk(host, e => { if (e.tag === 'g' && e.attrs['data-node-id'] === station) rx = e.children.find(c => c.tag === 'rect' && c.attrs.class !== 'lw-hit')?.attrs.rx; });
-  const box = s.nodes.find(n => n.id === station).bounds;
-  assert.equal(rx, Math.min(box.width, box.height) / 2, 'a station is a pill');
+  const box = s.nodes.find(n => n.id === station).bounds, cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  let dot = null, label = null;
+  walk(host, e => { if (e.tag === 'g' && e.attrs['data-node-id'] === station) { dot = e.children.find(c => c.tag === 'circle'); label = e.children.find(c => c.tag === 'text'); } });
+  assert.deepEqual([dot.attrs.cx, dot.attrs.cy, dot.attrs.r], [cx, cy, 7], 'a station is a dot in the middle of its box');
+  assert.ok(label.attrs.x > cx + 7 && label.attrs.y > cy + 7, 'its name outside, right of and below the dot');
+  // The route reaches the dot's middle.
+  const first = lines[0].attrs.points.split(' ')[0].split(',').map(Number);
+  const r0 = s.routes.find(r => r.id === lines[0].attrs['data-route-id']);
+  const ends = [r0.source, r0.target].map(id => s.nodes.find(n => n.id === id).bounds).map(b => [b.x + b.width / 2, b.y + b.height / 2]);
+  assert.ok(ends.some(([x, y]) => Math.abs(first[0] - x) < 1e-9 && Math.abs(first[1] - y) < 1e-9), 'a line starts in a dot');
   const plain = sceneBuffers(s, {style: STYLE_PRESETS.metro}), metro = sceneBuffers(withBus, {style: STYLE_PRESETS.metro});
   assert.equal(plain.layers[2].triangles.length - metro.layers[2].triangles.length, 2 * 3 * TRIANGLE_STRIDE, 'two arrowheads fewer on the GPU');
   const flow = toReactFlow(withBus, {style: STYLE_PRESETS.metro});
   assert.equal(flow.edges.find(e => e.id === routes[0]).data.look.arrow, 'none');
-  assert.equal(flow.nodes.find(n => n.id === station).data.look.radius, 'pill');
+  assert.equal(flow.nodes.find(n => n.id === station).data.look.glyph, 'dot');
+  assert.ok(flow.edges.find(e => e.id === routes[0]).data.look.points, 'React Flow gets the points to the dots');
+  // The GPU buffers draw the station as a dot of radius 7 in the middle.
+  const leaves = metro.layers[3].boxes, ids = metro.layers[3].ids, k = ids.indexOf(station);
+  assert.deepEqual([...leaves.slice(k * BOX_STRIDE, k * BOX_STRIDE + 6)], [cx - 7, cy - 7, 14, 14, 7, 1]);
 });

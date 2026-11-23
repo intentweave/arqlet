@@ -11,7 +11,7 @@ export interface StyleTheme {
 }
 /** What a rule sets on a node: colours may be CSS colours, a token (`$route`) or `auto` (categorical by kind). */
 /** `radius`: the corner radius, a number or `'pill'` (half the shorter side). */
-export interface NodeStyle { fill?: string; stroke?: string; strokeWidth?: number; text?: string; dash?: string; radius?: number | 'pill' }
+export interface NodeStyle { fill?: string; stroke?: string; strokeWidth?: number; text?: string; dash?: string; radius?: number | 'pill'; /** `'dot'`: a station dot of `glyphSize` (default 7) instead of the box, the name outside. */ glyph?: 'dot'; glyphSize?: number }
 /** What a rule sets on an edge (route). `width` and `opacity` replace the weight-based defaults; `arrow: 'none'` draws no arrowhead. */
 export interface EdgeStyle { stroke?: string; arrow?: string; width?: number; opacity?: number; dash?: string }
 /**
@@ -46,3 +46,8 @@ export function themeFromCss(element: Element, view?: Window): Partial<StyleThem
 /** Built-in sheets: `default`, `byKind` (routes and leaf outlines by kind), `metro` (buses as metro lines, stations,
  * interchanges; light), `light` (needs a light background). */
 export const STYLE_PRESETS: Readonly<Record<'default' | 'byKind' | 'metro' | 'light', StyleSheet>>;
+
+/** Provisional: a node's glyph (`glyph: 'dot'`): the dot's middle and radius and where its name goes; null for a box. */
+export function glyphOf(look: NodeStyle | null | undefined, bounds: {x: number; y: number; width: number; height: number}): {cx: number; cy: number; r: number; labelX: number; labelY: number} | null;
+/** The points a route is drawn with when an end is a glyph (to the dot's middle). */
+export function routeToGlyphs(points: {x: number; y: number}[], sourceGlyph: {cx: number; cy: number} | null | undefined, targetGlyph: {cx: number; cy: number} | null | undefined): {x: number; y: number}[];

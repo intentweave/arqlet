@@ -1,9 +1,9 @@
 import type {BoundaryCrossing, PlacedLabel, Point, Scene, SceneBusLine, SceneHubRef, SceneHull, SceneNode, SceneRoute} from '@arqlet/contracts';
 
 /** A node's appearance resolved from a style, the theme filled in; the state colours for the host to use. */
-export interface ArqletNodeLook { fill: string; stroke: string; text: string; strokeWidth: number; dash?: string; radius?: number | 'pill'; selectedFill: string; selectedStroke: string; invalid: string }
+export interface ArqletNodeLook { fill: string; stroke: string; text: string; strokeWidth: number; dash?: string; radius?: number | 'pill'; /** A glyph instead of the box: a dot of `glyphSize` in its middle, the name outside. */ glyph?: 'dot'; glyphSize?: number; selectedFill: string; selectedStroke: string; invalid: string }
 /** An edge's appearance resolved from a style. */
-export interface ArqletEdgeLook { stroke: string; /** 'none': no arrowhead. */ arrow: string; width?: number; opacity?: number; dash?: string; invalid: string }
+export interface ArqletEdgeLook { /** The route's points when an end is a glyph (run on to the dot's middle). */ points?: {x: number; y: number}[]; stroke: string; /** 'none': no arrowhead. */ arrow: string; width?: number; opacity?: number; dash?: string; invalid: string }
 
 export interface ArqletFlowHandle {
   id: string;

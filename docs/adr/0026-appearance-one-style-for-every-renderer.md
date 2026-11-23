@@ -67,6 +67,12 @@ black pill), on a light background; junction dots are the theme's `junctionFill`
 drawn as shared lines (`busStyle: 'lines'`); the playground switches the bus style when *Metro* is chosen, as a layout
 option that undo takes back. Checked in all three renderers (Node) and in Chrome against `renderSvg` in both backends.
 
+Stations (amended): the node properties `glyph: 'dot'` and `glyphSize` draw a node as a station dot in the middle of its
+box with its name outside (right of and below the dot, where lines running across or along do not cross it); its
+routes run on to the dot's middle (`routeToGlyphs`: a straight route from dot to dot, a longer one with a connector)
+and its ports are not marked. The layout keeps the box, so the name has room. With the octilinear star strategy and
+straight routing this gives octilinear lines through the stations.
+
 Not yet, and the steps after it: octilinear routing (0°, 45°, 90°, which the engine refuses today), the order of
 parallel lines in a shared corridor (metro-line crossing minimisation), line names in the scene (a bus carries only its
 edges, so lines are numbered, not named) and a legend; and a profile that carries layout options and a style together.
