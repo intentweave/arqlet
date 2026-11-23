@@ -687,6 +687,125 @@ fn a_bus_given_as_data_is_crossed_by_trace_and_neighbourhood() {
     );
 }
 
+/// #144: a bus given as data is one shared medium for `neighbourhood` in every bus style, as it is for `trace`.
+#[test]
+fn neighbourhood_crosses_a_bus_given_as_data_in_every_style() {
+    let mut nodes = vec![json!({"id": "gw", "kind": "ecu", "label": "gw"})];
+    let mut taps = vec![json!({"edge": "t-gw", "node": "gw", "toBus": true, "kind": "connects"})];
+    for i in 0..4 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("e{i}")}));
+        taps.push(json!({"edge": format!("t{i}"), "node": format!("e{i}"), "toBus": true, "kind": "connects"}));
+    }
+    let g: Graph = serde_json::from_value(json!({"nodes": nodes, "edges": [],
+        "buses": [{"id": "can", "edges": [], "label": "CAN", "kind": "bus", "taps": taps}]}))
+    .unwrap();
+    for style in ["bar", "lines", "trunk"] {
+        let options: LayoutOptions = serde_json::from_value(json!({"busStyle": style})).unwrap();
+        let s = import_graph_with(g.clone(), 100, &options).unwrap();
+        let around =
+            arqlet_runtime::trace::neighbourhood_answer_on(&s, &json!({"nodeId": "gw", "hops": 2}))
+                .unwrap();
+        let mut found = around.nodes.clone();
+        found.sort();
+        assert_eq!(
+            found,
+            ["can", "e0", "e1", "e2", "e3", "gw"],
+            "{style}: {around:?}"
+        );
+        // One hop: the bus itself is shown, as its bar or as its lines.
+        let near =
+            arqlet_runtime::trace::neighbourhood_answer_on(&s, &json!({"nodeId": "gw"})).unwrap();
+        let shown =
+            near.visible.nodes.contains(&"can".to_string()) || !near.visible.routes.is_empty();
+        assert!(
+            shown,
+            "{style}: the bus is shown at one hop: {:?}",
+            near.visible
+        );
+        if style == "lines" {
+            let mut lines = s.graph.buses[0].edges.clone();
+            lines.sort();
+            assert_eq!(near.visible.routes, lines, "the bus's lines");
+        }
+        let path =
+            arqlet_runtime::trace::trace_answer_on(&s, &json!({"from": "e0", "to": "e3"})).unwrap();
+        assert_eq!(path.length, Some(2), "{style}");
+    }
+}
+
+/// #145: a bus given as data needs no `edges`, and its taps make it a shared medium whatever `edges` holds.
+#[test]
+fn a_bus_with_taps_is_a_shared_medium_whatever_its_edges_hold() {
+    let mut nodes = Vec::new();
+    let mut taps = Vec::new();
+    for i in 0..4 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("e{i}")}));
+        taps.push(json!({"edge": format!("t{i}"), "node": format!("e{i}"), "toBus": true, "kind": "connects"}));
+    }
+    // Without `edges`, and with the member edges of an older form (removed from the graph) in `edges`.
+    for bus in [
+        json!({"id": "can", "kind": "bus", "taps": taps}),
+        json!({"id": "can", "kind": "bus", "taps": taps, "edges": ["old0", "old1", "old2"]}),
+    ] {
+        let g: Graph =
+            serde_json::from_value(json!({"nodes": nodes, "edges": [], "buses": [bus]})).unwrap();
+        for style in ["bar", "lines"] {
+            let options: LayoutOptions =
+                serde_json::from_value(json!({"busStyle": style})).unwrap();
+            let s = import_graph_with(g.clone(), 100, &options).unwrap();
+            let path =
+                arqlet_runtime::trace::trace_answer_on(&s, &json!({"from": "e0", "to": "e3"}))
+                    .unwrap();
+            assert_eq!(path.length, Some(2), "{style}: {path:?}");
+            let around = arqlet_runtime::trace::neighbourhood_answer_on(
+                &s,
+                &json!({"nodeId": "e0", "hops": 2}),
+            )
+            .unwrap();
+            assert_eq!(around.nodes.len(), 5, "{style}: {:?}", around.nodes);
+        }
+    }
+}
+
+/// #149 (first part): a patch keeps a bus given as data, and the taps of the nodes that stay.
+#[test]
+fn a_patch_keeps_a_bus_given_as_data() {
+    let mut nodes = Vec::new();
+    let mut taps = Vec::new();
+    for i in 0..4 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("e{i}")}));
+        taps.push(json!({"edge": format!("t{i}"), "node": format!("e{i}"), "toBus": true, "kind": "connects"}));
+    }
+    let g: Graph = serde_json::from_value(
+        json!({"nodes": nodes, "edges": [], "buses": [{"id": "can", "kind": "bus", "taps": taps}]}),
+    )
+    .unwrap();
+    for style in ["bar", "lines"] {
+        let options: LayoutOptions = serde_json::from_value(json!({"busStyle": style})).unwrap();
+        let s = import_graph_with(g.clone(), 100, &options).unwrap();
+        let patch: arqlet_model::GraphPatch = serde_json::from_value(json!({
+            "nodes": [{"id": "x", "kind": "ecu", "label": "x"}],
+            "removeNodes": ["e3"]
+        }))
+        .unwrap();
+        let p = arqlet_runtime::patch::patch_snapshot(&s, s.revision, s.layout_version, &patch)
+            .unwrap();
+        let bus = p.graph.buses.iter().find(|b| b.id == "can").expect(style);
+        let mut members: Vec<&str> = bus.taps.iter().map(|t| t.node.as_str()).collect();
+        members.sort();
+        assert_eq!(members, ["e0", "e1", "e2"], "{style}");
+        let scene = arqlet_scene::build_scene(&p).unwrap();
+        if style == "bar" {
+            assert!(p.bus_lines.contains_key("can"), "the bar stays");
+        } else {
+            assert!(
+                !scene.junctions.is_empty(),
+                "the lines and their junctions stay"
+            );
+        }
+    }
+}
+
 #[test]
 fn reveal_takes_the_id_of_a_bus_given_as_data() {
     let run = |v: serde_json::Value| -> serde_json::Value {

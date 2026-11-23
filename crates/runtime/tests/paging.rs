@@ -73,10 +73,64 @@ fn reveal_more_pages_through_a_rest_and_a_step_back_undoes_it() {
         .unwrap()
         .iter()
         .any(|c| c == "rest:box"));
-    // Paging a container that is not shown in part is refused.
+    // Paging a container that is shown whole is refused.
     let refused: Value = serde_json::from_str(&arqlet_runtime::dispatch(
         &json!({"op": "reveal", "snapshot": all, "expectedRevision": all["revision"], "expectedLayoutVersion": all["layoutVersion"],
             "more": {"container": "box", "count": 5}}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(refused["ok"], false);
+}
+
+/// #146: paging starts from a collapsed container: its first page, then the next one, and a step back collapses it.
+#[test]
+fn reveal_more_on_a_collapsed_container_shows_its_first_page() {
+    let mut nodes = vec![json!({"id": "box", "kind": "ecu", "label": "box"})];
+    for i in 0..30 {
+        nodes.push(json!({"id": format!("c{i:02}"), "kind": "frame", "label": format!("c{i:02}"), "parentId": "box"}));
+    }
+    let graph = json!({"nodes": nodes, "edges": []});
+    let first = run(json!({"op": "import", "graph": graph, "limit": 100, "options": {"levelOfDetail": {"depth": 0}}}))["snapshot"].clone();
+    assert!(first["collapsedIds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|c| c == "box"));
+    let page = on(
+        &first,
+        json!({"op": "reveal", "more": {"container": "box", "count": 12}}),
+    );
+    assert_eq!(shown(&page), 12);
+    let ids: Vec<&str> = page["options"]["partial"]["box"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(ids.first(), Some(&"c00"), "{ids:?}");
+    assert!(!page["collapsedIds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|c| c == "box"));
+    let next = on(
+        &page,
+        json!({"op": "reveal", "more": {"container": "box", "count": 12}}),
+    );
+    assert_eq!(shown(&next), 24);
+    // Back to the start: the intent of the import restores the collapsed container.
+    let remembered = run(json!({"op": "intent", "snapshot": first}))["intent"].clone();
+    let back = on(&next, json!({"op": "restore", "intent": remembered}));
+    assert!(back["collapsedIds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|c| c == "box"));
+    assert_eq!(shown(&back), 0);
+    // An unknown container is refused.
+    let refused: Value = serde_json::from_str(&arqlet_runtime::dispatch(
+        &json!({"op": "reveal", "snapshot": first, "expectedRevision": first["revision"], "expectedLayoutVersion": first["layoutVersion"],
+            "more": {"container": "nowhere", "count": 5}}).to_string(),
     ))
     .unwrap();
     assert_eq!(refused["ok"], false);

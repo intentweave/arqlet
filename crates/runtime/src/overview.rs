@@ -268,7 +268,11 @@ fn hierarchy_of(
             .map_err(|e| format!("Overview option hubs must be {{minLinks?, nodes?}}: {e}"))?,
         None => Default::default(),
     };
-    let graph = arqlet_layout::communities::with_given_groups(graph, &groups)?;
+    // #147: buses given as data (`Graph.buses` with taps) are nodes of shape `busLine` with one edge per tap, as the
+    // layout and `trace` see them, so the overview draws their bus lines too.
+    let expanded = arqlet_layout::with_bus_nodes(graph);
+    let graph =
+        arqlet_layout::communities::with_given_groups(expanded.as_ref().unwrap_or(graph), &groups)?;
     let h = overview::with_satellites(
         overview::with_communities_except(
             overview::hierarchy(&graph),

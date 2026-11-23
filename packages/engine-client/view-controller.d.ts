@@ -95,7 +95,7 @@ export interface ViewController {
   open(id: string): Promise<ViewResult>;
   close(id: string): Promise<ViewResult>;
   toggle(id: string): Promise<ViewResult>;
-  /** The next `count` (default `page`) children of a `+N more` box; `container` or `rest:<container>`. */
+  /** The next `count` (default `page`) children of a `+N more` box, or the first page of a collapsed container; `container` or `rest:<container>`. */
   showRest(container: string, count?: number): Promise<ViewResult>;
   reveal(nodeIds: string[], init?: {partial?: boolean}): Promise<ViewResult>;
   filter(hide?: Hidden): Promise<ViewResult>;

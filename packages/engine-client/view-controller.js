@@ -376,7 +376,8 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
 
     /**
      * Shows the next `count` (default `page`) children of `container`'s `+N more` box; on the last page the container is
-     * whole again. `container` may also be the rest's id (`rest:<container>`).
+     * whole again. A collapsed container opens in part with its first page. `container` may also be the rest's id
+     * (`rest:<container>`).
      */
     showRest(container, count = page) {
       const id = container.startsWith('rest:') ? container.slice(5) : container;

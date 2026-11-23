@@ -134,10 +134,15 @@ pub fn patch_snapshot(
     let kept_edges: BTreeSet<String> = graph.edges.iter().map(|e| e.id.clone()).collect();
     graph.ports.retain(|p| !removed.contains(&p.node_id));
     graph.edge_ports.retain(|b| kept_edges.contains(&b.edge_id));
+    let kept_nodes: BTreeSet<&str> = graph.nodes.iter().map(|n| n.id.as_str()).collect();
     for bus in &mut graph.buses {
         bus.edges.retain(|e| kept_edges.contains(e));
+        // A bus given as data (#145, #149) keeps the taps of the nodes that stay.
+        bus.taps.retain(|t| kept_nodes.contains(t.node.as_str()));
     }
-    graph.buses.retain(|b| !b.edges.is_empty());
+    graph
+        .buses
+        .retain(|b| !b.edges.is_empty() || !b.taps.is_empty());
     // Provisional (ADR 0022 §5b): the memberships changed by dimension and group; validated with the graph below.
     graph.memberships = patched_memberships(&graph.memberships, patch)?;
     validate(&graph)?;
