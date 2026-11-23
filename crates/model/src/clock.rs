@@ -19,6 +19,19 @@ pub struct Phases {
     pub repair: f64,
     pub port_resolution: f64,
     pub routing: f64,
+    /// Single pass (#152), parts of `routing`: the abstract plan, the channels' growth, the construction of the routes,
+    /// the router for the edges handed back to it, and the finalization.
+    pub plan: f64,
+    pub channel_growth: f64,
+    pub construction: f64,
+    pub fallback_routing: f64,
+    pub finalization: f64,
+    /// Drawing the explicit buses on the routes (#152).
+    pub buses: f64,
+    /// `elkLayout` (#152): translating the ELK graph and writing the result back, outside `layout`.
+    pub elk_translation: f64,
+    /// Refinement on request, outside `layout`.
+    pub refinement: f64,
 }
 
 static SPENT: Mutex<Phases> = Mutex::new(Phases {
@@ -29,6 +42,14 @@ static SPENT: Mutex<Phases> = Mutex::new(Phases {
     repair: 0.,
     port_resolution: 0.,
     routing: 0.,
+    plan: 0.,
+    channel_growth: 0.,
+    construction: 0.,
+    fallback_routing: 0.,
+    finalization: 0.,
+    buses: 0.,
+    elk_translation: 0.,
+    refinement: 0.,
 });
 
 /// Installs the host's clock (milliseconds from any fixed origin). The first one installed stays.
@@ -51,6 +72,14 @@ pub fn add(phases: Phases) {
         spent.repair += phases.repair;
         spent.port_resolution += phases.port_resolution;
         spent.routing += phases.routing;
+        spent.plan += phases.plan;
+        spent.channel_growth += phases.channel_growth;
+        spent.construction += phases.construction;
+        spent.fallback_routing += phases.fallback_routing;
+        spent.finalization += phases.finalization;
+        spent.buses += phases.buses;
+        spent.elk_translation += phases.elk_translation;
+        spent.refinement += phases.refinement;
     }
 }
 
