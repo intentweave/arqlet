@@ -449,10 +449,12 @@ boundaries 23 % along the flow and 20 % across, straight long edges 34 % across)
 single pass, and `packComponents` and a narrower channel beside a border rank do not pay. `simplexRanks` unguarded saves
 9.3 % area in sum but costs crossings on 3 of 17 views. Step 0 (2026-11-23,
 `benchmarks/results/simplex-guard-offline-20261123.md`): a guard per area cannot keep it safe — 11 of 16 regressions lie
-outside the area whose ranks changed (in children, siblings and ancestors). Open decision: no step 1, or a choice per
-view between the two rankings (no view worse by construction; −9.4 % area on the comparison task, −3.2 % on the configured
-datasets; a second layout per view, to be timed). Then unlinked sibling areas spread along the flow (step 2), its upper
-bound first; each behind an option, accepted only if no view gets worse.
+outside the area whose ranks changed (in children, siblings and ancestors). Decided: no guard per area and no choice per view in
+the layout (it would double every interactive step and could flip the ranks with an edit); instead the simplex ranks
+become the first refinement candidate under single pass (no view worse by construction; −9.4 % area on the comparison
+task, −3.2 % on the configured datasets; its time measured on an idle machine first). The main lever is the composition of
+the areas: unlinked sibling areas spread along the flow (step 2), its upper bound with ELK's layerers first; each behind an
+option, accepted only if no view gets worse.
 
 `ENGINE_VERSION` follows the release (`0.6.0` with release 0.6.0; it stayed `0.2.0-prototype` from 0.2 to 0.4): the
 defaults changed in 0.5.0 and 0.6.0, and edits refuse snapshots of another engine version.

@@ -2,6 +2,8 @@
 
 Date: 2026-11-23.
 Status: proposed. Nothing is implemented; the default output is unchanged. Step 0 done (2026-11-23): the plan-crossing
+Revised 2026-11-23 after step 0: the per-area guard (former step 1) is dropped; `simplexRanks` becomes a refinement
+candidate (step 1 below), and the composition of the areas (step 2) is the main lever.
 guard **fails**; the fallback for step 1 is open (see "Outcome of step 0").
 
 Related: [ADR 0016](0016-single-pass-default-gate.md) (single pass is the default), [ADR 0017](0017-area-border-legs.md)
@@ -98,36 +100,44 @@ simplex on 7 of 17 views, crossings 3064 → 2929, area −9.4 % on the uniform 
 that do not run single pass (configured mixed-large: `simplexRanks` 4.5 to 7 times slower on the legacy pipeline), so it
 would be limited to views that run single pass and timed on an idle machine first.
 
-Decision needed before step 1: **no step 1**, or **a choice per view** behind an option (limited to single pass, its time
-measured first). Step 2 does not depend on it and keeps its own order (ELK's `MIN_WIDTH`/`STRETCH_WIDTH` upper bound first).
+Decided (2026-11-23): **no per-area guard, and no choice per view in the layout.** A choice per view in the layout would
+double the cost of every layout, the interactive steps (open, toggle, filter) included, for at most 9.4 % area, which
+ranks last in the objective order; and the choice could flip with any edit, so that one toggle moved every rank of the
+view (ADR 0001, incremental layout), unless it were stored and kept. The choice per view is taken instead where its cost
+is off the interactive path: as a refinement candidate (step 1 below). Step 0 also shows where the lever for #119 is:
+rank changes act mostly on *other* areas, so the composition of the areas among themselves (step 2) comes before more
+work on the ranks inside one area.
 
-### Step 1: simplex ranks per area, kept only where they cost no crossings
+### Step 1: `simplexRanks` as a refinement candidate
 
-Single pass constructs every area on its own, so the ranking can be chosen per area. Each layered area is ranked both
-ways — longest paths and network simplex — and ordered both ways; the simplex ranks are kept for that area only when
-its ordered plan is **not worse in the objective order the plan can see**: first its crossings (the plan's crossings
-between neighbouring ranks, `layered_plan::order_crossings`, as `benchmarks/eval/plan-crossings.mjs` reads them), then
-its dummies (the plan's proxy for bends and length, which are not known before routing), ties broken by the longest-path
-ranks. Overlaps and line–node hits are not visible in the plan; they, and the drawn bends, are left to the acceptance. The choice must be deterministic and independent of the thread count, and an area whose
-choice is the longest-path ranks must lay out byte-identically to the default (a requirement of the implementation,
-checked against the stored fingerprints).
+The refinement already runs off the interactive path (a second worker or the backend, `refine`), compares candidate
+drawings by the published key in a fixed order, and publishes a result only for the revision it started from, so a stale
+result is refused (ADR 0006). Step 1 adds one candidate there: the view laid out again with network-simplex ranks
+(`simplexRanks`); it replaces the drawing only when it is better by the published key. So:
 
-The guard is a hypothesis, tested by step 0: the plan's crossings are known before routing and moved with the drawn
-crossings between the arms measured so far, but whether they catch the 3 to 4 views where `simplexRanks` costs
-crossings is what step 0 shows.
+- **No view worse, by construction**, in the published key's order (which follows the objectives). The gate runs above
+  give the expected result: simplex kept on 7 of 17 views, crossings 3064 → 2929, area −9.4 % (uniform task); 6 of 17,
+  crossings 5310 → 5194, area −3.2 % (configured datasets).
+- **The interactive steps keep their cost and their ranks**: the layout is unchanged; only a refinement exchanges the
+  drawing, as for every refinement candidate.
+- **New for single pass:** the refinement plans no candidates on a single-pass drawing today (ADR 0016); this is its
+  first. It gets its own candidate identity (strategy `simplex-ranks`, `execution::CandidateId`), counts in the
+  deterministic work budget like the others, and is independent of the thread count.
+- **Limited to views that run single pass**: on the pipeline before (configured mixed-large) `simplexRanks` is 4.5 to 7
+  times slower, and that pipeline has its own candidates.
+- **Kept across edits** (a requirement of the implementation): an edit after a refined drawing lays out with the ranking
+  the refinement chose, stored with the snapshot and omitted when it is the default, so the ranks do not flip back with
+  every toggle and the default output stays byte-identical; a new import starts from the default ranks.
 
-**The guard is local, the acceptance global.** Choosing ranks per area changes that area's box (its extent along the
-flow), and with it the ranks, legs and border nodes of its parent (ADR 0017). A guard that compares two plans of one area
-cannot see crossings or bends that move into the parent. The acceptance per view sees them; for every view that gets
-worse, the results record whether the regression lies in an area whose ranks changed or in an ancestor of it. If the
-regressions lie in ancestors, the guard is extended to the parent's plan with the child's new box before step 1 is
-accepted.
+Optionally the same choice as an option for hosts that lay out exactly once (the ELK drop-in, an export), where a second
+layout per view does not matter: `rankChoice: "best"`, behind the same acceptance.
 
-Cost: a second ranking and ordering per area; recorded with the measurement.
+Cost: a second layout per refinement of a single-pass view, measured on an idle machine before acceptance.
 
 ### Step 2: unlinked sibling areas spread along the flow
 
-For the stacking that step 1 leaves (layerweave-code: gaps between stacked sibling areas 4235 of 9581 across the flow):
+The main lever (step 0: rank changes act mostly on other areas). For the stacking of unlinked sibling areas
+(layerweave-code: gaps between stacked sibling areas 4235 of 9581 across the flow):
 an element whose links leave it slack between its earliest and its latest feasible rank takes, within that slack, the
 rank that balances the ranks' extents across the flow, counting an area by its box. This is width-bounded layering
 (Coffman and Graham, Acta Informatica 1972; the minimum-width heuristic of Healy and Nikolov, "How to layer a directed
@@ -156,8 +166,9 @@ changes.
 
 ## Consequences
 
-- If step 1 is accepted, part of the measured 9.3 % (uniform task) stays — the part on the areas where simplex ranks do
-  not cost crossings. The upper bound is known; what the guard keeps is not.
+- If step 1 is accepted, a refined single-pass view keeps the simplex ranks where they make it better by the published
+  key: −9.4 % area on the uniform task, −3.2 % on the configured datasets, from the gate runs; the layout itself and its
+  cost stay as they are.
 - Neither step changes spacings, frames, the construction's margins or the straightness of long edges, so the reasons
   for which those were ruled out still hold.
 - The remaining gap to elk-rs after both steps is expected to be the containers' frames and channels and the straight
@@ -165,7 +176,10 @@ changes.
 
 ## Open questions
 
-- Does the plan-crossing guard predict the drawn regressions (step 1)? If not, is a per-area construction affordable?
+- Answered by step 0: the plan-crossing guard does not predict the drawn regressions, and most of them lie outside the
+  area whose ranks changed; no per-area guard can see them.
+- Step 1: the time of the second layout per refinement on an idle machine, and how the chosen ranking is kept across
+  edits (stored with the snapshot) without changing the default output.
 - Which views lose under step 2, and by how much length?
 - `layerweave-code` is generated from the repository's source and drifts (measured copy: 1105 nodes / 2461 edges);
   record its size and hash with every figure.
