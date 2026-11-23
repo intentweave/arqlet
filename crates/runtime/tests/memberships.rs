@@ -1068,3 +1068,98 @@ fn m2b_no_hull_on_any_fixture_encloses_a_foreign_box_and_every_group_is_drawn_wh
         }
     }
 }
+
+/// A priority from JSON, for the `show` tests.
+fn with_priority(priority: serde_json::Value) -> LayoutOptions {
+    LayoutOptions {
+        grouping_priority: serde_json::from_value(priority).expect("a priority"),
+        ..LayoutOptions::default()
+    }
+}
+
+#[test]
+fn show_as_the_owner_makes_containers_of_the_shown_groups_only() {
+    // One project among several: Zeus becomes a box; whoever is on another project only stays in their department.
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let options = with_priority(serde_json::json!([
+        {"by": "project", "show": ["zeus"]}, {"by": "parent"}
+    ]));
+    let snapshot = import_graph_with(graph, 500, &options).expect("imports");
+    let view = view_parents(&snapshot);
+    for person in ["dora", "emil", "fay"] {
+        assert_eq!(
+            view[person].as_deref(),
+            Some("membership:project/zeus"),
+            "{person} is on Zeus"
+        );
+    }
+    assert_eq!(
+        view["anna"].as_deref(),
+        Some("sales"),
+        "Apollo is not shown"
+    );
+    assert_eq!(view["carl"].as_deref(), Some("eng"));
+    assert!(
+        !view
+            .keys()
+            .any(|id| id == "membership:project/apollo" || id == "membership:project/hermes"),
+        "a group not shown is no container"
+    );
+    let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
+    let project = &scene.membership_report[0];
+    assert_eq!(
+        (project.owned, project.groups, project.multiple_owners),
+        (3, 1, 0)
+    );
+}
+
+#[test]
+fn show_as_a_soft_criterion_draws_the_shown_groups_only() {
+    let graph: Graph = serde_json::from_str(THREE_DIMENSIONS).expect("a graph");
+    let options = with_priority(serde_json::json!([
+        {"by": "parent"}, {"by": "team", "show": ["payments"]}
+    ]));
+    let snapshot = import_graph_with(graph.clone(), 500, &options).expect("imports");
+    let scene = arqlet_scene::build_scene(&snapshot).expect("a scene");
+    let groups: BTreeSet<&str> = scene
+        .membership_hulls
+        .iter()
+        .map(|h| h.group.as_str())
+        .chain(scene.membership_marks.iter().map(|m| m.group.as_str()))
+        .collect();
+    assert_eq!(
+        groups,
+        ["payments"].into_iter().collect(),
+        "one team, not three"
+    );
+    let drawn: BTreeSet<&str> = scene
+        .membership_hulls
+        .iter()
+        .flat_map(|h| h.boxes.iter().map(String::as_str))
+        .chain(scene.membership_marks.iter().map(|m| m.node.as_str()))
+        .collect();
+    assert_eq!(drawn, ["billing", "ledger", "orders"].into_iter().collect());
+    let team = scene
+        .membership_report
+        .iter()
+        .find(|r| r.dimension == "team")
+        .expect("a team entry");
+    assert_eq!((team.groups, team.drawn), (1, 1));
+    // Drawing only: the boxes are the plain view's.
+    let plain = import_graph_with(graph, 500, &LayoutOptions::default()).expect("imports");
+    assert_eq!(snapshot.boxes, plain.boxes);
+}
+
+#[test]
+fn show_is_refused_on_parent_and_for_an_undeclared_group() {
+    let error = arqlet_runtime::options_from_patch(&serde_json::json!({
+        "groupingPriority": [{"by": "parent", "show": ["eng"]}]
+    }))
+    .expect_err("show on parent");
+    assert!(error.contains("not to parent"), "{error}");
+    let graph: Graph = serde_json::from_str(ORG_CHART).expect("a graph");
+    let options =
+        with_priority(serde_json::json!([{"by": "project", "show": ["ares"]}, {"by": "parent"}]));
+    let error = import_graph_with(graph, 500, &options).expect_err("an undeclared group");
+    assert!(error.contains("declares no group"), "{error}");
+}

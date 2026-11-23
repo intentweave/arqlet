@@ -5,6 +5,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- `show` on a criterion of `groupingPriority` (provisional, ADR 0022): a dimension shows only the listed groups — one
+  document among hundreds. As the first criterion only those groups become boxes and every other node falls to the next
+  criterion; held softly only they draw hulls or marks. A member of a nested group belongs to the deepest shown group on
+  its path. Refused on `parent` and for a group the dimension does not declare. Playground: *Show only*.
+
 ### Changed
 
 - A soft membership group is no longer always one hull (provisional, ADR 0022 M2b): it is drawn whole where its hull

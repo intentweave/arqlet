@@ -829,6 +829,10 @@ fn membership_overlays(
                 }
             }
             for group in &d.groups {
+                // A group the criterion does not show (`show`) is neither drawn nor counted.
+                if !grouping::shows(criterion, &group.id) {
+                    continue;
+                }
                 for m in &group.members {
                     if !parent_of.contains_key(m.as_str()) {
                         unknown += 1;

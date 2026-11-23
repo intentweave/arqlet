@@ -55,8 +55,33 @@ pub fn with_grouping_priority(
             (d.id.as_str(), of)
         })
         .collect();
-    // The groups that own a node, with their ancestors in the dimension: they become containers. A walk stops at a group
-    // met already (its ancestors are in), and after as many steps as the dimension has groups (a cycle, refused earlier).
+    // Whether a group is shown: its criterion's `show` lists it, or the criterion lists none.
+    let shown = |dimension: &str, group: &str| -> bool {
+        priority
+            .iter()
+            .find(|c| c.by == dimension)
+            .is_none_or(|c| grouping::shows(c, group))
+    };
+    // The nearest shown ancestor of a group: the container a shown group nests in. Bounded like every walk up here.
+    let shown_parent = |dimension: &str, group: &str| -> Option<String> {
+        let parent_of = parents.get(dimension)?;
+        let mut at = parent_of.get(group).copied().flatten();
+        let mut walked = 0usize;
+        while let Some(p) = at {
+            if shown(dimension, p) {
+                return Some(p.to_string());
+            }
+            walked += 1;
+            if walked > parent_of.len() {
+                return None;
+            }
+            at = parent_of.get(p).copied().flatten();
+        }
+        None
+    };
+    // The groups that own a node, with their shown ancestors in the dimension: they become containers. A walk stops at a
+    // group met already (its ancestors are in), and after as many steps as the dimension has groups (a cycle, refused
+    // earlier). A group the criterion does not show is passed over, never made a container.
     let mut needed: std::collections::BTreeSet<(String, String)> = Default::default();
     for owner in ownership.owners.values() {
         if let Owner::Group { dimension, group } = owner {
@@ -66,7 +91,10 @@ pub fn with_grouping_priority(
             let mut at = Some(group.as_str());
             let mut walked = 0usize;
             while let Some(g) = at {
-                if !needed.insert((dimension.clone(), g.to_string())) || walked > parent_of.len() {
+                if walked > parent_of.len() {
+                    break;
+                }
+                if shown(dimension, g) && !needed.insert((dimension.clone(), g.to_string())) {
                     break;
                 }
                 walked += 1;
@@ -95,7 +123,7 @@ pub fn with_grouping_priority(
                 } else {
                     g.label.clone()
                 },
-                parent_id: g.parent.as_deref().map(|p| container_id(&d.id, p)),
+                parent_id: shown_parent(&d.id, &g.id).map(|p| container_id(&d.id, &p)),
                 shape: Default::default(),
             });
         }

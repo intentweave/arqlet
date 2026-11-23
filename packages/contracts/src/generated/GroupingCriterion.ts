@@ -23,4 +23,11 @@ as?: GroupingRendering,
 /**
  * The shape of this criterion's hulls where it holds nodes softly; `LayoutOptions::membership_hull` without it.
  */
-hull?: HullShape, };
+hull?: HullShape,
+/**
+ * The groups of a dimension this criterion shows; empty (the default) shows them all. A shown group owns or holds
+ * its members as usual, and a member of a nested group belongs to the deepest shown group on its path. Groups not
+ * shown neither become containers nor draw hulls, so the nodes they would own fall to the next criterion. Not
+ * allowed on `parent`. Lets a view show one document among hundreds (ADR 0022 §2).
+ */
+show?: Array<string>, };

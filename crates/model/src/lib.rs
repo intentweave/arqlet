@@ -2661,6 +2661,13 @@ pub struct GroupingCriterion {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub hull: Option<HullShape>,
+    /// The groups of a dimension this criterion shows; empty (the default) shows them all. A shown group owns or holds
+    /// its members as usual, and a member of a nested group belongs to the deepest shown group on its path. Groups not
+    /// shown neither become containers nor draw hulls, so the nodes they would own fall to the next criterion. Not
+    /// allowed on `parent`. Lets a view show one document among hundreds (ADR 0022 §2).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub show: Vec<String>,
 }
 
 /// Provisional (ADR 0022 §3): how an owning criterion's groups are drawn.
@@ -2912,6 +2919,9 @@ impl LayoutOptions {
             }
             if c.by == grouping::PARENT && !c.values.is_empty() {
                 return Err("groupingPriority: values belong to a dimension, not to parent".into());
+            }
+            if c.by == grouping::PARENT && !c.show.is_empty() {
+                return Err("groupingPriority: show belongs to a dimension, not to parent".into());
             }
         }
         let lanes = self
