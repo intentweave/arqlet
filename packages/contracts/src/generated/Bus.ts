@@ -5,7 +5,13 @@ import type { BusTap } from "./BusTap";
  * An explicit bus (`Graph::buses`): edges drawn with one shared trunk. The edges that share an end (all one source,
  * or all one target) leave (enter) that node by one port and share the way to where they branch off.
  */
-export type Bus = { id: string, edges: Array<string>,
+export type Bus = { id: string,
+/**
+ * The member edges of a bus drawn on shared routes. Optional in input (`[]`); a bus with `taps` is a shared medium
+ * whatever its input `edges` hold: they are dropped at the import (`Graph::taps_as_media`, #145), and the view fills
+ * them with the lines it draws.
+ */
+edges?: Array<string>,
 /**
  * What the bus is called in the drawing ("CAN 500 kbit/s"). Placed like an edge label when the options give its size
  * under `edge_labels["bus:<id>"]`; omitted when none.

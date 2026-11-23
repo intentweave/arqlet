@@ -761,6 +761,58 @@ fn a_bus_line_node_is_a_line_with_taps_in_the_overview() {
     assert_eq!(overview(&graph, 4)["busLines"], o["busLines"]);
 }
 
+/// #147: buses given as data (`Graph.buses` with taps, no node) are drawn as bus lines in the overview, as `busLine` nodes are.
+#[test]
+fn a_bus_given_as_data_is_a_bus_line_in_the_overview() {
+    let mut nodes = Vec::new();
+    let mut can = Vec::new();
+    for i in 0..5 {
+        nodes.push(json!({"id": format!("e{i}"), "kind": "ecu", "label": format!("E{i}")}));
+        can.push(json!({"edge": format!("c{i}"), "node": format!("e{i}"), "toBus": true, "kind": "connects"}));
+    }
+    let lin = vec![json!({"edge": "l0", "node": "e0", "toBus": true, "kind": "connects"})];
+    let graph = json!({"nodes": nodes, "edges": [], "buses": [
+        {"id": "can", "kind": "bus", "label": "CAN", "taps": can},
+        {"id": "lin", "kind": "bus", "label": "LIN", "taps": lin}
+    ]});
+    let o = overview(&graph, 1);
+    let ids: Vec<&str> = o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    let lines = o["busLines"]
+        .as_array()
+        .expect("bus lines for buses given as data");
+    assert_eq!(lines.len(), 2);
+    let members = |line: &Value| -> (String, Vec<String>) {
+        let bus = ids[line["node"].as_u64().unwrap() as usize].to_string();
+        let mut taps: Vec<String> = line["taps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| ids[t.as_u64().unwrap() as usize].to_string())
+            .collect();
+        taps.sort();
+        (bus, taps)
+    };
+    let mut found: Vec<(String, Vec<String>)> = lines.iter().map(members).collect();
+    found.sort();
+    assert_eq!(
+        found[0],
+        (
+            "can".to_string(),
+            vec!["e0", "e1", "e2", "e3", "e4"]
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        )
+    );
+    assert_eq!(found[1], ("lin".to_string(), vec!["e0".to_string()]));
+    assert_eq!(overview(&graph, 4)["busLines"], o["busLines"]);
+}
+
 #[test]
 fn a_member_in_another_cluster_taps_the_bus_line_without_stretching_it() {
     // A zone with a bus and four members, and a gateway outside on the same bus: the line stays within the zone's disc.

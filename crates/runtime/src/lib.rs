@@ -727,6 +727,8 @@ pub fn import_graph_counted(
     let options = single_pass.as_ref().unwrap_or(options);
     let budgeted = budget_communities(options);
     let options = budgeted.as_ref().unwrap_or(options);
+    // #145: a bus given with taps is a shared medium whatever its `edges` hold.
+    graph.taps_as_media();
     validate(&graph)?;
     options.validate_grouping()?;
     arqlet_model::grouping::validate(&options.grouping_priority, &graph.memberships)?;
@@ -1252,8 +1254,9 @@ pub fn reveal_nodes(
 }
 
 /// Provisional (paging): the next `count` children of a container shown in part (`LayoutOptions::partial`), in the order
-/// of the graph, that its rest (`+N more`) still holds; revealed as `reveal` with `partial` does. Unknown or whole
-/// containers are refused; a rest that is empty after it goes.
+/// of the graph, that its rest (`+N more`) still holds; revealed as `reveal` with `partial` does. A collapsed container
+/// opens in part with its first page (#146). Unknown containers and containers shown whole are refused; a rest that is
+/// empty after it goes.
 pub fn reveal_more(
     snapshot: &Snapshot,
     expected: u64,
@@ -1261,8 +1264,15 @@ pub fn reveal_more(
     container: &str,
     count: usize,
 ) -> Result<Snapshot, String> {
-    let Some(shown) = snapshot.options.partial.get(container) else {
-        return Err(format!("{container} is not shown in part"));
+    let none = Vec::new();
+    let shown = match snapshot.options.partial.get(container) {
+        Some(shown) => shown,
+        None if snapshot.collapsed_ids.iter().any(|c| c == container) => &none,
+        None => {
+            return Err(format!(
+                "{container} is neither collapsed nor shown in part"
+            ))
+        }
     };
     let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let mut base_options = snapshot.options.clone();

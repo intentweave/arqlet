@@ -1718,6 +1718,22 @@ impl Graph {
         std::borrow::Cow::Owned(out)
     }
 
+    /// Provisional (#145): a bus given with `taps` is one shared medium for drawing, trace and neighbourhood, whatever its
+    /// input `edges` hold, so they are dropped (inside the engine, taps beside edges mean a bus already drawn as lines or
+    /// a trunk). Returns the ids of the buses whose edges were dropped. Called on a host's graph at the import.
+    pub fn taps_as_media(&mut self) -> Vec<String> {
+        let mut changed = Vec::new();
+        for bus in self
+            .buses
+            .iter_mut()
+            .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
+        {
+            bus.edges.clear();
+            changed.push(bus.id.clone());
+        }
+        changed
+    }
+
     pub fn edge_area(&self, source: &str, target: &str) -> Option<String> {
         let target_chain = self.strict_ancestors(target);
         self.strict_ancestors(source)
@@ -2672,6 +2688,11 @@ impl GroupingRendering {
 #[serde(rename_all = "camelCase")]
 pub struct Bus {
     pub id: String,
+    /// The member edges of a bus drawn on shared routes. Optional in input (`[]`); a bus with `taps` is a shared medium
+    /// whatever its input `edges` hold: they are dropped at the import (`Graph::taps_as_media`, #145), and the view fills
+    /// them with the lines it draws.
+    #[serde(default)]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
     pub edges: Vec<String>,
     /// What the bus is called in the drawing ("CAN 500 kbit/s"). Placed like an edge label when the options give its size
     /// under `edge_labels["bus:<id>"]`; omitted when none.
