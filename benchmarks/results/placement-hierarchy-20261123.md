@@ -606,7 +606,7 @@ straight from the border nodes to the children.
 
 ## The prototype
 
-An experimental option `borderChannelGap` (patch: `border-channel-gap-20261123.patch`, 138 lines; model, runtime
+An experimental option `borderChannelGap` (patch: `benchmarks/experiments/border-channel-gap-20261123.patch`, 138 lines; model, runtime
 validation, layout, regenerated TypeScript contract): beside a border rank, a channel with no counted track and nothing
 the construction reported short narrows to the given width; every other channel keeps the floor. Default unchanged
 (`None`, omitted) — the default arm below reproduces the earlier default run exactly on all 17 views.

@@ -1,7 +1,7 @@
 // Usage: node benchmarks/eval/border-channel.mjs [--limit 150] [--pose uniform|native] [--gaps 0,6,12,18] [--json OUT]
 //        [DATASET ...]; needs target/release/layout-command and `npm ci` in benchmarks/eval (elk-rs, uniform pose only).
 //
-// Needs the prototype patch applied first: `git apply benchmarks/results/border-channel-gap-20261123.patch` (the option was
+// Needs the prototype patch applied first: `git apply benchmarks/experiments/border-channel-gap-20261123.patch` (the option was
 // measured not to pay and is not part of the engine; see `placement-hierarchy-20261123.md`, fifth step).
 //
 // Issue #119, lever 1: the experimental option `borderChannelGap` lets a channel beside a border rank in which no edge

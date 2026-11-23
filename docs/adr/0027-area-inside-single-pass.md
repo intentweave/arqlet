@@ -61,22 +61,42 @@ layerweave-code (−3.7 %): its 19 unlinked areas move together towards the bord
 
 ## Decision (proposed)
 
-Two steps, each behind its own option, each measured and accepted before the next.
+Two steps, each behind its own option, each measured and accepted before the next; step 1 starts with an offline check
+of its guard (step 0).
+
+### Step 0: test the guard offline, before any engine change
+
+The guard of step 1 is read from the plan, which the probes can already compute without an engine change
+(`benchmarks/eval/plan-crossings.mjs`). For every view of both poses, and per layered area: the plan's crossings and
+dummies with longest-path ranks and with simplex ranks, and the choice step 1 would make. The check passes when, on the
+3 (uniform) and 4 (configured) views where unguarded `simplexRanks` is worse in objective order, the guard rejects the
+simplex ranks on the areas that cause the loss, and keeps them on the areas that carry the area gain (org-chart,
+mixed-large, synthetic-2k). Recorded in a results file, per view and area.
+
+If it fails, the fallback is decided before step 1 is built: a guard on the constructed routes of the area, whose cost (a
+construction per area) is measured on the same views first; or no step 1.
 
 ### Step 1: simplex ranks per area, kept only where they cost no crossings
 
 Single pass constructs every area on its own, so the ranking can be chosen per area. Each layered area is ranked both
 ways — longest paths and network simplex — and ordered both ways; the simplex ranks are kept for that area only when
-its ordered plan has **no more crossings** than the longest-path plan (the plan's crossings between neighbouring ranks,
-`layered_plan::order_crossings`, as `benchmarks/eval/plan-crossings.mjs` reads them), ties broken by fewer dummies, then
-by the longest-path ranks. The choice must be deterministic and independent of the thread count, and an area whose
+its ordered plan is **not worse in the objective order the plan can see**: first its crossings (the plan's crossings
+between neighbouring ranks, `layered_plan::order_crossings`, as `benchmarks/eval/plan-crossings.mjs` reads them), then
+its dummies (the plan's proxy for bends and length, which are not known before routing), ties broken by the longest-path
+ranks. Overlaps and line–node hits are not visible in the plan; they, and the drawn bends, are left to the acceptance. The choice must be deterministic and independent of the thread count, and an area whose
 choice is the longest-path ranks must lay out byte-identically to the default (a requirement of the implementation,
 checked against the stored fingerprints).
 
-The guard is a hypothesis to test, not a result: the plan's crossings are known before routing and moved with the drawn
+The guard is a hypothesis, tested by step 0: the plan's crossings are known before routing and moved with the drawn
 crossings between the arms measured so far, but whether they catch the 3 to 4 views where `simplexRanks` costs
-crossings is exactly what step 1 has to show. If they do not, the fallback is a guard on the constructed routes of the area, which
-costs a construction per area.
+crossings is what step 0 shows.
+
+**The guard is local, the acceptance global.** Choosing ranks per area changes that area's box (its extent along the
+flow), and with it the ranks, legs and border nodes of its parent (ADR 0017). A guard that compares two plans of one area
+cannot see crossings or bends that move into the parent. The acceptance per view sees them; for every view that gets
+worse, the results record whether the regression lies in an area whose ranks changed or in an ancestor of it. If the
+regressions lie in ancestors, the guard is extended to the parent's plan with the child's new box before step 1 is
+accepted.
 
 Cost: a second ranking and ordering per area; recorded with the measurement.
 
@@ -91,7 +111,9 @@ the papers; no code is copied. It changes the ranks inside one area, so ADR 0017
 
 It is not obviously a gain: on layerweave-code the unlinked areas are linked only to the border rank, so an area moved
 away from the border lengthens its chain again, and dummies also cost room across the flow. The trade has to be
-measured, not assumed.
+measured, not assumed. A cheap upper bound comes first: ELK's own `MIN_WIDTH` and `STRETCH_WIDTH` layerers, run through
+the pinned elk-rs (`benchmarks/eval`) on the same views and poses, against elk-rs's default layering; if they buy little
+area there, step 2 is not built.
 
 ### Acceptance, for each step
 
