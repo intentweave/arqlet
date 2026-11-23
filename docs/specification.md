@@ -440,6 +440,14 @@ tracks need; every measured dataset keeps its crossings and bends, the layered v
 17 % less area. New reference fingerprints: `fingerprints-20261114-channels-by-demand-default.jsonl`
 (15 views at threads 1 and 4); with `channelsByDemand: false` the geometry equals 0.4.0.
 
+Area against elk-rs inside single pass (issue #119, ADR 0027 proposed, 2026-11-23): single pass stays the default and
+no view may get worse in objective order. The area is 1.60 times elk-rs's at the median on the comparison task, with
+fewer crossings and bends; where it goes is measured in `benchmarks/results/placement-hierarchy-20261123.md` (container
+boundaries 23 % along the flow and 20 % across, straight long edges 34 % across). `globalLayering` cannot run with
+single pass, and `packComponents` and a narrower channel beside a border rank do not pay. Next: `simplexRanks` kept per
+area only where its plan has no more crossings (unguarded it saves 9.3 % area in sum but costs crossings on 3 of 17
+views), then unlinked sibling areas spread along the flow; each behind an option, accepted only if no view gets worse.
+
 `ENGINE_VERSION` follows the release (`0.6.0` with release 0.6.0; it stayed `0.2.0-prototype` from 0.2 to 0.4): the
 defaults changed in 0.5.0 and 0.6.0, and edits refuse snapshots of another engine version.
 
