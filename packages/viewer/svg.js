@@ -1,5 +1,5 @@
 import {isSceneColumns,sceneOfColumns} from './scene-columns.js';
-import {createStyle} from './style.js';
+import {createStyle, glyphOf, routeToGlyphs} from './style.js';
 let viewerId=0;
 const markerIds=new WeakMap();
 /** Paint a scene. Selection is an event; this module never mutates or computes layout. */
@@ -161,9 +161,12 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  }
  // The selected route is drawn above the others; the other routes are dimmed. A wide transparent line makes a thin route clickable.
  const active=scene.routes.find(r=>r.id===selectedRoute),endpoints=new Set(active?[active.source,active.target]:[]);
+ // Leaves drawn as glyphs (a style's `glyph: 'dot'`): their routes run on to the dot's middle.
+ const glyphs=new Map();
+ for(const n of nodes.values())if(!parents.has(n.id)&&n.kind!=='attribute'&&!n.rows?.length){const gl=glyphOf(looks.node(n),n.bounds);if(gl)glyphs.set(n.id,gl);}
  for(const route of scene.routes){const weight=route.weight??1,isActive=route===active,dim=!!active&&!isActive;
   // The engine's points already contain the arcs of a rounded route (crates/scene realize.rs); they are drawn as given.
-  const points=route.points.map(p=>`${p.x},${p.y}`).join(' ');
+  const points=routeToGlyphs(route.points,glyphs.get(route.source),glyphs.get(route.target)).map(p=>`${p.x},${p.y}`).join(' ');
   // A route that stands for collapsed content (communities) carries its edges in both directions: it grows wider and
   // more opaque with their number (logarithmically, so strong links stand out), and has an arrow at the start too when
   // some run back.
@@ -221,13 +224,17 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  g.append(element('rect',{x:cx-hitW/2,y:cy-hitH/2,width:hitW,height:hitH,fill:'transparent',class:'lw-hit'}));
  // Entity-relationship notation: an attribute is a row of text in its entity; relationships are labelled edges.
  const attribute=n.kind==='attribute';
+ const glyph=glyphs.get(n.id);
  const shape=attribute?element('rect',{...r,rx:4,fill:'transparent',stroke:'transparent'})
+  :glyph?element('circle',{cx:glyph.cx,cy:glyph.cy,r:glyph.r,...look})
   :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:radiusOf(own,r,7),...look});
  g.append(shape);
  g.onpointerenter=()=>shape.setAttribute('stroke',HOVER_STROKE);
  g.onpointerleave=()=>shape.setAttribute('stroke',attribute?'transparent':look.stroke);if(pinned.has(n.id)){g.setAttribute('data-pinned-id',n.id);if(!onPin){const pin=element('circle',{cx:round?cx+rad*.62:r.x+r.width-10,cy:round?cy-rad*.62:r.y+10,r:4,fill:T.pin,'pointer-events':'none'});pin.append(element('title',{},'Pinned: layout keeps this position'));g.append(pin);}}
  const size=controlSize(Math.min(r.height*.5,r.width/5,24)),toggled=onToggle&&collapsed.has(n.id);
- if(!n.rows?.length)g.append(element('text',round?{x:cx,y:cy+5,'text-anchor':'middle',fill:own.text??T.text,'font-size':13,'pointer-events':'none'}:{x:toggled?r.x+8+size:r.x+10,y:n.kind==='attribute'?r.y+r.height/2+5:r.y+32,fill:own.text??T.text,'font-size':13},(collapsed.has(n.id)&&!onToggle?'▸ ':'')+n.label.slice(0,23)));
+ // A glyph's name stands outside it, right of and below the dot.
+ if(glyph)g.append(element('text',{x:glyph.labelX,y:glyph.labelY,fill:own.text??T.text,'font-size':12,'pointer-events':'none'},n.label.slice(0,32)));
+ else if(!n.rows?.length)g.append(element('text',round?{x:cx,y:cy+5,'text-anchor':'middle',fill:own.text??T.text,'font-size':13,'pointer-events':'none'}:{x:toggled?r.x+8+size:r.x+10,y:n.kind==='attribute'?r.y+r.height/2+5:r.y+32,fill:own.text??T.text,'font-size':13},(collapsed.has(n.id)&&!onToggle?'▸ ':'')+n.label.slice(0,23)));
  if(toggled)g.append(toggleControl(n,r.x+4,r.y+(r.height-size)/2,size));
  // Rows of a node (ADR 0011): the engine gives each row its rectangle; the viewer draws the text inside it. The first row
 // is the title, a rule separates it from the others.
@@ -236,8 +243,9 @@ if(n.rows?.length){
   const t=n.rows[0].bounds;
   if(n.rows.length>1)g.append(element('line',{x1:r.x,y1:t.y+t.height+2,x2:r.x+r.width,y2:t.y+t.height+2,stroke:T.frameStroke,'pointer-events':'none'}));
 }
-if(onPin&&n.kind!=='attribute')g.append(pinControl(n,round?cx+rad*.62-size/2:r.x+r.width-size-4,round?cy-rad*.62-size/2:r.y+4,size));g.append(element('title',{},n.id));const select=e=>choose(n,e);g.onclick=select;g.onkeydown=e=>{if(e.key==='Enter')select(e);};if(onNodeDragStart&&!parents.has(n.id))g.onpointerdown=e=>onNodeDragStart(n,e);if(active&&!endpoints.has(n.id))g.setAttribute('opacity','.4');svg.append(g);}
- for(const port of (scene.showPorts?scene.ports:[])){const dot=element('circle',{'data-port-id':port.id,cx:port.position.x,cy:port.position.y,r:3,fill:port.endpoint==='source'?T.portSource:T.portTarget,stroke:T.frameFill,'stroke-width':1,'pointer-events':'none'});dot.append(element('title',{},`${port.id} · ${port.side}${onPortDragStart?' (drag along the border to place it)':''}`));svg.append(dot);
+if(onPin&&n.kind!=='attribute')g.append(glyph?pinControl(n,glyph.cx+glyph.r,glyph.cy-glyph.r-size,size):pinControl(n,round?cx+rad*.62-size/2:r.x+r.width-size-4,round?cy-rad*.62-size/2:r.y+4,size));g.append(element('title',{},n.id));const select=e=>choose(n,e);g.onclick=select;g.onkeydown=e=>{if(e.key==='Enter')select(e);};if(onNodeDragStart&&!parents.has(n.id))g.onpointerdown=e=>onNodeDragStart(n,e);if(active&&!endpoints.has(n.id))g.setAttribute('opacity','.4');svg.append(g);}
+ // A glyph's ports are not marked: its lines run on to the dot.
+ for(const port of (scene.showPorts?scene.ports:[]).filter(p=>!glyphs.has(p.nodeId))){const dot=element('circle',{'data-port-id':port.id,cx:port.position.x,cy:port.position.y,r:3,fill:port.endpoint==='source'?T.portSource:T.portTarget,stroke:T.frameFill,'stroke-width':1,'pointer-events':'none'});dot.append(element('title',{},`${port.id} · ${port.side}${onPortDragStart?' (drag along the border to place it)':''}`));svg.append(dot);
   // A port can be dragged along the border of its node: a larger invisible circle gives it a target that is easy to hit.
   if(onPortDragStart){const hit=element('circle',{'data-port-hit':port.id,cx:port.position.x,cy:port.position.y,r:Math.min(9/Math.max(scale||1,.0001),6),fill:'transparent','pointer-events':'all',style:'cursor:grab'});hit.onpointerdown=e=>{e.stopPropagation();onPortDragStart(port,e);};svg.append(hit);}}
  for(const crossing of scene.crossings){const mark=element('rect',{x:crossing.position.x-3,y:crossing.position.y-3,width:6,height:6,fill:T.crossing,'pointer-events':'none'});mark.append(element('title',{},`${crossing.edgeId} → ${crossing.containerId}`));svg.append(mark);}

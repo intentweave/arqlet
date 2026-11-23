@@ -1,4 +1,4 @@
-import {createStyle} from './style.js';
+import {createStyle, glyphOf, routeToGlyphs} from './style.js';
 /** Pure adapter: no React dependency and no secondary routing. */
 export function toReactFlow(scene,{overlayNode=false,draggable=false,style:sheet}={}){
  // With a style (style.js), every node and edge carries its resolved look (`data.look`), the theme filled in, so a host's
@@ -6,8 +6,11 @@ export function toReactFlow(scene,{overlayNode=false,draggable=false,style:sheet
  const style=sheet?createStyle(sheet):null,T=style?.theme;
  const looks=style?.bind(scene);
  const nodeLook=n=>{const o=looks.node(n);return {fill:o.fill??(n.container?T.frameFill:T.leafFill),stroke:o.stroke??(n.container?T.frameStroke:T.leafStroke),text:o.text??(n.container?T.title:T.text),
-  strokeWidth:o.strokeWidth??1,...(o.dash?{dash:o.dash}:{}),...(o.radius!==undefined?{radius:o.radius}:{}),selectedFill:T.selectedFill,selectedStroke:T.selectedStroke,invalid:T.invalid};};
- const edgeLook=r=>{const o=looks.edge(r);return {stroke:o.stroke??T.route,arrow:o.arrow??T.arrow,...(o.width!==undefined?{width:o.width}:{}),...(o.opacity!==undefined?{opacity:o.opacity}:{}),...(o.dash?{dash:o.dash}:{}),invalid:T.invalid};};
+  strokeWidth:o.strokeWidth??1,...(o.dash?{dash:o.dash}:{}),...(o.radius!==undefined?{radius:o.radius}:{}),...(o.glyph?{glyph:o.glyph,glyphSize:o.glyphSize??7}:{}),selectedFill:T.selectedFill,selectedStroke:T.selectedStroke,invalid:T.invalid};};
+ // A glyph's routes run on to the dot's middle (`routeToGlyphs`); the look carries those points.
+ const glyphs=new Map();
+ if(style)for(const n of scene.nodes)if(!n.container&&n.kind!=='attribute'&&!n.rows?.length){const g=glyphOf(looks.node(n),n.bounds);if(g)glyphs.set(n.id,g);}
+ const edgeLook=r=>{const o=looks.edge(r),gs=glyphs.get(r.source),gt=glyphs.get(r.target);return {...(gs||gt?{points:routeToGlyphs(r.points,gs,gt)}:{}),stroke:o.stroke??T.route,arrow:o.arrow??T.arrow,...(o.width!==undefined?{width:o.width}:{}),...(o.opacity!==undefined?{opacity:o.opacity}:{}),...(o.dash?{dash:o.dash}:{}),invalid:T.invalid};};
  if(scene.schemaVersion!==1)throw Error('Unsupported scene schema');
  const byId=new Map(scene.nodes.map(n=>[n.id,n])),handles=new Map(scene.nodes.map(n=>[n.id,[]]));
  for(const route of scene.routes){

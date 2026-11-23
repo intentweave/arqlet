@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Metro stations: a style may draw a node as a glyph (`glyph: 'dot'`, `glyphSize`): a station dot in the middle of its
+  box, its name outside, right of and below the dot, its lines running on to the dot's middle (straight routes from
+  dot to dot) and no port marks; in renderSvg, the GPU far layer (also its labels from afar) and React Flow. The
+  `metro` preset uses it for stations and interchanges.
 - Layout strategy `octilinear` (provisional): an octilinear star for bus systems and metro maps: the most linked node
   in the middle, branches in the eight compass directions, every line (explicit bus or edge kind) straight through the
   nodes it passes, other branches bending off by 45°. The example *Vehicle buses as metro lines* uses it with straight

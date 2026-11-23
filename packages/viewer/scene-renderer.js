@@ -56,8 +56,8 @@ function drawLodLabels(ctx, texts, view, w, h, rect, {minTextPixels, font}) {
   for (const t of candidates) {
     if (drawn >= MAX_LOD_LABELS) break;
     const px = LOD_PIXELS[t.lod.kind], b = t.lod.box, [x0, y0] = toScreen(b.x, b.y), bw = b.width * s, bh = b.height * s;
-    const container = t.lod.kind === 'container';
-    if (container ? bh < px + 2 || bw < px * 2 : bw < 6 || bh < 3) continue;
+    const container = t.lod.kind === 'container', dot = t.lod.dot;
+    if (dot ? dot.r * s < 1.5 : container ? bh < px + 2 || bw < px * 2 : bw < 6 || bh < 3) continue;
     ctx.font = `${t.lod.kind === 'container' ? 600 : 400} ${px}px ${font}`;
     let label = t.text, width = ctx.measureText(label).width;
     const room = container ? bw - 6 : Math.max(bw - 4, LEAF_ROOM);
@@ -68,7 +68,10 @@ function drawLodLabels(ctx, texts, view, w, h, rect, {minTextPixels, font}) {
     // large container), a leaf's name in its middle.
     const vx = Math.max(x0, 0), vy = Math.max(y0, 0);
     if (container && (vx + width + 8 > x0 + bw || vy + px + 4 > y0 + bh)) continue;
-    const lx = container ? vx + 4 : x0 + bw / 2 - width / 2, ly = container ? vy + px * 0.5 + 3 : y0 + bh / 2;
+    // A glyph's name right of and below its dot.
+    const [dx, dy] = dot ? toScreen(dot.cx, dot.cy) : [0, 0];
+    const lx = dot ? dx + dot.r * s + 3 : container ? vx + 4 : x0 + bw / 2 - width / 2;
+    const ly = dot ? dy + dot.r * s + px * 0.7 : container ? vy + px * 0.5 + 3 : y0 + bh / 2;
     const r = [lx - 1, ly - px * 0.6, lx + width + 1, ly + px * 0.6];
     if (!free(...r)) continue;
     take(r);
