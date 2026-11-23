@@ -34,6 +34,14 @@ fn timings_are_reported_on_request_and_change_nothing_else() {
         "repair",
         "portResolution",
         "routing",
+        "plan",
+        "channelGrowth",
+        "construction",
+        "fallbackRouting",
+        "finalization",
+        "buses",
+        "elkTranslation",
+        "refinement",
     ] {
         assert!(t[key].as_f64().is_some(), "{key} in {t}");
     }
@@ -54,4 +62,35 @@ fn timings_are_reported_on_request_and_change_nothing_else() {
         "expectedRevision": answer["revision"], "expectedLayoutVersion": answer["layoutVersion"]}));
     assert_eq!(toggled["ok"], true, "{toggled}");
     assert!(toggled["timings"]["total"].as_f64().is_some());
+    // In the same test: the times are collected in one place for the process, so two tests at once would mix them.
+    elk_layout_reports_translation_and_single_pass_phases();
+}
+
+/// #152: an `elkLayout` request reports its translation and the single-pass phases, and a refinement on request apart.
+fn elk_layout_reports_translation_and_single_pass_phases() {
+    let graph = json!({"id": "root", "children": [
+        {"id": "a", "width": 40, "height": 20}, {"id": "b", "width": 40, "height": 20}, {"id": "c", "width": 40, "height": 20}],
+        "edges": [{"id": "ab", "sources": ["a"], "targets": ["b"]}, {"id": "bc", "sources": ["b"], "targets": ["c"]},
+            {"id": "ac", "sources": ["a"], "targets": ["c"]}]});
+    let plain: Value = serde_json::from_str(&arqlet_runtime::dispatch(
+        &json!({"op": "elkLayout", "graph": graph}).to_string(),
+    ))
+    .unwrap();
+    let timed: Value = serde_json::from_str(&arqlet_runtime::dispatch(
+        &json!({"op": "elkLayout", "graph": graph, "timings": true, "refine": true}).to_string(),
+    ))
+    .unwrap();
+    assert_eq!(timed["ok"], true, "{timed}");
+    let t = &timed["timings"];
+    assert!(t["elkTranslation"].as_f64().unwrap() > 0., "{t}");
+    assert!(t["refinement"].as_f64().unwrap() > 0., "{t}");
+    // Single pass draws this graph: its plan and construction are timed, as parts of the routing.
+    assert!(t["plan"].as_f64().unwrap() > 0., "{t}");
+    assert!(t["construction"].as_f64().unwrap() > 0., "{t}");
+    assert!(
+        t["routing"].as_f64().unwrap() >= t["construction"].as_f64().unwrap(),
+        "{t}"
+    );
+    assert!(plain.get("timings").is_none());
+    assert_eq!(plain["ok"], true);
 }

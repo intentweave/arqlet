@@ -3830,7 +3830,14 @@ fn elk_response(v: &serde_json::Value) -> String {
             (None, Default::default())
         };
         let elk = ordered.as_ref().unwrap_or(&v["graph"]);
+        // Phase timings (#152): the translation in and out, and a refinement, apart from the layout.
+        let ms_since = |start: Option<f64>| match (start, arqlet_model::clock::now()) {
+            (Some(start), Some(now)) if now > start => now - start,
+            _ => 0.,
+        };
+        let started = arqlet_model::clock::now();
         let translation = arqlet_elk::translate(elk)?;
+        let mut translating = ms_since(started);
         let graph: Graph =
             serde_json::from_value(translation.graph.clone()).map_err(|e| e.to_string())?;
         let mut patch = translation.options.clone();
@@ -3852,12 +3859,17 @@ fn elk_response(v: &serde_json::Value) -> String {
                 .as_u64()
                 .unwrap_or(1)
                 .clamp(1, MAX_THREADS as u64) as usize;
+            let started = arqlet_model::clock::now();
             snapshot = refine_snapshot_with(
                 &snapshot,
                 snapshot.revision,
                 snapshot.layout_version,
                 threads,
             )?;
+            arqlet_model::clock::add(arqlet_model::clock::Phases {
+                refinement: ms_since(started),
+                ..Default::default()
+            });
         }
         let diagnostics: Vec<String> = translation
             .diagnostics
@@ -3872,8 +3884,15 @@ fn elk_response(v: &serde_json::Value) -> String {
             )
             .chain(snapshot.geometry_issues.iter().map(|i| i.message.clone()))
             .collect();
+        let started = arqlet_model::clock::now();
+        let written = arqlet_elk::write_back(elk, &snapshot, &translation);
+        translating += ms_since(started);
+        arqlet_model::clock::add(arqlet_model::clock::Phases {
+            elk_translation: translating,
+            ..Default::default()
+        });
         let mut out = serde_json::json!({
-            "graph": arqlet_elk::write_back(elk, &snapshot, &translation),
+            "graph": written,
             "diagnostics": diagnostics,
         });
         if !back.is_empty() {
@@ -4233,6 +4252,14 @@ pub fn timed(run: impl FnOnce() -> String) -> String {
                 "repair": round(p.repair),
                 "portResolution": round(p.port_resolution),
                 "routing": round(p.routing),
+                "plan": round(p.plan),
+                "channelGrowth": round(p.channel_growth),
+                "construction": round(p.construction),
+                "fallbackRouting": round(p.fallback_routing),
+                "finalization": round(p.finalization),
+                "buses": round(p.buses),
+                "elkTranslation": round(p.elk_translation),
+                "refinement": round(p.refinement),
             }),
         );
     }
