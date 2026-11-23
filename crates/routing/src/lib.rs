@@ -636,6 +636,87 @@ fn corridor_span(
     (floor, ceiling)
 }
 
+/// #156: the axis-parallel segments of routes by their line, so the routes a route shares a segment with (as
+/// `shares_segment` decides it: collinear within `EPS`, overlapping by more than `EPS`) are found without comparing it with
+/// every route. Kept up to date as routes move (`remove`, `insert`).
+#[derive(Default)]
+struct SegmentIndex {
+    /// Horizontal segments by the floor of their y, vertical ones by the floor of their x: (route, line, from, to).
+    horizontal: BTreeMap<i64, Vec<(usize, f64, f64, f64)>>,
+    vertical: BTreeMap<i64, Vec<(usize, f64, f64, f64)>>,
+}
+
+impl SegmentIndex {
+    fn of(routes: &[Route]) -> Self {
+        let mut index = SegmentIndex::default();
+        for (j, route) in routes.iter().enumerate() {
+            index.insert(j, route);
+        }
+        index
+    }
+
+    /// The segments of `route`, each as (horizontal?, line, from, to) the way `shares_probe` compares them: a segment that
+    /// is both (shorter than `EPS`) is listed as both; it overlaps nothing by more than `EPS`.
+    fn segments(route: &Route) -> impl Iterator<Item = (bool, f64, f64, f64)> + '_ {
+        route.points.windows(2).flat_map(|w| {
+            let h = horizontal(&w[0], &w[1]).then_some((true, w[0].y, w[0].x, w[1].x));
+            let v = vertical(&w[0], &w[1]).then_some((false, w[0].x, w[0].y, w[1].y));
+            h.into_iter().chain(v)
+        })
+    }
+
+    fn key(line: f64) -> i64 {
+        line.floor() as i64
+    }
+
+    fn insert(&mut self, j: usize, route: &Route) {
+        for (h, line, a, b) in Self::segments(route) {
+            let map = if h {
+                &mut self.horizontal
+            } else {
+                &mut self.vertical
+            };
+            map.entry(Self::key(line))
+                .or_default()
+                .push((j, line, a, b));
+        }
+    }
+
+    fn remove(&mut self, j: usize, route: &Route) {
+        for (h, line, _, _) in Self::segments(route) {
+            let map = if h {
+                &mut self.horizontal
+            } else {
+                &mut self.vertical
+            };
+            if let Some(list) = map.get_mut(&Self::key(line)) {
+                list.retain(|(k, ..)| *k != j);
+            }
+        }
+    }
+
+    /// The routes (ascending, each once) other than those `skip` names that share a segment with `route`.
+    fn sharing(&self, route: &Route, skip: impl Fn(usize) -> bool) -> Vec<usize> {
+        let overlap =
+            |a: f64, b: f64, c: f64, d: f64| a.max(b).min(c.max(d)) - a.min(b).max(c.min(d)) > EPS;
+        let mut found = Vec::new();
+        for (h, line, a, b) in Self::segments(route) {
+            let map = if h { &self.horizontal } else { &self.vertical };
+            let key = Self::key(line);
+            for k in [key - 1, key, key + 1] {
+                for &(j, other, c, d) in map.get(&k).map(Vec::as_slice).unwrap_or(&[]) {
+                    if !skip(j) && (line - other).abs() < EPS && overlap(a, b, c, d) {
+                        found.push(j);
+                    }
+                }
+            }
+        }
+        found.sort_unstable();
+        found.dedup();
+        found
+    }
+}
+
 /// Resolves the exact overlaps that remain after the track separation. An interior segment of an overlapping route moves
 /// to another track of its corridor; the move is kept only when the route then overlaps fewer routes, keeps its stub
 /// directions and has no more hits on nodes it may not cross. Every kept move lowers the number of overlapping pairs, so
@@ -653,13 +734,30 @@ fn resolve_overlaps(
         .map(|(id, r)| (id.clone(), r.clone()))
         .collect();
     let mut result = routes.to_vec();
-    let overlaps = |all: &[Route], index: usize, route: &Route| -> usize {
-        all.iter()
-            .enumerate()
-            .filter(|(j, other)| {
-                *j != index && other.bundle_of.is_none() && shares_segment(route, other)
-            })
-            .count()
+    // #156: the routes' bounds, kept up to date as routes move; an overlap is tested only where the bounds meet
+    // (`shares_probe` tests them first, so the count is the same).
+    let mut bounds: Vec<Bounds> = result.iter().map(route_bounds).collect();
+    // #156: a route for which no move was found is not searched again until a route moves near it. Its search depends on
+    // the route, its partners and the routes their moves (6 tracks at most) can meet, all inside `region`; a move whose old
+    // or new bounds meet that region forgets it. So the result is the one a search every round gives.
+    let reach = 6. * params.track + 2. * EPS;
+    let grow = |b: &Bounds| [b[0] - reach, b[1] - reach, b[2] + reach, b[3] + reach];
+    let mut stuck: Vec<Option<Bounds>> = vec![None; result.len()];
+    // The candidate moves of a route at a segment (`shifted_candidates`), kept until the route moves.
+    let mut moves: MoveCache = BTreeMap::new();
+    let forget = |stuck: &mut Vec<Option<Bounds>>, moved: &[Bounds]| {
+        for entry in stuck.iter_mut() {
+            if entry.is_some_and(|region| moved.iter().any(|b| !apart(&region, b))) {
+                *entry = None;
+            }
+        }
+    };
+    // The routes sharing a segment, from the segment index (the same count `shares_segment` gives).
+    let mut segments = SegmentIndex::of(&result);
+    let overlaps = |all: &[Route], segments: &SegmentIndex, index: usize, route: &Route| -> usize {
+        segments
+            .sharing(route, |j| j == index || all[j].bundle_of.is_some())
+            .len()
     };
     for _ in 0..OVERLAP_ROUNDS {
         let mut changed = false;
@@ -667,7 +765,10 @@ fn resolve_overlaps(
             if result[index].bundle_of.is_some() || result[index].points.len() < 4 {
                 continue;
             }
-            let current = overlaps(&result, index, &result[index]);
+            if stuck[index].is_some() {
+                continue;
+            }
+            let current = overlaps(&result, &segments, index, &result[index]);
             if current == 0 {
                 continue;
             }
@@ -675,25 +776,29 @@ fn resolve_overlaps(
                 continue;
             };
             let skip = excluded_with(&info, edge);
+            // The obstacles this route may not cross, built once for all its candidates.
+            let outlines: Vec<Outline> = obstacles
+                .iter()
+                .filter(|(id, _)| {
+                    let endpoint =
+                        id == &edge.source || edge.target.as_deref() == Some(id.as_str());
+                    endpoint || !skip.contains(id.as_str())
+                })
+                .map(|(id, rect)| {
+                    obstacle(
+                        id,
+                        rect,
+                        info.get(id.as_str())
+                            .map_or_else(NodeShape::default, |(_, s)| *s),
+                        edge,
+                        params,
+                    )
+                })
+                .collect();
             let hits_of = |route: &Route| {
-                obstacles
+                outlines
                     .iter()
-                    .filter(|(id, rect)| {
-                        let endpoint =
-                            id == &edge.source || edge.target.as_deref() == Some(id.as_str());
-                        (endpoint || !skip.contains(id.as_str()))
-                            && hits_outline(
-                                route,
-                                &obstacle(
-                                    id,
-                                    rect,
-                                    info.get(id.as_str())
-                                        .map_or_else(NodeShape::default, |(_, s)| *s),
-                                    edge,
-                                    params,
-                                ),
-                            )
-                    })
+                    .filter(|outline| hits_outline(route, outline))
                     .count()
             };
             let hits_before = hits_of(&result[index]);
@@ -741,7 +846,7 @@ fn resolve_overlaps(
                         {
                             continue;
                         }
-                        let count = overlaps(&result, index, &candidate);
+                        let count = overlaps(&result, &segments, index, &candidate);
                         if count < current
                             && best
                                 .as_ref()
@@ -753,14 +858,44 @@ fn resolve_overlaps(
                 }
             }
             if let Some((_, _, route)) = best {
+                moves.retain(|(moved, _), _| *moved != index);
+                segments.remove(index, &result[index]);
+                segments.insert(index, &route);
+                let new = route_bounds(&route);
+                forget(&mut stuck, &[bounds[index], new]);
+                bounds[index] = new;
                 result[index] = route;
                 changed = true;
-            } else if let Some((first, second, partner)) =
-                pair_move(&edges, &info, &obstacles, &result, index, params)
-            {
+            } else if let Some((first, second, partner)) = pair_move(
+                &edges, &info, &obstacles, &result, index, params, &mut moves, &segments,
+            ) {
+                moves.retain(|(route, _), _| *route != index && *route != partner);
+                segments.remove(index, &result[index]);
+                segments.remove(partner, &result[partner]);
+                segments.insert(index, &first);
+                segments.insert(partner, &second);
+                let (new_a, new_b) = (route_bounds(&first), route_bounds(&second));
+                forget(&mut stuck, &[bounds[index], new_a, bounds[partner], new_b]);
+                bounds[index] = new_a;
+                bounds[partner] = new_b;
                 result[index] = first;
                 result[partner] = second;
                 changed = true;
+            } else {
+                // No move: remembered with the region its search depends on (the route and its partners, grown).
+                let mut region = grow(&bounds[index]);
+                for j in segments.sharing(&result[index], |j| {
+                    j == index || result[j].bundle_of.is_some()
+                }) {
+                    let b = grow(&bounds[j]);
+                    region = [
+                        region[0].min(b[0]),
+                        region[1].min(b[1]),
+                        region[2].max(b[2]),
+                        region[3].max(b[3]),
+                    ];
+                }
+                stuck[index] = Some(region);
             }
         }
         if !changed {
@@ -894,6 +1029,10 @@ fn shifted_candidates(
 
 /// A joint move for two overlapping routes when no move of either alone lowers the overlap count: both shift, and the
 /// pair is kept only when the overlaps of the two routes, together, drop. Returns the new routes and the partner's index.
+/// The candidate moves of route `i` at segment `near`, as `shifted_candidates` gives them (#156).
+type MoveCache = BTreeMap<(usize, usize), Vec<(f64, Route)>>;
+
+#[allow(clippy::too_many_arguments)]
 fn pair_move(
     edges: &BTreeMap<&str, &Edge>,
     info: &NodeInfo<'_>,
@@ -901,63 +1040,77 @@ fn pair_move(
     result: &[Route],
     index: usize,
     params: Params,
+    cache: &mut MoveCache,
+    segments: &SegmentIndex,
 ) -> Option<(Route, Route, usize)> {
+    // #156: overlaps counted from the segment index (the same count `shares_segment` gives).
     let count = |route: &Route, skip_a: usize, skip_b: usize| -> usize {
-        result
-            .iter()
-            .enumerate()
-            .filter(|(j, other)| {
-                *j != skip_a
-                    && *j != skip_b
-                    && other.bundle_of.is_none()
-                    && shares_segment(route, other)
+        segments
+            .sharing(route, |j| {
+                j == skip_a || j == skip_b || result[j].bundle_of.is_some()
             })
-            .count()
+            .len()
     };
     let edge_a = edges.get(result[index].id.as_str())?;
     let skip_a = excluded_with(info, edge_a);
-    for partner in 0..result.len() {
-        if partner == index
-            || result[partner].bundle_of.is_some()
-            || !shares_segment(&result[index], &result[partner])
-        {
-            continue;
-        }
+    // The partners in ascending order, as a scan of all routes would meet them.
+    for partner in segments.sharing(&result[index], |j| {
+        j == index || result[j].bundle_of.is_some()
+    }) {
         let Some(edge_b) = edges.get(result[partner].id.as_str()) else {
             continue;
         };
         let skip_b = excluded_with(info, edge_b);
         let (near_a, near_b) = first_shared_segments(&result[index], &result[partner])?;
-        let mut moves_a = shifted_candidates(
-            &result[index],
-            near_a,
-            edge_a,
-            &skip_a,
-            obstacles,
-            info,
-            params,
-        );
+        let mut moves_a = cache
+            .entry((index, near_a))
+            .or_insert_with(|| {
+                shifted_candidates(
+                    &result[index],
+                    near_a,
+                    edge_a,
+                    &skip_a,
+                    obstacles,
+                    info,
+                    params,
+                )
+            })
+            .clone();
         moves_a.push((0., result[index].clone()));
-        let mut moves_b = shifted_candidates(
-            &result[partner],
-            near_b,
-            edge_b,
-            &skip_b,
-            obstacles,
-            info,
-            params,
-        );
+        let mut moves_b = cache
+            .entry((partner, near_b))
+            .or_insert_with(|| {
+                shifted_candidates(
+                    &result[partner],
+                    near_b,
+                    edge_b,
+                    &skip_b,
+                    obstacles,
+                    info,
+                    params,
+                )
+            })
+            .clone();
         moves_b.push((0., result[partner].clone()));
         let before =
             count(&result[index], index, partner) + count(&result[partner], index, partner) + 1;
+        // A move's overlaps with the other routes do not depend on the partner's move: counted once per move.
+        let counts_a: Vec<usize> = moves_a
+            .iter()
+            .map(|(_, a)| count(a, index, partner))
+            .collect();
+        let counts_b: Vec<usize> = moves_b
+            .iter()
+            .map(|(_, b)| count(b, index, partner))
+            .collect();
         let mut best: Option<(usize, f64, Route, Route)> = None;
-        for (cost_a, a) in &moves_a {
-            for (cost_b, b) in &moves_b {
+        for (ia, (cost_a, a)) in moves_a.iter().enumerate() {
+            for (ib, (cost_b, b)) in moves_b.iter().enumerate() {
                 if *cost_a == 0. && *cost_b == 0. {
                     continue;
                 }
                 let between = usize::from(shares_segment(a, b));
-                let after = count(a, index, partner) + count(b, index, partner) + between;
+                let after = counts_a[ia] + counts_b[ib] + between;
                 if after < before
                     && best
                         .as_ref()
@@ -1858,8 +2011,74 @@ fn grid_route_search(
                 (q.y - p.y).signum() * stub_length
             },
     };
-    let a = stub(start, &route.points[1]);
-    let b = stub(end, &route.points[route.points.len() - 2]);
+    // #156: when the stub runs into an obstacle (a neighbour closer than the stub is long, or a route that reaches its end
+    // through the node), the search would give up. Then shorter stubs are tried, toward the route and straight out of the
+    // side the port lies on, so a route can still leave through a narrow gap.
+    let blocked = |p: &Point, q: &Point| {
+        let segment = Route {
+            id: String::new(),
+            points: vec![p.clone(), q.clone()],
+            ..route.clone()
+        };
+        obstacles.iter().any(|o| hits_outline(&segment, o))
+    };
+    // The outward direction of the side of an own node that `p` lies on.
+    let outward = |p: &Point| -> Option<(f64, f64)> {
+        obstacles.iter().zip(own).find_map(|(o, own)| {
+            if !own {
+                return None;
+            }
+            let r = o.bounds();
+            let near = |u: f64, v: f64| (u - v).abs() < 0.5;
+            let inside_x = p.x >= r.x - 0.5 && p.x <= r.x + r.width + 0.5;
+            let inside_y = p.y >= r.y - 0.5 && p.y <= r.y + r.height + 0.5;
+            if near(p.x, r.x) && inside_y {
+                Some((-1., 0.))
+            } else if near(p.x, r.x + r.width) && inside_y {
+                Some((1., 0.))
+            } else if near(p.y, r.y) && inside_x {
+                Some((0., -1.))
+            } else if near(p.y, r.y + r.height) && inside_x {
+                Some((0., 1.))
+            } else {
+                None
+            }
+        })
+    };
+    let end_stub = |p: &Point, toward: &Point| {
+        let first = stub(p, toward);
+        if !blocked(p, &first) {
+            return first;
+        }
+        let along = |length: f64, (dx, dy): (f64, f64)| Point {
+            x: p.x + dx * length,
+            y: p.y + dy * length,
+        };
+        let toward_direction = (
+            if (toward.x - p.x).abs() < EPS {
+                0.
+            } else {
+                (toward.x - p.x).signum()
+            },
+            if (toward.y - p.y).abs() < EPS {
+                0.
+            } else {
+                (toward.y - p.y).signum()
+            },
+        );
+        let directions = std::iter::once(toward_direction).chain(outward(p));
+        for length in [stub_length, 6., 3.] {
+            for direction in directions.clone() {
+                let candidate = along(length, direction);
+                if !blocked(p, &candidate) {
+                    return candidate;
+                }
+            }
+        }
+        first
+    };
+    let a = end_stub(start, &route.points[1]);
+    let b = end_stub(end, &route.points[route.points.len() - 2]);
     // The grid lines: beside every obstacle (those that meet `window`, when there is one) and at the two ends of the route.
     let lines = |window: Option<&Bounds>| -> (Vec<f64>, Vec<f64>) {
         let mut xs = vec![a.x, b.x];
@@ -2342,6 +2561,103 @@ mod tests {
             }
         }
     }
+    /// #156: the segment index finds exactly the routes `shares_segment` finds, on random axis-parallel routes on a coarse
+    /// grid (so that many segments are collinear, overlap, touch or are shorter than `EPS`).
+    #[test]
+    fn the_segment_index_agrees_with_shares_segment() {
+        let mut seed: u64 = 12345;
+        let mut next = |n: u64| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) % n
+        };
+        let mut routes = Vec::new();
+        for i in 0..60 {
+            let mut p = Point {
+                x: next(12) as f64 * 10.,
+                y: next(12) as f64 * 10.,
+            };
+            let mut points = vec![p.clone()];
+            for k in 0..(2 + next(4)) {
+                // Alternate the axis; now and then a step shorter than EPS.
+                let step = if next(9) == 0 {
+                    1e-7
+                } else {
+                    (next(7) as f64 - 3.) * 10.
+                };
+                if k % 2 == 0 {
+                    p.x += step;
+                } else {
+                    p.y += step;
+                }
+                points.push(p.clone());
+            }
+            routes.push(Route {
+                id: format!("r{i}"),
+                points,
+                weight: 1,
+                bundle_of: None,
+            });
+        }
+        let index = SegmentIndex::of(&routes);
+        for (i, route) in routes.iter().enumerate() {
+            let brute: Vec<usize> = (0..routes.len())
+                .filter(|&j| j != i && shares_segment(route, &routes[j]))
+                .collect();
+            assert_eq!(index.sharing(route, |j| j == i), brute, "route {i}");
+        }
+    }
+
+    /// #156: the end of a route lies on the side of its node that faces a neighbour closer than the stub is long. The repair
+    /// still finds a way (a shorter stub into the gap) instead of keeping the route through the neighbour.
+    #[test]
+    fn the_repair_leaves_through_a_gap_narrower_than_the_stub() {
+        let graph = two_edge_graph(&["s", "t", "n"], &[("e", "s", "t")]);
+        let rect = |x: f64, y: f64, width: f64, height: f64| Rect {
+            x,
+            y,
+            width,
+            height,
+        };
+        // `t` above, `n` 20 below it: grown by the clearance of 12, it leaves a gap of 8, less than the stub of 12. `s` below
+        // `n`; the route runs straight up through `n`.
+        let rects = BTreeMap::from([
+            ("t".into(), rect(0., 0., 200., 50.)),
+            ("n".into(), rect(-40., 70., 280., 100.)),
+            ("s".into(), rect(60., 300., 80., 40.)),
+        ]);
+        let through = Route {
+            id: "e".into(),
+            points: vec![Point { x: 100., y: 300. }, Point { x: 100., y: 50. }],
+            weight: 1,
+            bundle_of: None,
+        };
+        assert!(
+            hits(&through, &rects["n"]),
+            "the start: through the neighbour"
+        );
+        let params = Params {
+            clearance: 12.,
+            own_clearance: 12.,
+            rail_offset: 6.,
+            ..Params::default()
+        };
+        let repaired = repair_with(&graph, &rects, &[through], params);
+        let route = &repaired[0];
+        assert!(
+            !hits(route, &rects["n"]),
+            "around the neighbour: {:?}",
+            route.points
+        );
+        assert_eq!(route.points.first(), Some(&Point { x: 100., y: 300. }));
+        assert_eq!(
+            route.points.last(),
+            Some(&Point { x: 100., y: 50. }),
+            "it still ends at its port"
+        );
+    }
+
     fn two_edge_graph(nodes: &[&str], edges: &[(&str, &str, &str)]) -> Graph {
         let node = |id: &str| Node {
             id: id.into(),

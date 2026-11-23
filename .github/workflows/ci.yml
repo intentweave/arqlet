@@ -1,5 +1,13 @@
 name: Rust checks
-on: [push, pull_request]
+on:
+  # A pull request is checked as a pull request; a branch push without one is not built twice. `main` after a merge.
+  push:
+    branches: [main]
+  pull_request:
+# A newer push to a pull request stops its older runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 permissions:
   contents: read
 jobs:
@@ -8,6 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal --component rustfmt
+      # The build cache (target and registry), keyed by the lock file and the toolchain: incremental instead of from scratch.
+      - uses: Swatinem/rust-cache@v2.7.3
       - run: cargo +stable fmt --all -- --check
       - run: cargo +stable check --workspace --locked
       # Tests read the benchmark datasets, which are generated (git-ignored): deterministic, standard library only.
@@ -51,6 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install 1.94.0 --profile minimal --target wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2.7.3
       - run: cargo +1.94.0 check --workspace --locked
       # The browser adapter is built for WASM; check it with the minimum version too.
       - run: cargo +1.94.0 check -p arqlet-wasm --target wasm32-unknown-unknown --locked

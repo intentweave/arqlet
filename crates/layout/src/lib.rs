@@ -981,11 +981,11 @@ fn compute_counted_inner(
     }
     finish(snapshot).map(|mut snapshot| {
         if too_much_work && !snapshot.route_conflicts.is_empty() {
+            // The count of conflicts is left out: in a view with bus lines they belong to a drawing the bus lines replace (#156).
             snapshot.layout_diagnostics.push(format!(
-                "Engine choice not tried: routing the drawing again with both engines would take too long (estimated work {} above {}); {} routes through nodes are reported",
+                "Engine choice not tried: routing the drawing again with both engines would take too long (estimated work {} above {}); the remaining conflicts are reported in the routing issues",
                 engine_choice::work(&snapshot),
-                engine_choice::MAX_REROUTE_WORK,
-                snapshot.route_conflicts.len()
+                engine_choice::MAX_REROUTE_WORK
             ));
         }
         (snapshot, stages)
