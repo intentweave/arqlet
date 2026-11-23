@@ -47,9 +47,53 @@ the copyright and license notices of the Rust crates linked into the WASM (`tool
 without a license file fails `node tools/third-party-notices.mjs --check`, and a release waits for a decision on it).
 Check a tarball by installing it into an empty project.
 
-## Publish
+## Publish with the release workflow
 
 Publishing cannot be undone (crates.io only allows yanking; npm unpublish is limited to 72 hours).
+
+After the version bump is merged to `main`, a tag publishes the release (`.github/workflows/release.yml`, #120):
+
+```sh
+node tools/release-check.mjs x.y.z     # every version agrees (the workflow checks it again)
+git tag -a vx.y.z -m x.y.z && git push origin vx.y.z
+```
+
+The workflow then runs, in this order:
+
+1. `verify`: the release check (and the CHANGELOG section as the release notes), `cargo fmt --check`, the workspace
+   tests, the dry run of the crates (`cargo publish --dry-run --workspace`), and the npm packages packed with
+   `pnpm pack`, installed into an empty project and imported.
+2. `crates`: the crates not yet on crates.io, with trusted publishing (`rust-lang/crates-io-auth-action`: a short-lived
+   token from GitHub's OIDC token; no token is stored).
+3. `npm`: the packages not yet on npm, in dependency order: `pnpm pack` (it runs `prepack` and resolves `workspace:^`
+   to the released version), then `npm publish` of the tarball with trusted publishing; npm adds provenance itself.
+4. `github-release`: the GitHub release of the tag, with the CHANGELOG section.
+
+The publishing jobs run in the GitHub environment `release`. Each skips versions the registry already has, so a run that
+failed half way is run again from the Actions page. Run by hand (`workflow_dispatch`, with a version), the workflow only
+runs `verify`: a dry run that never publishes.
+
+### One-time setup
+
+Trusted publishing is configured per package on the registries. Each package must exist there already (all of them do
+since 0.8.0); a new crate or npm package is published once by hand (below) before it can be added.
+
+- **GitHub:** an environment `release` (Settings → Environments). Required reviewers on it make every release wait for
+  an approval before anything is published.
+- **crates.io:** for every published crate (`arqlet`, `arqlet-model`, `arqlet-topology`, `arqlet-routing`,
+  `arqlet-scene`, `arqlet-view`, `arqlet-layout`, `arqlet-reference`, `arqlet-elk`, `arqlet-runtime`, `arqlet-query`,
+  `arqlet-query-cypher`, `arqlet-query-model`, `arqlet-query-json`): Settings → Trusted Publishing → add GitHub, owner
+  `intentweave`, repository `arqlet`, workflow `release.yml`, environment `release`.
+- **npm:** for `arqlet`, `@arqlet/contracts`, `@arqlet/engine-client` and `@arqlet/viewer`: Settings → Trusted
+  publisher → GitHub Actions, organization `intentweave`, repository `arqlet`, workflow `release.yml`, environment
+  `release`. Then the package can forbid token publishing (Settings → Publishing access).
+
+Requirements the workflow meets: `id-token: write` on the publishing jobs, npm 11.5.1 or later, and no `registry-url`
+in `setup-node` (it writes a token into `.npmrc`, which keeps npm from using OIDC).
+
+## Publish by hand (fallback)
+
+For a first release of a new package, or when the workflow cannot be used.
 
 ```sh
 cargo login                       # token from crates.io
@@ -61,7 +105,8 @@ git tag -a vx.y.z -m x.y.z && git push origin vx.y.z
 ```
 
 `cargo publish --workspace` publishes in dependency order. `pnpm -r publish` publishes in dependency order as well and
-skips versions that already exist.
+skips versions that already exist. Pushing the tag starts the release workflow too: it finds every version published already and only
+creates the GitHub release.
 
 ## The `query` feature
 
@@ -74,6 +119,4 @@ feature, so `decypher` is not in the engine package and its notices need no entr
 
 ## Later
 
-- A release workflow on tags with trusted publishing (OIDC) for crates.io and npm and npm provenance, so no tokens
-  are stored.
 - A smaller WASM (size-optimised profile or `wasm-opt`); only with unchanged output.

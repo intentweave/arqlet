@@ -1,0 +1,141 @@
+name: Release
+# Publishes a release to crates.io and npm with trusted publishing (OIDC, #120): no registry token is stored. A tag
+# `vX.Y.Z` runs the checks and the dry runs (`verify`), then publishes the crates, then the npm packages (with npm
+# provenance), then creates the GitHub release from the CHANGELOG section. Run by hand (`workflow_dispatch`) it is a dry
+# run: `verify` only. Each publish step skips versions the registry already has, so a run that failed half way can be
+# run again. One-time setup on crates.io, npm and GitHub: docs/releasing.md.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to check (X.Y.Z); a manual run never publishes'
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+env:
+  # Crates that are not published (publish = false); `cargo publish --workspace` excludes them.
+  UNPUBLISHED: arqlet-wasm arqlet-contracts arqlet-node arqlet-query-cli arqlet-query-wasm
+  NPM_PACKAGES: contracts engine-client viewer arqlet
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        env:
+          REF: ${{ github.ref_name }}
+          INPUT: ${{ inputs.version }}
+        run: |
+          v="${INPUT:-$REF}"; v="${v#v}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node tools/release-check.mjs "${{ steps.version.outputs.version }}" --notes release-notes.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+      - run: rustup toolchain install stable --profile minimal --component rustfmt && rustup target add wasm32-unknown-unknown --toolchain stable
+      - uses: Swatinem/rust-cache@v2.7.3
+      - run: cargo +stable fmt --all -- --check
+      - run: python3 benchmarks/generate.py --no-manifest
+      - run: cargo +stable test --workspace --locked
+      - name: Dry run of the crates
+        run: |
+          ex=""; for c in $UNPUBLISHED; do ex="$ex --exclude $c"; done
+          cargo +stable publish --dry-run --workspace --locked $ex
+      - run: corepack enable && pnpm install --frozen-lockfile --ignore-scripts
+      - name: Dry run of the npm packages (pack, install into an empty project, import)
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          for p in $NPM_PACKAGES; do (cd "packages/$p" && pnpm pack --pack-destination "$RUNNER_TEMP/pack"); done
+          node tools/third-party-notices.mjs --check
+          mkdir -p "$RUNNER_TEMP/try" && cd "$RUNNER_TEMP/try" && npm init -y >/dev/null
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
+          node --input-type=module -e "const m = await import('arqlet'); if (!Object.keys(m).length) throw Error('arqlet exports nothing');"
+        env:
+          RUSTUP_TOOLCHAIN: stable
+
+  crates:
+    needs: verify
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish the crates not yet on crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          ex=""; for c in $UNPUBLISHED; do ex="$ex --exclude $c"; done
+          todo=0
+          for c in $(cargo +stable metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.publish != []) | .name'); do
+            case " $UNPUBLISHED " in *" $c "*) continue;; esac
+            code=$(curl -s -o /dev/null -w '%{http_code}' -A 'arqlet-release (github.com/intentweave/arqlet)' "https://crates.io/api/v1/crates/$c/$VERSION")
+            if [ "$code" = 200 ]; then echo "$c $VERSION is on crates.io already"; ex="$ex --exclude $c"; else todo=1; fi
+          done
+          if [ "$todo" = 1 ]; then cargo +stable publish --workspace --locked $ex; else echo "Every crate is published already."; fi
+
+  npm:
+    needs: [verify, crates]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      # No `registry-url`: it writes a token into .npmrc, which keeps npm from using OIDC.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # Trusted publishing needs npm 11.5.1 or later; provenance comes with it.
+      - run: npm install -g npm@^11.5.1 && npm --version
+      - run: rustup toolchain install stable --profile minimal && rustup target add wasm32-unknown-unknown --toolchain stable
+      - run: corepack enable && pnpm install --frozen-lockfile --ignore-scripts
+      - name: Publish the packages not yet on npm, in dependency order
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+          RUSTUP_TOOLCHAIN: stable
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          for p in $NPM_PACKAGES; do
+            name=$(node -p "require('./packages/$p/package.json').name")
+            if npm view "$name@$VERSION" version >/dev/null 2>&1; then echo "$name $VERSION is on npm already"; continue; fi
+            # pnpm pack runs prepack (licenses, WASM, bundled types) and resolves workspace:^ to the released version.
+            (cd "packages/$p" && pnpm pack --pack-destination "$RUNNER_TEMP/pack")
+            npm publish "$RUNNER_TEMP/pack/$(node -p "'$name'.replace('@','').replace('/','-')")-$VERSION.tgz" --access public
+          done
+
+  github-release:
+    needs: [verify, npm]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "Release $TAG exists already"; exit 0; fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "${TAG#v}" --notes-file release-notes.md
