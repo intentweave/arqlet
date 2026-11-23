@@ -644,3 +644,50 @@ fn a_group_scattered_over_more_containers_than_the_threshold_is_marked_not_hulle
         "the case stays above the threshold"
     );
 }
+
+#[test]
+fn a_moved_down_parent_draws_no_hull_around_a_subtree_that_stayed_in_its_own_box() {
+    // Found on a real export: with a dimension first that owns nothing below a directory, the parent hierarchy held its
+    // nested containers softly and drew a hull around each directory's descendants — a hull tracing the very box the view
+    // already draws, and overlaps with every nested one. A member owned by the parent hierarchy through a container at or
+    // below the group is inside the group's box; such a group needs no hull.
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr",
+        "nodes": [
+            {"id": "dir", "kind": "directory", "label": "dir"},
+            {"id": "file", "kind": "file", "label": "file", "parentId": "dir"},
+            {"id": "f", "kind": "symbol", "label": "f", "parentId": "file"},
+            {"id": "g", "kind": "symbol", "label": "g", "parentId": "file"},
+            {"id": "other", "kind": "file", "label": "other"},
+            {"id": "h", "kind": "symbol", "label": "h", "parentId": "other"}
+        ],
+        "edges": [
+            {"id": "fg", "kind": "calls", "source": "f", "target": "g"},
+            {"id": "gh", "kind": "calls", "source": "g", "target": "h"}
+        ],
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "notes", "label": "Notes", "members": ["h"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("doc"), by("parent")];
+    let snapshot = import_graph_with(graph, 100, &options).expect("imports");
+    let scene = build_scene(&snapshot).expect("a scene");
+    // `dir` and `file` kept every member in their own boxes: no hull traces them.
+    let parent_hulls: Vec<&str> = scene
+        .membership_hulls
+        .iter()
+        .filter(|h| h.dimension == "parent")
+        .map(|h| h.group.as_str())
+        .collect();
+    assert!(
+        !parent_hulls.contains(&"dir") && !parent_hulls.contains(&"file"),
+        "no parent hull traces a box the view draws: {parent_hulls:?}"
+    );
+    // `other` lost its only member to the doc's container, so it is no box of this view: that is exactly when the
+    // moved-down hierarchy is drawn as a hull, around where its member went.
+    assert_eq!(parent_hulls, ["other"]);
+    assert!(!snapshot.graph.nodes.iter().any(|n| n.id == "other"));
+    assert_eq!(report(&scene, "parent").overlapping_pairs, 0);
+}

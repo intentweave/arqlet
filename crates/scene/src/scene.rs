@@ -856,8 +856,29 @@ fn membership_overlays(
                 if !parent_of.contains_key(member.as_str()) {
                     continue;
                 }
+                // Already inside the group's own box: owned by this group, or — for the parent hierarchy, whose groups hold
+                // their descendants — owned by the parent hierarchy through a container at or below the group.
                 let here = match ownership.owners.get(member) {
-                    Some(Owner::Parent(Some(p))) => criterion.by == PARENT && p == group,
+                    Some(Owner::Parent(Some(p))) => {
+                        criterion.by == PARENT && {
+                            let mut at = Some(p.as_str());
+                            let mut walked = 0usize;
+                            let mut found = false;
+                            while let Some(c) = at {
+                                if c == group.as_str() {
+                                    found = true;
+                                    break;
+                                }
+                                // The parent hierarchy of the source is a tree; the bound only guards against a broken one.
+                                walked += 1;
+                                if walked > parent_of.len() {
+                                    break;
+                                }
+                                at = parent_of.get(c).copied().flatten();
+                            }
+                            found
+                        }
+                    }
                     Some(Owner::Group {
                         dimension,
                         group: g,
