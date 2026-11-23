@@ -1204,6 +1204,7 @@ impl RoutingStyle {
                 | Self::RoundedPolyline
                 | Self::Octilinear
                 | Self::Curve
+                | Self::Bus
         )
     }
 
@@ -1652,6 +1653,70 @@ impl Graph {
 
     /// The area an edge is drawn in: the deepest container that holds both endpoints (`None` for the root). An edge from a
     /// container to its own child is drawn in the container's parent.
+    /// The buses the layout draws (ADR 0005, amendment C): the explicit ones (`buses`), and in every area whose routing
+    /// picks `bus` the fans of its edges: the edges with one source form a bus (`fan:source:<id>`), then the edges left
+    /// with one target (`fan:target:<id>`), each from two edges up. An edge in an explicit bus, a self-loop and an edge
+    /// without a target stay out. Choosing `bus` for an area is the explicit request; `auto` and lists never pick it. The
+    /// graph is not changed.
+    pub fn effective_buses(&self) -> std::borrow::Cow<'_, [Bus]> {
+        let picks_bus =
+            |c: &Option<RoutingConstraint>| c.as_ref().is_some_and(|c| c.picks(RoutingStyle::Bus));
+        if !picks_bus(&self.default_routing)
+            && !self
+                .container_routing
+                .values()
+                .any(|c| c.picks(RoutingStyle::Bus))
+        {
+            return std::borrow::Cow::Borrowed(&self.buses);
+        }
+        let explicit: BTreeSet<&str> = self
+            .buses
+            .iter()
+            .flat_map(|b| b.edges.iter().map(String::as_str))
+            .collect();
+        let mut areas: BTreeMap<Option<String>, bool> = BTreeMap::new();
+        let mut candidates: Vec<(&str, &str, &str)> = Vec::new();
+        for edge in &self.edges {
+            let Some(target) = edge.target.as_deref() else {
+                continue;
+            };
+            if target == edge.source || explicit.contains(edge.id.as_str()) {
+                continue;
+            }
+            let area = self.edge_area(&edge.source, target);
+            let on = *areas
+                .entry(area.clone())
+                .or_insert_with(|| picks_bus(&self.routing_constraint(area.as_deref())));
+            if on {
+                candidates.push((edge.id.as_str(), edge.source.as_str(), target));
+            }
+        }
+        let mut out = self.buses.clone();
+        let mut taken: BTreeSet<&str> = BTreeSet::new();
+        for by_target in [false, true] {
+            let mut fans: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+            for &(id, source, target) in &candidates {
+                if !taken.contains(id) {
+                    fans.entry(if by_target { target } else { source })
+                        .or_default()
+                        .push(id);
+                }
+            }
+            for (end, edges) in fans {
+                if edges.len() < 2 {
+                    continue;
+                }
+                taken.extend(edges.iter().copied());
+                out.push(Bus {
+                    id: format!("fan:{}:{end}", if by_target { "target" } else { "source" }),
+                    edges: edges.into_iter().map(str::to_string).collect(),
+                    ..Bus::default()
+                });
+            }
+        }
+        std::borrow::Cow::Owned(out)
+    }
+
     pub fn edge_area(&self, source: &str, target: &str) -> Option<String> {
         let target_chain = self.strict_ancestors(target);
         self.strict_ancestors(source)
