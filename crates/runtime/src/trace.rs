@@ -385,7 +385,23 @@ pub fn neighbourhood_answer_on(
     let found = neighbourhood(canonical, &starts, hops, reach, |e| {
         kinds.as_ref().is_none_or(|k| k.contains(&e.kind))
     })?;
-    let (nodes, routes, distance) = on_view(snapshot, &found.nodes, &found.edges, &kinds)?;
+    let (nodes, mut routes, distance) = on_view(snapshot, &found.nodes, &found.edges, &kinds)?;
+    // #144: a bus given as data and drawn as lines (`busStyle: lines`) has no box of its own; reached, it is shown by its
+    // lines, as a bar is shown by itself, so the neighbourhood looks across it in every bus style.
+    let reached: BTreeSet<&str> = found.nodes.iter().map(String::as_str).collect();
+    let drawn_routes: BTreeSet<&str> = snapshot.routes.iter().map(|r| r.id.as_str()).collect();
+    for bus in snapshot.graph.buses.iter().filter(|b| {
+        !b.taps.is_empty()
+            && !snapshot.bus_lines.contains_key(&b.id)
+            && reached.contains(b.id.as_str())
+    }) {
+        routes.extend(
+            bus.edges
+                .iter()
+                .filter(|e| drawn_routes.contains(e.as_str()))
+                .cloned(),
+        );
+    }
     Ok(NeighbourhoodAnswer {
         nodes: found.nodes,
         edges: found.edges,

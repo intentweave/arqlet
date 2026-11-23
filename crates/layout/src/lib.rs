@@ -9427,10 +9427,15 @@ fn draw_buses_on(snapshot: &mut Snapshot, routes: &mut [Route]) {
         .iter()
         .map(|b| format!("Bus {}: ", b.id))
         .collect();
+    // Per fan: its edges leave the node to different sides (nothing to share, as in a cycle), or it is drawn in part.
+    let mut sides = BTreeSet::new();
     let mut partly = BTreeSet::new();
     let mut own = 0;
     for finding in found {
         match fans.iter().position(|head| finding.starts_with(head)) {
+            Some(fan) if finding.contains("to the same side") => {
+                sides.insert(fan);
+            }
             Some(fan) => {
                 partly.insert(fan);
                 own += usize::from(finding.contains("keeps its own route"));
@@ -9438,11 +9443,12 @@ fn draw_buses_on(snapshot: &mut Snapshot, routes: &mut [Route]) {
             None => snapshot.layout_diagnostics.push(finding),
         }
     }
-    if !partly.is_empty() {
+    if !sides.is_empty() || !partly.is_empty() {
         snapshot.layout_diagnostics.push(format!(
-            "Bus style: {} of {} fans drawn only in part or apart; {own} edges keep their own routes (a shared way would enter a node or share a line with another edge)",
-            partly.len(),
-            fans.len()
+            "Bus style: of {} fans, {} leave their node to different sides (drawn apart), {} are drawn in part or apart; {own} edges keep their own routes (a shared way would enter a node or share a line with another edge)",
+            fans.len(),
+            sides.len(),
+            partly.len()
         ));
     }
 }
@@ -11631,6 +11637,10 @@ mod routing_declaration_tests {
         assert_eq!(buses.len(), 1);
         assert_eq!(buses[0].id, "fan:source:a");
         assert!(graph.buses.is_empty(), "the graph keeps no bus");
+        assert!(
+            graph.default_routing.as_ref().unwrap().orthogonal_only(),
+            "bus is laid out by single pass like orthogonal"
+        );
         let s = compute(&graph, None, &BTreeSet::new(), &LayoutOptions::default()).unwrap();
         let starts: BTreeSet<(i64, i64)> = s
             .routes

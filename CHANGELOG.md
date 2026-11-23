@@ -5,6 +5,22 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- Routing style `bus`: laid out by single pass like `orthogonal`, so the fans find their shared ways in its channels
+  (on six public examples, fans drawn in part from 78 of 105 to 8); the `Bus style` diagnostic counts apart the fans whose
+  edges leave to different sides.
+
+### Fixed
+
+- Buses given as data (`Graph.buses` with `taps`): `edges` is optional, and a bus with taps is a shared medium whatever
+  `edges` holds (#145; before, listing edges beside the taps silently stopped trace and neighbourhood at the bus);
+  `neighbourhood` shows a reached bus drawn as lines (`busStyle: 'lines'`) by its lines, as a bar by itself (#144);
+  a `patch` keeps such buses (it dropped every bus without edges, part of #149); the cluster overview draws their bus
+  lines (#147).
+- `reveal` with `more` (the view controller's `showRest`) on a collapsed container shows its first page instead of
+  refusing it (#146).
+
 ### Added
 
 - Steps back restore the geometry (#148, provisional): the engine session keeps earlier snapshots under marks (`keep`,

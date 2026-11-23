@@ -1267,14 +1267,15 @@ impl RoutingConstraint {
         }
     }
 
-    /// Whether every edge of the area is drawn on its orthogonal route: a fixed `orthogonal` or `roundedOrthogonal`, or a list
-    /// of only these two. Rounded corners are drawn by the scene on the same route, so a layout that only builds orthogonal
-    /// routes (single pass) can take both. `auto` and lists with other styles may draw some edges otherwise.
+    /// Whether every edge of the area is drawn on its orthogonal route: a fixed `orthogonal`, `roundedOrthogonal` or `bus`,
+    /// or a list of only these. Rounded corners are drawn by the scene on the same route, and the fans of `bus` are drawn on
+    /// the orthogonal routes (ADR 0005, amendment C), so a layout that only builds orthogonal routes (single pass) can take
+    /// them. `auto` and lists with other styles may draw some edges otherwise.
     pub fn orthogonal_only(&self) -> bool {
         let orthogonal = |s: &RoutingStyle| {
             matches!(
                 s,
-                RoutingStyle::Orthogonal | RoutingStyle::RoundedOrthogonal
+                RoutingStyle::Orthogonal | RoutingStyle::RoundedOrthogonal | RoutingStyle::Bus
             )
         };
         match self {
@@ -1715,6 +1716,22 @@ impl Graph {
             }
         }
         std::borrow::Cow::Owned(out)
+    }
+
+    /// Provisional (#145): a bus given with `taps` is one shared medium for drawing, trace and neighbourhood, whatever its
+    /// input `edges` hold, so they are dropped (inside the engine, taps beside edges mean a bus already drawn as lines or
+    /// a trunk). Returns the ids of the buses whose edges were dropped. Called on a host's graph at the import.
+    pub fn taps_as_media(&mut self) -> Vec<String> {
+        let mut changed = Vec::new();
+        for bus in self
+            .buses
+            .iter_mut()
+            .filter(|b| !b.taps.is_empty() && !b.edges.is_empty())
+        {
+            bus.edges.clear();
+            changed.push(bus.id.clone());
+        }
+        changed
     }
 
     pub fn edge_area(&self, source: &str, target: &str) -> Option<String> {
@@ -2671,6 +2688,11 @@ impl GroupingRendering {
 #[serde(rename_all = "camelCase")]
 pub struct Bus {
     pub id: String,
+    /// The member edges of a bus drawn on shared routes. Optional in input (`[]`); a bus with `taps` is a shared medium
+    /// whatever its input `edges` hold: they are dropped at the import (`Graph::taps_as_media`, #145), and the view fills
+    /// them with the lines it draws.
+    #[serde(default)]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
     pub edges: Vec<String>,
     /// What the bus is called in the drawing ("CAN 500 kbit/s"). Placed like an edge label when the options give its size
     /// under `edge_labels["bus:<id>"]`; omitted when none.
