@@ -8187,10 +8187,31 @@ fn place(
                 tie_by_area: in_layered,
                 ..organic_anchors(graph, &ids, &sizes, boxes)
             });
-            organic::organic_arrange_counted(
+            // Provisional (`organicGap`, #156): a wider gap than the arrangement's own, as half of the extra on every side of
+            // each box during the arrangement; the boxes are shrunk back around their centres afterwards. Kept a multiple of
+            // twice the grid, so the boxes stay on it.
+            let extra = options
+                .organic_gap
+                .map_or(0., |gap| (gap - organic::GAP).max(0.));
+            let extra = if grid > 0. && extra > 0. {
+                (extra / (2. * grid)).ceil() * 2. * grid
+            } else {
+                extra
+            };
+            let grown;
+            let sizes_for_arrangement = if extra > 0. {
+                grown = sizes
+                    .iter()
+                    .map(|(id, (w, h))| (id.clone(), (w + extra, h + extra)))
+                    .collect::<BTreeMap<_, _>>();
+                &grown
+            } else {
+                &sizes
+            };
+            let (mut placed, extent) = organic::organic_arrange_counted(
                 &ids,
                 &link_set,
-                &sizes,
+                sizes_for_arrangement,
                 start.as_ref(),
                 options
                     .organic_iterations
@@ -8205,7 +8226,16 @@ fn place(
                 options.scalable_stress,
                 anchors.as_ref(),
                 counters,
-            )
+            );
+            if extra > 0. {
+                for rect in placed.values_mut() {
+                    rect.x += extra / 2.;
+                    rect.y += extra / 2.;
+                    rect.width -= extra;
+                    rect.height -= extra;
+                }
+            }
+            (placed, extent)
         }
         Mode::Radial => {
             let ids: Vec<String> = children.iter().map(|n| n.id.clone()).collect();
