@@ -144,5 +144,3 @@ mod straight_detours;
 mod structure_cache;
 #[path = "structured_communities.rs"]
 mod structured_communities;
-#[path = "timings.rs"]
-mod timings;

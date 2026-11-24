@@ -19,6 +19,12 @@ autotests = false
 name = "all"
 path = "tests/all.rs"
 
+# Phase timings are collected in one place per process (`arqlet_model::clock`), so their test runs in a binary of its own:
+# in `all` the other tests' layouts would add to the times it checks.
+[[test]]
+name = "timings"
+path = "tests/timings.rs"
+
 [features]
 benchmark-timings = ["arqlet-layout/benchmark-timings"]
 # The operation `query` (ADR 0021, M5b; provisional). Off by default; the query crates are published as provisional.

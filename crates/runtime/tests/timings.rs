@@ -62,7 +62,8 @@ fn timings_are_reported_on_request_and_change_nothing_else() {
         "expectedRevision": answer["revision"], "expectedLayoutVersion": answer["layoutVersion"]}));
     assert_eq!(toggled["ok"], true, "{toggled}");
     assert!(toggled["timings"]["total"].as_f64().is_some());
-    // In the same test: the times are collected in one place for the process, so two tests at once would mix them.
+    // In the same test, and in a binary of its own (crates/runtime/Cargo.toml): the times are collected in one place for
+    // the process, so two tests at once would mix them.
     elk_layout_reports_translation_and_single_pass_phases();
 }
 
