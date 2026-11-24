@@ -5,12 +5,36 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
-### Fixed
+## 0.9.0 — 2026-11-24
 
-- The SVG viewer drew membership hulls before the container frames, whose fill hid every hull inside a container. Hulls
-  are now unfilled outlines drawn above the frames and below routes and leaves (provisional, ADR 0022).
-- Playground: *Only groups* is a multiple select; several groups, of one dimension or several, set `consider` per
-  dimension.
+A visual release: one appearance for every renderer and a metro-map style, the GPU scene renderer for large views, and
+routing styles beyond orthogonal. A style (ADR 0026) colours parts and states from a theme and draws explicit buses as
+metro lines with station dots; the layout strategy `octilinear` lays bus systems out as an octilinear star, and the
+routing styles `octilinear`, `curve` and `bus` (fans as buses) are drawn, with bridges at crossings on request. The far
+layer of large views draws with WebGPU (WebGL 2 as the fallback, ADR 0025), and the cluster overview shares it. Buses
+given as data work everywhere (neighbourhood, overview, patches), a step back restores the geometry it left, phase
+timings reach ELK callers, and dragging on a single-pass drawing keeps the edges at the node. Routes find their way
+through narrow gaps in organic views, the overlap resolution behind it is much faster with the same output, and the
+engine choice no longer routes large drawings a second time. Memberships (ADR 0022) are drawn in stages (whole, in
+pieces, as marks) and a criterion can consider only some groups.
+
+### Upgrading from 0.8
+
+- **The engine version is `0.9.0`**: edits of a snapshot from an earlier engine are refused, so import the graph again.
+  Default layouts are unchanged; the reference fingerprints are `fingerprints-20261124-default-0.9.0.jsonl` (they differ
+  from the 0.8.0 file only in metadata; `layerweave-code`, which is generated from the source, was checked on the same
+  graph against v0.8.0).
+- **A bus given with `taps` ignores its `edges`** (#145): it is one shared medium for drawing, trace and neighbourhood.
+  Before, a non-empty `edges` beside the taps silently stopped trace and neighbourhood at the bus. `edges` is optional.
+- **The cluster overview shows buses given as data as bus nodes** (#147): their ids are nodes of the overview, as with
+  `busLine` input.
+- **The view controller's `back` and `forward` restore the geometry they left** (#148) instead of laying the view out
+  again; `keepGeometry: false` keeps 0.8's behaviour, and the result says `relaidOut` when it had to lay out again.
+- **Routes may differ from 0.8 on views that 0.8 drew with routes through nodes**: the route repair now leaves through
+  gaps narrower than its stub (#158), and the engine choice is not tried above a work limit (#157). The reference views
+  are unchanged.
+- **Membership hulls are unfilled outlines above the container frames**, and a soft group may be drawn in pieces or as
+  marks on its members (scene `marks`, hull `piece`/`pieces`, report `keptBox`); drawing only.
 
 ### Added
 
@@ -21,53 +45,6 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   — one document among hundreds. As the first criterion only those groups become boxes and every other node falls to the
   next criterion; held softly only they draw hulls or marks. A member of a nested group belongs to the deepest considered
   group on its path. Refused on `parent` and for a group the dimension does not declare. Playground: *Only group*.
-
-### Changed
-
-- Phase timings (#152): `timings` also reports the single-pass parts of the routing (`plan`, `channelGrowth`,
-  `construction`, `fallbackRouting`, `finalization`), `buses`, and for `elkLayout` the translation (`elkTranslation`) and
-  a refinement (`refinement`). The ELK drop-in takes `timings: true` and exposes them as `elk.timings` after each call.
-- `sharedTracks`: when shared tracks make the lane orders cyclic and the layout falls back to one without them, the
-  drawing is no longer completed a second time before that fallback; same result, 1.5 s instead of 1.9–2.0 s on a dense
-  flat graph (`benchmarks/results/phase-timings-shared-tracks-20261123.md`).
-- A soft membership group is no longer always one hull (provisional, ADR 0022 M2b): it is drawn whole where its hull
-  encloses no foreign node, else in pieces — one per container that holds its members, then by distance within one —
-  and a group that falls into more than three pieces is marked member by member instead (`Scene.membershipMarks`, a dot
-  in its dimension's hue in the SVG viewer). Hulls carry `piece` and `pieces`; the report adds `split`, `marked` and
-  `intrudersWhole` (what the group's whole hull would have enclosed). Drawing only: no node moves and no route changes.
-  The threshold of three pieces is a placeholder until it is measured (M3).
-
-- The engine choice (routing a drawing that still runs routes through nodes again with both routing engines) is not
-  tried when its estimated work (routes × grid cells over the box edges) exceeds 1 million; the conflicts are reported
-  with a diagnostic (#149). A meshed bus view of 100 nodes on 30 buses given as data, organic, took 20 to 42 s and now
-  0.35 s with the same output (`benchmarks/results/engine-choice-work-20261123.md`); the stored default fingerprints are
-  unchanged.
-- Routing style `bus`: laid out by single pass like `orthogonal`, so the fans find their shared ways in its channels
-  (on six public examples, fans drawn in part from 78 of 105 to 8); the `Bus style` diagnostic counts apart the fans whose
-  edges leave to different sides.
-
-### Fixed
-
-- Dragging on a single-pass drawing: the edges follow the node. A drag step moved only the node's box and kept every
-  route, so the edges stayed at the old place until the drop; it now routes again what the move touches (the node's
-  edges and the routes into its old or new box) around the drawing as it is (`arqlet_layout::preview_move`), which stays
-  a single-pass one. The drop lays the view out as before.
-- Route repair: where a route's end faces a neighbour closer than its stub (narrow gaps in organic views with
-  containers), the repair tries shorter stubs instead of keeping the route through the boxes (#156). Generated organic
-  view, 100 nodes with 11 containers: 54 of 250 routes crossed foreign boxes, now none; with buses and 240 children, 518
-  of 1 159 routes, now 18. The overlap resolution became much faster with the same output (segment index by line,
-  counts per move, cached moves): 117 s to 3.5 s on 120 children; dense views still cost more than before
-  (`benchmarks/results/narrow-gap-repair-20261123.md`). Default fingerprints unchanged.
-- Buses given as data (`Graph.buses` with `taps`): `edges` is optional, and a bus with taps is a shared medium whatever
-  `edges` holds (#145; before, listing edges beside the taps silently stopped trace and neighbourhood at the bus);
-  `neighbourhood` shows a reached bus drawn as lines (`busStyle: 'lines'`) by its lines, as a bar by itself (#144);
-  a `patch` keeps such buses (it dropped every bus without edges, part of #149); the cluster overview draws their bus
-  lines (#147).
-- `reveal` with `more` (the view controller's `showRest`) on a collapsed container shows its first page instead of
-  refusing it (#146).
-
-### Added
-
 - `organicGap` (#156, provisional, off): the gap between the boxes of an organic area (default 24). On generated bus views
   with containers, 36 or 48 left far fewer routes through boxes and often took much less time, at more area
   (`benchmarks/results/organic-gap-20261123.md`); the default stays until the quality gates accept a change.
@@ -131,7 +108,6 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   ADR 0025 §6, O4); the playground's GPU view morphs on every new layout. The overview page zooms on into the scene view
   of a structured cluster and back without a jump (`sceneViewOf`, `overviewViewOf`; checkbox *Zoom on into the scene
   view*).
-
 - Scene renderer for large views (ADR 0025 V1–V2, provisional) in `@arqlet/viewer`: a far layer on the GPU, WebGPU
   first and WebGL 2 as the fallback (`createSceneGpuRenderer`, `createSceneRenderer`, `sceneBackend`), drawing the
   same boxes, routes, arrowheads, hulls and marks as `renderSvg`, with texts on a 2D canvas and picking; and a scene
@@ -143,6 +119,53 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - The far layer draws the trace (path in amber, the rest receding), pin dots and a hover outline as `renderSvg` does;
   lines thinner than a pixel keep their coverage as opacity, as in SVG. `toReactFlow` returns membership hulls among its
   overlays (`hulls`), and the React Flow example draws all overlays.
+
+### Changed
+
+- Phase timings (#152): `timings` also reports the single-pass parts of the routing (`plan`, `channelGrowth`,
+  `construction`, `fallbackRouting`, `finalization`), `buses`, and for `elkLayout` the translation (`elkTranslation`) and
+  a refinement (`refinement`). The ELK drop-in takes `timings: true` and exposes them as `elk.timings` after each call.
+- `sharedTracks`: when shared tracks make the lane orders cyclic and the layout falls back to one without them, the
+  drawing is no longer completed a second time before that fallback; same result, 1.5 s instead of 1.9–2.0 s on a dense
+  flat graph (`benchmarks/results/phase-timings-shared-tracks-20261123.md`).
+- A soft membership group is no longer always one hull (provisional, ADR 0022 M2b): it is drawn whole where its hull
+  encloses no foreign node, else in pieces — one per container that holds its members, then by distance within one —
+  and a group that falls into more than three pieces is marked member by member instead (`Scene.membershipMarks`, a dot
+  in its dimension's hue in the SVG viewer). Hulls carry `piece` and `pieces`; the report adds `split`, `marked` and
+  `intrudersWhole` (what the group's whole hull would have enclosed). Drawing only: no node moves and no route changes.
+  The threshold of three pieces is a placeholder until it is measured (M3).
+- The engine choice (routing a drawing that still runs routes through nodes again with both routing engines) is not
+  tried when its estimated work (routes × grid cells over the box edges) exceeds 1 million; the conflicts are reported
+  with a diagnostic (#149). A meshed bus view of 100 nodes on 30 buses given as data, organic, took 20 to 42 s and now
+  0.35 s with the same output (`benchmarks/results/engine-choice-work-20261123.md`); the stored default fingerprints are
+  unchanged.
+- Routing style `bus`: laid out by single pass like `orthogonal`, so the fans find their shared ways in its channels
+  (on six public examples, fans drawn in part from 78 of 105 to 8); the `Bus style` diagnostic counts apart the fans whose
+  edges leave to different sides.
+
+### Fixed
+
+- The SVG viewer drew membership hulls before the container frames, whose fill hid every hull inside a container. Hulls
+  are now unfilled outlines drawn above the frames and below routes and leaves (provisional, ADR 0022).
+- Playground: *Only groups* is a multiple select; several groups, of one dimension or several, set `consider` per
+  dimension.
+- Dragging on a single-pass drawing: the edges follow the node. A drag step moved only the node's box and kept every
+  route, so the edges stayed at the old place until the drop; it now routes again what the move touches (the node's
+  edges and the routes into its old or new box) around the drawing as it is (`arqlet_layout::preview_move`), which stays
+  a single-pass one. The drop lays the view out as before.
+- Route repair: where a route's end faces a neighbour closer than its stub (narrow gaps in organic views with
+  containers), the repair tries shorter stubs instead of keeping the route through the boxes (#156). Generated organic
+  view, 100 nodes with 11 containers: 54 of 250 routes crossed foreign boxes, now none; with buses and 240 children, 518
+  of 1 159 routes, now 18. The overlap resolution became much faster with the same output (segment index by line,
+  counts per move, cached moves): 117 s to 3.5 s on 120 children; dense views still cost more than before
+  (`benchmarks/results/narrow-gap-repair-20261123.md`). Default fingerprints unchanged.
+- Buses given as data (`Graph.buses` with `taps`): `edges` is optional, and a bus with taps is a shared medium whatever
+  `edges` holds (#145; before, listing edges beside the taps silently stopped trace and neighbourhood at the bus);
+  `neighbourhood` shows a reached bus drawn as lines (`busStyle: 'lines'`) by its lines, as a bar by itself (#144);
+  a `patch` keeps such buses (it dropped every bus without edges, part of #149); the cluster overview draws their bus
+  lines (#147).
+- `reveal` with `more` (the view controller's `showRest`) on a collapsed container shows its first page instead of
+  refusing it (#146).
 
 ## 0.8.0 — 2026-11-22
 
