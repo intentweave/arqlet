@@ -109,25 +109,10 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
   c.append(element('circle',{cx,cy:y+size*.35,r:size*.25,fill:on?colour:'none',stroke:colour,'stroke-width':size*.1,'pointer-events':'none'}));
   return c;
  };
- // Provisional (ADR 0022): membership hulls, drawn first so that everything else covers them. A hull is a closed
- // polygon around the boxes of one group; it takes no pointer events, because it is not a thing to select and because a
- // node under it must stay reachable. One hue per dimension, so two dimensions over the same nodes stay apart; the
- // group's name sits at the hull's topmost point.
  const hulls=scene.membershipHulls??[],marks=scene.membershipMarks??[];
  // One hue per dimension, shared by its hulls and its marks (ADR 0022 §3, M2b).
  const membershipDimensions=[...new Set([...hulls,...marks].map(h=>h.dimension))];
  const hueOf=dimension=>(membershipDimensions.indexOf(dimension)*67+191)%360;
- if(hulls.length){
-  for(const h of hulls){
-   if(!(h.points?.length>=3))continue;
-   const hue=hueOf(h.dimension),points=h.points.map(p=>`${p.x},${p.y}`).join(' ');
-   const shape=element('polygon',{points,fill:`hsl(${hue} 60% 55% / .12)`,stroke:`hsl(${hue} 60% 65% / .55)`,'stroke-width':1.4,'stroke-dasharray':'6 4','pointer-events':'none',class:'lw-hull','data-hull-dimension':h.dimension,'data-hull-group':h.group});
-   shape.append(element('title',{},`${h.dimensionLabel||h.dimension}: ${h.label}${(h.pieces??1)>1?` (piece ${(h.piece??0)+1} of ${h.pieces})`:''}${h.intruders?.length?` (${h.intruders.length} foreign inside)`:''}`));
-   svg.append(shape);
-   const at=h.points.reduce((a,b)=>b.y<a.y||(b.y===a.y&&b.x<a.x)?b:a);
-   svg.append(element('text',{x:at.x+6,y:at.y-5,fill:`hsl(${hue} 55% 78%)`,'font-size':11,'pointer-events':'none',class:'lw-hull-label'},h.label));
-  }
- }
  const rings=[],top=[];
  for(const n of [...nodes.values()].filter(n=>parents.has(n.id)).sort((a,b)=>depth(a)-depth(b))){const r=absolute.get(n.id);
   // A circle container is a disc inscribed in its square box, like a circle leaf; its controls sit on the disc.
@@ -160,6 +145,22 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
   // The resize handle at the bottom-right corner: dragging it sets the container's minimum size (ADR 0010, decision 3).
   if(onResize){const handle=element('rect',{x:round?mx+on45-6:r.x+r.width-14,y:round?my+on45-6:r.y+r.height-14,width:12,height:12,rx:2,fill:T.control,class:'lw-resize','data-resize-id':n.id,style:'cursor:nwse-resize'});handle.onpointerdown=e=>{e.stopPropagation();onResize(n,e);};top.push(handle);}
   if(onReset)(sized.get(n.id)??[]).forEach((axis,index)=>top.push(round?resetControl(n,axis,mx-(index+1)*size-4,my+rad-size-10,size):resetControl(n,axis,r.x+r.width-(index+2)*size-12,r.y+6,size)));
+ }
+ // Provisional (ADR 0022): membership hulls, drawn after the container frames — whose fill would hide every hull inside
+ // a container — and before routes and leaves, which stay on top. Outlines only, no fill: a hull crosses frames and other
+ // hulls, and a fill would tint what it crosses. A hull takes no pointer events, because it is not a thing to select and
+ // because a node under it must stay reachable. One hue per dimension, so two dimensions over the same nodes stay apart;
+ // the group's name sits at the hull's topmost point.
+ if(hulls.length){
+  for(const h of hulls){
+   if(!(h.points?.length>=3))continue;
+   const hue=hueOf(h.dimension),points=h.points.map(p=>`${p.x},${p.y}`).join(' ');
+   const shape=element('polygon',{points,fill:'none',stroke:`hsl(${hue} 60% 62% / .8)`,'stroke-width':1.6,'stroke-dasharray':'6 4','pointer-events':'none',class:'lw-hull','data-hull-dimension':h.dimension,'data-hull-group':h.group});
+   shape.append(element('title',{},`${h.dimensionLabel||h.dimension}: ${h.label}${(h.pieces??1)>1?` (piece ${(h.piece??0)+1} of ${h.pieces})`:''}${h.intruders?.length?` (${h.intruders.length} foreign inside)`:''}`));
+   svg.append(shape);
+   const at=h.points.reduce((a,b)=>b.y<a.y||(b.y===a.y&&b.x<a.x)?b:a);
+   svg.append(element('text',{x:at.x+6,y:at.y-5,fill:`hsl(${hue} 55% 78%)`,'font-size':11,'pointer-events':'none',class:'lw-hull-label'},h.label));
+  }
  }
  // The selected route is drawn above the others; the other routes are dimmed. A wide transparent line makes a thin route clickable.
  const active=scene.routes.find(r=>r.id===selectedRoute),endpoints=new Set(active?[active.source,active.target]:[]);

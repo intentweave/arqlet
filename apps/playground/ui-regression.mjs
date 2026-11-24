@@ -357,10 +357,13 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','back to the containment');
   assert.equal(latest.options?.groupingPriority,undefined);
 
-  // Only one group (ADR 0022 §2, consider): held softly it is the only hull; first, the only box of its dimension.
+  // Only some groups (ADR 0022 §2, consider; a multiple select): held softly they are the only hulls; first, the only
+  // boxes of their dimension.
   const payments=JSON.stringify(['team','payments']);
+  const pick=(...values)=>{for(const o of get('grouping-consider').children)o.selected=values.includes(o.value);get('grouping-consider').onchange();};
+  const picked=()=>[...get('grouping-consider').children].filter(o=>o.selected).map(o=>o.value);
   assert.ok([...get('grouping-consider').children].some(c=>c.value===payments),'every group of every dimension is offered');
-  get('grouping-consider').value=payments;get('grouping-consider').onchange();await flush();
+  pick(payments);await flush();
   assert.deepEqual(latest.options.groupingPriority,[{by:'parent'},{by:'team',consider:['payments']}],'the team joins softly, considering one group');
   const one=sceneOf(engine,latest);
   assert.deepEqual([...new Set([...one.membershipHulls,...(one.membershipMarks??[])].map(h=>h.group))],['payments'],'one group drawn');
@@ -369,8 +372,16 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   assert.equal(latest.graph.nodes.find(n=>n.id==='orders').parentId,'membership:team/payments','the considered group is a box');
   assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','a node of a group not considered stays where it was');
   assert.ok(!latest.graph.nodes.some(n=>n.id==='membership:team/platform'),'no box for a group not considered');
-  assert.equal(get('grouping-consider').value,payments,'the control shows the view it asked for');
-  get('grouping-consider').value='';get('grouping-consider').onchange();await flush();
+  assert.deepEqual(picked(),[payments],'the control shows the view it asked for');
+  // Several groups of two dimensions: each dimension considers its own.
+  const dims=latest.sourceGraph?.memberships?.dimensions??latest.graph.memberships.dimensions;
+  const other=dims.find(d=>d.id!=='team'),second=JSON.stringify([other.id,other.groups[0].id]),platform=JSON.stringify(['team','platform']);
+  pick(payments,platform,second);await flush();
+  assert.deepEqual(latest.options.groupingPriority,[{by:'team',consider:['platform','payments']},{by:'parent'},{by:other.id,consider:[other.groups[0].id]}],'two groups of the team in their declared order, one of another dimension');
+  assert.ok(latest.graph.nodes.some(n=>n.id==='membership:team/platform'),'both considered groups are boxes');
+  assert.deepEqual(picked().sort(),[payments,platform,second].sort(),'all three stay selected');
+  pick('');await flush();
+  assert.deepEqual(picked(),[''],'All groups');
   get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
   assert.equal(latest.options?.groupingPriority,undefined,'back to the default');
   get('example').value='default';get('example').onchange();await flush();
