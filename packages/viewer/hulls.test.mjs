@@ -1,5 +1,5 @@
-// Provisional (ADR 0022, first slice): the renderer draws a membership hull as a polygon behind everything else, takes no
-// pointer events on it, and gives each dimension its own hue so two dimensions over the same nodes stay apart.
+// Provisional (ADR 0022): the renderer draws a membership hull as an unfilled polygon above the container frames and
+// below routes and leaves, takes no pointer events on it, and gives each dimension its own hue so two dimensions over the same nodes stay apart.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {renderSvg} from './svg.js';
@@ -48,6 +48,24 @@ test('the hull is drawn before the nodes, so the nodes cover it', () => {
   const firstNode = svg.children.findIndex(c => c.tag === 'g');
   assert.ok(polygon >= 0 && firstNode >= 0, 'both are drawn');
   assert.ok(polygon < firstNode, `the hull (${polygon}) must come before the first node (${firstNode})`);
+});
+
+test('a hull is an outline above a container frame, so the frame does not hide it', () => {
+  // The z-order fix: frames are filled, and a hull drawn before them vanished wherever it lay inside a container.
+  const svg = new Element('svg');
+  const scene = sceneWith([hull('zone', 'dmz', square(20, 20, 60, 30))]);
+  scene.nodes = [
+    {...node('box', {x: 0, y: 0, width: 300, height: 120}), container: true},
+    {...node('a', {x: 20, y: 40, width: 80, height: 40}), parentId: 'box'},
+  ];
+  renderSvg(svg, scene, {document});
+  const polygon = svg.children.findIndex(c => c.tag === 'polygon');
+  const frame = svg.children.findIndex(c => c.attrs?.['data-container-id'] === 'box' && (c.tag === 'rect' || c.tag === 'circle'));
+  const leaf = svg.children.findIndex(c => c.tag === 'g');
+  assert.ok(polygon >= 0 && frame >= 0 && leaf >= 0, `all drawn: hull ${polygon}, frame ${frame}, leaf ${leaf}`);
+  assert.ok(frame < polygon, `the hull (${polygon}) must come after the frame (${frame})`);
+  assert.ok(polygon < leaf, `the hull (${polygon}) must come before the leaf (${leaf})`);
+  assert.equal(svg.children[polygon].attrs.fill, 'none', 'an outline, not a tinted area');
 });
 
 test('each dimension gets its own hue, and a group is named at its hull', () => {

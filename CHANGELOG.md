@@ -5,6 +5,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Fixed
+
+- The SVG viewer drew membership hulls before the container frames, whose fill hid every hull inside a container. Hulls
+  are now unfilled outlines drawn above the frames and below routes and leaves (provisional, ADR 0022).
+- Playground: *Only groups* is a multiple select; several groups, of one dimension or several, set `consider` per
+  dimension.
+
 ### Added
 
 - A membership group that is still a box (a source container that kept some members, or a dimension's container)

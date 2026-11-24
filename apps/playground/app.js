@@ -1190,7 +1190,7 @@ function syncDetails(){
  // Hulls are on when a dimension after the first is listed for its own sake; one listed only to show a single group
  // (`consider`, the control below) does not turn them on.
  $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent'&&!c.consider?.length);
- // Provisional (ADR 0022 §2, consider): one group of one dimension, or all. A value is the JSON pair [dimension, group], since
+ // Provisional (ADR 0022 §2, consider): some groups, or all. A value is the JSON pair [dimension, group], since
  // group ids may hold any character (documents are paths).
  const graphDims=(snapshot?.sourceGraph??snapshot?.graph)?.memberships?.dimensions??[];
  const considerChoices=graphDims.flatMap(d=>d.groups.map(g=>({value:JSON.stringify([d.id,g.id]),text:`${d.label||d.id}: ${g.label||g.id}`})));
@@ -1201,8 +1201,10 @@ function syncDetails(){
   considerSelect.replaceChildren(all,...considerChoices.map(c=>{const option=document.createElement('option');option.value=c.value;option.textContent=c.text;return option;}));
  }
  considerSelect.disabled=dimensions.length===0;
- const considering=priority.find(c=>c.consider?.length);
- considerSelect.value=considering?JSON.stringify([considering.by,considering.consider[0]]):'';
+ // Several groups, of one or several dimensions (a multiple select): each option is selected when its criterion
+ // considers it; "All groups" when none does.
+ const considered=new Set(priority.flatMap(c=>(c.consider??[]).map(g=>JSON.stringify([c.by,g]))));
+ for(const option of considerSelect.children??[])option.selected=option.value?considered.has(option.value):considered.size===0;
  $('membership-hull').disabled=dimensions.length===0;
  $('membership-hull').value=o.membershipHull??'rectangle';
 }
@@ -1293,15 +1295,19 @@ function applyGrouping(label){
  const order=[first];
  if(first!=='parent')order.push('parent');
  if($('membership-hulls').checked)order.push(...dimensions.filter(d=>d!==first));
- // Only one group: its dimension keeps its rank, or joins as a soft criterion when it is not listed yet.
- const chosen=$('grouping-consider').value?JSON.parse($('grouping-consider').value):null;
- if(chosen&&!order.includes(chosen[0]))order.push(chosen[0]);
- const criteria=order.map(by=>chosen&&by===chosen[0]?{by,consider:[chosen[1]]}:{by});
+ // Only some groups: each chosen group's dimension keeps its rank, or joins as a soft criterion when it is not listed
+ // yet, and considers the chosen groups of that dimension. "All groups" chosen, or nothing: every group.
+ const options=[...($('grouping-consider').children??[])].filter(o=>o.selected);
+ const chosen=options.some(o=>!o.value)?[]:options.map(o=>JSON.parse(o.value));
+ const consider=new Map();
+ for(const [by,group] of chosen){if(!consider.has(by))consider.set(by,[]);consider.get(by).push(group);}
+ for(const by of consider.keys())if(!order.includes(by))order.push(by);
+ const criteria=order.map(by=>consider.has(by)?{by,consider:consider.get(by)}:{by});
  setOption({groupingPriority:criteria.length===1&&!criteria[0].consider?[]:criteria},label);
 }
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
 $('grouping-first').onchange=()=>applyGrouping('Structure first');
-$('grouping-consider').onchange=()=>applyGrouping('Only group');
+$('grouping-consider').onchange=()=>applyGrouping('Only groups');
 // Provisional (ADR 0022 §3): the hull's outline. Sent as it is; the engine omits the default (rectangle) when it writes
 // the options back, so a snapshot that never chose a shape stays unchanged.
 $('membership-hull').onchange=()=>setOption({membershipHull:$('membership-hull').value},'Hull shape');
