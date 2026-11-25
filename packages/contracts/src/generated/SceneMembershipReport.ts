@@ -60,4 +60,8 @@ intrudersWhole: number,
  * Groups the view still draws as a box that lost some members to another criterion: only those members are drawn,
  * joined to the box where that is compact and encloses nothing foreign, else marked (ADR 0022 §3). The box shows the rest.
  */
-keptBox: number, summary: string, };
+keptBox: number,
+/**
+ * Provisional (ADR 0022 M3b): groups the layout holds together inside their owner (`LayoutOptions::hold_memberships`).
+ */
+held?: number, summary: string, };

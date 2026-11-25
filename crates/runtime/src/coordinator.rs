@@ -67,7 +67,15 @@ pub fn refine_structured(
         .len();
 
     let mut not_applied = Vec::new();
-    if containers.is_empty() {
+    // Parts are laid out without the rest of the graph, so they cannot hold membership groups (ADR 0022 M3b): only the
+    // joint layout does.
+    let holds = options.hold_memberships && options.grouping_priority.len() > 1;
+    if holds {
+        not_applied.push((
+            "parts",
+            "holdMemberships holds in the joint layout".to_string(),
+        ));
+    } else if containers.is_empty() {
         not_applied.push(("container", "the graph has no container".to_string()));
         if components > 1 {
             match refine_by_components(graph, options) {

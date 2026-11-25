@@ -143,6 +143,10 @@ pub struct SceneMembershipReport {
     /// Groups the view still draws as a box that lost some members to another criterion: only those members are drawn,
     /// joined to the box where that is compact and encloses nothing foreign, else marked (ADR 0022 §3). The box shows the rest.
     pub kept_box: usize,
+    /// Provisional (ADR 0022 M3b): groups the layout holds together inside their owner (`LayoutOptions::hold_memberships`).
+    #[serde(skip_serializing_if = "is_zero")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<usize>"))]
+    pub held: usize,
     pub summary: String,
 }
 
@@ -694,6 +698,10 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     })
 }
 
+fn is_zero(value: &usize) -> bool {
+    *value == 0
+}
+
 /// How far a hull reaches beyond the boxes it encloses, in layout units.
 const HULL_PADDING: f64 = 10.;
 
@@ -1129,6 +1137,14 @@ fn membership_overlays(
         if unassigned > 0 {
             summary.push_str(&format!(", {unassigned} nodes no criterion assigns"));
         }
+        let held = snapshot
+            .held_groups
+            .iter()
+            .filter(|h| h.dimension == criterion.by)
+            .count();
+        if held > 0 {
+            summary.push_str(&format!(", {held} held together by the layout"));
+        }
         if lanes {
             summary.push_str(", lanes not applied yet (ADR 0022, M4)");
         }
@@ -1149,6 +1165,7 @@ fn membership_overlays(
             marked,
             intruders_whole,
             kept_box,
+            held,
             summary,
         });
     }

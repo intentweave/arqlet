@@ -54,6 +54,8 @@ mod geometry_update;
 mod graph_patch;
 #[path = "graph_roundtrip.rs"]
 mod graph_roundtrip;
+#[path = "holding.rs"]
+mod holding;
 #[path = "import_limit.rs"]
 mod import_limit;
 #[path = "interactive_continuation.rs"]

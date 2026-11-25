@@ -405,6 +405,18 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   [results](../../benchmarks/results/memberships-20261125-baseline.md)): with the parent first and groups planted along the
   edges, 11 of 24 groups inside one container are drawn whole and none of 30 across containers. Holding within an owner
   (M3b) can improve at most 13 of these groups, regions across owners (M3c) at most 30. Planted groups, not real ones.
+  **M3b, holding inside an owner, done behind `holdMemberships`** (2026-11-25, off by default;
+  `crates/layout/src/holding.rs`, [results](../../benchmarks/results/memberships-20261125-hold.md)). Order alone does not hold a
+  group: 2 of 19 become whole, against 19 of 19 as a nested container
+  ([feasibility](../../benchmarks/results/memberships-20261125-hold-inside.md)). So a group whose shown members share a container is
+  laid out as a container nested there, which is taken out of the result again: the view, its owners and its ports have no
+  trace of it, and only the hull is drawn. Groups are tried one by one in the order of the priority, each with a layout of its
+  own (at most 64), and kept when they are then whole, break no group that was whole, add no hard violation and stay in a
+  budget: crossings the larger of 2 and 5 percent, bends the larger of 4 and 5 percent, halved per further rank. On the
+  baseline inputs 5 of 19 groups are held. Not held: a moved-down parent hierarchy, groups across containers (M3c), members
+  with a pin or an order hint, graphs with buses. A complete layout holds; an edit of a part starts from the held places and
+  may release a group, which the snapshot then no longer lists (`heldGroups`). A drawing that holds something is not refined
+  until candidates hold as well. Open for M3d: the budget, per group and in total, and the number of trials.
 - **M4 — lanes** (`as: lanes`): at rank 1 across the drawing, below a higher rank inside each owner, two of them as a grid.
   *Exit:* the gate; `pools-and-lanes.json` with its `groupingPriority` draws as the 2×3 grid with no lane violation;
   `three-dimensions.json` reports what it cannot satisfy.

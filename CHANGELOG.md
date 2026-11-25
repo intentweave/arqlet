@@ -5,6 +5,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- `holdMemberships` (provisional, ADR 0022 M3b, off by default): the layout keeps a soft membership group whose shown members
+  share a container together there, where that stays within a budget of crossings and bends. Snapshot `heldGroups`, report
+  `held`. It costs a layout per group tried. Playground: *Hold groups together*.
+
 ### Changed
 
 - Membership hulls (provisional, ADR 0022): members that left a group's box are joined to it by a hull only where the hull
