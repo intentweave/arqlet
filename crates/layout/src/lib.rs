@@ -425,14 +425,9 @@ fn compute_counted_unclocked(
             hold_memberships: false,
             ..options.clone()
         };
-        let mut dirty = dirty.clone();
-        if let Some(p) = previous {
-            dirty.extend(holding::owners(p));
+        if let Some(previous) = previous {
+            return holding::resume(graph, previous, dirty, options, &plain);
         }
-        let (mut snapshot, stages) = compute_counted_unclocked(graph, previous, &dirty, &plain)?;
-        let earlier = previous.map_or(&[][..], |p| p.held_groups.as_slice());
-        holding::kept(&mut snapshot, options, earlier);
-        return Ok((snapshot, stages));
     }
     // Provisional (`hubRefs`): the edges of hubs are taken out of the layout and kept as references to draw as stubs.
     if let Some((view, refs)) = hub_refs(graph, options.hub_refs) {
@@ -2638,6 +2633,7 @@ fn align_lanes(
     stacked: &BTreeMap<(id::Id, id::Id), f64>,
     // `pinsInSinglePass`: the places across the flow that pinned elements hold.
     held: &BTreeMap<id::Id, f64>,
+    header: f64,
 ) -> (f64, BTreeMap<usize, Vec<id::Id>>) {
     let across = |r: &Rect| {
         if vertical {
@@ -2712,7 +2708,7 @@ fn align_lanes(
             }
         }
     }
-    let low = if vertical { 24. } else { 48. };
+    let low = if vertical { 24. } else { header };
     // The sweeps work on indices: every element of the ranks and the chains, with its place across the flow (when it is
     // placed) and its size; the places go back to `placed` after the sweeps.
     let mut slot: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
@@ -3062,6 +3058,16 @@ fn straighten_chains(
         .fold(0., f64::max)
 }
 
+/// Where the children of an area start below its upper border: below the title row, which a container that only holds a
+/// membership group during the layout does not have (ADR 0022 M3b).
+fn header_of(area: Option<&str>) -> f64 {
+    if area.is_some_and(holding::is_holding) {
+        24.
+    } else {
+        48.
+    }
+}
+
 fn slide_free(
     placed: &mut BTreeMap<String, Rect>,
     levels: &BTreeMap<usize, Vec<String>>,
@@ -3069,6 +3075,7 @@ fn slide_free(
     vertical: bool,
     gap: f64,
     extent: f64,
+    header: f64,
 ) {
     let cross = |r: &Rect| {
         if vertical {
@@ -3077,7 +3084,7 @@ fn slide_free(
             (r.y, r.height)
         }
     };
-    let low = if vertical { 24. } else { 48. };
+    let low = if vertical { 24. } else { header };
     for _ in 0..3 {
         for ids in levels.values() {
             for (index, id) in ids.iter().enumerate() {
@@ -5792,6 +5799,7 @@ fn placed_snapshot(
             .map(|(area, plan)| (area.clone(), plan.to_stored()))
             .collect(),
         held_groups: Vec::new(),
+        holding: None,
         options: options.clone(),
         source_graph: None,
         collapsed_ids: vec![],
@@ -7454,7 +7462,8 @@ fn place(
                     .sum::<f64>()
         };
         let max_cross = levels.values().map(cross_total).fold(0., f64::max);
-        let mut primary = snap(if vertical { 48. } else { 24. }, grid);
+        let header = header_of(parent);
+        let mut primary = snap(if vertical { header } else { 24. }, grid);
         let mut cross_extent: f64 = snap(if vertical { 48. } else { 90. }, grid);
         let mut placed = BTreeMap::new();
         let level_list: Vec<&Vec<id::Id>> = levels.values().collect();
@@ -7469,7 +7478,7 @@ fn place(
                     }
                 })
                 .fold(0., f64::max);
-            let mut cross = snap(if vertical { 24. } else { 48. }, grid);
+            let mut cross = snap(if vertical { 24. } else { header }, grid);
             if optimize >= 3 {
                 cross = snap(cross + (max_cross - cross_total(ids)) / 2., grid);
             }
@@ -7593,6 +7602,7 @@ fn place(
                 vertical,
                 cross_gap,
                 cross_extent,
+                header,
             );
         }
         let mut physical_track_counts = Vec::new();
@@ -7857,6 +7867,7 @@ fn place(
                                 vertical,
                                 cross_gap,
                                 cross_extent,
+                                header,
                             );
                         }
                         let slots = chain_slots(
@@ -7879,6 +7890,7 @@ fn place(
                             options.shared_border_ranks,
                             &stacked,
                             &held,
+                            header,
                         );
                         placement_geometry::CrossPlan {
                             tracks: channel_tracks_by_edges(
@@ -7933,6 +7945,7 @@ fn place(
                             options.shared_border_ranks,
                             &stacked,
                             &held,
+                            header,
                         );
                         *border_orders.borrow_mut() = reordered;
                         cross_extent = cross_extent.max(reach + cross_gap);
@@ -7945,6 +7958,7 @@ fn place(
                             vertical,
                             cross_gap,
                             cross_extent,
+                            header,
                         );
                         // The dummies of every long edge on one line: a bend costs more than the room it saves (the
                         // objectives rank bends before length).

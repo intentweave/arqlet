@@ -1145,6 +1145,20 @@ fn membership_overlays(
         if held > 0 {
             summary.push_str(&format!(", {held} held together by the layout"));
         }
+        // Why the others are not, by reason (`Snapshot::holding` names the groups).
+        let mut reasons: BTreeMap<ReleaseReason, usize> = BTreeMap::new();
+        for r in snapshot.holding.iter().flat_map(|h| &h.released) {
+            if r.dimension == criterion.by {
+                *reasons.entry(r.reason).or_default() += 1;
+            }
+        }
+        if !reasons.is_empty() {
+            let list: Vec<String> = reasons
+                .iter()
+                .map(|(r, n)| format!("{n} {}", r.text()))
+                .collect();
+            summary.push_str(&format!(", not held: {}", list.join(", ")));
+        }
         if lanes {
             summary.push_str(", lanes not applied yet (ADR 0022, M4)");
         }

@@ -8,6 +8,7 @@ import type { GeometryIssue } from "./GeometryIssue";
 import type { Gesture } from "./Gesture";
 import type { Graph } from "./Graph";
 import type { HeldGroup } from "./HeldGroup";
+import type { HoldingReport } from "./HoldingReport";
 import type { HubRef } from "./HubRef";
 import type { LayoutOptions } from "./LayoutOptions";
 import type { LayoutStrategy } from "./LayoutStrategy";
@@ -99,4 +100,9 @@ layeredPlans?: { [key in string]: StoredAreaPlan },
  * Provisional (ADR 0022 M3b): the membership groups this layout holds together inside their owner
  * (`LayoutOptions::hold_memberships`). Omitted when empty.
  */
-heldGroups?: Array<HeldGroup>, };
+heldGroups?: Array<HeldGroup>,
+/**
+ * Provisional (ADR 0022 M3b): which soft groups the layout does not hold and why, and what holding the others costs.
+ * Omitted without `LayoutOptions::hold_memberships`.
+ */
+holding?: HoldingReport | null, };

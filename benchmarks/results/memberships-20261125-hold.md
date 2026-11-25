@@ -22,6 +22,12 @@ broken. The budget is per group, so a drawing's total grows with the number of g
   earlier experiment and three here. The cause was not investigated.
 - The across group of `crosses-containers` is whole as well (fixtures across 7 to 8 of 12), as a side effect.
 
+## After the browser check (same day)
+
+A holding container has no title row any more where its area is layered (`memberships-20261125-hold-2.jsonl`, same command).
+The same groups are held. The area of `crosses-containers` falls from 339264 to 310080 (291480 without holding); `nested-tree-radial`
+is unchanged, because a tree area keeps its title row. Edges against the flow are counted: on `crosses-containers` 1 to 2.
+
 ## Tables
 
 uml-class.json near: no group of 4 can be planted

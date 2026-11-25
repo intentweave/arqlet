@@ -1210,6 +1210,16 @@ function syncDetails(){
  // Provisional (ADR 0022 M3b): holding needs a soft dimension to hold.
  $('membership-hold').disabled=dimensions.length===0;
  $('membership-hold').checked=!!o.holdMemberships;
+ $('membership-hold-info').textContent=o.holdMemberships?holdingText(snapshot):'';
+}
+/** What holding did (ADR 0022 M3b): how many groups are held, why the others are not, and what it costs. */
+function holdingText(s){
+ const held=s?.heldGroups?.length??0,count=new Map();
+ const why={acrossContainers:'across containers',fixedPlace:'pinned or ordered',overlapsHeld:'shares nodes with a held group',refused:'no layout possible',notWhole:'not whole even then',breaksOther:'would break another group',violation:'would break a hard rule',budget:'over the budget',trials:'not tried',edit:'released by an edit',buses:'graph with buses'};
+ for(const r of s?.holding?.released??[])count.set(r.reason,(count.get(r.reason)??0)+1);
+ const parts=[`${held} held`,...[...count].map(([r,n])=>`${n} ${why[r]??r}`)],c=s?.holding?.cost;
+ const cost=c?` Crossings ${c.crossingsBefore} → ${c.crossings}, bends ${c.bendsBefore} → ${c.bends}, edges against the flow ${c.againstFlowBefore} → ${c.againstFlow}.`:'';
+ return `${parts.join(', ')}.${cost}`;
 }
 /** The ids of the membership dimensions the current graph declares, in their declared order. */
 function membershipDimensions(){

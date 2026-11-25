@@ -1,6 +1,6 @@
 //! ADR 0022 M3b (`holdMemberships`): a soft group whose members share a container is held together there, where the budget
 //! allows it, and nothing of the container that holds it during the layout is left in the result.
-use arqlet_model::{Graph, GroupingCriterion, LayoutOptions, Point, Snapshot};
+use arqlet_model::{Graph, GroupingCriterion, LayoutOptions, Point, ReleaseReason, Snapshot};
 use arqlet_runtime::{dispatch, import_graph_with, refine_snapshot};
 use arqlet_scene::{build_scene, metrics::Metrics};
 
@@ -295,4 +295,133 @@ fn every_kind_of_edit_works_on_a_drawing_that_holds_a_group() {
     }
     let structured = call(&held, serde_json::json!({"op": "structuredRefine"}));
     assert!(structured.geometry_issues.is_empty());
+}
+
+#[test]
+fn an_edit_keeps_a_group_held() {
+    // Seen in the browser: one added node released the group while the option stayed on.
+    let held = laid(CROSSES, true);
+    let pieces = |s: &Snapshot| {
+        build_scene(s)
+            .unwrap()
+            .membership_hulls
+            .iter()
+            .filter(|h| h.group == "local")
+            .count()
+    };
+    for n in &held.graph.nodes {
+        if held
+            .graph
+            .nodes
+            .iter()
+            .any(|m| m.parent_id.as_deref() == Some(&n.id))
+        {
+            continue;
+        }
+        let mut s = arqlet_runtime::add_node(&held, held.revision, &n.id, "new").unwrap();
+        assert_eq!(s.held_groups, held.held_groups, "beside {}", n.id);
+        assert_eq!(pieces(&s), 1);
+        assert!(!json(&s).contains("held:"));
+        assert!(s.geometry_issues.is_empty(), "{:?}", s.geometry_issues);
+        // And a second edit on top, then a refinement.
+        s = arqlet_runtime::add_node(&s, s.revision, &n.id, "again").unwrap();
+        assert_eq!(s.held_groups, held.held_groups);
+        let refined = refine_snapshot(&s, s.revision, s.layout_version).unwrap();
+        assert_eq!(refined.held_groups, held.held_groups);
+    }
+}
+
+#[test]
+fn a_closed_and_opened_container_holds_its_group_again_or_says_why_not() {
+    let held = laid(CROSSES, true);
+    let toggle = |s: &Snapshot, id: &str| -> Snapshot {
+        let answer: serde_json::Value =
+            serde_json::from_str(&dispatch(&json(&serde_json::json!({
+                "op": "toggle", "snapshot": s, "nodeId": id, "expectedRevision": s.revision,
+                "expectedLayoutVersion": s.layout_version
+            }))))
+            .unwrap();
+        assert_eq!(answer["ok"], true, "{}", answer["error"]);
+        serde_json::from_value(answer["snapshot"].clone()).unwrap()
+    };
+    for id in ["left", "right"] {
+        let back = toggle(&toggle(&held, id), id);
+        let local = back.held_groups.iter().any(|h| h.group == "local");
+        let released = back
+            .holding
+            .iter()
+            .flat_map(|h| &h.released)
+            .any(|r| r.group == "local");
+        let hulls = build_scene(&back).unwrap().membership_hulls;
+        let whole = hulls.iter().filter(|h| h.group == "local").count() == 1;
+        assert!(local || released || whole, "{id}: nothing is said");
+        assert!(!local || whole, "{id}: said to be held and is not");
+    }
+}
+
+#[test]
+fn every_group_that_is_not_held_says_why_and_the_cost_counts_edges_against_the_flow() {
+    let reason = |s: &Snapshot, group: &str| {
+        s.holding
+            .as_ref()
+            .unwrap()
+            .released
+            .iter()
+            .find(|r| r.group == group)
+            .map(|r| r.reason)
+    };
+    assert_eq!(
+        reason(&laid(NON_CONTIGUOUS, true), "g3"),
+        Some(ReleaseReason::BreaksOther)
+    );
+    assert_eq!(
+        reason(&laid(THREE, true), "platform"),
+        Some(ReleaseReason::AcrossContainers)
+    );
+    let g = graph(CROSSES);
+    let mut o = options(&g, true);
+    let free = laid(CROSSES, false);
+    let member = g.memberships.dimension("focus").unwrap().groups[1].members[0].clone();
+    let at = &free.boxes[&member];
+    o.pins.insert(member, Point { x: at.x, y: at.y });
+    let pinned = import_graph_with(g, 500, &o).unwrap();
+    assert!(pinned
+        .holding
+        .unwrap()
+        .released
+        .iter()
+        .any(|r| r.reason == ReleaseReason::FixedPlace));
+    // Every released group is not whole, and a group is never both.
+    for text in FIXTURES {
+        let s = laid(text, true);
+        let h = s.holding.as_ref().expect("a report");
+        for r in &h.released {
+            assert!(!s
+                .held_groups
+                .iter()
+                .any(|x| x.group == r.group && x.dimension == r.dimension));
+        }
+        assert_eq!(h.cost.is_some(), !s.held_groups.is_empty());
+        if let Some(c) = h.cost {
+            let m = measured(&s);
+            assert_eq!(c.crossings, m.crossings + m.shared_endpoint_crossings);
+            assert_eq!(c.bends, m.bends);
+        }
+    }
+    // L1 and L3 are held around L2, so one of the edges between them runs back.
+    let cost = laid(CROSSES, true).holding.unwrap().cost.unwrap();
+    assert_eq!((cost.against_flow_before, cost.against_flow), (1, 2));
+    assert!(laid(CROSSES, false).holding.is_none());
+}
+
+#[test]
+fn a_held_group_has_no_room_for_a_title() {
+    let held = laid(CROSSES, true);
+    // The first member stands below the owner's own title row (48) and the padding of the group (24).
+    let top = ["l1", "l3", "L1", "L3"]
+        .iter()
+        .filter_map(|id| held.boxes.get(*id))
+        .map(|r| r.y)
+        .fold(f64::MAX, f64::min);
+    assert!(top <= 48. + 24. + 1e-6, "{top}");
 }

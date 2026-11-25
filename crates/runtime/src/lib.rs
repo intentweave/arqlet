@@ -4704,6 +4704,7 @@ mod tests {
             gesture: None,
             layered_plans: Default::default(),
             held_groups: Vec::new(),
+            holding: None,
         }
     }
 
