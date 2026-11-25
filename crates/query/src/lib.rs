@@ -9,11 +9,13 @@
 #![forbid(unsafe_code)]
 
 pub mod exec;
+mod functions;
 pub mod plan;
 pub mod store;
 pub mod value;
 
 pub use exec::{execute, Limits, ResultSet};
+pub use functions::MAX_VALUE_BYTES;
 pub use plan::Plan;
 pub use store::{Direction, EdgeRef, GraphStore};
 pub use value::{EdgeId, NodeId, Value};

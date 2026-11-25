@@ -81,6 +81,10 @@ fn show(store: &ModelStore, v: &Value) -> serde_json::Value {
         Value::List(items) => {
             serde_json::Value::Array(items.iter().map(|i| show(store, i)).collect())
         }
+        Value::Map(entries) => serde_json::json!({ "map": entries
+            .iter()
+            .map(|(k, v)| (k.clone(), show(store, v)))
+            .collect::<serde_json::Map<_, _>>() }),
         Value::Node(n) => serde_json::json!({ "node": store.node_id(*n) }),
         Value::Edge(e) => serde_json::json!({ "edge": store.edge_id(*e) }),
     }

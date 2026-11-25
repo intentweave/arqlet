@@ -10,12 +10,12 @@ export type {Graph} from '@arqlet/contracts';
 /** URL of the module shipped with this package (`arqlet-query.wasm` beside this module). */
 export const defaultWasmUrl: URL;
 
-/** A value a query sees or takes: a JSON value without maps. */
-export type PropertyValue = null | boolean | number | string | PropertyValue[];
+/** A value a query sees or takes: a JSON value; an object is a map. */
+export type PropertyValue = null | boolean | number | string | PropertyValue[] | {[key: string]: PropertyValue};
 
 /**
- * Properties beside the graph, by node id and by edge id. A key may not be a property the graph has itself (`id`, `kind`,
- * `label`, `parentId` for a node; `id`, `kind`, `weight` for an edge): the graph's value is what a query reads.
+ * Properties beside the graph, by node id and by edge id. The keys `id`, `kind`, `label`, `parentId` and `weight` are
+ * refused: they name properties of the graph itself.
  */
 export interface Payload {
   nodes?: {[nodeId: string]: {[key: string]: PropertyValue}};
@@ -31,8 +31,19 @@ export interface QueryInit {
   maxHops?: number;
 }
 
-/** A value in a row of an answer: a JSON value, a node as `{node: id}`, an edge as `{edge: id}`, or a list. */
-export type QueryValue = null | boolean | number | string | {node: string} | {edge: string} | QueryValue[];
+/**
+ * A value in a row of an answer: a JSON value or a list. Every object is tagged: a node is `{node: id}`, an edge
+ * `{edge: id}`, a map `{map: {key: value}}`.
+ */
+export type QueryValue =
+  | null
+  | boolean
+  | number
+  | string
+  | {node: string}
+  | {edge: string}
+  | {map: {[key: string]: QueryValue}}
+  | QueryValue[];
 
 export interface LoadAnswer {
   /** The nodes and edges of the graph as given. */

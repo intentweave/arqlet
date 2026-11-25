@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-const MIN_PASSING: usize = 40;
+const MIN_PASSING: usize = 80;
 
 fn fixture(path: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -28,6 +28,10 @@ fn to_json(store: &ModelStore, v: &Value) -> serde_json::Value {
         Value::List(items) => {
             serde_json::Value::Array(items.iter().map(|i| to_json(store, i)).collect())
         }
+        Value::Map(entries) => serde_json::json!({ "map": entries
+            .iter()
+            .map(|(k, v)| (k.clone(), to_json(store, v)))
+            .collect::<serde_json::Map<_, _>>() }),
         Value::Node(n) => serde_json::json!({ "node": store.node_id(*n) }),
         Value::Edge(e) => serde_json::json!({ "edge": store.edge_id(*e) }),
     }
@@ -138,7 +142,7 @@ fn unresolved_edges_are_not_in_the_store_and_the_graph_is_not_changed() {
 }
 
 #[test]
-fn payload_for_unknown_ids_is_ignored_and_counted_and_a_map_is_refused() {
+fn payload_for_unknown_ids_is_ignored_and_counted_and_a_large_integer_is_refused() {
     let g = graph("small");
     let json = serde_json::json!({
         "nodes": { "a": { "tag": "x" }, "nobody": { "tag": "y" } },
@@ -148,7 +152,7 @@ fn payload_for_unknown_ids_is_ignored_and_counted_and_a_map_is_refused() {
     let store = ModelStore::new(&g, &p);
     // `nobody` is no node and `unknown` is an unresolved edge: two entries ignored.
     assert_eq!(store.ignored_payload(), 2);
-    let map = serde_json::json!({ "nodes": { "a": { "nested": { "k": 1 } } } });
-    let e = Payload::from_json(&map).unwrap_err();
-    assert!(e.contains("nested") && e.contains("map"), "{e}");
+    let beyond = serde_json::json!({ "nodes": { "a": { "nested": { "k": u64::MAX } } } });
+    let e = Payload::from_json(&beyond).unwrap_err();
+    assert!(e.contains("nested") && e.contains("i64"), "{e}");
 }

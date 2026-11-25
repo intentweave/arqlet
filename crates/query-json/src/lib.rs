@@ -6,7 +6,7 @@
 //!
 //! Request: `query` (text), optional `params` (object of `$name` values), optional `maxSteps`, `maxRows`, `maxHops`
 //! (the execution limits of ADR 0021 item 11). Answer: `columns`, `rowCount`, `rows` (nodes as `{"node": id}`, edges as
-//! `{"edge": id}`), `nodes` and `edges` (the ids once each, in the order they first appear) and `graph` (the size of what
+//! `{"edge": id}`, maps as `{"map": {key: value}}`; every object in a row is one of the three), `nodes` and `edges` (the ids once each, in the order they first appear) and `graph` (the size of what
 //! the query could see). Errors read `query <class>: message`.
 #![forbid(unsafe_code)]
 
@@ -85,6 +85,11 @@ pub fn run(graph: &Graph, payload: &dyn PayloadSource, v: &Value) -> Result<Outc
             Cell::Float(f) => json!(f),
             Cell::String(s) => json!(s),
             Cell::List(items) => Value::Array(items.iter().map(|i| show(store, i, seen)).collect()),
+            // Tagged like a node and an edge: a map with the key `node` is not mistaken for one.
+            Cell::Map(entries) => json!({ "map": entries
+                .iter()
+                .map(|(k, v)| (k.clone(), show(store, v, seen)))
+                .collect::<serde_json::Map<_, _>>() }),
             Cell::Node(n) => {
                 let id = store.node_id(*n);
                 if seen.node_set.insert(id.to_string()) {
