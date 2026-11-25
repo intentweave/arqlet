@@ -4,6 +4,7 @@
 //   --wasm   builds crates/wasm (profile wasm-size, wasm32-unknown-unknown, --locked) and copies it to ./arqlet.wasm, and
 //            writes ./THIRD_PARTY_NOTICES.md: the license notices of the crates linked into that WASM
 //            (tools/third-party-notices.mjs)
+//   --query-wasm  the same for the query-only module, crates/query-wasm, copied to ./arqlet-query.wasm
 //   --types  bundles the generated contract types (src/generated/*.ts) into ./dist/index.d.ts
 // The copies are git-ignored; they exist only so that the packed tarball contains them.
 import {execFileSync} from 'node:child_process';
@@ -17,13 +18,19 @@ const flags = new Set(process.argv.slice(2));
 
 for (const name of ['LICENSE-APACHE', 'LICENSE-MIT']) copyFileSync(join(root, name), join(pkg, name));
 
-if (flags.has('--wasm')) {
+// The WASM modules the packages ship, by flag: the crate and the file in the package.
+const modules = {
+  '--wasm': {crate: 'arqlet-wasm', file: 'arqlet.wasm'},
+  '--query-wasm': {crate: 'arqlet-query-wasm', file: 'arqlet-query.wasm'},
+};
+for (const [flag, {crate, file}] of Object.entries(modules)) {
+  if (!flags.has(flag)) continue;
   // The size profile of Cargo.toml: the same output as `release`, about half the download.
-  execFileSync('cargo', ['build', '-p', 'arqlet-wasm', '--target', 'wasm32-unknown-unknown', '--profile', 'wasm-size', '--locked'],
+  execFileSync('cargo', ['build', '-p', crate, '--target', 'wasm32-unknown-unknown', '--profile', 'wasm-size', '--locked'],
     {cwd: root, stdio: 'inherit'});
-  copyFileSync(join(root, 'target/wasm32-unknown-unknown/wasm-size/arqlet_wasm.wasm'), join(pkg, 'arqlet.wasm'));
+  copyFileSync(join(root, 'target/wasm32-unknown-unknown/wasm-size', `${crate.replaceAll('-', '_')}.wasm`), join(pkg, file));
   // The WASM contains the crates it links; the MIT and Apache-2.0 licenses ask for their notices to travel with it.
-  writeFileSync(join(pkg, 'THIRD_PARTY_NOTICES.md'), notices('arqlet-wasm', 'wasm32-unknown-unknown') + '\n');
+  writeFileSync(join(pkg, 'THIRD_PARTY_NOTICES.md'), notices(crate, 'wasm32-unknown-unknown') + '\n');
 }
 
 if (flags.has('--types')) {

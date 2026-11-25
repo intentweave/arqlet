@@ -5,6 +5,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+- **`@arqlet/query`** (new npm package, provisional): the query-only WASM module with a loader and types — read-only
+  openCypher queries over an Arqlet graph in the browser and Node, without the layout engine (1.08 MB, 0.34 MB gzip;
+  `benchmarks/results/query-npm-20261125.md`). ADR 0021, M5c.
+- **Fixed (query layer):** the keys `id`, `kind`, `label`, `parentId` and `weight` are refused wherever properties come
+  in beside the graph, as a session's `payload` already did (ADR 0021, M0): by `Payload::from_json` (and with it the
+  query-only module and `arqlet-query`) and by a stateless `query` request with `content`. Before, such a key was
+  accepted there: where the model has that property the model's value silently won, elsewhere the given one was read.
+
 ## 0.9.0 — 2026-11-24
 
 A visual release: one appearance for every renderer and a metro-map style, the GPU scene renderer for large views, and

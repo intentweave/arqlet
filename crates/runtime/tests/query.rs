@@ -50,6 +50,39 @@ fn a_query_reads_structure_and_the_sessions_content() {
     assert_eq!(a["ignoredContent"], 1);
 }
 
+/// The session's content and the payload of the standalone adapter refuse the same keys (ADR 0021, M0 item 1).
+#[test]
+fn content_and_the_adapters_payload_refuse_the_same_keys() {
+    assert_eq!(
+        arqlet_runtime::content::VIRTUAL_KEYS,
+        arqlet_query_model::VIRTUAL_KEYS
+    );
+}
+
+#[test]
+fn stateless_content_may_not_use_the_models_own_keys() {
+    let mut s = session();
+    let snapshot = ok(s.run_value(&json!({"op": "export"})))["snapshot"].clone();
+    for content in [
+        json!({"nodes": {"a": {"label": "other"}}}),
+        json!({"edges": {"xa": {"weight": 9}}}),
+    ] {
+        let answer: Value = serde_json::from_str(&arqlet_runtime::dispatch(
+            &json!({"op": "query", "query": "MATCH (n) RETURN n", "snapshot": snapshot, "content": content})
+                .to_string(),
+        ))
+        .unwrap();
+        assert_eq!(answer["ok"], false, "{answer}");
+        assert!(
+            answer["error"]
+                .as_str()
+                .unwrap()
+                .contains("property of the model itself"),
+            "{answer}"
+        );
+    }
+}
+
 #[test]
 fn unresolved_edges_are_excluded_and_nodes_and_edges_come_back_as_ids() {
     let mut s = session();

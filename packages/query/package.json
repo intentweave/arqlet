@@ -1,0 +1,51 @@
+{
+  "name": "@arqlet/query",
+  "version": "0.9.0",
+  "description": "Read-only openCypher queries over an Arqlet graph in the browser and Node via WebAssembly, without the layout engine. Provisional.",
+  "keywords": [
+    "graph",
+    "query",
+    "cypher",
+    "opencypher",
+    "wasm"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Benjamin Becker",
+  "homepage": "https://github.com/intentweave/arqlet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intentweave/arqlet.git",
+    "directory": "packages/query"
+  },
+  "bugs": {
+    "url": "https://github.com/intentweave/arqlet/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./arqlet-query.wasm": "./arqlet-query.wasm"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "arqlet-query.wasm",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepack": "node ../../tools/npm-prepack.mjs --query-wasm"
+  },
+  "dependencies": {
+    "@arqlet/contracts": "workspace:^"
+  }
+}

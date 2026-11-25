@@ -405,11 +405,13 @@ macOS arm64, Windows x64) and WASM give identical responses (checked in CI by
 | `crates/reference` | curated reference diagrams (canonical JSON, validation, SVG) |
 | `crates/wasm` | browser ABI (`lw_alloc`, `lw_free`, `lw_run` with JSON payloads) |
 | `crates/contracts` | generates the TypeScript contract types (tooling) |
+| `crates/query*` | the read-only openCypher query layer, usable without layout (ADR 0021, provisional) |
 | `crates/node` | placeholder for a native Node.js adapter |
 | `crates/arqlet` | facade crate: re-exports the engine crates and `dispatch` |
 | `packages/arqlet` | npm entry point: re-exports engine client and viewer |
 | `packages/engine-client` | the WASM engine with loader, worker protocol, presets, ELK-style API |
 | `packages/viewer` | SVG rendering, navigation, React Flow adapter |
+| `packages/query` | `@arqlet/query`: the query layer as WASM, without the layout engine (not published yet) |
 | `packages/containment-tree` | interactive containment tree of a scene |
 | `packages/contracts` | generated TypeScript types for snapshot, scene and config sets |
 | `apps/playground` | demo UI, comparison view and loopback backend |

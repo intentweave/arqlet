@@ -9,7 +9,7 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import {join, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
-export const NPM_PACKAGES = ['contracts', 'engine-client', 'viewer', 'arqlet'];
+export const NPM_PACKAGES = ['contracts', 'engine-client', 'viewer', 'arqlet', 'query'];
 
 /** The mismatches for `version` in the repository at `root` (empty when it is consistent), and the CHANGELOG section. */
 export function releaseCheck(root, version) {
