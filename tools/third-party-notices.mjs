@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Collects the license notices of the Rust crates that are linked into a build of this repository, from the sources
-// cargo has already fetched, and renders them as one Markdown file. `tools/npm-prepack.mjs --wasm` puts the result into
-// the npm package of the engine as THIRD_PARTY_NOTICES.md: the MIT and Apache-2.0 licenses of these crates require their
+// cargo has already fetched, and renders them as one Markdown file. `tools/npm-prepack.mjs` (`--wasm`, `--query-wasm`) puts the
+// result into the npm package that ships the module, as THIRD_PARTY_NOTICES.md: the MIT and Apache-2.0 licenses of these crates require their
 // copyright and license notices to accompany a distribution, and a WASM binary contains the crates themselves.
 //
 //   node tools/third-party-notices.mjs [--package arqlet-wasm] [--target wasm32-unknown-unknown] [--check]
@@ -68,7 +68,7 @@ export function render(crates, pkg = 'arqlet-wasm', target = 'wasm32-unknown-unk
   const out = [
     '# Third-party notices',
     '',
-    `The WebAssembly engine in this package contains the Rust crates listed below, each under the license named, and their`,
+    `The WebAssembly module in this package contains the Rust crates listed below, each under the license named, and their`,
     `copyright and license notices follow. Arqlet itself is licensed under either of the Apache License, Version 2.0`,
     `(LICENSE-APACHE) or the MIT license (LICENSE-MIT), at your option.`,
     '',

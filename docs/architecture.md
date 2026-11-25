@@ -475,7 +475,8 @@ the project rules ask before third-party code is taken in. The `Cargo.lock` pins
   engine this is done: `tools/npm-prepack.mjs` writes `THIRD_PARTY_NOTICES.md` from the crates the WASM links
   (`tools/third-party-notices.mjs`), so decypher and its crates are picked up when they are linked, and a test fails when
   a linked crate ships no license file (the `Unicode-3.0` file of `unicode-ident` is then the thing to look at). The
-  project distributes no native binaries today; if it does, they need the same.
+  npm package `@arqlet/query` links these crates and gets its notices the same way; every one of them ships its license
+  files (checked 2026-11-25). The project distributes no native binaries today; if it does, they need the same.
 - Known defects that shape its use are listed in ADR 0021 (upstream issues #132 to #134, mitigated by a guard over the
   syntax tree). The fallback front end is https://github.com/a-poor/open-cypher (0.5.0, Apache-2.0); it is not a
   dependency, and the same record is made before it would become one.

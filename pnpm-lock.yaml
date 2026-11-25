@@ -77,6 +77,12 @@ importers:
         specifier: workspace:^
         version: link:../contracts
 
+  packages/query:
+    dependencies:
+      '@arqlet/contracts':
+        specifier: workspace:^
+        version: link:../contracts
+
   packages/viewer:
     dependencies:
       '@arqlet/contracts':
