@@ -220,6 +220,45 @@ impl Function {
     }
 }
 
+impl Expr {
+    /// Calls `f` on every expression directly inside this one.
+    pub fn for_each_child_mut(&mut self, f: &mut dyn FnMut(&mut Expr)) {
+        match self {
+            Expr::Literal(_) | Expr::Param(_) | Expr::Slot(_) => {}
+            Expr::Property(x, _)
+            | Expr::Not(x)
+            | Expr::Neg(x)
+            | Expr::IsNull(x, _)
+            | Expr::HasLabel(x, _) => f(x),
+            Expr::List(items) | Expr::Call(_, items) => items.iter_mut().for_each(f),
+            Expr::Binary(_, a, b) | Expr::In(a, b) => {
+                f(a);
+                f(b);
+            }
+            Expr::Compare(left, chain) => {
+                f(left);
+                chain.iter_mut().for_each(|(_, right)| f(right));
+            }
+            Expr::Case {
+                scrutinee,
+                alternatives,
+                default,
+            } => {
+                if let Some(s) = scrutinee {
+                    f(s);
+                }
+                for (when, then) in alternatives {
+                    f(when);
+                    f(then);
+                }
+                if let Some(d) = default {
+                    f(d);
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinOp {
     Add,

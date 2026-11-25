@@ -89,6 +89,7 @@ fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryE
         bound: BTreeSet::new(),
         ops: Vec::new(),
         aliases: BTreeMap::new(),
+        grouped: Vec::new(),
         distinct_return: false,
     };
     for part in &hir.parts {
@@ -102,11 +103,138 @@ fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryE
         let slots = columns.iter().map(|c| c.slot).collect();
         lowering.ops.push(Op::Distinct(slots));
     }
-    Ok(Plan {
+    let plan = Plan {
         slots: lowering.next_slot,
         ops: lowering.ops,
         columns,
-    })
+    };
+    available(&plan, &hir.arenas)?;
+    Ok(plan)
+}
+
+/// Refuses a plan in which an expression reads a variable that holds nothing at that point: it would read null and answer
+/// something the query does not say. After an aggregation only the grouping keys and the aggregates are there.
+fn available(plan: &Plan, arenas: &HirArenas) -> Result<(), QueryError> {
+    let mut there = BTreeSet::new();
+    check_ops(&plan.ops, &mut there, arenas)?;
+    for column in &plan.columns {
+        read(column.slot, &there, arenas)?;
+    }
+    Ok(())
+}
+
+fn read(slot: usize, there: &BTreeSet<usize>, arenas: &HirArenas) -> Result<(), QueryError> {
+    if there.contains(&slot) {
+        return Ok(());
+    }
+    let name = arenas
+        .bindings
+        .iter()
+        .find(|(id, _)| id.0 == slot)
+        .map_or("?", |(_, b)| b.name.as_str());
+    Err(QueryError::unsupported(format!(
+        "the variable `{name}` has no value here: a pattern cannot read a variable it binds itself, and after an \
+         aggregation only the grouping keys and the aggregates are there (name what is needed in a WITH first)"
+    )))
+}
+
+fn check_expr(expr: &Expr, there: &BTreeSet<usize>, arenas: &HirArenas) -> Result<(), QueryError> {
+    if let Expr::Slot(slot) = expr {
+        return read(*slot, there, arenas);
+    }
+    let mut result = Ok(());
+    expr.clone().for_each_child_mut(&mut |child| {
+        if result.is_ok() {
+            result = check_expr(child, there, arenas);
+        }
+    });
+    result
+}
+
+fn check_ops(
+    ops: &[Op],
+    there: &mut BTreeSet<usize>,
+    arenas: &HirArenas,
+) -> Result<(), QueryError> {
+    for op in ops {
+        match op {
+            Op::ScanNodes { slot, props, .. } => {
+                for (_, e) in props {
+                    check_expr(e, there, arenas)?;
+                }
+                there.insert(*slot);
+            }
+            Op::CheckNode { slot, props, .. } => {
+                read(*slot, there, arenas)?;
+                for (_, e) in props {
+                    check_expr(e, there, arenas)?;
+                }
+            }
+            Op::Expand(x) => {
+                read(x.from, there, arenas)?;
+                if x.to_bound {
+                    read(x.to, there, arenas)?;
+                }
+                for (_, e) in x.props.iter().chain(&x.to_props) {
+                    check_expr(e, there, arenas)?;
+                }
+                there.insert(x.rel);
+                there.insert(x.to);
+            }
+            Op::Optional(inner) => check_ops(inner, there, arenas)?,
+            Op::Filter(e) => check_expr(e, there, arenas)?,
+            Op::Unwind { expr, slot } => {
+                check_expr(expr, there, arenas)?;
+                there.insert(*slot);
+            }
+            Op::Project { items, .. } => {
+                for (e, _) in items {
+                    check_expr(e, there, arenas)?;
+                }
+                there.extend(items.iter().map(|(_, slot)| *slot));
+            }
+            Op::Aggregate { keys, aggregates } => {
+                for (e, _) in keys {
+                    check_expr(e, there, arenas)?;
+                }
+                for e in aggregates.iter().filter_map(|a| a.arg.as_ref()) {
+                    check_expr(e, there, arenas)?;
+                }
+                *there = keys
+                    .iter()
+                    .map(|(_, slot)| *slot)
+                    .chain(aggregates.iter().map(|a| a.slot))
+                    .collect();
+            }
+            Op::Distinct(slots) => {
+                for slot in slots {
+                    read(*slot, there, arenas)?;
+                }
+            }
+            Op::Sort(keys) => {
+                for key in keys {
+                    check_expr(&key.expr, there, arenas)?;
+                }
+            }
+            Op::Skip(e) | Op::Limit(e) => check_expr(e, &BTreeSet::new(), arenas)?,
+            // Each branch is a plan of its own, checked when it was lowered.
+            Op::Union { .. } => {}
+        }
+    }
+    Ok(())
+}
+
+/// Replaces every part of `expr` that is a grouping expression by the slot that holds its value after the aggregation.
+/// The HIR does this in some places only (not inside a list or a function call).
+fn regroup(mut expr: Expr, grouped: &[(Expr, usize)]) -> Expr {
+    if let Some((_, slot)) = grouped.iter().find(|(key, _)| *key == expr) {
+        return Expr::Slot(*slot);
+    }
+    expr.for_each_child_mut(&mut |child| {
+        let taken = std::mem::replace(child, Expr::Literal(Value::Null));
+        *child = regroup(taken, grouped);
+    });
+    expr
 }
 
 struct Lowering<'a> {
@@ -118,6 +246,8 @@ struct Lowering<'a> {
     ops: Vec<Op>,
     /// The aliases of the current part's projections: name to slot, for the columns.
     aliases: BTreeMap<String, usize>,
+    /// The grouping expressions of the last aggregation, as they read before it, with the slot of each.
+    grouped: Vec<(Expr, usize)>,
     /// `RETURN DISTINCT`: the HIR keeps the flag on the Return operation, not on the projection.
     distinct_return: bool,
 }
@@ -162,7 +292,7 @@ impl Lowering<'_> {
                 Ok(())
             }
             Operation::Filter(f) => {
-                let e = self.expr(f.predicate)?;
+                let e = self.after(f.predicate)?;
                 self.ops.push(Op::Filter(e));
                 Ok(())
             }
@@ -177,7 +307,7 @@ impl Lowering<'_> {
                 let mut items = Vec::new();
                 for item in &p.items {
                     let slot = item.alias.0;
-                    items.push((self.expr(item.expression)?, slot));
+                    items.push((self.after(item.expression)?, slot));
                     self.bound.insert(slot);
                     self.aliases
                         .insert(self.arenas.bindings.get(item.alias).name.clone(), slot);
@@ -218,6 +348,7 @@ impl Lowering<'_> {
                         item.alias.0,
                     );
                 }
+                self.grouped = keys.clone();
                 self.ops.push(Op::Aggregate { keys, aggregates });
                 Ok(())
             }
@@ -225,7 +356,7 @@ impl Lowering<'_> {
                 let mut keys = Vec::new();
                 for item in &s.items {
                     keys.push(SortKey {
-                        expr: self.expr(item.expression)?,
+                        expr: self.after(item.expression)?,
                         descending: matches!(item.direction, SortDirection::Descending),
                     });
                 }
@@ -257,6 +388,11 @@ impl Lowering<'_> {
                     .unwrap_or("?")
             ))),
         }
+    }
+
+    /// An expression of a clause that may follow an aggregation.
+    fn after(&self, id: ExprId) -> Result<Expr, QueryError> {
+        Ok(regroup(self.expr(id)?, &self.grouped))
     }
 
     fn fresh(&mut self) -> usize {

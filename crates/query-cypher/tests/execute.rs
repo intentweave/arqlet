@@ -325,3 +325,36 @@ fn a_value_that_doubles_stops_at_the_value_limit() {
         assert!(message.contains("value limit"), "{message}");
     }
 }
+
+/// A grouping expression may be used beside an aggregate, wherever it stands: the HIR rewrites it in some places only,
+/// and elsewhere it read a variable that the aggregation had emptied.
+#[test]
+fn a_grouping_expression_keeps_its_value_beside_an_aggregate() {
+    for (query, rows) in [
+        (
+            "MATCH (a)-[:KNOWS]->(b) RETURN a.name AS n, [a.name, count(*)] AS l ORDER BY n",
+            serde_json::json!([["Ann", ["Ann", 3]], ["Bob", ["Bob", 1]], ["Cid", ["Cid", 2]]]),
+        ),
+        (
+            "MATCH (a)-[:KNOWS]->(b) RETURN a.name AS n, a.name + '!' + toString(count(*)) AS s ORDER BY n",
+            serde_json::json!([["Ann", "Ann!3"], ["Bob", "Bob!1"], ["Cid", "Cid!2"]]),
+        ),
+        (
+            "MATCH (a)-[:KNOWS]->(b) WITH a AS who, [a.name, count(*)] AS l RETURN l ORDER BY who.name",
+            serde_json::json!([[["Ann", 3]], [["Bob", 1]], [["Cid", 2]]]),
+        ),
+    ] {
+        assert_eq!(spike(query), Ok(rows), "{query}");
+    }
+}
+
+#[test]
+fn a_variable_without_a_value_is_refused_not_read_as_null() {
+    // A property read inside the pattern that binds the variable.
+    for query in [
+        "MATCH (n {name: n.name}) RETURN n",
+        "MATCH (a)-[r:KNOWS {since: b.age}]->(b) RETURN b",
+    ] {
+        assert_eq!(refused(query), ErrorClass::Unsupported, "{query}");
+    }
+}

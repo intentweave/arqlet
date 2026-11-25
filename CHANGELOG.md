@@ -5,6 +5,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+- **Fixed (query layer, wrong answers in 0.8.0 and 0.9.0):** a grouping expression used beside an aggregate could read
+  null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
+  wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that
+  names a variable the pattern binds itself) is refused as unsupported instead of answered with null.
 - **Query layer: functions and `UNION`** (ADR 0021, provisional): `id`, `elementId`, `type`, `labels`, `size`,
   `coalesce`, `toString`, `toUpper`, `toLower`, `trim`, `ltrim`, `rtrim`, `replace`, `substring`, `left`, `right`,
   `split`, `reverse`, and `UNION [ALL]`. `id` gives the model's string id. The query module grows by 2.2 % (gzip 2.4 %,
