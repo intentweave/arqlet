@@ -150,3 +150,27 @@ fn outcomes_are_pinned() {
         changed.join("\n")
     );
 }
+
+/// No query of the grid that uses a construct the executor does not run yet lowers to a plan: it is refused, never run
+/// as a different query.
+#[test]
+fn unsupported_constructs_never_lower_to_a_plan() {
+    let ran: Vec<String> = grid()
+        .into_iter()
+        .filter(|c| c.unsupported && lower(&c.query).is_ok())
+        .map(|c| c.query)
+        .collect();
+    assert!(ran.is_empty(), "lowered to a plan:\n{}", ran.join("\n"));
+}
+
+/// The rest of the grid lowers, and the path selector `ALL` keeps every path, like a pattern without a selector.
+#[test]
+fn supported_patterns_lower_and_all_is_no_selector() {
+    for case in grid().into_iter().filter(|c| !c.unsupported) {
+        let plan = lower(&case.query).unwrap_or_else(|e| panic!("{}: {e}", case.query));
+        if case.query.contains(" ALL ") {
+            let plain = case.query.replace(" ALL ", " ");
+            assert_eq!(plan, lower(&plain).unwrap(), "{}", case.query);
+        }
+    }
+}

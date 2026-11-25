@@ -17,7 +17,7 @@ description = "Provisional: the openCypher front end of the Arqlet query layer (
 # features. It has no host API (no filesystem, network, process, thread or clock) and builds for wasm32.
 [dependencies]
 arqlet-query = { workspace = true }
-decypher = { version = "=0.2.0" }
+decypher = { version = "=0.3.0" }
 
 [dev-dependencies]
 # Tests read the fixtures of `examples/cypher/`.

@@ -26,8 +26,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// Checks a query (the parser and the guard), then lowers it into a plan.
 pub fn lower(query: &str) -> Result<Plan, QueryError> {
-    crate::check(query)?;
-    let hir = decypher::analyze(query).map_err(|e| QueryError::syntax(e.to_string()))?;
+    let hir = crate::checked(query)?;
     let tree = decypher::parse_cst(query).tree;
     // The `RETURN` clauses in the order written: one for each part of a `UNION`, the last one for any other query.
     let returns: Vec<SyntaxNode> = tree
@@ -303,11 +302,6 @@ impl Lowering<'_> {
     fn op(&mut self, op: &Operation) -> Result<(), QueryError> {
         match op {
             Operation::Match(m) => {
-                if !m.pattern.path_bindings.is_empty() {
-                    return Err(QueryError::unsupported(
-                        "a path variable is undecided (ADR 0021, open)",
-                    ));
-                }
                 self.pattern(&m.pattern)?;
                 for predicate in &m.predicates {
                     let e = self.expr(*predicate)?;
@@ -316,11 +310,6 @@ impl Lowering<'_> {
                 Ok(())
             }
             Operation::OptionalMatch(m) => {
-                if !m.pattern.path_bindings.is_empty() {
-                    return Err(QueryError::unsupported(
-                        "a path variable is undecided (ADR 0021, open)",
-                    ));
-                }
                 // Its operations run as a sub-plan per row; its WHERE belongs to it, not to the rows around it.
                 let outer = std::mem::take(&mut self.ops);
                 let result = self.pattern(&m.pattern).and_then(|()| {

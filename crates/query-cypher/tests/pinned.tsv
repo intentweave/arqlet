@@ -165,10 +165,10 @@ unsupported	MATCH (a)-[:calls]->{,2}(b) RETURN b
 unsupported	MATCH (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH (a)-[:calls]->{2}(b) RETURN b
 unsupported	MATCH (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH (a)-[:calls]->+(b) RETURN b
-syntax	MATCH (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH (a)-[:calls]->*(b) RETURN b
-syntax	MATCH (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH (a)-[:calls]->+(b) RETURN b
+unsupported	MATCH (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH (a)-[:calls]->*(b) RETURN b
+unsupported	MATCH (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	MATCH (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 ok:a8957bf366ddae74	MATCH (a:Parse)-->(b) RETURN b
@@ -193,10 +193,10 @@ unsupported	MATCH (a:Parse)-[:calls]->{,2}(b) RETURN b
 unsupported	MATCH (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH (a:Parse)-[:calls]->{2}(b) RETURN b
 unsupported	MATCH (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH (a:Parse)-[:calls]->+(b) RETURN b
-syntax	MATCH (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH (a:Parse)-[:calls]->*(b) RETURN b
-syntax	MATCH (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	MATCH (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	MATCH (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	MATCH (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH (a WHERE a.label = 'Parse')-->(b) RETURN b
@@ -221,432 +221,432 @@ unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
 unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
 unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	MATCH (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-->(b) RETURN b
-syntax	MATCH ALL (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)<--(b) RETURN b
-syntax	MATCH ALL (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)--(b) RETURN b
-syntax	MATCH ALL (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls]->(b) RETURN b
-syntax	MATCH ALL (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[r:calls]->(b) RETURN b
-syntax	MATCH ALL (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ALL (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls*]->(b) RETURN b
-syntax	MATCH ALL (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ALL (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ALL (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls]->{2}(b) RETURN b
-syntax	MATCH ALL (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls]->+(b) RETURN b
-syntax	MATCH ALL (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a)-[:calls]->*(b) RETURN b
-syntax	MATCH ALL (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-->(b) RETURN b
-syntax	MATCH ALL (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)<--(b) RETURN b
-syntax	MATCH ALL (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)--(b) RETURN b
-syntax	MATCH ALL (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[r:calls]->(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls*]->(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->+(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->*(b) RETURN b
-syntax	MATCH ALL (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-->(b) RETURN b
-syntax	MATCH ANY (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)<--(b) RETURN b
-syntax	MATCH ANY (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)--(b) RETURN b
-syntax	MATCH ANY (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls]->(b) RETURN b
-syntax	MATCH ANY (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[r:calls]->(b) RETURN b
-syntax	MATCH ANY (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ANY (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls*]->(b) RETURN b
-syntax	MATCH ANY (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ANY (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ANY (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls]->{2}(b) RETURN b
-syntax	MATCH ANY (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls]->+(b) RETURN b
-syntax	MATCH ANY (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a)-[:calls]->*(b) RETURN b
-syntax	MATCH ANY (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-->(b) RETURN b
-syntax	MATCH ANY (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)<--(b) RETURN b
-syntax	MATCH ANY (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)--(b) RETURN b
-syntax	MATCH ANY (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[r:calls]->(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls*]->(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->+(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->*(b) RETURN b
-syntax	MATCH ANY (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)<--(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)--(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[r:calls]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls*]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->{2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->+(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->*(b) RETURN b
-syntax	MATCH ANY SHORTEST (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)<--(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)--(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)<--(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)--(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[r:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls*]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->{2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->+(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->*(b) RETURN b
-syntax	MATCH SHORTEST 2 (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)<--(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)--(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)<--(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)--(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)<--(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)--(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+ok:f3f534807a4250b2	MATCH ALL (a)-->(b) RETURN b
+unsupported	MATCH ALL (a)-->(b WHERE b.label = 'Parse') RETURN b
+ok:d991503f967591d7	MATCH ALL (a)<--(b) RETURN b
+unsupported	MATCH ALL (a)<--(b WHERE b.label = 'Parse') RETURN b
+ok:11b601427c05ba6f	MATCH ALL (a)--(b) RETURN b
+unsupported	MATCH ALL (a)--(b WHERE b.label = 'Parse') RETURN b
+ok:3333c67727a773cf	MATCH ALL (a)-[:calls]->(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:18cff282515bbb5e	MATCH ALL (a)-[r:calls]->(b) RETURN b
+unsupported	MATCH ALL (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:8cc863db7130c66b	MATCH ALL (a)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+ok:78965a4bd3d04772	MATCH ALL (a)-[:calls*]->(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a)-[:calls]->+(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a)-[:calls]->*(b) RETURN b
+unsupported	MATCH ALL (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+ok:a8957bf366ddae74	MATCH ALL (a:Parse)-->(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+ok:562d977eef08a425	MATCH ALL (a:Parse)<--(b) RETURN b
+unsupported	MATCH ALL (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+ok:79ec810ea8b35c21	MATCH ALL (a:Parse)--(b) RETURN b
+unsupported	MATCH ALL (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+ok:76eab6bf5d5a0ffd	MATCH ALL (a:Parse)-[:calls]->(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:1432c2a282fb3b9c	MATCH ALL (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:402d9691625a5839	MATCH ALL (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+ok:143ae92eb7ea20ec	MATCH ALL (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	MATCH ALL (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-->(b) RETURN b
+unsupported	MATCH ANY (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)<--(b) RETURN b
+unsupported	MATCH ANY (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)--(b) RETURN b
+unsupported	MATCH ANY (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls]->(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[r:calls]->(b) RETURN b
+unsupported	MATCH ANY (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls*]->(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls]->+(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a)-[:calls]->*(b) RETURN b
+unsupported	MATCH ANY (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-->(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)<--(b) RETURN b
+unsupported	MATCH ANY (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)--(b) RETURN b
+unsupported	MATCH ANY (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	MATCH ANY (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)<--(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)--(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[r:calls]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls*]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->+(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->*(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)<--(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)--(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)<--(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)--(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[r:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls*]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->+(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->*(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)<--(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)--(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)<--(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)--(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)<--(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)--(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a)-->(b) RETURN b
 unsupported	MATCH p = (a)-->(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a)<--(b) RETURN b
@@ -669,10 +669,10 @@ unsupported	MATCH p = (a)-[:calls]->{,2}(b) RETURN b
 unsupported	MATCH p = (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a)-[:calls]->{2}(b) RETURN b
 unsupported	MATCH p = (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH p = (a)-[:calls]->+(b) RETURN b
-syntax	MATCH p = (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH p = (a)-[:calls]->*(b) RETURN b
-syntax	MATCH p = (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH p = (a)-[:calls]->+(b) RETURN b
+unsupported	MATCH p = (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH p = (a)-[:calls]->*(b) RETURN b
+unsupported	MATCH p = (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	MATCH p = (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a:Parse)-->(b) RETURN b
@@ -697,10 +697,10 @@ unsupported	MATCH p = (a:Parse)-[:calls]->{,2}(b) RETURN b
 unsupported	MATCH p = (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a:Parse)-[:calls]->{2}(b) RETURN b
 unsupported	MATCH p = (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH p = (a:Parse)-[:calls]->+(b) RETURN b
-syntax	MATCH p = (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH p = (a:Parse)-[:calls]->*(b) RETURN b
-syntax	MATCH p = (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH p = (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	MATCH p = (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH p = (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	MATCH p = (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	MATCH p = (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a WHERE a.label = 'Parse')-->(b) RETURN b
@@ -725,10 +725,10 @@ unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
 unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
 unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	MATCH p = (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	MATCH p = shortestPath((a)-->(b)) RETURN b
@@ -753,12 +753,12 @@ unsupported	MATCH p = shortestPath((a)-[:calls]->{,2}(b)) RETURN b
 unsupported	MATCH p = shortestPath((a)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = shortestPath((a)-[:calls]->{2}(b)) RETURN b
 unsupported	MATCH p = shortestPath((a)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a)-[:calls]->+(b)) RETURN b
-syntax	MATCH p = shortestPath((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a)-[:calls]->*(b)) RETURN b
-syntax	MATCH p = shortestPath((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a)-[:calls]->+(b)) RETURN b
+unsupported	MATCH p = shortestPath((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a)-[:calls]->*(b)) RETURN b
+unsupported	MATCH p = shortestPath((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = shortestPath((a:Parse)-->(b)) RETURN b
 unsupported	MATCH p = shortestPath((a:Parse)-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = shortestPath((a:Parse)<--(b)) RETURN b
@@ -781,12 +781,12 @@ unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->{,2}(b)) RETURN b
 unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->{2}(b)) RETURN b
 unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a:Parse)-[:calls]->+(b)) RETURN b
-syntax	MATCH p = shortestPath((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a:Parse)-[:calls]->*(b)) RETURN b
-syntax	MATCH p = shortestPath((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->+(b)) RETURN b
+unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->*(b)) RETURN b
+unsupported	MATCH p = shortestPath((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-->(b)) RETURN b
 unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')<--(b)) RETURN b
@@ -809,12 +809,12 @@ unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->{,2}(b)
 unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->{2}(b)) RETURN b
 unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
-syntax	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
-syntax	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
+unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
+unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a)-->(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a)-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a)<--(b)) RETURN b
@@ -837,12 +837,12 @@ unsupported	MATCH p = allShortestPaths((a)-[:calls]->{,2}(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a)-[:calls]->{2}(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a)-[:calls]->+(b)) RETURN b
-syntax	MATCH p = allShortestPaths((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a)-[:calls]->*(b)) RETURN b
-syntax	MATCH p = allShortestPaths((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a)-[:calls]->+(b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a)-[:calls]->*(b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a:Parse)-->(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a:Parse)-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a:Parse)<--(b)) RETURN b
@@ -865,12 +865,12 @@ unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->{,2}(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->{2}(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b)) RETURN b
-syntax	MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b)) RETURN b
-syntax	MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-->(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')<--(b)) RETURN b
@@ -893,12 +893,12 @@ unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->{,2
 unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->{2}(b)) RETURN b
 unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
-syntax	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
-syntax	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 ok:c244635c373b63e3	OPTIONAL MATCH (a)-->(b) RETURN b
 unsupported	OPTIONAL MATCH (a)-->(b WHERE b.label = 'Parse') RETURN b
 ok:037ff30304ae8e38	OPTIONAL MATCH (a)<--(b) RETURN b
@@ -921,10 +921,10 @@ unsupported	OPTIONAL MATCH (a)-[:calls]->{,2}(b) RETURN b
 unsupported	OPTIONAL MATCH (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH (a)-[:calls]->{2}(b) RETURN b
 unsupported	OPTIONAL MATCH (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH (a)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH (a)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH (a)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH (a)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	OPTIONAL MATCH (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 ok:f304df20d5f25c9f	OPTIONAL MATCH (a:Parse)-->(b) RETURN b
@@ -949,10 +949,10 @@ unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->{,2}(b) RETURN b
 unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->{2}(b) RETURN b
 unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH (a:Parse)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH (a:Parse)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	OPTIONAL MATCH (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-->(b) RETURN b
@@ -977,432 +977,432 @@ unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN 
 unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
 unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	OPTIONAL MATCH (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)<--(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)--(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)<--(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)--(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)<--(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)--(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)<--(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)--(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)<--(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)--(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)<--(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)--(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)<--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)<--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)<--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)<--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
-syntax	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+ok:c244635c373b63e3	OPTIONAL MATCH ALL (a)-->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-->(b WHERE b.label = 'Parse') RETURN b
+ok:037ff30304ae8e38	OPTIONAL MATCH ALL (a)<--(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)<--(b WHERE b.label = 'Parse') RETURN b
+ok:47e64201ba2924e4	OPTIONAL MATCH ALL (a)--(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)--(b WHERE b.label = 'Parse') RETURN b
+ok:07ce5cd7a52077c0	OPTIONAL MATCH ALL (a)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:f65309cc52ffa64d	OPTIONAL MATCH ALL (a)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:59506697082ad388	OPTIONAL MATCH ALL (a)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+ok:9ea6c86cb7ca1d33	OPTIONAL MATCH ALL (a)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+ok:f304df20d5f25c9f	OPTIONAL MATCH ALL (a:Parse)-->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+ok:b9ef0a2107acecdc	OPTIONAL MATCH ALL (a:Parse)<--(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+ok:4db2864e30618f00	OPTIONAL MATCH ALL (a:Parse)--(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+ok:7eb8fed5f7c9c2c4	OPTIONAL MATCH ALL (a:Parse)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:4989dfcc1af62281	OPTIONAL MATCH ALL (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+ok:ff1b648d73f17424	OPTIONAL MATCH ALL (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+ok:8ce732c9af67855f	OPTIONAL MATCH ALL (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ALL (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)<--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)<--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ANY (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)<--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)<--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH ANY SHORTEST (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)<--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)<--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 2 (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)<--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)<--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')<--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')--(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*1..2]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls*]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[r:calls WHERE r.weight > 1]->(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{1,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
+unsupported	OPTIONAL MATCH SHORTEST 1 GROUPS (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a)-->(b) RETURN b
 unsupported	OPTIONAL MATCH p = (a)-->(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a)<--(b) RETURN b
@@ -1425,10 +1425,10 @@ unsupported	OPTIONAL MATCH p = (a)-[:calls]->{,2}(b) RETURN b
 unsupported	OPTIONAL MATCH p = (a)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a)-[:calls]->{2}(b) RETURN b
 unsupported	OPTIONAL MATCH p = (a)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH p = (a)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH p = (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH p = (a)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH p = (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH p = (a)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH p = (a)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH p = (a)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH p = (a)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	OPTIONAL MATCH p = (a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a:Parse)-->(b) RETURN b
@@ -1453,10 +1453,10 @@ unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->{,2}(b) RETURN b
 unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->{2}(b) RETURN b
 unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH p = (a:Parse)-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH p = (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH p = (a:Parse)-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH p = (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH p = (a:Parse)-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a:Parse) ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	OPTIONAL MATCH p = (a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-->(b) RETURN b
@@ -1481,10 +1481,10 @@ unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{,2}(b) RET
 unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{2}(b) RETURN b
 unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
-syntax	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
-syntax	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
-syntax	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b) RETURN b
+unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse') RETURN b
+unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b) RETURN b
+unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b) RETURN b
 unsupported	OPTIONAL MATCH p = (a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse') RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a)-->(b)) RETURN b
@@ -1509,12 +1509,12 @@ unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->{,2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->{2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a)-[:calls]->+(b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a)-[:calls]->*(b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->+(b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->*(b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-->(b)) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)<--(b)) RETURN b
@@ -1537,12 +1537,12 @@ unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->{,2}(b)) RETURN 
 unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->{2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->+(b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->*(b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->+(b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->*(b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-->(b)) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')<--(b)) RETURN b
@@ -1565,12 +1565,12 @@ unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]
 unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->{2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	OPTIONAL MATCH p = shortestPath((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a)-->(b)) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a)-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a)<--(b)) RETURN b
@@ -1593,12 +1593,12 @@ unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->{,2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->{2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->+(b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->*(b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->+(b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->*(b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-->(b)) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)<--(b)) RETURN b
@@ -1621,12 +1621,12 @@ unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->{,2}(b)) RET
 unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->{2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse)-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a:Parse) ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-->(b)) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-->(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')<--(b)) RETURN b
@@ -1649,9 +1649,9 @@ unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:ca
 unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->{,2}(b WHERE b.label = 'Parse')) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->{2}(b)) RETURN b
 unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->{2}(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
-syntax	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->+(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse')-[:calls]->*(b WHERE b.label = 'Parse')) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b)) RETURN b
+unsupported	OPTIONAL MATCH p = allShortestPaths((a WHERE a.label = 'Parse') ((x)-[:calls]->(y)){1,2} (b WHERE b.label = 'Parse')) RETURN b

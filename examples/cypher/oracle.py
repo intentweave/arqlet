@@ -121,10 +121,10 @@ def cases():
     add("net-05", "network-vlan", "MATCH (f:firewall)-[r:allow|deny]->(s:switch) RETURN f.label, count(r) AS rules ORDER BY f.label", "supported", lambda g: sorted([[k, v] for k, v in collections.Counter(g.nodes[e["source"]]["label"] for e in g.of_kind("allow", "deny") if g.nodes[e["source"]]["kind"] == "firewall" and g.nodes[e["target"]]["kind"] == "switch").items()]), ["f.label", "rules"], ordered=True, note="relationship type alternatives with a grouping")
 
     # Constructs the first release must reject (ADR 0021, items 4 and 5). decypher drops the first four silently.
-    add("reject-01", "small", "MATCH p = shortestPath((a)-[*]-(b)) RETURN p", "later", error="unsupported", note="decypher drops shortestPath (upstream #133); the syntax-tree guard must reject it")
-    add("reject-02", "small", "MATCH (a)-[:calls]->{1,3}(b) RETURN b", "later", error="unsupported", note="decypher lowers the quantifier to one hop (upstream #134)")
-    add("reject-03", "small", "MATCH (n WHERE n.label = 'Parse') RETURN n", "later", error="unsupported", note="decypher drops the WHERE inside the pattern (upstream #132)")
-    add("reject-04", "small", "MATCH (a)((x)-[:calls]->(y)){2}(b) RETURN b", "later", error="unsupported", note="decypher splits a quantified path pattern into three patterns (upstream #134)")
+    add("reject-01", "small", "MATCH p = shortestPath((a)-[*]-(b)) RETURN p", "later", error="unsupported", note="a path selector; decypher 0.2 dropped shortestPath (upstream #133)")
+    add("reject-02", "small", "MATCH (a)-[:calls]->{1,3}(b) RETURN b", "later", error="unsupported", note="a quantified relationship; decypher 0.2 lowered it to one hop (upstream #134)")
+    add("reject-03", "small", "MATCH (n WHERE n.label = 'Parse') RETURN n", "later", error="unsupported", note="WHERE inside a pattern; decypher 0.2 dropped it (upstream #132)")
+    add("reject-04", "small", "MATCH (a)((x)-[:calls]->(y)){2}(b) RETURN b", "later", error="unsupported", note="a quantified path pattern; decypher 0.2 split it into three patterns (upstream #134)")
     add("reject-05", "small", "CREATE (n:function {label: 'x'})", "rejected", error="unsupported", note="writes are outside the first release")
     add("reject-06", "small", "MATCH (n) DETACH DELETE n", "rejected", error="unsupported")
     add("reject-07", "small", "CALL db.index.vector.queryNodes('emb', 5, $v) YIELD node, score RETURN node", "rejected", error="unsupported", note="procedures other than the ones we define")

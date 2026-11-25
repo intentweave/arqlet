@@ -1,9 +1,9 @@
 //! Provisional (ADR 0021): the openCypher front end of the Arqlet query layer.
 //!
 //! [`check`] parses a query with decypher and runs the **guard**: every construct either runs correctly or is rejected,
-//! never silently changed. decypher drops some constructs on the way from its syntax tree to its AST and HIR
-//! (`shortestPath`, quantified paths, `WHERE` inside a pattern; upstream issues #132 to #134), so the guard walks the
-//! syntax tree, which still holds all of them, before anything is lowered.
+//! never silently changed. The guard walks the syntax tree for what is outside the first release (writes, procedures,
+//! subqueries, unknown functions), then the HIR's patterns for what the executor does not run yet (path selectors such as
+//! `shortestPath`, quantified paths, `WHERE` inside a pattern, path variables). The lowering never sees those.
 //!
 //! [`lower`] then turns a checked query into a plan of `arqlet-query`, and [`run`] lowers and executes it. The lowering
 //! reads decypher's HIR and takes what the HIR loses (the order of the columns) from the syntax tree.
@@ -14,6 +14,9 @@ mod lower;
 pub use lower::lower;
 
 use arqlet_query::{execute, GraphStore, Limits, QueryError, ResultSet, Value};
+use decypher::hir::ops::Operation;
+use decypher::hir::pattern::{GraphPattern, PathSelector};
+use decypher::hir::HirQuery;
 use decypher::syntax::{SyntaxElement, SyntaxKind as K, SyntaxNode};
 use std::collections::BTreeMap;
 
@@ -63,8 +66,13 @@ pub const FUNCTIONS: &[&str] = &[
 ///
 /// An `Err` of class `Syntax` means the query is not valid Cypher; of class `Unsupported`, that it is valid but outside
 /// what this layer runs (a write, a procedure, a construct of the ADR's "Later" column, an unknown function, a query
-/// beyond [`MAX_QUERY_BYTES`]). The message names the construct and, for the constructs decypher drops, the upstream issue.
+/// beyond [`MAX_QUERY_BYTES`]). The message names the construct.
 pub fn check(query: &str) -> Result<(), QueryError> {
+    checked(query).map(|_| ())
+}
+
+/// [`check`], returning the HIR for the lowering.
+fn checked(query: &str) -> Result<HirQuery, QueryError> {
     if query.len() > MAX_QUERY_BYTES {
         return Err(QueryError::unsupported(format!(
             "the query is {} bytes; the limit is {MAX_QUERY_BYTES}",
@@ -76,9 +84,44 @@ pub fn check(query: &str) -> Result<(), QueryError> {
         return Err(QueryError::syntax(first.to_string()));
     }
     guard(&parsed.tree)?;
-    // The AST is built from the same tree and can still refuse what the tree accepts.
-    decypher::parse(query).map_err(|e| QueryError::syntax(e.to_string()))?;
+    // The AST and the HIR are built from the same tree and can still refuse what the tree accepts.
+    let hir = decypher::analyze(query).map_err(|e| QueryError::syntax(e.to_string()))?;
+    guard_patterns(&hir)?;
+    Ok(hir)
+}
+
+/// Rejects the first pattern of a `MATCH` or `OPTIONAL MATCH` that uses what the executor does not run yet.
+fn guard_patterns(hir: &HirQuery) -> Result<(), QueryError> {
+    for op in hir.parts.iter().flat_map(|p| &p.operations) {
+        match op {
+            Operation::Match(m) | Operation::OptionalMatch(m) => pattern_support(&m.pattern)?,
+            Operation::Union(u) => u.branches.iter().try_for_each(guard_patterns)?,
+            _ => {}
+        }
+    }
     Ok(())
+}
+
+/// Why a pattern is not run, as an error, or `Ok` when it is.
+fn pattern_support(pattern: &GraphPattern) -> Result<(), QueryError> {
+    let reason = if pattern
+        .paths
+        .iter()
+        .any(|p| p.selector != PathSelector::All)
+    {
+        "path selectors (shortestPath, allShortestPaths, ANY, SHORTEST) are not supported yet (ADR 0021, Later)"
+    } else if !pattern.quantified.is_empty() {
+        "quantified paths and path patterns are not supported yet (ADR 0021, Later)"
+    } else if pattern.nodes.iter().any(|n| n.predicate.is_some())
+        || pattern.relationships.iter().any(|r| r.predicate.is_some())
+    {
+        "WHERE inside a node or relationship pattern is not supported yet (ADR 0021, Later)"
+    } else if pattern.paths.iter().any(|p| p.binding.is_some()) {
+        "a path variable is undecided (ADR 0021, open)"
+    } else {
+        return Ok(());
+    };
+    Err(QueryError::unsupported(reason))
 }
 
 /// Walks the syntax tree in document order and rejects the first construct outside the first release.
@@ -111,28 +154,7 @@ fn reject(element: &SyntaxElement) -> Option<String> {
         K::EXISTS_SUBQUERY | K::COUNT_SUBQUERY | K::COLLECT_SUBQUERY => {
             "EXISTS, COUNT and COLLECT subqueries are not supported yet (ADR 0021, Later)"
         }
-        K::QUANTIFIED_PATH_PATTERN | K::RELATIONSHIP_QUANTIFIER => {
-            "quantified paths and path patterns are not supported yet; decypher lowers them to a single hop (upstream #134)"
-        }
         K::TILDE_EQ => "regular expressions (=~) are not supported yet (ADR 0021, Later)",
-        K::WHERE_CLAUSE => {
-            let inside_pattern = element.as_node()?.parent().map(|p| p.kind());
-            match inside_pattern {
-                Some(K::NODE_PATTERN | K::RELATIONSHIP_DETAIL | K::RELATIONSHIP_PATTERN) => {
-                    "WHERE inside a node or relationship pattern is not supported yet; decypher drops it (upstream #132)"
-                }
-                _ => return None,
-            }
-        }
-        K::IDENT => {
-            let token = element.as_token()?;
-            let text = token.text();
-            if text.eq_ignore_ascii_case("shortestPath") || text.eq_ignore_ascii_case("allShortestPaths") {
-                "shortestPath and allShortestPaths are not supported yet; decypher drops them (upstream #133)"
-            } else {
-                return None;
-            }
-        }
         K::FUNCTION_INVOCATION => {
             let node = element.as_node()?;
             let name = node
@@ -185,42 +207,70 @@ mod tests {
         }
     }
 
-    // One test per construct that decypher drops silently: the guard has to see it in the syntax tree.
+    // One test per pattern construct the executor does not run yet: the guard reads it from the HIR.
 
-    #[test]
-    fn shortest_path_is_rejected_although_decypher_drops_it() {
-        let e = check("MATCH p = shortestPath((a)-[*..5]-(b)) RETURN p").unwrap_err();
-        assert_eq!(e.class, ErrorClass::Unsupported);
-        assert!(e.message.contains("#133"), "{e}");
-        assert_eq!(
-            class("MATCH p = allShortestPaths((a)-[*]-(b)) RETURN p"),
-            Some(ErrorClass::Unsupported)
-        );
-        assert_eq!(
-            class("MATCH p = SHORTESTPATH((a)-[*]-(b)) RETURN p"),
-            Some(ErrorClass::Unsupported)
-        );
+    fn unsupported_naming(query: &str, construct: &str) {
+        let e = check(query).unwrap_err();
+        assert_eq!(e.class, ErrorClass::Unsupported, "{query}: {e}");
+        assert!(e.message.contains(construct), "{query}: {e}");
     }
 
     #[test]
-    fn quantified_paths_are_rejected_although_decypher_lowers_them_to_one_hop() {
-        let e = check("MATCH (a)-[:KNOWS]->{1,3}(b) RETURN b").unwrap_err();
-        assert_eq!(e.class, ErrorClass::Unsupported);
-        assert!(e.message.contains("#134"), "{e}");
-        assert_eq!(
-            class("MATCH (a)((x)-[:K]->(y)){2}(b) RETURN b"),
-            Some(ErrorClass::Unsupported)
-        );
+    fn path_selectors_are_rejected() {
+        for q in [
+            "MATCH p = shortestPath((a)-[*..5]-(b)) RETURN p",
+            "MATCH p = allShortestPaths((a)-[*]-(b)) RETURN p",
+            "MATCH p = SHORTESTPATH((a)-[*]-(b)) RETURN p",
+            "MATCH ANY SHORTEST (a)-[*]-(b) RETURN b",
+            "MATCH SHORTEST 2 (a)-[*]-(b) RETURN b",
+            "MATCH SHORTEST 1 GROUPS (a)-[*]-(b) RETURN b",
+            "MATCH ANY (a)-->(b) RETURN b",
+            "OPTIONAL MATCH ALL SHORTEST (a)-[*]-(b) RETURN b",
+        ] {
+            unsupported_naming(q, "path selectors");
+        }
     }
 
     #[test]
-    fn where_inside_a_pattern_is_rejected_although_decypher_drops_it() {
-        let e = check("MATCH (n WHERE n.age > 3) RETURN n").unwrap_err();
-        assert_eq!(e.class, ErrorClass::Unsupported);
-        assert!(e.message.contains("#132"), "{e}");
-        assert_eq!(
-            class("MATCH (a)-[r:K WHERE r.x > 1]->(b) RETURN a"),
-            Some(ErrorClass::Unsupported)
+    fn the_selector_all_is_a_plain_pattern() {
+        assert_eq!(class("MATCH ALL (a)-->(b) RETURN b"), None);
+    }
+
+    #[test]
+    fn quantified_paths_are_rejected() {
+        for q in [
+            "MATCH (a)-[:KNOWS]->{1,3}(b) RETURN b",
+            "MATCH (a)-[:KNOWS]->{,3}(b) RETURN b",
+            "MATCH (a)-[:KNOWS]->+(b) RETURN b",
+            "MATCH (a)-[:KNOWS]->*(b) RETURN b",
+            "MATCH (a)((x)-[:K]->(y)){2}(b) RETURN b",
+            "OPTIONAL MATCH (a)((x)-[:K]->(y)){1,2}(b) RETURN b",
+        ] {
+            unsupported_naming(q, "quantified paths");
+        }
+    }
+
+    #[test]
+    fn where_inside_a_pattern_is_rejected() {
+        for q in [
+            "MATCH (n WHERE n.age > 3) RETURN n",
+            "MATCH (a)-[r:K WHERE r.x > 1]->(b) RETURN a",
+            "OPTIONAL MATCH (a)-->(b WHERE b.x = 1) RETURN a",
+        ] {
+            unsupported_naming(q, "WHERE inside");
+        }
+    }
+
+    #[test]
+    fn a_path_variable_is_rejected() {
+        unsupported_naming("MATCH p = (a)-->(b) RETURN p", "path variable");
+    }
+
+    #[test]
+    fn a_pattern_in_a_union_branch_is_guarded() {
+        unsupported_naming(
+            "MATCH (a) RETURN a UNION MATCH (a WHERE a.x = 1) RETURN a",
+            "WHERE inside",
         );
     }
 
@@ -231,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn unknown_functions_are_rejected_although_decypher_accepts_them() {
+    fn unknown_functions_are_rejected() {
         let e = check("RETURN foo_bar(1) AS x").unwrap_err();
         assert_eq!(e.class, ErrorClass::Unsupported);
         assert!(e.message.contains("foo_bar"), "{e}");

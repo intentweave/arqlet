@@ -1,6 +1,6 @@
 # arqlet-query-cypher
 
-The openCypher front end of the Arqlet query layer (ADR 0021): the parser `decypher` behind a guard over its syntax tree that rejects what it would drop silently, and the lowering into the plan of `arqlet-query`.
+The openCypher front end of the Arqlet query layer (ADR 0021): the parser `decypher` behind a guard over its syntax tree and HIR that rejects every construct the executor does not run, and the lowering into the plan of `arqlet-query`.
 
 Part of [Arqlet](https://github.com/intentweave/arqlet), an incremental graph-layout
 engine. The query operation is reached through [`arqlet-runtime`](https://crates.io/crates/arqlet-runtime) with its

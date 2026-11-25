@@ -16,6 +16,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
   overview page pauses the overview while the scene view of a cluster covers it.
 
+### Changed
+
+- The Cypher front end uses decypher 0.3.0 (was 0.2.0), which keeps inline `WHERE`, path selectors and quantified paths
+  in its HIR instead of dropping them (upstream #132 to #134). The guard now rejects these constructs from the HIR rather
+  than from the syntax tree, which also covers the GQL selectors 0.3.0 parses (`ANY`, `ANY SHORTEST`, `SHORTEST k`,
+  `SHORTEST k GROUPS`), and `MATCH ALL …` runs like a pattern without a selector. They are still unsupported; no plan of
+  a supported query changes (`crates/query-cypher/tests/grid.rs` pins the outcome of about 1 600 queries).
+
 ## 0.10.0 — 2026-11-27
 
 A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list
