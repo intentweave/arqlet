@@ -168,6 +168,12 @@ groupingPriority?: Array<GroupingCriterion>,
  */
 membershipHull?: HullShape,
 /**
+ * Provisional (ADR 0022 M3b): hold the soft membership groups whose shown members have one container in the view
+ * together there, each where the cost in crossings and bends stays in a budget that halves with the rank. The held
+ * group is drawn as its hull; its members keep their container. Off by default (omitted).
+ */
+holdMemberships?: boolean,
+/**
  * Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
  * (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
  */
@@ -251,6 +257,15 @@ organicIterations?: number | null,
  * than the default leaves a route room to leave a node that faces a neighbour.
  */
 organicGap?: number | null,
+/**
+ * Experimental (ADR 0016, amendment *Pins in single pass*, step P1): under single pass, and in the hierarchical
+ * pipeline it falls back to, a pinned leaf of an area that flows left to right or top to bottom is a constraint of the
+ * arrangement: the pin chooses its rank and its order there and holds its place across the flow, and along the flow it
+ * stands in its rank's band (the difference is reported in the layout diagnostics). Without it, and when a pin is
+ * another one (a container, another strategy, a reversed flow), such a pin takes the view off that pipeline. Omitted
+ * when off.
+ */
+pinsInSinglePass?: boolean,
 /**
  * Experimental minimum-displacement overlap constraints for organic placement and repair. Off by default.
  */

@@ -666,6 +666,19 @@ pub struct Snapshot {
     /// Empty (and omitted) without the option.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub layered_plans: BTreeMap<String, StoredAreaPlan>,
+    /// Provisional (ADR 0022 M3b): the membership groups this layout holds together inside their owner
+    /// (`LayoutOptions::hold_memberships`). Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub held_groups: Vec<HeldGroup>,
+}
+
+/// Provisional (ADR 0022 M3b): a membership group a layout holds together (`Snapshot::held_groups`).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HeldGroup {
+    pub dimension: String,
+    pub group: String,
 }
 /// The format of `StoredAreaPlan`; a plan of another format is not reused.
 pub const STORED_PLAN_FORMAT: u32 = 1;
@@ -2179,6 +2192,11 @@ pub struct LayoutOptions {
     /// convex hull. A criterion of `groupingPriority` may override it (M1).
     #[serde(default, skip_serializing_if = "HullShape::is_default")]
     pub membership_hull: HullShape,
+    /// Provisional (ADR 0022 M3b): hold the soft membership groups whose shown members have one container in the view
+    /// together there, each where the cost in crossings and bends stays in a budget that halves with the rank. The held
+    /// group is drawn as its hull; its members keep their container. Off by default (omitted).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hold_memberships: bool,
     /// Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
     /// (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -2278,6 +2296,14 @@ pub struct LayoutOptions {
     /// than the default leaves a route room to leave a node that faces a neighbour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_gap: Option<f64>,
+    /// Experimental (ADR 0016, amendment *Pins in single pass*, step P1): under single pass, and in the hierarchical
+    /// pipeline it falls back to, a pinned leaf of an area that flows left to right or top to bottom is a constraint of the
+    /// arrangement: the pin chooses its rank and its order there and holds its place across the flow, and along the flow it
+    /// stands in its rank's band (the difference is reported in the layout diagnostics). Without it, and when a pin is
+    /// another one (a container, another strategy, a reversed flow), such a pin takes the view off that pipeline. Omitted
+    /// when off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pins_in_single_pass: bool,
     /// Experimental minimum-displacement overlap constraints for organic placement and repair. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub vpsc_overlap_removal: bool,
@@ -2835,6 +2861,7 @@ impl Default for LayoutOptions {
             grouping_priority: Vec::new(),
             removed_membership_views: (),
             membership_hull: HullShape::Rectangle,
+            hold_memberships: false,
             hub_ref_room: 0.,
             isolated_grid_areas: BTreeSet::new(),
             bus_roots: Vec::new(),
@@ -2853,6 +2880,7 @@ impl Default for LayoutOptions {
             edge_routing: None,
             organic_iterations: None,
             organic_gap: None,
+            pins_in_single_pass: false,
             vpsc_overlap_removal: false,
             directed_repair: false,
             organic_forces: true,

@@ -369,6 +369,14 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   box, and no box is in two pieces of one group; a group over four containers is marked, a pair inside one is not; both
   shapes cover each group with the same boxes. On the three-dimension example the nine groups are drawn in more than nine
   clean pieces: they cut across the deployments, which is what the stages are for.
+  **After looking at it in a browser** (2026-11-25): a group that is still a box — a source container that kept some
+  members, or a dimension's container — draws only the members that left it. They are joined to the box by one hull where
+  that encloses nothing foreign and stays compact: it may add at most `JOINED_GROWTH_LIMIT` (4, a placeholder for M3)
+  times the area of the members. Otherwise they are marked, and the mark names the box (`SceneMark.ownBox`). On the real
+  export the first form of this rule drew 11 hulls and no mark for a document taken first, which read well as a number and
+  badly as a drawing: one hull spanned nearly the whole drawing and ten did not touch the box they stood for. The moved-down
+  parent hierarchy draws each container's children only, not its descendants, so nested levels do not repeat one hull; a
+  level that holds nothing but containers is therefore not drawn. The report counts groups that kept a box as `keptBox`.
 - **M1 — `groupingPriority` as a projection.** Ranked criteria, ownership, value priority, `parent` as a criterion that can
   be moved down, the refusals and diagnostics of §5, `details` per criterion; `membershipViews` removed. No change to the
   layout algorithm: a non-default priority hands the engine a different container tree. *Exit:* the default view
@@ -393,16 +401,32 @@ Each step is behind an option and measured before the next. Nothing becomes a de
 - **M3 — holding.** Soft criteria as breakable containers within an owner and as regions across owners (members at the
   facing border), the switch per piece, and the measurement of §6 that places it. *Exit:* the gate of §6, the budgets and
   the threshold recorded with their run, and `overlapping-boxes.json` drawn as the target picture of §3.
+  **M3a, the baseline, done** (2026-11-25; `benchmarks/memberships.mjs`,
+  [results](../../benchmarks/results/memberships-20261125-baseline.md)): with the parent first and groups planted along the
+  edges, 11 of 24 groups inside one container are drawn whole and none of 30 across containers. Holding within an owner
+  (M3b) can improve at most 13 of these groups, regions across owners (M3c) at most 30. Planted groups, not real ones.
+  **M3b, holding inside an owner, done behind `holdMemberships`** (2026-11-25, off by default;
+  `crates/layout/src/holding.rs`, [results](../../benchmarks/results/memberships-20261125-hold.md)). Order alone does not hold a
+  group: 2 of 19 become whole, against 19 of 19 as a nested container
+  ([feasibility](../../benchmarks/results/memberships-20261125-hold-inside.md)). So a group whose shown members share a container is
+  laid out as a container nested there, which is taken out of the result again: the view, its owners and its ports have no
+  trace of it, and only the hull is drawn. Groups are tried one by one in the order of the priority, each with a layout of its
+  own (at most 64), and kept when they are then whole, break no group that was whole, add no hard violation and stay in a
+  budget: crossings the larger of 2 and 5 percent, bends the larger of 4 and 5 percent, halved per further rank. On the
+  baseline inputs 5 of 19 groups are held. Not held: a moved-down parent hierarchy, groups across containers (M3c), members
+  with a pin or an order hint, graphs with buses. A complete layout holds; an edit of a part starts from the held places and
+  may release a group, which the snapshot then no longer lists (`heldGroups`). A drawing that holds something is not refined
+  until candidates hold as well. Open for M3d: the budget, per group and in total, and the number of trials.
+  **M3c, across containers, probed and not built** (2026-11-25;
+  [levers](../../benchmarks/results/memberships-20261125-hold-across.md),
+  [alignment](../../benchmarks/results/memberships-20261125-hold-aligned.md)): nested pieces, pieces at the facing borders and
+  owners pulled together make 10 of 35 groups whole, 5 of them in the M3b budget. Aligning the pieces across the flow brings the
+  groups with two owners from 9 to 12 of 19, and none of the added ones is in the budget. Pieces and marks stay the answer for
+  groups across containers until real groupings say otherwise.
 - **M4 — lanes** (`as: lanes`): at rank 1 across the drawing, below a higher rank inside each owner, two of them as a grid.
   *Exit:* the gate; `pools-and-lanes.json` with its `groupingPriority` draws as the 2×3 grid with no lane violation;
   `three-dimensions.json` reports what it cannot satisfy.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
-
-A group that is still a box — a source container that kept some members, or a dimension's container that owns some
-nodes — draws only the members that left it to an earlier criterion: the box already shows the others. They are joined
-to the box by one hull where that hull encloses no foreign leaf, else they go through the stages above on their own.
-Found on the real export: a document taken first moved 12 symbols out of a file that kept its box, and the file was
-marked whole (~146 marks); now the same view draws 11 hulls and no mark. The report counts these groups as `keptBox`.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.
 
@@ -437,6 +461,9 @@ proved by brute force over all orders.
   `visibility` with `--memberships`; the index has no namespace, and claim candidates bind one subject each. Which further
   dimensions are worth exporting, and how many criteria a view can carry, come from use; how many *groups* is answered
   by `consider`.
+- **A projection that breaks an arrangement.** With a dimension first, a graph whose root is arranged as a tree may no longer
+  be one, and the import is refused (`nested-tree-radial` in the M3a baseline). Falling back with a report would be kinder.
+- **Edges in the real export.** None of its call edges has a target, so it cannot measure what holding costs.
 - **A dimension at several ranks.** `values` lets a dimension order its groups; whether one dimension may also appear at two
   ranks (`[project: apollo, parent, project: the rest]`, one project first and the others after the reporting line) is
   open. The list's shape allows it later without a change of format.

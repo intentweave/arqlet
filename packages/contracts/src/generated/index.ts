@@ -33,6 +33,7 @@ export * from './GraphPatch';
 export * from './GraphTrace';
 export * from './GroupingCriterion';
 export * from './GroupingRendering';
+export * from './HeldGroup';
 export * from './Hidden';
 export * from './HubRef';
 export * from './HullShape';

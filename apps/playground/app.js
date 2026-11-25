@@ -1207,6 +1207,9 @@ function syncDetails(){
  for(const option of considerSelect.children??[])option.selected=option.value?considered.has(option.value):considered.size===0;
  $('membership-hull').disabled=dimensions.length===0;
  $('membership-hull').value=o.membershipHull??'rectangle';
+ // Provisional (ADR 0022 M3b): holding needs a soft dimension to hold.
+ $('membership-hold').disabled=dimensions.length===0;
+ $('membership-hold').checked=!!o.holdMemberships;
 }
 /** The ids of the membership dimensions the current graph declares, in their declared order. */
 function membershipDimensions(){
@@ -1281,7 +1284,7 @@ numberOption('routing-clearance','routingClearance','Clearance to nodes',{min:0,
 numberOption('track-spacing','trackSpacing','track spacing',{min:1,max:50});
 numberOption('archive-refinement','archiveRefinement','archive refinement',{min:0,max:50,integer:true});
 // On/off options and optional numbers; an empty number field clears its option, so the engine default applies.
-const FLAGS=[['component-packing','componentPacking'],['vpsc-overlap-removal','vpscOverlapRemoval'],['directed-repair','directedRepair'],['node-edge-repulsion','nodeEdgeRepulsion'],['sparse-stress','sparseStress'],['scalable-stress','scalableStress'],['force-directed','forceDirected'],['strict-clearance','strictClearance'],['extended-conflict-selection','extendedConflictSelection'],['routed-candidates','routedCandidates'],['flat-region','flatRegion'],['global-layering','globalLayering'],['simplex-ranks','simplexRanks']];
+const FLAGS=[['component-packing','componentPacking'],['vpsc-overlap-removal','vpscOverlapRemoval'],['directed-repair','directedRepair'],['node-edge-repulsion','nodeEdgeRepulsion'],['sparse-stress','sparseStress'],['scalable-stress','scalableStress'],['force-directed','forceDirected'],['strict-clearance','strictClearance'],['extended-conflict-selection','extendedConflictSelection'],['routed-candidates','routedCandidates'],['flat-region','flatRegion'],['global-layering','globalLayering'],['simplex-ranks','simplexRanks'],['pins-in-single-pass','pinsInSinglePass']];
 for(const [id,key] of FLAGS)$(id).onchange=()=>setOption({[key]:$(id).checked},key);
 // Provisional (ADR 0022): show every declared dimension as an overlay, or none. The hulls are derived from the boxes the
 // layout already produced, so this never moves a node; one `configure` edit carries the option like any other.
@@ -1308,6 +1311,8 @@ function applyGrouping(label){
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
 $('grouping-first').onchange=()=>applyGrouping('Structure first');
 $('grouping-consider').onchange=()=>applyGrouping('Only groups');
+// Provisional (ADR 0022 M3b): the layout keeps soft groups together where that stays cheap. It moves nodes.
+$('membership-hold').onchange=()=>setOption({holdMemberships:$('membership-hold').checked},'Hold groups');
 // Provisional (ADR 0022 §3): the hull's outline. Sent as it is; the engine omits the default (rectangle) when it writes
 // the options back, so a snapshot that never chose a shape stays unchanged.
 $('membership-hull').onchange=()=>setOption({membershipHull:$('membership-hull').value},'Hull shape');

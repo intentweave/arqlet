@@ -73,8 +73,11 @@ The workflow then runs, in this order:
 4. `github-release`: the GitHub release of the tag, with the CHANGELOG section.
 
 The publishing jobs run in the GitHub environment `release`. Each skips versions the registry already has, so a run that
-failed half way is run again from the Actions page. Run by hand (`workflow_dispatch`, with a version), the workflow only
-runs `verify`: a dry run that never publishes.
+failed half way is run again from the Actions page. `crates` logs in to crates.io only when a crate is left to publish,
+so a tag after a release by hand works without trusted publishing. Run by hand (`workflow_dispatch`, with a version),
+the workflow only runs `verify`: a dry run that never publishes.
+
+Afterwards, [check the release](#check-the-release).
 
 ### One-time setup
 
@@ -110,8 +113,30 @@ git tag -a vx.y.z -m x.y.z && git push origin vx.y.z
 ```
 
 `cargo publish --workspace` publishes in dependency order. `pnpm -r publish` publishes in dependency order as well and
-skips versions that already exist. Pushing the tag starts the release workflow too: it finds every version published already and only
-creates the GitHub release.
+skips versions that already exist. Push the tag only when the registries show every package (see below): it starts the
+release workflow too, which finds every version published already and only creates the GitHub release. A package that
+is still missing would be published by the workflow, which needs trusted publishing.
+
+## Check the release
+
+A release is done only when it installs from the registries. A publish command that ran is not enough: a package can be
+missing after it, and a new version can take some minutes to appear.
+
+```sh
+v=x.y.z
+# 1. Every npm package has the version.
+for p in arqlet @arqlet/engine-client @arqlet/viewer @arqlet/contracts; do
+  npm view "$p@$v" version >/dev/null 2>&1 && echo "$p $v" || echo "$p MISSING"
+done
+# 2. The npm entry point installs into an empty project and imports.
+(cd "$(mktemp -d)" && npm init -y >/dev/null && npm install --no-audit --no-fund "arqlet@$v" &&
+  node --input-type=module -e "if (!Object.keys(await import('arqlet')).length) throw Error('arqlet exports nothing')")
+# 3. The facade crate resolves from crates.io and builds with its dependencies.
+(cd "$(mktemp -d)" && cargo init --quiet --name release-check && cargo add "arqlet@=$v" && cargo build)
+```
+
+The query crates are not dependencies of the facade; look them up separately (`cargo info arqlet-query-cypher@x.y.z`,
+likewise for the other three).
 
 ## The `query` feature
 
