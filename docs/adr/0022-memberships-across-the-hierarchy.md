@@ -414,9 +414,12 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   own (at most 64), and kept when they are then whole, break no group that was whole, add no hard violation and stay in a
   budget: crossings the larger of 2 and 5 percent, bends the larger of 4 and 5 percent, halved per further rank. On the
   baseline inputs 5 of 19 groups are held. Not held: a moved-down parent hierarchy, groups across containers (M3c), members
-  with a pin or an order hint, graphs with buses. A complete layout holds; an edit of a part starts from the held places and
-  may release a group, which the snapshot then no longer lists (`heldGroups`). A drawing that holds something is not refined
-  until candidates hold as well. Open for M3d: the budget, per group and in total, and the number of trials.
+  with a pin or an order hint, graphs with buses. A complete layout searches; an edit of a part holds the groups that were held
+  again in the areas it lays out, and searches for no others. A drawing that holds something is not refined
+  until candidates hold as well. A group that is not held says why, and the cost of all held groups together is reported with the edges that run
+  against the flow (`Snapshot::holding`): they are counted and not limited, because a group held around a node between its
+  members turns an edge back, and holding is what the user chose. Open for M3d: the budget, per group and in total, and the
+  number of trials; and the title row a held group still has in tree and organic areas.
   **M3c, across containers, probed and not built** (2026-11-25;
   [levers](../../benchmarks/results/memberships-20261125-hold-across.md),
   [alignment](../../benchmarks/results/memberships-20261125-hold-aligned.md)): nested pieces, pieces at the facing borders and

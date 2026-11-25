@@ -72,7 +72,11 @@ pub(crate) fn align_borders(
         };
         let origin = absolute(&container, boxes, &parent, vertical);
         let width = if vertical { frame.width } else { frame.height };
-        let margin = if vertical { 24. } else { 48. };
+        let margin = if vertical {
+            24.
+        } else {
+            crate::header_of(Some(container.as_str()))
+        };
         let mut targets: Vec<(String, f64)> = Vec::new();
         for (edge, border) in &inner.borders {
             let Some(rect) = inner.dummies.get(border) else {

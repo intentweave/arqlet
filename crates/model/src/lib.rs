@@ -670,6 +670,98 @@ pub struct Snapshot {
     /// (`LayoutOptions::hold_memberships`). Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub held_groups: Vec<HeldGroup>,
+    /// Provisional (ADR 0022 M3b): which soft groups the layout does not hold and why, and what holding the others costs.
+    /// Omitted without `LayoutOptions::hold_memberships`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub holding: Option<HoldingReport>,
+}
+
+/// The prefix of the ids of the containers that hold a membership group during the layout (ADR 0022 M3b). No result has one.
+pub const HOLDING_PREFIX: &str = "held:";
+
+/// Provisional (ADR 0022 M3b): what `LayoutOptions::hold_memberships` did besides `Snapshot::held_groups`.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HoldingReport {
+    /// The soft groups with at least two shown members that are neither held nor whole without holding.
+    pub released: Vec<ReleasedGroup>,
+    /// The drawing without holding against this one. Only after a complete layout: an edit has nothing to compare with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub cost: Option<HoldingCost>,
+}
+
+/// Provisional (ADR 0022 M3b): a group the layout does not hold.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct ReleasedGroup {
+    pub dimension: String,
+    pub group: String,
+    pub reason: ReleaseReason,
+}
+
+/// Provisional (ADR 0022 M3b): why a group is not held.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum ReleaseReason {
+    /// Its members are in several containers of the view (M3c).
+    AcrossContainers,
+    /// A member has a pin or an order hint.
+    FixedPlace,
+    /// Another held group has some of its members.
+    OverlapsHeld,
+    /// The layout cannot be made with it (an arrangement refuses the container).
+    Refused,
+    /// It is not whole even then.
+    NotWhole,
+    /// It would break a group that is whole.
+    BreaksOther,
+    /// It would add a hard violation.
+    Violation,
+    /// It costs more crossings or bends than its budget.
+    Budget,
+    /// Too many groups were tried before it.
+    Trials,
+    /// An edit of a part of the drawing released it.
+    Edit,
+    /// The graph has buses, beside which nothing is held.
+    Buses,
+}
+
+impl ReleaseReason {
+    /// The reason in words, for a report line.
+    pub fn text(self) -> &'static str {
+        match self {
+            Self::AcrossContainers => "across containers",
+            Self::FixedPlace => "pinned or ordered",
+            Self::OverlapsHeld => "sharing nodes with a held group",
+            Self::Refused => "without a possible layout",
+            Self::NotWhole => "not whole even then",
+            Self::BreaksOther => "breaking another group",
+            Self::Violation => "breaking a hard rule",
+            Self::Budget => "over the budget",
+            Self::Trials => "not tried",
+            Self::Edit => "released by an edit",
+            Self::Buses => "beside buses",
+        }
+    }
+}
+
+/// Provisional (ADR 0022 M3b): the cost of all held groups together. Edges against the flow are counted, not limited: a
+/// group held around a node between its members turns an edge back.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HoldingCost {
+    pub crossings_before: usize,
+    pub crossings: usize,
+    pub bends_before: usize,
+    pub bends: usize,
+    pub against_flow_before: usize,
+    pub against_flow: usize,
 }
 
 /// Provisional (ADR 0022 M3b): a membership group a layout holds together (`Snapshot::held_groups`).

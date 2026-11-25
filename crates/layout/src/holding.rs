@@ -6,18 +6,22 @@
 //! other ranks. Each group is tried on its own layout, in the order of the priority, and kept when it is then drawn whole
 //! and its cost stays in the budget; otherwise it is released, and the display stages of ADR 0022 §3 draw it.
 //!
-//! Only complete layouts hold. A layout that continues an earlier drawing (an edit of a part of it) starts from the held
-//! places and keeps the groups that are still whole.
+//! Only a complete layout searches. One that continues an earlier drawing (an edit of a part of it) holds the groups that
+//! were held, in the areas it lays out again, and tries no others.
 
 use crate::{compute_counted_unclocked, hard_violations, published_metrics, SearchCounters};
 use arqlet_model::{
     grouping::{self, PARENT},
-    Graph, HeldGroup, LayoutOptions, Node, Rect, Snapshot,
+    Graph, HeldGroup, HoldingCost, HoldingReport, LayoutOptions, Mode, Node, Orientation, Rect,
+    ReleaseReason, ReleasedGroup, Snapshot, HOLDING_PREFIX as PREFIX,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-/// The prefix of the ids of the containers that hold a group during the layout. None of them leaves this module.
-const PREFIX: &str = "held:";
+/// Whether `id` is a container that holds a group during the layout. None of them leaves this module.
+pub(crate) fn is_holding(id: &str) -> bool {
+    id.starts_with(PREFIX)
+}
+
 /// At most this many groups are tried in one layout, since each costs a layout. A placeholder until M3 measures it.
 pub const TRIALS: usize = 64;
 /// The budget of one group on rank 2, halved with every further rank: at most the larger of the fixed number and the share
@@ -40,6 +44,21 @@ struct Candidate {
     rank: usize,
     held: HeldGroup,
     members: Vec<String>,
+}
+
+impl Candidate {
+    /// The id of the container that holds it during the layout.
+    fn container(&self) -> String {
+        format!("{PREFIX}{}/{}", self.held.dimension, self.held.group)
+    }
+
+    fn released(&self, reason: ReleaseReason) -> ReleasedGroup {
+        ReleasedGroup {
+            dimension: self.held.dimension.clone(),
+            group: self.held.group.clone(),
+            reason,
+        }
+    }
 }
 
 /// The groups of the soft dimensions with at least two shown members, by rank and in their declared order. A moved-down
@@ -244,30 +263,41 @@ pub(crate) fn hold(
     };
     let lay = |g: &Graph| compute_counted_unclocked(g, None, &BTreeSet::new(), &plain);
     let (mut best, stages) = lay(graph)?;
-    let finish = |mut snapshot: Snapshot, held: Vec<HeldGroup>| {
+    let found = candidates(graph, options);
+    let finish = |mut snapshot: Snapshot,
+                  held: Vec<HeldGroup>,
+                  released: Vec<ReleasedGroup>,
+                  cost: Option<HoldingCost>| {
         snapshot.options.hold_memberships = true;
         snapshot.held_groups = held;
+        snapshot.holding = Some(HoldingReport { released, cost });
         Ok((snapshot, stages))
     };
     // A bus is drawn on lines its members share; its layout rewrites the graph, so nothing is held beside one.
-    if !graph.buses.is_empty() || graph.nodes.iter().any(|n| n.id.starts_with(PREFIX)) {
+    if !graph.buses.is_empty() || graph.nodes.iter().any(|n| is_holding(&n.id)) {
         best.layout_diagnostics
             .push("holdMemberships: not applied to a graph with buses or ids `held:`".into());
-        return finish(best, Vec::new());
+        let released = found
+            .iter()
+            .map(|c| c.released(ReleaseReason::Buses))
+            .collect();
+        return finish(best, Vec::new(), released, None);
     }
-    let all: Vec<Candidate> = {
-        let parent = parents(graph);
-        candidates(graph, options)
-            .into_iter()
-            .filter(|c| {
-                common_parent(&parent, &c.members).is_some()
-                    // A place or an order the user fixed is relative to the owner; holding would move it.
-                    && !c.members.iter().any(|m| {
-                        options.pins.contains_key(m) || options.order_hints.contains_key(m)
-                    })
-            })
-            .collect()
-    };
+    let mut released = Vec::new();
+    let mut all: Vec<Candidate> = Vec::new();
+    for c in found {
+        let reason = match fixed(graph, options, &c) {
+            Some(reason) => reason,
+            None => {
+                all.push(c);
+                continue;
+            }
+        };
+        if !whole(&best, options, &c) {
+            released.push(c.released(reason));
+        }
+    }
+    let flow_before = against_flow(&best);
     let (base_crossings, base_bends, _) = cost(&best)?;
     let (mut crossings, mut bends, mut hard) = cost(&best)?;
     let mut is_whole: Vec<bool> = all.iter().map(|c| whole(&best, options, c)).collect();
@@ -280,36 +310,20 @@ pub(crate) fn hold(
         }
         // Members that another held group took apart cannot share a container any more.
         let parent = parents(&working);
-        let Some(owner) = common_parent(&parent, &candidate.members) else {
+        if common_parent(&parent, &candidate.members).is_none() {
+            released.push(candidate.released(ReleaseReason::OverlapsHeld));
             continue;
-        };
+        }
         if trials == TRIALS {
-            best.layout_diagnostics.push(format!(
-                "holdMemberships: {TRIALS} groups tried, the others not"
-            ));
-            break;
+            released.push(candidate.released(ReleaseReason::Trials));
+            continue;
         }
         trials += 1;
-        let id = format!(
-            "{PREFIX}{}/{}",
-            candidate.held.dimension, candidate.held.group
-        );
         let mut trial = working.clone();
-        trial.nodes.push(Node {
-            id: id.clone(),
-            kind: "membership".into(),
-            label: String::new(),
-            parent_id: owner.map(str::to_string),
-            shape: Default::default(),
-        });
-        let members: BTreeSet<&str> = candidate.members.iter().map(String::as_str).collect();
-        for n in &mut trial.nodes {
-            if members.contains(n.id.as_str()) {
-                n.parent_id = Some(id.clone());
-            }
-        }
+        enclose(&mut trial, candidate);
         // A layout the container makes impossible (an arrangement that refuses it) releases the group.
         let Some(drawn) = lay(&trial).ok().and_then(|(s, _)| dissolve(s, graph)) else {
+            released.push(candidate.released(ReleaseReason::Refused));
             continue;
         };
         let (c, b, h) = cost(&drawn)?;
@@ -321,18 +335,237 @@ pub(crate) fn hold(
             .iter()
             .zip(&now)
             .all(|(before, after)| !before || *after);
-        if now[i]
-            && keeps
-            && h <= hard
-            && c <= crossings + allowed(CROSSINGS, base_crossings)
-            && b <= bends + allowed(BENDS, base_bends)
+        let reason = if !now[i] {
+            ReleaseReason::NotWhole
+        } else if !keeps {
+            ReleaseReason::BreaksOther
+        } else if h > hard {
+            ReleaseReason::Violation
+        } else if c > crossings + allowed(CROSSINGS, base_crossings)
+            || b > bends + allowed(BENDS, base_bends)
         {
+            ReleaseReason::Budget
+        } else {
             (best, crossings, bends, hard, is_whole) = (drawn, c, b, h, now);
             working = trial;
             held.push(candidate.held.clone());
+            continue;
+        };
+        released.push(candidate.released(reason));
+    }
+    // A group that a later one made whole is not released after all.
+    released.retain(|r| {
+        !all.iter()
+            .zip(&is_whole)
+            .any(|(c, whole)| *whole && c.held.dimension == r.dimension && c.held.group == r.group)
+    });
+    let cost = (!held.is_empty()).then(|| HoldingCost {
+        crossings_before: base_crossings,
+        crossings,
+        bends_before: base_bends,
+        bends,
+        against_flow_before: flow_before,
+        against_flow: against_flow(&best),
+    });
+    finish(best, held, released, cost)
+}
+
+/// Why a group cannot be tried at all: its members are in several containers, or one has a place or an order the user fixed,
+/// which is relative to the owner and which holding would move.
+fn fixed(graph: &Graph, options: &LayoutOptions, c: &Candidate) -> Option<ReleaseReason> {
+    if common_parent(&parents(graph), &c.members).is_none() {
+        return Some(ReleaseReason::AcrossContainers);
+    }
+    c.members
+        .iter()
+        .any(|m| options.pins.contains_key(m) || options.order_hints.contains_key(m))
+        .then_some(ReleaseReason::FixedPlace)
+}
+
+/// Puts the members of a group into a container of their own inside the one they share. Nothing where they share none.
+fn enclose(graph: &mut Graph, candidate: &Candidate) -> bool {
+    let owner = match common_parent(&parents(graph), &candidate.members) {
+        Some(owner) => owner.map(str::to_string),
+        None => return false,
+    };
+    let id = candidate.container();
+    graph.nodes.push(Node {
+        id: id.clone(),
+        kind: "membership".into(),
+        label: String::new(),
+        parent_id: owner,
+        shape: Default::default(),
+    });
+    let members: BTreeSet<&str> = candidate.members.iter().map(String::as_str).collect();
+    for n in &mut graph.nodes {
+        if members.contains(n.id.as_str()) {
+            n.parent_id = Some(id.clone());
         }
     }
-    finish(best, held)
+    true
+}
+
+/// The edges whose target does not lie ahead of their source along the flow of the area both are in. Areas without a flow
+/// (organic, radial) count none.
+fn against_flow(snapshot: &Snapshot) -> usize {
+    let graph = &snapshot.graph;
+    let parent = parents(graph);
+    let boxes = crate::absolute_all(graph, &snapshot.boxes);
+    let path = |id: &str| {
+        let mut out = Vec::new();
+        let mut at = parent.get(id).copied().flatten();
+        while let Some(p) = at {
+            if out.len() > parent.len() {
+                break;
+            }
+            out.push(p.to_string());
+            at = parent.get(p).copied().flatten();
+        }
+        out
+    };
+    graph
+        .edges
+        .iter()
+        .filter(|e| {
+            let Some(target) = e.target.as_deref().filter(|t| *t != e.source) else {
+                return false;
+            };
+            let (a, b) = (path(&e.source), path(target));
+            let area = a.iter().find(|p| b.contains(p)).map(String::as_str);
+            let orientation = match snapshot.area_orientations.get(area.unwrap_or("<root>")) {
+                Some(o) => *o,
+                None => match graph.area_mode(area) {
+                    Ok(Mode::Orientation(o)) => o,
+                    _ => return false,
+                },
+            };
+            let (Some(s), Some(t)) = (boxes.get(e.source.as_str()), boxes.get(target)) else {
+                return false;
+            };
+            let (s, t) = (arqlet_scene::hull::centre(s), arqlet_scene::hull::centre(t));
+            match orientation {
+                Orientation::Lr => t.x < s.x,
+                Orientation::Rl => t.x > s.x,
+                Orientation::Tb => t.y < s.y,
+                Orientation::Bt => t.y > s.y,
+            }
+        })
+        .count()
+}
+
+/// A layout that continues `previous`: the groups held there are held again in the areas it lays out, without a search. Where
+/// that is not possible, the layout goes on without holding, and their owners, which have no plan to keep, are placed again.
+pub(crate) fn resume(
+    graph: &Graph,
+    previous: &Snapshot,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+    plain: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    let found = candidates(graph, options);
+    let again: Vec<&Candidate> = previous
+        .held_groups
+        .iter()
+        .filter_map(|h| found.iter().find(|c| c.held == *h))
+        .filter(|c| fixed(graph, options, c).is_none())
+        .collect();
+    let (mut working, mut earlier) = (graph.clone(), previous.clone());
+    // Laid out again: what the edit asks for, the owners of held groups, and the containers of the groups themselves.
+    let mut redo = dirty.clone();
+    redo.extend(owners(previous));
+    let mut boxes = crate::absolute_all(&previous.graph, &previous.boxes);
+    let mut enclosed = Vec::new();
+    for c in again {
+        if enclose(&mut working, c) {
+            redo.insert(c.container());
+            enclosed.push(c);
+        }
+    }
+    // The earlier drawing with the same containers around the members it shows; an inner one was enclosed after the outer.
+    for c in enclosed.iter().rev() {
+        let of: Vec<&Rect> = working
+            .nodes
+            .iter()
+            .filter(|n| n.parent_id.as_deref() == Some(c.container().as_str()))
+            .filter_map(|n| boxes.get(n.id.as_str()))
+            .collect();
+        if of.is_empty() {
+            continue;
+        }
+        let low = |v: &dyn Fn(&Rect) -> f64| of.iter().map(|r| v(r)).fold(f64::MAX, f64::min);
+        let high = |v: &dyn Fn(&Rect) -> f64| of.iter().map(|r| v(r)).fold(f64::MIN, f64::max);
+        let (x, y) = (low(&|r| r.x) - 24., low(&|r| r.y) - 24.);
+        let rect = Rect {
+            x,
+            y,
+            width: high(&|r| r.x + r.width) + 24. - x,
+            height: high(&|r| r.y + r.height) + 24. - y,
+        };
+        boxes.insert(c.container(), rect);
+    }
+    let parent = parents(&working);
+    for n in &mut earlier.graph.nodes {
+        if let Some(p) = parent.get(n.id.as_str()).copied().flatten() {
+            if is_holding(p) {
+                n.parent_id = Some(p.to_string());
+            }
+        }
+    }
+    for c in &enclosed {
+        let id = c.container();
+        if let (Some(n), true) = (
+            working.nodes.iter().find(|n| n.id == id),
+            boxes.contains_key(&id),
+        ) {
+            earlier.graph.nodes.push(n.clone());
+        }
+    }
+    earlier.boxes = earlier
+        .graph
+        .nodes
+        .iter()
+        .filter_map(|n| {
+            let mut r = boxes.get(&n.id)?.clone();
+            if let Some(p) = n.parent_id.as_ref().and_then(|p| boxes.get(p)) {
+                r.x -= p.x;
+                r.y -= p.y;
+            }
+            Some((n.id.clone(), r))
+        })
+        .collect();
+    let held = (!enclosed.is_empty())
+        .then(|| compute_counted_unclocked(&working, Some(&earlier), &redo, plain).ok())
+        .flatten()
+        .and_then(|(s, stages)| Some((dissolve(s, graph)?, stages)));
+    let (mut snapshot, stages) = match held {
+        Some(done) => done,
+        None => {
+            let mut redo = dirty.clone();
+            redo.extend(owners(previous));
+            compute_counted_unclocked(graph, Some(previous), &redo, plain)?
+        }
+    };
+    kept(&mut snapshot, options, &previous.held_groups);
+    // What was released stays so; a group the edit released says it.
+    let held = &snapshot.held_groups;
+    let released = found
+        .iter()
+        .filter(|c| !held.contains(&c.held) && !whole(&snapshot, options, c))
+        .map(|c| {
+            let before = previous.holding.iter().flat_map(|h| &h.released);
+            let before = before
+                .filter(|r| r.dimension == c.held.dimension && r.group == c.held.group)
+                .map(|r| r.reason)
+                .next();
+            let reason = fixed(graph, options, c).or(before);
+            c.released(reason.unwrap_or(ReleaseReason::Edit))
+        })
+        .collect();
+    snapshot.holding = Some(HoldingReport {
+        released,
+        cost: None,
+    });
+    Ok((snapshot, stages))
 }
 
 /// The areas a layout that continues `earlier` has to place again: the owners of held groups have no plan to keep.
