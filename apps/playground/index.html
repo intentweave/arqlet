@@ -297,6 +297,7 @@ table.stats tr.section td{color:var(--muted);font-size:11px;padding-top:8px}
   <label class="check"><input id="flat-region" type="checkbox"> Flat-region candidate (planar grid drawing)</label>
   <label class="check" title="Experimental, needs layered construction: a container whose flow runs along the same axis as its area's takes part with its children in the area's ranks, as one block (one level)."><input id="global-layering" type="checkbox"> Global layering: same-axis containers in the common ranks</label>
   <label class="check" title="Experimental, needs hierarchical ordering: the ranks of every area minimise the summed lengths of its links (network simplex) instead of the longest paths."><input id="simplex-ranks" type="checkbox"> Simplex ranks: shortest links instead of longest paths</label>
+  <label class="check" title="Experimental: a pinned node of a layered area keeps its view on the layered pipeline. The pin chooses its rank and its order there and holds its place across the flow; along the flow the node stands in its rank, and the difference is listed in the layout notes. Off, or for a pinned container: the pin selects the previous layout pipeline."><input id="pins-in-single-pass" type="checkbox"> Pins stay in the layered layout (leaf nodes)</label>
   <label for="archive-refinement">Archive entries routed after the first stage (0 = off)</label><input id="archive-refinement" type="number" min="0" max="50" step="1">
  </div></details>
  <details><summary>Layout method</summary><div class="group">

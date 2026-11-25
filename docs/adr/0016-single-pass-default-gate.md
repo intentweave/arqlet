@@ -62,7 +62,7 @@ below; a drag step and a drop with release stay on single pass since #169 and th
 
 ## Amendment: pins in single pass (2026-11-24)
 
-Status: proposed. Nothing is built; the behaviour below comes behind an option first (`pinsInSinglePass`, off) and is
+Status: proposed. Step P1 is built behind the option (`pinsInSinglePass`, off; see *Step P1* below); the behaviour is
 accepted by the quality gate as every algorithm change.
 
 ### Context
@@ -140,6 +140,26 @@ with the pin gives the constraint above.
   out by single pass as before).
 - **P3** (only if P1 shows that the along-flow difference bothers): option 3.
 - Then the default decision; while the option is off, the default fingerprints stay identical (they have no pins).
+
+### Step P1 (built 2026-11-25)
+
+Two things differ from the text above:
+
+- **Not only single pass.** `can-bus`, the view the problem was seen on, is not drawn by single pass at all (its routing
+  declarations need the completing router): without a pin it is drawn by the hierarchical pipeline, and the pin selected
+  the pipeline before that one. The option therefore applies to both: every pipeline with the hierarchical order.
+- **Bands.** They are those of the drawing the layout continues. Without one (an import with pins) the view is laid out
+  once without the pins first, which costs a second layout.
+
+As built (`crates/layout/src/pinned.rs`): the layout runs without the pins; each becomes a place of its node. The
+ranking puts the node in the rank of a sibling in the pin's band, preferring one without an edge to it, and moves other
+nodes on only where a link needs a rank between its ends (a link that now runs against the flow is reversed). After the
+placement across the flow, the node is set to its pin there, the others of its rank give way in their order, and the node
+stands after those whose middle lies before its own, as far as they fit before it. A view with any pin the option does
+not take (a container, another strategy, a reversed flow) handles all its pins as before.
+
+Measured ([pins-single-pass-20261125.md](../../benchmarks/results/pins-single-pass-20261125.md)); the results file says
+what P2 and the default decision still need.
 
 ### Open questions
 

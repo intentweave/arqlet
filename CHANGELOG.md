@@ -10,6 +10,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - `holdMemberships` (provisional, ADR 0022 M3b, off by default): the layout keeps a soft membership group whose shown members
   share a container together there, where that stays within a budget of crossings and bends. Snapshot `heldGroups`, report
   `held`. It costs a layout per group tried. Playground: *Hold groups together*.
+- Pins in the layered pipelines, behind `pinsInSinglePass` (provisional, off; ADR 0016 amendment, step P1, #174): a
+  pinned leaf of a layered area no longer takes the view off single pass, or off the hierarchical pipeline behind it.
+  The pin chooses the node's rank and its order there and holds its place across the flow; along the flow the node
+  stands in its rank's band, and the layout diagnostics say how far from the pin. Buses stay buses, and a drag that keeps
+  the pin keeps the pipeline. Pinned containers are unchanged. The playground has a checkbox for it.
 
 ### Changed
 
@@ -18,6 +23,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   children only, so nested levels no longer repeat one hull. In the SVG viewer hull names avoid each other and container
   titles, hulls of different dimensions are drawn a step apart, and marks sit at the bottom right, off the pin.
 - Playground: the membership controls are a section of their own, *Groupings*, second in the side panel.
+
+### Fixed
+
+- A released drag (`move`, `finish` with `release`) of a pinned node kept the pin on a view whose options ask for single
+  pass but whose graph it does not take (`can-bus`): the node stayed pinned where it was dropped. The pin is removed.
 
 ## 0.9.0 — 2026-11-24
 
