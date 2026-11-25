@@ -180,6 +180,80 @@ def cases():
     add("spike-17", "spike", "MATCH (n:Person) RETURN CASE WHEN n.age < 18 THEN 'minor' ELSE 'adult' END AS g ORDER BY g", "supported", lambda g: [["minor" if p["age"] < 18 else "adult"] for p in sorted(g.nodes.values(), key=lambda p: ("minor" if p["age"] < 18 else "adult"))], ["g"], ordered=True, payload=P)
     add("spike-18", "spike", "MATCH ()-[r:KNOWS {since: 2020}]->() RETURN r.id", "supported", lambda g: [[e["id"]] for e in g.of_kind("KNOWS") if e["props"].get("since") == 2020], ["r.id"], payload=P, note="a payload property on an edge, used in the pattern")
     add("spike-19", "spike", "MATCH (n:Person) RETURN n.nick", "supported", lambda g: [[None] for p in g.nodes.values() if p["kind"] == "Person"], ["n.nick"], payload=P, note="null as an output value")
+
+    # The function table and UNION (2026-11-25). `id` and `elementId` give the model's string id.
+    def people(g):
+        return [p for p in g.nodes.values() if p["kind"] == "Person"]
+
+    def per_person(fn):
+        return lambda g: [fn(p) for p in people(g)]
+
+    def edge_counts_by_type(g):
+        c = collections.Counter(e["kind"] for e in g.edges)
+        return [[k, c[k]] for k in sorted(c)]
+
+    def follows_or_null(g):
+        rows = []
+        for p in people(g):
+            follows = [e for e in g.of_kind("FOLLOWS") if e["source"] == p["id"]]
+            for e in follows:
+                m = g.nodes[e["target"]]
+                rows.append([p["name"], e["kind"], m["id"], m["name"].upper(), len(m["name"])])
+            if not follows:
+                rows.append([p["name"], None, None, None, None])
+        return rows
+
+    def known_per_person(g):
+        known = collections.defaultdict(list)
+        for e in g.of_kind("KNOWS"):
+            known[e["source"]].append(g.nodes[e["target"]]["name"])
+        return [[g.nodes[k]["name"], len(v), g.nodes[k]["name"].upper()] for k, v in known.items()]
+
+    add("fn-01", "spike", "MATCH (n:Person) RETURN id(n), elementId(n), labels(n)", "supported", per_person(lambda p: [p["id"], p["id"], [p["kind"]]]), ["id(n)", "elementId(n)", "labels(n)"], payload=P, note="a node has one label, its kind")
+    add("fn-02", "spike", "MATCH (a)-[r:FOLLOWS]->(b) RETURN id(r), type(r), id(a), id(b)", "supported", lambda g: [[e["id"], e["kind"], e["source"], e["target"]] for e in g.of_kind("FOLLOWS")], ["id(r)", "type(r)", "id(a)", "id(b)"], payload=P)
+    add("fn-03", "spike", "MATCH ()-[r]->() RETURN type(r) AS t, count(*) AS c ORDER BY t", "supported", edge_counts_by_type, ["t", "c"], ordered=True, payload=P, note="a function as a grouping key")
+    add("fn-04", "spike", "MATCH (n:Person) RETURN toUpper(n.name), toLower(n.name), size(n.name), reverse(n.name)", "supported", per_person(lambda p: [p["name"].upper(), p["name"].lower(), len(p["name"]), p["name"][::-1]]), ["toUpper(n.name)", "toLower(n.name)", "size(n.name)", "reverse(n.name)"], payload=P)
+    add("fn-05", "spike", "MATCH (n:Person) WHERE toLower(n.name) STARTS WITH 'a' RETURN n.name", "supported", lambda g: [[p["name"]] for p in people(g) if p["name"].lower().startswith("a")], ["n.name"], payload=P, note="a function in WHERE")
+    add("fn-06", "spike", "RETURN size('stra\u00dfe') AS a, toUpper('stra\u00dfe') AS b, reverse('a\u00f1b') AS c, size([1, 2, 3]) AS d, reverse([1, 2, 3]) AS e", "supported", lambda g: [[len("stra\u00dfe"), "stra\u00dfe".upper(), "a\u00f1b"[::-1], 3, [3, 2, 1]]], ["a", "b", "c", "d", "e"], payload=P, note="sizes count characters, not bytes; upper case may be longer")
+    add("fn-07", "spike", "RETURN trim('  a b  ') AS a, ltrim('  a ') AS b, rtrim(' a  ') AS c", "supported", lambda g: [["  a b  ".strip(), "  a ".lstrip(), " a  ".rstrip()]], ["a", "b", "c"], payload=P)
+    add("fn-08", "spike", "RETURN replace('banana', 'an', 'AN') AS a, replace('ab', '', '-') AS b, split('a,b,,c,', ',') AS c", "supported", lambda g: [["banana".replace("an", "AN"), "ab".replace("", "-"), "a,b,,c,".split(",")]], ["a", "b", "c"], payload=P, note="empty parts are kept")
+    add("fn-09", "spike", "RETURN substring('hello', 1) AS a, substring('hello', 1, 3) AS b, substring('hello', 9) AS c, left('hello', 2) AS d, right('hello', 2) AS e, left('hi', 9) AS f", "supported", lambda g: [["hello"[1:], "hello"[1:4], "hello"[9:], "hello"[:2], "hello"[-2:], "hi"[:9]]], ["a", "b", "c", "d", "e", "f"], payload=P, note="positions start at 0")
+    add("fn-10", "spike", "MATCH (n:Person) RETURN coalesce(n.nick, n.name, 'x') AS c", "supported", per_person(lambda p: [p.get("nick") or p["name"]]), ["c"], payload=P)
+    add("fn-11", "spike", "RETURN toString(42) AS a, toString(-1.5) AS b, toString(2.0) AS c, toString(true) AS d, toString('s') AS e", "supported", lambda g: [[str(42), str(-1.5), str(2.0), "true", "s"]], ["a", "b", "c", "d", "e"], payload=P)
+    add("fn-12", "spike", "MATCH (n:Person) OPTIONAL MATCH (n)-[r:FOLLOWS]->(m) RETURN n.name, type(r), id(m), toUpper(m.name), size(m.name)", "supported", follows_or_null, ["n.name", "type(r)", "id(m)", "toUpper(m.name)", "size(m.name)"], payload=P, note="a function of null is null")
+    add("fn-13", "spike", "MATCH (a:Person)-[:KNOWS]->(b) RETURN a.name, size(collect(b.name)) AS n, toUpper(a.name) AS u", "supported", known_per_person, ["a.name", "n", "u"], payload=P, note="a function around an aggregate, beside a function that groups")
+    add("fn-14", "spike", "MATCH (n:Person) RETURN collect(toLower(n.name)) AS l", "supported", lambda g: [[[p["name"].lower() for p in people(g)]]], ["l"], payload=P, note="a function inside an aggregate")
+    add("fn-15", "spike", "MATCH (n:Person) RETURN coalesce(sum(n.missing), 0) + count(*) AS x", "supported", lambda g: [[0 + len(people(g))]], ["x"], payload=P)
+    add("fn-16", "spike", "RETURN toUpper(null) AS a, size(null) AS b, replace('a', null, 'b') AS c, substring(null, 1) AS d, split(null, ',') AS e, coalesce(null, null) AS f", "supported", lambda g: [[None] * 6], ["a", "b", "c", "d", "e", "f"], payload=P)
+    add("fn-17", "spike", "MATCH (n:Person) RETURN n.name ORDER BY size(n.name), toLower(n.name) DESC", "supported", lambda g: [[p["name"]] for p in sorted(sorted(people(g), key=lambda p: p["name"].lower(), reverse=True), key=lambda p: len(p["name"]))], ["n.name"], ordered=True, payload=P, note="functions as sort keys")
+    add("fn-18", "spike", "RETURN toInteger('1') AS x", "rejected", error="unsupported", note="not in the function table")
+
+    def older(g, limit):
+        return [p["name"] for p in people(g) if p["age"] > limit]
+
+    def younger(g, limit):
+        return [p["name"] for p in people(g) if p["age"] < limit]
+
+    def distinct(rows):
+        out = []
+        for row in rows:
+            if row not in out:
+                out.append(row)
+        return out
+
+    def known_or_followed(g):
+        rows = [[g.nodes[e["target"]]["name"], "known"] for e in g.of_kind("KNOWS")]
+        rows += [[g.nodes[e["target"]]["name"], "followed"] for e in g.of_kind("FOLLOWS")]
+        return distinct(rows)
+
+    BOTH = "MATCH (n:Person) WHERE n.age > 28 RETURN n.name AS x {} MATCH (n:Person) WHERE n.age < 35 RETURN n.name AS x"
+    add("union-01", "spike", BOTH.format("UNION"), "supported", lambda g: distinct([[n] for n in older(g, 28) + younger(g, 35)]), ["x"], payload=P, note="Ann is in both parts and comes once")
+    add("union-02", "spike", BOTH.format("UNION ALL"), "supported", lambda g: [[n] for n in older(g, 28) + younger(g, 35)], ["x"], payload=P, note="Ann comes twice")
+    add("union-03", "spike", "RETURN 1 AS x UNION ALL RETURN 2 AS x UNION ALL RETURN 1 AS x", "supported", lambda g: [[1], [2], [1]], ["x"], payload=P, note="three parts")
+    add("union-04", "spike", "MATCH (a)-[:KNOWS]->(b) RETURN b.name AS name, 'known' AS how UNION MATCH (a)-[:FOLLOWS]->(b) RETURN b.name AS name, 'followed' AS how", "supported", known_or_followed, ["name", "how"], payload=P, note="UNION also removes the duplicates within one part")
+    add("union-05", "spike", "MATCH (n:Person) RETURN n.name AS x ORDER BY n.age DESC LIMIT 1 UNION ALL MATCH (n:Person) RETURN n.name AS x ORDER BY n.age LIMIT 1", "supported", lambda g: [[max(people(g), key=lambda p: p["age"])["name"]], [min(people(g), key=lambda p: p["age"])["name"]]], ["x"], payload=P, note="ORDER BY and LIMIT belong to their part")
+    add("union-06", "spike", "MATCH ()-[r:KNOWS]->() RETURN count(r) AS c UNION ALL MATCH ()-[r:FOLLOWS]->() RETURN count(r) AS c", "supported", lambda g: [[len(g.of_kind("KNOWS"))], [len(g.of_kind("FOLLOWS"))]], ["c"], payload=P)
+    add("union-07", "spike", "MATCH (n:Person) RETURN n.nick AS x UNION RETURN null AS x", "supported", lambda g: [[None]], ["x"], payload=P, note="null is a duplicate of null")
     return C
 
 

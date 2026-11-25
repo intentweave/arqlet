@@ -194,25 +194,6 @@ fn payload_value(map: Option<&BTreeMap<String, Value>>, key: &str) -> Value {
     map.and_then(|m| m.get(key)).cloned().unwrap_or(Value::Null)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_payload_key_named_like_a_virtual_property_is_refused() {
-        for part in ["nodes", "edges"] {
-            for key in VIRTUAL_KEYS {
-                let json = serde_json::json!({part: {"x": {"loc": 1, key: "other"}}});
-                let error = Payload::from_json(&json).unwrap_err();
-                assert!(error.contains(&format!("`{key}`")), "{error}");
-            }
-        }
-        // Only these names: others, also in another case, are the host's.
-        let json = serde_json::json!({"nodes": {"x": {"Label": 1, "parent": 2}}});
-        assert!(Payload::from_json(&json).is_ok());
-    }
-}
-
 impl GraphStore for ModelStore<'_> {
     fn node_count(&self) -> usize {
         self.graph.nodes.len()
@@ -292,5 +273,24 @@ impl GraphStore for ModelStore<'_> {
                 merged
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_payload_key_named_like_a_virtual_property_is_refused() {
+        for part in ["nodes", "edges"] {
+            for key in VIRTUAL_KEYS {
+                let json = serde_json::json!({part: {"x": {"loc": 1, key: "other"}}});
+                let error = Payload::from_json(&json).unwrap_err();
+                assert!(error.contains(&format!("`{key}`")), "{error}");
+            }
+        }
+        // Only these names: others, also in another case, are the host's.
+        let json = serde_json::json!({"nodes": {"x": {"Label": 1, "parent": 2}}});
+        assert!(Payload::from_json(&json).is_ok());
     }
 }

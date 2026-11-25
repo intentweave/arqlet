@@ -5,6 +5,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+- **Query layer: functions and `UNION`** (ADR 0021, provisional): `id`, `elementId`, `type`, `labels`, `size`,
+  `coalesce`, `toString`, `toUpper`, `toLower`, `trim`, `ltrim`, `rtrim`, `replace`, `substring`, `left`, `right`,
+  `split`, `reverse`, and `UNION [ALL]`. `id` gives the model's string id. The query module grows by 2.2 % (gzip 2.4 %,
+  `benchmarks/results/query-functions-20261125.md`). For users of `arqlet-query` as a library: `plan::Expr` has the new
+  variant `Call`, `plan::Op` the new variant `Union`.
+- **Changed (query layer):** a computed value (text or list) holds at most 16 MiB; beyond it a query stops with a limit
+  error. Before, a short query could double a value until memory ran out.
 - **`@arqlet/query`** (new npm package, provisional): the query-only WASM module with a loader and types — read-only
   openCypher queries over an Arqlet graph in the browser and Node, without the layout engine (1.08 MB, 0.34 MB gzip;
   `benchmarks/results/query-npm-20261125.md`). ADR 0021, M5c.

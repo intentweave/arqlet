@@ -9,17 +9,18 @@
 //! refusal.
 
 use arqlet_query::plan::{
-    AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Op, Plan, SortKey,
+    AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Function, Op, Plan, SortKey,
 };
 use arqlet_query::Direction;
 use arqlet_query::{QueryError, Value};
 use decypher::hir::arena::ExprId;
 use decypher::hir::arena::HirArenas;
 use decypher::hir::expr::{BinaryOp, ComparisonOperator, ExprKind, Literal, UnaryOp};
-use decypher::hir::ops::{AggregateItem, Operation, SortDirection};
+use decypher::hir::ops::{AggregateItem, Operation, SortDirection, UnionOp};
 use decypher::hir::pattern::{
     GraphPattern, LabelExpr, NodePattern, RelationshipDirection, RelationshipLength,
 };
+use decypher::hir::HirQuery;
 use decypher::syntax::{SyntaxKind as K, SyntaxNode};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -28,6 +29,59 @@ pub fn lower(query: &str) -> Result<Plan, QueryError> {
     crate::check(query)?;
     let hir = decypher::analyze(query).map_err(|e| QueryError::syntax(e.to_string()))?;
     let tree = decypher::parse_cst(query).tree;
+    // The `RETURN` clauses in the order written: one for each part of a `UNION`, the last one for any other query.
+    let returns: Vec<SyntaxNode> = tree
+        .descendants()
+        .filter(|n| n.kind() == K::RETURN_CLAUSE)
+        .collect();
+    if let [part] = hir.parts.as_slice() {
+        if let [Operation::Union(u)] = part.operations.as_slice() {
+            return union(u, &returns);
+        }
+    }
+    single(&hir, returns.last())
+}
+
+/// `UNION [ALL]`: every branch is a query of its own, with its own variables.
+fn union(u: &UnionOp, returns: &[SyntaxNode]) -> Result<Plan, QueryError> {
+    if u.branches.len() != returns.len() {
+        return Err(QueryError::unsupported(
+            "cannot match the parts of this UNION to their RETURN clauses",
+        ));
+    }
+    let branches = u
+        .branches
+        .iter()
+        .zip(returns)
+        .map(|(query, clause)| single(query, Some(clause)))
+        .collect::<Result<Vec<Plan>, _>>()?;
+    let names = |p: &Plan| p.columns.iter().map(|c| c.name.clone()).collect::<Vec<_>>();
+    let Some(first) = branches.first().map(names) else {
+        return Err(QueryError::unsupported("a UNION without parts"));
+    };
+    // decypher refuses different names; the same names in another order it accepts, and rows are matched by position.
+    if branches.iter().any(|b| names(b) != first) {
+        return Err(QueryError::unsupported(
+            "the parts of a UNION must return the same columns in the same order",
+        ));
+    }
+    let columns: Vec<Column> = first
+        .into_iter()
+        .enumerate()
+        .map(|(slot, name)| Column { name, slot })
+        .collect();
+    Ok(Plan {
+        slots: columns.len(),
+        ops: vec![Op::Union {
+            branches,
+            distinct: u.distinct,
+        }],
+        columns,
+    })
+}
+
+/// A query without `UNION`, with the `RETURN` clause that names its columns.
+fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryError> {
     let slots = hir.arenas.bindings.iter().count();
     let mut lowering = Lowering {
         arenas: &hir.arenas,
@@ -43,7 +97,7 @@ pub fn lower(query: &str) -> Result<Plan, QueryError> {
             lowering.op(op)?;
         }
     }
-    let columns = lowering.columns(&tree)?;
+    let columns = lowering.columns(returning)?;
     if lowering.distinct_return {
         let slots = columns.iter().map(|c| c.slot).collect();
         lowering.ops.push(Op::Distinct(slots));
@@ -70,10 +124,6 @@ struct Lowering<'a> {
 
 /// The label and the `{key: value}` constraints of a node pattern.
 type Constraints = (Option<String>, Vec<(String, Expr)>);
-
-fn not_yet(what: &str, stage: &str) -> QueryError {
-    QueryError::unsupported(format!("{what} is not built yet ({stage} of ADR 0021)"))
-}
 
 impl Lowering<'_> {
     fn op(&mut self, op: &Operation) -> Result<(), QueryError> {
@@ -196,7 +246,9 @@ impl Lowering<'_> {
                 self.distinct_return = r.distinct;
                 Ok(())
             }
-            Operation::Union(_) => Err(not_yet("UNION", "stage M4")),
+            Operation::Union(_) => Err(QueryError::unsupported(
+                "a UNION inside a query is not supported",
+            )),
             other => Err(QueryError::unsupported(format!(
                 "the operation {} is not supported",
                 format!("{other:?}")
@@ -469,6 +521,15 @@ impl Lowering<'_> {
                 }
                 Expr::Compare(Box::new(self.expr(*left)?), chain)
             }
+            ExprKind::FunctionCall {
+                function,
+                args,
+                distinct,
+            } => self.call(
+                self.arenas.functions.name_of(*function).unwrap_or(""),
+                args,
+                *distinct,
+            )?,
             ExprKind::IsNull { operand, negated } => {
                 Expr::IsNull(Box::new(self.expr(*operand)?), *negated)
             }
@@ -560,9 +621,47 @@ impl Lowering<'_> {
         })
     }
 
-    /// The columns of the answer, in the order the last `RETURN` writes them, matched to the aliases of the last part.
-    fn columns(&self, tree: &SyntaxNode) -> Result<Vec<Column>, QueryError> {
-        let names = return_names(tree)?;
+    /// A scalar function call. Aggregates are not expressions here: the HIR takes them out of a projection, so one that
+    /// is left stands where none may stand.
+    fn call(&self, name: &str, args: &[ExprId], distinct: bool) -> Result<Expr, QueryError> {
+        let lower = name.to_ascii_lowercase();
+        if matches!(
+            lower.as_str(),
+            "avg" | "collect" | "count" | "max" | "min" | "sum"
+        ) {
+            return Err(QueryError::syntax(format!(
+                "the aggregate `{name}` is only allowed in RETURN and WITH"
+            )));
+        }
+        let function = scalar(&lower).ok_or_else(|| {
+            QueryError::unsupported(format!(
+                "the function `{name}` is not in the function table"
+            ))
+        })?;
+        if distinct {
+            return Err(QueryError::syntax(format!(
+                "DISTINCT is for aggregates, not for `{name}`"
+            )));
+        }
+        let (fewest, most) = function.arity();
+        if args.len() < fewest || args.len() > most {
+            return Err(QueryError::syntax(format!(
+                "`{}` does not take {} arguments",
+                function.name(),
+                args.len()
+            )));
+        }
+        Ok(Expr::Call(
+            function,
+            args.iter()
+                .map(|a| self.expr(*a))
+                .collect::<Result<_, _>>()?,
+        ))
+    }
+
+    /// The columns of the answer, in the order the `RETURN` writes them, matched to the aliases of the last part.
+    fn columns(&self, returning: Option<&SyntaxNode>) -> Result<Vec<Column>, QueryError> {
+        let names = return_names(returning)?;
         names
             .into_iter()
             .map(|name| match self.aliases.get(&name) {
@@ -591,12 +690,33 @@ fn cmp(op: ComparisonOperator) -> Result<CmpOp, QueryError> {
     })
 }
 
-/// The names of the columns of the last `RETURN`, in the order written: the alias after `AS`, else the text of the item.
-fn return_names(tree: &SyntaxNode) -> Result<Vec<String>, QueryError> {
-    let clause = tree
-        .descendants()
-        .filter(|n| n.kind() == K::RETURN_CLAUSE)
-        .last()
+/// The scalar function of a name in lower case.
+fn scalar(name: &str) -> Option<Function> {
+    Some(match name {
+        "id" | "elementid" => Function::Id,
+        "type" => Function::Type,
+        "labels" => Function::Labels,
+        "size" => Function::Size,
+        "coalesce" => Function::Coalesce,
+        "tostring" => Function::ToString,
+        "toupper" => Function::ToUpper,
+        "tolower" => Function::ToLower,
+        "trim" => Function::Trim,
+        "ltrim" => Function::LTrim,
+        "rtrim" => Function::RTrim,
+        "replace" => Function::Replace,
+        "substring" => Function::Substring,
+        "left" => Function::Left,
+        "right" => Function::Right,
+        "split" => Function::Split,
+        "reverse" => Function::Reverse,
+        _ => return None,
+    })
+}
+
+/// The names of the columns of a `RETURN`, in the order written: the alias after `AS`, else the text of the item.
+fn return_names(returning: Option<&SyntaxNode>) -> Result<Vec<String>, QueryError> {
+    let clause = returning
         .ok_or_else(|| QueryError::unsupported("a query without RETURN has no columns"))?;
     let items = clause
         .descendants()
@@ -627,5 +747,21 @@ fn unquote(text: &str) -> String {
     match text.strip_prefix('`').and_then(|t| t.strip_suffix('`')) {
         Some(inner) => inner.replace("``", "`"),
         None => text.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_function_of_the_table_is_an_aggregate_or_has_a_lowering() {
+        for name in crate::FUNCTIONS {
+            let aggregate = matches!(*name, "avg" | "collect" | "count" | "max" | "min" | "sum");
+            assert_ne!(aggregate, scalar(name).is_some(), "{name}");
+        }
+        for name in ["id", "elementid", "type", "labels", "size", "coalesce"] {
+            assert!(crate::FUNCTIONS.contains(&name), "{name}");
+        }
     }
 }

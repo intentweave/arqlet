@@ -9,7 +9,10 @@
 //! order; `collect` keeps input order; a result that would be `NaN` is an error until its rules are decided in the
 //! fixtures. Mixed-type ordering and the comparison of an integer with a float beyond 2^53 are provisional.
 
-use crate::plan::{AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Op, Plan, SortKey};
+use crate::functions::{self, weight};
+use crate::plan::{
+    AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Function, Op, Plan, SortKey,
+};
 use crate::store::GraphStore;
 use crate::value::{EdgeId, NodeId, Value};
 use crate::QueryError;
@@ -74,16 +77,7 @@ struct Run<'a> {
 
 impl Run<'_> {
     fn run(&mut self, plan: &Plan) -> Result<ResultSet, QueryError> {
-        let mut rows: Vec<Row> = vec![vec![Value::Null; self.slots]];
-        for op in &plan.ops {
-            rows = self.apply(op, rows)?;
-            if rows.len() > self.limits.max_rows {
-                return Err(QueryError::limit(format!(
-                    "stopped: more than {} rows (the row limit) after {} steps",
-                    self.limits.max_rows, self.steps
-                )));
-            }
-        }
+        let rows = self.rows(plan)?;
         Ok(ResultSet {
             columns: plan.columns.iter().map(|c| c.name.clone()).collect(),
             rows: rows
@@ -96,6 +90,51 @@ impl Run<'_> {
                 })
                 .collect(),
         })
+    }
+
+    /// The rows after the last operation of `plan`.
+    fn rows(&mut self, plan: &Plan) -> Result<Vec<Row>, QueryError> {
+        let mut rows: Vec<Row> = vec![vec![Value::Null; self.slots]];
+        for op in &plan.ops {
+            rows = self.apply(op, rows)?;
+            self.within_row_limit(rows.len())?;
+        }
+        Ok(rows)
+    }
+
+    fn within_row_limit(&self, rows: usize) -> Result<(), QueryError> {
+        if rows > self.limits.max_rows {
+            return Err(QueryError::limit(format!(
+                "stopped: more than {} rows (the row limit) after {} steps",
+                self.limits.max_rows, self.steps
+            )));
+        }
+        Ok(())
+    }
+
+    /// `UNION`: every branch under the same budget, one after the other.
+    fn union(&mut self, branches: &[Plan], distinct: bool) -> Result<Vec<Row>, QueryError> {
+        let slots = self.slots;
+        let mut seen = HashSet::new(); // only to find a row seen before; never iterated
+        let mut out: Vec<Row> = Vec::new();
+        for branch in branches {
+            self.slots = branch.slots;
+            let rows = self.rows(branch);
+            self.slots = slots;
+            for row in rows? {
+                self.tick(1)?;
+                let mut next = vec![Value::Null; slots];
+                for (to, column) in next.iter_mut().zip(&branch.columns) {
+                    *to = row[column.slot].clone();
+                }
+                if distinct && !seen.insert(group_key(next.iter())) {
+                    continue;
+                }
+                out.push(next);
+                self.within_row_limit(out.len())?;
+            }
+        }
+        Ok(out)
     }
 
     fn tick(&mut self, n: usize) -> Result<(), QueryError> {
@@ -262,6 +301,7 @@ impl Run<'_> {
                 let n = self.count(expr, "LIMIT")?;
                 Ok(rows.into_iter().take(n).collect())
             }
+            Op::Union { branches, distinct } => self.union(branches, *distinct),
         }
     }
 
@@ -510,12 +550,19 @@ impl Run<'_> {
                     )))
                 }
             },
-            Expr::List(items) => Value::List(
-                items
-                    .iter()
-                    .map(|e| self.eval(e, row))
-                    .collect::<Result<_, _>>()?,
-            ),
+            Expr::List(items) => {
+                // Weighed item by item: the list is refused before it holds much more than the limit.
+                let mut values = Vec::with_capacity(items.len());
+                let mut bytes = 16u64;
+                for item in items {
+                    let value = self.eval(item, row)?;
+                    bytes = bytes.saturating_add(weight(&value) as u64);
+                    functions::fits(bytes)?;
+                    values.push(value);
+                }
+                Value::List(values)
+            }
+            Expr::Call(function, args) => self.call(*function, args, row)?,
             Expr::Not(x) => match truth(&self.eval(x, row)?, "NOT")? {
                 None => Value::Null,
                 Some(b) => Value::Bool(!b),
@@ -607,6 +654,44 @@ impl Run<'_> {
                 }
             }
         })
+    }
+
+    fn call(&self, function: Function, args: &[Expr], row: &Row) -> Result<Value, QueryError> {
+        if function == Function::Coalesce {
+            for arg in args {
+                let value = self.eval(arg, row)?;
+                if !value.is_null() {
+                    return Ok(value);
+                }
+            }
+            return Ok(Value::Null);
+        }
+        let values = args
+            .iter()
+            .map(|a| self.eval(a, row))
+            .collect::<Result<Vec<_>, _>>()?;
+        let wrong = |wanted: &str, got: &Value| {
+            QueryError::runtime(format!(
+                "`{}` expects {wanted}, not a {}",
+                function.name(),
+                got.kind()
+            ))
+        };
+        match (function, values.as_slice()) {
+            (Function::Id | Function::Type | Function::Labels, [Value::Null]) => Ok(Value::Null),
+            (Function::Id, [Value::Node(n)]) => Ok(self.store.node_property(*n, "id")),
+            (Function::Id, [Value::Edge(e)]) => Ok(self.store.edge_property(*e, "id")),
+            (Function::Id, [other]) => Err(wrong("a node or a relationship", other)),
+            (Function::Type, [Value::Edge(e)]) => {
+                Ok(Value::String(self.store.edge_type(*e).to_string()))
+            }
+            (Function::Type, [other]) => Err(wrong("a relationship", other)),
+            (Function::Labels, [Value::Node(n)]) => Ok(Value::List(vec![Value::String(
+                self.store.node_label(*n).to_string(),
+            )])),
+            (Function::Labels, [other]) => Err(wrong("a node", other)),
+            _ => functions::call(function, values),
+        }
     }
 
     fn binary(&self, op: BinOp, a: &Expr, b: &Expr, row: &Row) -> Result<Value, QueryError> {
@@ -879,6 +964,7 @@ fn arithmetic(op: BinOp, l: Value, r: Value) -> Result<Value, QueryError> {
             })
         }
         (Value::String(x), Value::String(y)) if op == BinOp::Add => {
+            functions::fits(x.len() as u64 + y.len() as u64)?;
             Ok(Value::String(format!("{x}{y}")))
         }
         _ => Err(QueryError::runtime(format!(

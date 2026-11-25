@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
-const MIN_PASSING: usize = 40;
+const MIN_PASSING: usize = 64;
 
 fn fixture(path: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

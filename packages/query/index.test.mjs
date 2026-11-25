@@ -36,6 +36,16 @@ test('the example of the README gives the answer it shows', {skip}, async () => 
   assert.ok(readme.includes("// answer.rows: [['main', {node: 'parse'}, 120]]"));
 });
 
+test('functions and UNION answer through the package', {skip}, async () => {
+  const engine = await loadQueryEngine(wasm);
+  engine.load(graph);
+  const answer = engine.query(
+    "MATCH (n:fn) RETURN toUpper(n.label) AS x, id(n) AS i UNION ALL MATCH ()-[r]->() RETURN type(r) AS x, id(r) AS i");
+  assert.deepEqual(answer.rows, [['MAIN', 'main'], ['PARSE', 'parse'], ['calls', 'e1']]);
+  assert.match(engine.query("WITH 'aaaaaaaaaaaaaaaa' AS a" + ' WITH a + a AS a'.repeat(40) + ' RETURN a').error, /value limit/);
+  assert.deepEqual(engine.query('RETURN 1 AS one').rows, [[1]], 'the engine goes on after a limit');
+});
+
 test('errors are answers, and a refused load keeps what was loaded', {skip}, async () => {
   const engine = await loadQueryEngine(wasm);
   assert.equal(engine.query('MATCH (n) RETURN n').ok, false, 'nothing loaded');
