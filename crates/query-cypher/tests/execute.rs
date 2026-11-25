@@ -11,7 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// How many of the supported cases pass today. Raised by every stage that makes more of them pass.
-const MIN_PASSING: usize = 40;
+const MIN_PASSING: usize = 80;
 
 fn fixture(path: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -29,7 +29,12 @@ fn json_value(v: &serde_json::Value) -> Value {
             .map_or_else(|| Value::Float(n.as_f64().unwrap_or(f64::NAN)), Value::Int),
         serde_json::Value::String(s) => Value::String(s.clone()),
         serde_json::Value::Array(items) => Value::List(items.iter().map(json_value).collect()),
-        serde_json::Value::Object(_) => Value::Null, // maps are not values of this layer yet
+        serde_json::Value::Object(entries) => Value::Map(
+            entries
+                .iter()
+                .map(|(k, v)| (k.clone(), json_value(v)))
+                .collect(),
+        ),
     }
 }
 
@@ -157,6 +162,10 @@ fn to_json(v: &Value) -> serde_json::Value {
         Value::Float(f) => serde_json::json!(f),
         Value::String(s) => serde_json::json!(s),
         Value::List(items) => serde_json::Value::Array(items.iter().map(to_json).collect()),
+        Value::Map(entries) => serde_json::json!({ "map": entries
+            .iter()
+            .map(|(k, v)| (k.clone(), to_json(v)))
+            .collect::<serde_json::Map<_, _>>() }),
         Value::Node(n) => serde_json::json!(format!("node {}", n.0)),
         Value::Edge(e) => serde_json::json!(format!("edge {}", e.0)),
     }
@@ -227,4 +236,191 @@ fn the_supported_cases_get_the_oracles_rows() {
         passing.len(),
         pending.join(" ")
     );
+}
+
+/// Rows of a query over the spike graph, as JSON, or the error's class and message.
+fn spike(query: &str) -> Result<serde_json::Value, (ErrorClass, String)> {
+    let store = JsonStore::load("spike", Some("spike"));
+    run(query, &store, &BTreeMap::new(), Limits::default())
+        .map(|r| {
+            serde_json::Value::Array(
+                r.rows
+                    .iter()
+                    .map(|row| serde_json::Value::Array(row.iter().map(to_json).collect()))
+                    .collect(),
+            )
+        })
+        .map_err(|e| (e.class, e.message))
+}
+
+fn refused(query: &str) -> ErrorClass {
+    match spike(query) {
+        Ok(rows) => panic!("{query} was answered: {rows}"),
+        Err((class, _)) => class,
+    }
+}
+
+#[test]
+fn functions_and_union_refuse_what_they_must() {
+    for query in [
+        "RETURN size() AS x",
+        "RETURN size(1, 2) AS x",
+        "RETURN size(DISTINCT [1]) AS x",
+        "MATCH (n) WHERE count(n) > 1 RETURN n",
+        "MATCH (n) RETURN type(n) AS x",
+        "RETURN 1 AS x UNION RETURN 2 AS y",
+        "RETURN 1 AS x UNION RETURN 2 AS x UNION ALL RETURN 3 AS x",
+    ] {
+        assert_eq!(refused(query), ErrorClass::Syntax, "{query}");
+    }
+    for query in [
+        "MATCH (n) RETURN length(n.name) AS x",
+        "RETURN apoc.text.join([1]) AS x",
+        // The same names in another order: rows are matched by position, so this is refused, not misaligned.
+        "RETURN 1 AS x, 2 AS y UNION RETURN 2 AS y, 3 AS x",
+        "RETURN 1 AS x UNION CREATE (n) RETURN n AS x",
+    ] {
+        assert_eq!(refused(query), ErrorClass::Unsupported, "{query}");
+    }
+    // Wrong values that only the execution sees.
+    for query in [
+        "MATCH (n) RETURN toUpper(n.age) AS x",
+        "MATCH (n) RETURN substring(n.name, -1) AS x",
+        "RETURN toString(10000000.0) AS x",
+    ] {
+        assert_eq!(refused(query), ErrorClass::Runtime, "{query}");
+    }
+}
+
+#[test]
+fn function_names_ignore_case_and_coalesce_stops_at_the_first_value() {
+    assert_eq!(
+        spike("MATCH (n {name: 'Ann'}) RETURN TOUPPER(n.name), Size(n.name), ElementID(n)"),
+        Ok(serde_json::json!([["ANN", 3, "ann"]]))
+    );
+    // The second argument would be an error (a number has no upper case); it is not evaluated.
+    assert_eq!(
+        spike("MATCH (n {name: 'Ann'}) RETURN coalesce(n.name, toUpper(n.age)) AS x"),
+        Ok(serde_json::json!([["Ann"]]))
+    );
+}
+
+#[test]
+fn order_by_after_an_aggregation_may_name_a_grouping_expression() {
+    assert_eq!(
+        spike("MATCH (a)-[:KNOWS]->(b) RETURN a.name AS n, count(*) AS c ORDER BY a.name DESC"),
+        Ok(serde_json::json!([["Cid", 2], ["Bob", 1], ["Ann", 3]]))
+    );
+}
+
+#[test]
+fn a_value_that_doubles_stops_at_the_value_limit() {
+    let text = format!(
+        "WITH 'aaaaaaaaaaaaaaaa' AS a{} RETURN size(a) AS s",
+        " WITH a + a AS a".repeat(40)
+    );
+    let list = format!(
+        "WITH [1] AS a{} RETURN size(a) AS s",
+        " WITH [a, a] AS a".repeat(60)
+    );
+    let replaced = format!(
+        "RETURN {}'a'{} AS s",
+        "replace(".repeat(60),
+        ", 'a', 'aaaaaaaaaa')".repeat(60)
+    );
+    let collected = format!(
+        "WITH 'aaaaaaaaaaaaaaaa' AS a{} RETURN size(a) AS s",
+        " UNWIND [1, 2] AS i WITH collect(a) AS a".repeat(22)
+    );
+    for query in [text, list, replaced, collected] {
+        let (class, message) = spike(&query).unwrap_err();
+        assert_eq!(class, ErrorClass::Limit, "{message}");
+        assert!(message.contains("value limit"), "{message}");
+    }
+}
+
+/// A grouping expression may be used beside an aggregate, wherever it stands: the HIR rewrites it in some places only,
+/// and elsewhere it read a variable that the aggregation had emptied.
+#[test]
+fn a_grouping_expression_keeps_its_value_beside_an_aggregate() {
+    for (query, rows) in [
+        (
+            "MATCH (a)-[:KNOWS]->(b) RETURN a.name AS n, [a.name, count(*)] AS l ORDER BY n",
+            serde_json::json!([["Ann", ["Ann", 3]], ["Bob", ["Bob", 1]], ["Cid", ["Cid", 2]]]),
+        ),
+        (
+            "MATCH (a)-[:KNOWS]->(b) RETURN a.name AS n, a.name + '!' + toString(count(*)) AS s ORDER BY n",
+            serde_json::json!([["Ann", "Ann!3"], ["Bob", "Bob!1"], ["Cid", "Cid!2"]]),
+        ),
+        (
+            "MATCH (a)-[:KNOWS]->(b) WITH a AS who, [a.name, count(*)] AS l RETURN l ORDER BY who.name",
+            serde_json::json!([[["Ann", 3]], [["Bob", 1]], [["Cid", 2]]]),
+        ),
+    ] {
+        assert_eq!(spike(query), Ok(rows), "{query}");
+    }
+}
+
+#[test]
+fn a_variable_without_a_value_is_refused_not_read_as_null() {
+    // A property read inside the pattern that binds the variable.
+    for query in [
+        "MATCH (n {name: n.name}) RETURN n",
+        "MATCH (a)-[r:KNOWS {since: b.age}]->(b) RETURN b",
+    ] {
+        assert_eq!(refused(query), ErrorClass::Unsupported, "{query}");
+    }
+}
+
+/// After a projection the parser replaces text that reads like a projected item, also inside a comprehension that means
+/// its own variable by it: such a name is refused instead of answered from the column.
+#[test]
+fn a_comprehension_variable_may_not_be_named_like_a_variable_outside() {
+    for query in [
+        "UNWIND [1, 2] AS x WITH x, count(*) AS c WHERE [x IN [7] | x][0] = 7 RETURN x, c",
+        "UNWIND [1, 2] AS x RETURN DISTINCT x ORDER BY [x IN [0] | x][0], x DESC",
+        "MATCH (a:Person) RETURN a.name AS n, count(*) AS c ORDER BY [a IN [{name: 'z'}] | a.name], n DESC",
+        "WITH 7 AS x RETURN [x IN [1, 2] | x] AS l, x",
+    ] {
+        assert_eq!(refused(query), ErrorClass::Unsupported, "{query}");
+    }
+    // Comprehensions may share a name among themselves, nested or side by side.
+    assert_eq!(
+        spike("RETURN [x IN [1] | x] + [x IN [2] | [x IN [x] | x * 10]] AS l"),
+        Ok(serde_json::json!([[[1, [20]]]]))
+    );
+}
+
+#[test]
+fn a_bound_relationship_variable_holds_a_later_match_to_its_edge() {
+    for (query, count) in [
+        // Six KNOWS edges, and each `r` can match only itself.
+        ("MATCH (a)-[r:KNOWS]->(b) WITH r, a MATCH (a)-[r]->(c) RETURN count(*)", 6),
+        ("MATCH ()-[r:FOLLOWS]->() MATCH (x)-[r]-(y) RETURN count(*)", 2),
+        // The end that does not fit the bound edge gives nothing.
+        ("MATCH (a)-[r:FOLLOWS]->(b) MATCH (b)-[r]->(c) RETURN count(*)", 0),
+        // The list of a variable-length path binds the same way.
+        (
+            "MATCH (a {name: 'Dee'})-[p:FOLLOWS|KNOWS*2]->(b) WITH a, p MATCH (a)-[p*2]->(c) RETURN count(*)",
+            3,
+        ),
+    ] {
+        assert_eq!(spike(query), Ok(serde_json::json!([[count]])), "{query}");
+    }
+}
+
+#[test]
+fn a_node_written_before_a_relationship_can_be_read_by_its_properties() {
+    for (query, count) in [
+        (
+            "MATCH (a:Person), (b:Person {name: a.name}) RETURN count(*)",
+            4,
+        ),
+        (
+            "MATCH (a:Person), (b:Person {name: a.name})-[:KNOWS]->(c) RETURN count(*)",
+            6,
+        ),
+    ] {
+        assert_eq!(spike(query), Ok(serde_json::json!([[count]])), "{query}");
+    }
 }

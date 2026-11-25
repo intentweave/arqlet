@@ -11,8 +11,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   share a container together there, where that stays within a budget of crossings and bends. Snapshot `heldGroups`, report
   `held`. It costs a layout per group tried. Playground: *Hold groups together*.
 - **`@arqlet/query`** (new npm package, provisional): the query-only WASM module with a loader and types — read-only
-  openCypher queries over an Arqlet graph in the browser and Node, without the layout engine (1.08 MB, 0.34 MB gzip;
-  `benchmarks/results/query-npm-20261125.md`). ADR 0021, M5c.
+  openCypher queries over an Arqlet graph in the browser and Node, without the layout engine (1.16 MB, 0.37 MB gzip;
+  `benchmarks/results/query-merged-20261125.md`). ADR 0021, M5c.
+- **Query layer: functions and `UNION`** (ADR 0021, provisional): `id`, `elementId`, `type`, `labels`, `size`,
+  `coalesce`, `toString`, `toUpper`, `toLower`, `trim`, `ltrim`, `rtrim`, `replace`, `substring`, `left`, `right`,
+  `split`, `reverse`, and `UNION [ALL]`. `id` gives the model's string id. The query module grows by 2.2 % (gzip 2.4 %,
+  `benchmarks/results/query-functions-20261125.md`). For users of `arqlet-query` as a library: `plan::Expr` has the new
+  variant `Call`, `plan::Op` the new variant `Union`.
+- **Query layer: maps and list expressions** (ADR 0021, provisional): map literals, list comprehension, `list[i]`,
+  `list[from..to]`, `map['key']` and `+` on lists. The query module grows by 4.6 % (gzip 5.7 %,
+  `benchmarks/results/query-expressions-20261125.md`). For users of `arqlet-query`: `Value` has the new variant `Map`,
+  `plan::Expr` the variants `Map`, `Index`, `Slice` and `Comprehension`.
 - Pins in the layered pipelines, behind `pinsInSinglePass` (provisional, off; ADR 0016 amendment, step P1, #174): a
   pinned leaf of a layered area no longer takes the view off single pass, or off the hierarchical pipeline behind it.
   The pin chooses the node's rank and its order there and holds its place across the flow; along the flow the node
@@ -26,9 +35,27 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   children only, so nested levels no longer repeat one hull. In the SVG viewer hull names avoid each other and container
   titles, hulls of different dimensions are drawn a step apart, and marks sit at the bottom right, off the pin.
 - Playground: the membership controls are a section of their own, *Groupings*, second in the side panel.
+- **Query layer:** a map in a payload, in a session's content or in a parameter is a map; before, the payload
+  and parameters refused it and the engine's query read it as null (`skippedValues`). In a JSON answer a map is
+  `{"map": {…}}`.
+- **Query layer:** a computed value (text or list) holds at most 16 MiB; beyond it a query stops with a limit
+  error. Before, a short query could double a value until memory ran out.
 
 ### Fixed
 
+- **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
+  null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
+  wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that
+  names a variable the pattern binds itself) is refused as unsupported instead of answered with null.
+- **Query layer, wrong answers in 0.8.0 and 0.9.0:** a relationship variable bound by an earlier clause did not
+  constrain a later `MATCH`: `MATCH (a)-[r]->(b) WITH r, a MATCH (a)-[r]->(c)` matched every edge of `a`. It matches the
+  bound edge (or the bound list of a variable-length path) only. For users of `arqlet-query`: `plan::Expand` has the new
+  field `rel_bound`.
+- **Query layer:** `collect` stops at the value limit like the other ways to build a value, and the
+  limit counts every value the same way; a node written before a relationship of its pattern can be read by the
+  properties of what follows; a comprehension variable named like a variable outside the comprehension is refused (the
+  parser could answer from a result column instead); a property or item of a comprehension variable is read without
+  copying it. The playground shows maps in query rows.
 - **Query layer:** the keys `id`, `kind`, `label`, `parentId` and `weight` are refused wherever properties come
   in beside the graph, as a session's `payload` already did (ADR 0021, M0): by `Payload::from_json` (and with it the
   query-only module and `arqlet-query`) and by a stateless `query` request with `content`. Before, such a key was

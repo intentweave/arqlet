@@ -380,6 +380,75 @@ most 10 000 nodes), it holds a large export if the host sends it, at the cost of
 to load a large graph is not measured; neither is the share of `arqlet-model` in the module's size (item 12's graph-only
 crate would reduce it by that share).
 
+## The function table and UNION
+
+**Added on 2026-11-25 (provisional, to be confirmed in review).** Item 4 asks for our own function table; this is its
+first version. Names are matched without regard to case. Besides the aggregates (`count`, `sum`, `min`, `max`, `avg`,
+`collect`):
+
+| Function | Answer |
+|---|---|
+| `id(x)`, `elementId(x)` | the model's string id of a node or relationship |
+| `type(r)`, `labels(n)` | the edge's `kind`; the list of the node's one label, its `kind` |
+| `size(x)`, `reverse(x)` | of a string (counted in characters, Unicode code points) or a list |
+| `coalesce(a, …)` | the first argument that is not null; later ones are not evaluated |
+| `toString(x)` | of a string, boolean, integer, or a float that is 0 or of magnitude from 0.001 up to 10 000 000 |
+| `toUpper`, `toLower`, `trim`, `ltrim`, `rtrim` | whitespace is Unicode White_Space |
+| `replace(s, search, with)`, `split(s, delimiter)` | one delimiter, not empty; empty parts are kept |
+| `substring(s, start[, length])`, `left(s, n)`, `right(s, n)` | positions from 0; a null or negative position or length is an error |
+
+A null argument gives null (for `substring`, `left` and `right`: a null string). A value of the wrong kind is an error,
+never converted. Where we do not know that another engine answers the same, the call is refused: `toString` of a float
+outside the range (openCypher engines on the JVM write an exponent differently) and `split` with an empty delimiter.
+
+- **A deviation:** `id()` gives a string. openCypher defines an integer, an engine-internal number; this layer has no
+  stable one (a node's position changes with the graph), so both names give the model's id. A differential run (M6) has to
+  set `id()` apart.
+- **A value limit** (beside item 11): a computed value holds at most 16 MiB (text bytes, plus 16 per value in it), else
+  the query stops with a limit error. Without it, `a + a`, `[a, a]` or nested `replace` double a value with every step and
+  a short query can ask for any amount of memory. It bounds one value, not the memory of a query as a whole (rows times
+  values), which stays unlimited and open. The number is not measured.
+- **`UNION` and `UNION ALL`:** each part is a query of its own, with its own variables and its own `ORDER BY`, `SKIP` and
+  `LIMIT`; the parts run one after the other under one work budget, and their rows come in the order of the parts.
+  `UNION` keeps the first of equal rows (null equals null, 1 equals 1.0). The parts must return the same column names in
+  the same order; mixing `UNION` and `UNION ALL` is a syntax error.
+
+Not in the table: conversions to numbers and booleans, list functions (`head`, `last`, `range`, …), `keys`, `properties`,
+`startNode`, `endNode`, `length`, the numeric and mathematical functions.
+
+**Maps and lists (added 2026-11-25, provisional).** Map literals, list comprehension, `list[i]` (from the end when
+negative, null outside), `list[from..to]` (`to` excluded, bounds clamped, null when a bound is null), `map.key` and
+`map['key']` (also a property of a node or relationship) and `+` on lists (join, append, prepend).
+
+- A map is a value of the layer, so a payload, a session's content and a parameter may hold one; before, such a value was
+  refused or read as null (M0 item 1 allows it).
+- In a JSON answer a map is `{"map": {…}}`: every object in a row is a node, an edge or a map, and a map with the key
+  `node` is not taken for a node.
+- Two maps are equal with the same keys and equal values (null with a null value). `ORDER BY`, `min` and `max` put maps
+  before lists, and compare maps by their keys, then their values; where maps rank is provisional, as the order of mixed
+  values is.
+- Refused: a map with a key twice; `list[..]` without a bound (decypher does not parse it; it answers a syntax error);
+  a comprehension variable named like a variable or alias outside it. After a projection decypher replaces text that
+  reads like a projected item by that item's column, also inside a comprehension that means its own variable by it, so
+  the query would answer from the column. To be reported upstream; until then the name is refused.
+- The work budget counts the items a comprehension visits, not the size of the values it copies or scans, so a query can
+  spend much time within its budget. Open, with the limit on the memory of a whole query.
+
+**Bound relationship variables (fixed 2026-11-25).** A relationship variable bound by an earlier clause did not
+constrain a later `MATCH` (item 6 asks for it), in 0.8.0 and 0.9.0. The plan now says that the variable is bound, and
+only its edge fits.
+
+**Grouping expressions (fixed 2026-11-25).** The HIR rewrites a grouping expression to its alias in some places only;
+elsewhere (in a list, in `n.name + toString(count(*))`) the expression read a variable the aggregation had emptied and
+answered null, in 0.8.0 and 0.9.0. The lowering now rewrites every occurrence, and refuses a plan in which any
+expression reads a variable that holds no value at that point.
+
+Still not built of item 5: nothing in its expression row; `=~` stays "Later". Not in item 5 and not built: map
+projection, pattern comprehension, `all`/`any`/`none`/`single`, `reduce`.
+
+The cases `fn-*`, `union-*` and `expr-*` of `examples/cypher/` carry the oracle's expectations. Unlike the earlier cases
+they have not been compared with Grafeo; that is part of M6.
+
 ## Not decided here
 
 - Syntax and scoring of search operators; hybrid ranking; embedding source.

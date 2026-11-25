@@ -1712,7 +1712,21 @@ async function runQuery(){
  if(!r.ok){box.textContent=`Not run: ${r.error}`;return;}
  if(!r.rowCount){box.textContent=`No rows (${r.graph.nodes} nodes, ${r.graph.edges} edges searched).`;return;}
  const label=id=>(snapshot.sourceGraph??snapshot.graph).nodes.find(n=>n.id===id)?.label??id;
- const show=v=>v&&typeof v==='object'?(v.node!==undefined?label(v.node):v.edge!==undefined?`edge ${v.edge}`:Array.isArray(v)?`[${v.map(show).join(', ')}]`:JSON.stringify(v)):String(v);
+ // A row value: every object is a node, an edge or a map (`{map: {…}}`).
+ const show=v=>{
+  if(v===null||typeof v!=='object')return String(v);
+  if(Array.isArray(v))return `[${v.map(show).join(', ')}]`;
+  if(v.node!==undefined)return label(v.node);
+  if(v.edge!==undefined)return `edge ${v.edge}`;
+  return `{${Object.entries(v.map).map(([key,x])=>`${key}: ${show(x)}`).join(', ')}}`;
+ };
+ // The first node in a value, also inside a list or a map.
+ const firstNode=v=>{
+  if(v===null||typeof v!=='object')return undefined;
+  if(!Array.isArray(v)&&v.node!==undefined)return v.node;
+  for(const x of Object.values(Array.isArray(v)?v:v.map??{})){const id=firstNode(x);if(id!==undefined)return id;}
+  return undefined;
+ };
  const head=document.createElement('span');head.textContent=`${r.rowCount} row${r.rowCount===1?'':'s'}: ${r.columns.join(' · ')}`;box.append(head);
  const shownBoxes=[...new Set(Object.values(r.shown?.nodes??{}).filter(Boolean))];
  if(shownBoxes.length){
@@ -1721,7 +1735,7 @@ async function runQuery(){
  }
  for(const row of r.rows.slice(0,20)){
   const b=document.createElement('button');b.setAttribute('role','listitem');b.textContent=row.map(show).join(' · ');
-  const node=row.find(v=>v&&typeof v==='object'&&v.node!==undefined)?.node;
+  const node=firstNode(row);
   if(node!==undefined)b.onclick=()=>focusNode(node);else b.disabled=true;
   box.append(b);
  }

@@ -79,8 +79,8 @@ pub fn query_on(
     use std::cell::Cell as Counter;
     use std::collections::BTreeMap;
 
-    /// The session's JSON content as a payload; a value the query layer has no type for (a map) reads as null and is
-    /// counted, so the answer says that something was left out instead of changing it silently.
+    /// The session's JSON content as a payload; a value the query layer has no type for (an integer beyond `i64`) reads
+    /// as null and is counted, so the answer says that something was left out instead of changing it silently.
     struct ContentSource<'a> {
         content: Option<&'a Content>,
         skipped: Counter<usize>,

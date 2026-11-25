@@ -93,7 +93,7 @@ export type DetailTarget = {nodeId: string; edgeId?: never} | {edgeId: string; n
 /** The answer of a read-only request (`trace`, `neighbourhood`): its fields beside `ok: true`, or the error. */
 /** Provisional (ADR 0021, M5b): what a query is given besides its text. */
 export interface QueryInit {
-  /** The values of the `$name` parameters (JSON values; a map is refused). */
+  /** The values of the `$name` parameters (JSON values; an object is a map). */
   params?: Record<string, unknown>;
   /** Also map the answer onto the current view (`shown`); costs a few milliseconds on a large view. */
   view?: boolean;
@@ -103,8 +103,19 @@ export interface QueryInit {
   maxHops?: number;
 }
 
-/** A value in a row of a query answer: a JSON value, a node as `{node: id}`, an edge as `{edge: id}`, or a list. */
-export type QueryValue = null | boolean | number | string | {node: string} | {edge: string} | QueryValue[];
+/**
+ * A value in a row of a query answer: a JSON value or a list. Every object is tagged: a node is `{node: id}`, an edge
+ * `{edge: id}`, a map `{map: {key: value}}`.
+ */
+export type QueryValue =
+  | null
+  | boolean
+  | number
+  | string
+  | {node: string}
+  | {edge: string}
+  | {map: {[key: string]: QueryValue}}
+  | QueryValue[];
 
 /** Provisional (ADR 0021, M5b): the answer of a query. */
 export interface QueryAnswer {
@@ -120,7 +131,7 @@ export interface QueryAnswer {
   contentRevision?: number;
   /** Content for ids the graph does not have (kept, ignored by the query). */
   ignoredContent?: number;
-  /** Content values the query layer has no type for (a map), read as null. */
+  /** Content values the query layer has no type for (an integer beyond 64 bits), read as null. */
   skippedValues?: number;
   /** With `view: true`: the box that shows each node and the drawn line that carries each edge (null when none). */
   shown?: {nodes: Record<string, string | null>; edges: Record<string, string | null>};

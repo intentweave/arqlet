@@ -186,6 +186,12 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
   assert.ok(row&&!row.disabled,`the row names the node: ${answer.children.map(c=>c.textContent).join(' | ')}`);
   await row.onclick();await settle();
   assert.equal(runInNewContext('selected',context),leaf,'a click on the row focuses the node');
+  // A map in a row is shown by its entries, with the node's label, and the row still focuses the node it holds.
+  get('query-text').value=`MATCH (n) WHERE n.id = ${JSON.stringify(leaf).replace(/"/g,"'")} RETURN {who: n, all: [n]} AS m`;
+  await get('query-run').onclick();await settle();
+  const mapped=get('query-results').children.find(b=>b.textContent.startsWith('{'));
+  assert.ok(mapped&&!mapped.disabled,`the map row: ${get('query-results').children.map(c=>c.textContent).join(' | ')}`);
+  assert.equal(mapped.textContent,`{all: [${label}], who: ${label}}`);
   get('query-text').value='MATCH (n RETURN n';await get('query-run').onclick();await settle();
   assert.match(get('query-results').textContent,/^Not run: query syntax/,get('query-results').textContent);
   console.log('Query passed: a node found by id, its box selected and focused; a syntax error reported.');

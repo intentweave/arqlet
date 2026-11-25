@@ -48,6 +48,11 @@ for (const [name, query] of [
   ['query content filter', "MATCH (n) WHERE n.tag = 'x' RETURN n.id, n.rank ORDER BY n.rank SKIP 2 LIMIT 5"],
   ['query two hops', 'MATCH (a)-[r1]->(b)-[r2]->(c) RETURN a.id, c.id ORDER BY a.id, c.id LIMIT 20'],
   ['query paths with a view', 'MATCH (a)-[*1..2]->(b) RETURN DISTINCT b.id ORDER BY b.id LIMIT 10'],
+  // Case mapping, whitespace and the text of floats come from the Rust library: the same natively and in WASM.
+  ['query text functions', "UNWIND ['straße', 'İSTANBUL', 'ﬁn ΟΔΟΣ', '\\u00a0 é \\u3000'] AS s RETURN toUpper(s), toLower(s), trim(s), size(s), reverse(s), split(s, ' ')"],
+  ['query float text', 'UNWIND [0.1 + 0.2, 1.0 / 3, -0.0, 1234567.125, 0.001] AS f RETURN toString(f)'],
+  ['query union', 'MATCH (n) RETURN labels(n) AS v UNION MATCH ()-[r]->() RETURN type(r) AS v'],
+  ['query maps and lists', 'MATCH (n) WITH n.kind AS k, collect(n.id) AS ids RETURN {kind: k, some: ids[..3], odd: [i IN ids WHERE size(i) % 2 = 1 | toUpper(i)][-2..]} AS m ORDER BY m'],
 ]) {
   requests.push([name, {op: 'query', query, snapshot: imported.snapshot, content, view: name.includes('view')}]);
 }
