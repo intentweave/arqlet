@@ -24,6 +24,8 @@ pub(crate) struct Memo {
     /// The links the cycle break reverses in every area, when they are known before the first placement (single pass):
     /// a crossing edge then takes the border sides of its final placement from the start.
     pub reversals: std::rc::Rc<BTreeMap<String, BTreeSet<(String, String)>>>,
+    /// `pinsInSinglePass`: what the pins ask of their areas' ranks and places across the flow.
+    pub pins: std::rc::Rc<crate::pinned::Places>,
     /// A pass that only orders (single pass): every area records its plan from the structure and the order, without
     /// coordinates, for the hierarchical ordering that the one placement with coordinates follows.
     pub order_only: bool,

@@ -5,13 +5,33 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
 - **`@arqlet/query`** (new npm package, provisional): the query-only WASM module with a loader and types — read-only
   openCypher queries over an Arqlet graph in the browser and Node, without the layout engine (1.08 MB, 0.34 MB gzip;
   `benchmarks/results/query-npm-20261125.md`). ADR 0021, M5c.
-- **Fixed (query layer):** the keys `id`, `kind`, `label`, `parentId` and `weight` are refused wherever properties come
+- Pins in the layered pipelines, behind `pinsInSinglePass` (provisional, off; ADR 0016 amendment, step P1, #174): a
+  pinned leaf of a layered area no longer takes the view off single pass, or off the hierarchical pipeline behind it.
+  The pin chooses the node's rank and its order there and holds its place across the flow; along the flow the node
+  stands in its rank's band, and the layout diagnostics say how far from the pin. Buses stay buses, and a drag that keeps
+  the pin keeps the pipeline. Pinned containers are unchanged. The playground has a checkbox for it.
+
+### Changed
+
+- Membership hulls (provisional, ADR 0022): members that left a group's box are joined to it by a hull only where the hull
+  stays compact, else marked (mark `ownBox` names the box). The moved-down parent hierarchy draws each container's
+  children only, so nested levels no longer repeat one hull. In the SVG viewer hull names avoid each other and container
+  titles, hulls of different dimensions are drawn a step apart, and marks sit at the bottom right, off the pin.
+- Playground: the membership controls are a section of their own, *Groupings*, second in the side panel.
+
+### Fixed
+
+- **Query layer:** the keys `id`, `kind`, `label`, `parentId` and `weight` are refused wherever properties come
   in beside the graph, as a session's `payload` already did (ADR 0021, M0): by `Payload::from_json` (and with it the
   query-only module and `arqlet-query`) and by a stateless `query` request with `content`. Before, such a key was
   accepted there: where the model has that property the model's value silently won, elsewhere the given one was read.
+- A released drag (`move`, `finish` with `release`) of a pinned node kept the pin on a view whose options ask for single
+  pass but whose graph it does not take (`can-bus`): the node stayed pinned where it was dropped. The pin is removed.
 
 ## 0.9.0 — 2026-11-24
 

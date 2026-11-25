@@ -854,10 +854,15 @@ fn m1_reports_what_the_projection_decided() {
         .filter(|h| h.dimension == "parent")
         .map(|h| h.label.as_str())
         .collect();
-    assert_eq!(
-        departments,
-        ["Engineering", "Operations", "Sales"].into_iter().collect()
-    );
+    assert_eq!(departments, ["Engineering", "Sales"].into_iter().collect());
+    // Operations kept its box (Gus); Fay left it for a project too far away to join, so Fay is marked and the mark names the box.
+    let marked: Vec<_> = scene
+        .membership_marks
+        .iter()
+        .filter(|m| m.dimension == "parent")
+        .map(|m| (m.label.as_str(), m.node.as_str(), m.own_box.as_deref()))
+        .collect();
+    assert_eq!(marked, [("Operations", "fay", Some("ops"))]);
     assert_eq!(entry("site").mode, "soft");
 
     // Without `parent`, Gus is owned by his site; with projects alone he is reported as unassigned.

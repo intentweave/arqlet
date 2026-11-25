@@ -78,11 +78,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal
-      - uses: rust-lang/crates-io-auth-action@v1
-        id: auth
-      - name: Publish the crates not yet on crates.io
+      # Look first, log in only when something is left: the login fails without trusted publishing, and a tag after a
+      # release by hand has nothing to publish.
+      - name: Find the crates not yet on crates.io
+        id: todo
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           ex=""; for c in $UNPUBLISHED; do ex="$ex --exclude $c"; done
@@ -92,7 +92,18 @@ jobs:
             code=$(curl -s -o /dev/null -w '%{http_code}' -A 'arqlet-release (github.com/intentweave/arqlet)' "https://crates.io/api/v1/crates/$c/$VERSION")
             if [ "$code" = 200 ]; then echo "$c $VERSION is on crates.io already"; ex="$ex --exclude $c"; else todo=1; fi
           done
-          if [ "$todo" = 1 ]; then cargo +stable publish --workspace --locked $ex; else echo "Every crate is published already."; fi
+          if [ "$todo" = 0 ]; then echo "Every crate is published already."; fi
+          echo "todo=$todo" >> "$GITHUB_OUTPUT"
+          echo "exclude=$ex" >> "$GITHUB_OUTPUT"
+      - uses: rust-lang/crates-io-auth-action@v1
+        if: steps.todo.outputs.todo == '1'
+        id: auth
+      - name: Publish the crates not yet on crates.io
+        if: steps.todo.outputs.todo == '1'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          EXCLUDE: ${{ steps.todo.outputs.exclude }}
+        run: cargo +stable publish --workspace --locked $EXCLUDE
 
   npm:
     needs: [verify, crates]
