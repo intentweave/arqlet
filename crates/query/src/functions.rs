@@ -26,6 +26,9 @@ pub(crate) fn weight(v: &Value) -> usize {
         Value::List(items) => items
             .iter()
             .fold(16, |sum: usize, item| sum.saturating_add(weight(item))),
+        Value::Map(entries) => entries.iter().fold(16, |sum: usize, (key, value)| {
+            sum.saturating_add(key.len()).saturating_add(weight(value))
+        }),
         _ => 16,
     }
 }
@@ -62,7 +65,7 @@ fn count(v: &Value, name: &str) -> Result<usize, QueryError> {
 }
 
 fn string(s: String) -> Result<Value, QueryError> {
-    fits(s.len() as u64)?;
+    fits(s.len() as u64 + 16)?;
     Ok(Value::String(s))
 }
 
@@ -99,7 +102,8 @@ pub(crate) fn call(function: Function, args: Vec<Value>) -> Result<Value, QueryE
             // The size of the result before it is built. An empty `search` matches before every character and at the end.
             let found = s.matches(search).count() as u64;
             let kept = s.len() as u64 - found.saturating_mul(search.len() as u64);
-            fits(kept.saturating_add(found.saturating_mul(with.len() as u64)))?;
+            let added = found.saturating_mul(with.len() as u64);
+            fits(kept.saturating_add(added).saturating_add(16))?;
             string(s.replace(search, with))
         }
         (Function::Split, [s, delimiter]) => {
@@ -109,8 +113,10 @@ pub(crate) fn call(function: Function, args: Vec<Value>) -> Result<Value, QueryE
                     "`split` with an empty delimiter is not decided yet (ADR 0021)",
                 ));
             }
-            let parts = s.matches(delimiter).count() as u64 + 1;
-            fits(parts.saturating_mul(16).saturating_add(s.len() as u64))?;
+            // The list, 16 for every part, and the text without the delimiters.
+            let found = s.matches(delimiter).count() as u64;
+            let text = s.len() as u64 - found * delimiter.len() as u64;
+            fits((found + 2).saturating_mul(16).saturating_add(text))?;
             Ok(Value::List(
                 s.split(delimiter)
                     .map(|part| Value::String(part.to_string()))
@@ -251,6 +257,26 @@ mod tests {
                 "{f}"
             );
         }
+    }
+
+    #[test]
+    fn the_value_limit_counts_a_value_the_same_way_however_it_is_made() {
+        // A string weighs its bytes and 16: the longest that fits, and one byte more.
+        let most = s(&"a".repeat(MAX_VALUE_BYTES - 16));
+        assert_eq!(weight(&ok(Function::Reverse, &[most])), MAX_VALUE_BYTES);
+        let over = s(&"a".repeat(MAX_VALUE_BYTES - 15));
+        assert_eq!(
+            class(Function::Reverse, std::slice::from_ref(&over)),
+            ErrorClass::Limit
+        );
+        // What `split` accepts weighs no more than the limit, and one part more is refused.
+        let parts = MAX_VALUE_BYTES / 16 - 1;
+        let fitting = ok(Function::Split, &[s(&",".repeat(parts - 1)), s(",")]);
+        assert_eq!(weight(&fitting), MAX_VALUE_BYTES);
+        assert_eq!(
+            class(Function::Split, &[s(&",".repeat(parts)), s(",")]),
+            ErrorClass::Limit
+        );
     }
 
     #[test]

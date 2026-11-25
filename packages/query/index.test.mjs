@@ -46,6 +46,15 @@ test('functions and UNION answer through the package', {skip}, async () => {
   assert.deepEqual(engine.query('RETURN 1 AS one').rows, [[1]], 'the engine goes on after a limit');
 });
 
+test('maps come from the payload and from parameters, and are tagged in a row', {skip}, async () => {
+  const engine = await loadQueryEngine(wasm);
+  engine.load(graph, {payload: {nodes: {parse: {meta: {node: 'x', lines: [10, 20]}}}}});
+  const answer = engine.query(
+    'MATCH (n:fn) WHERE n.meta.lines[-1] > $p.over RETURN n, n.meta, [x IN n.meta.lines | x + 1]', {params: {p: {over: 15}}});
+  assert.deepEqual(answer.rows, [[{node: 'parse'}, {map: {lines: [10, 20], node: 'x'}}, [11, 21]]]);
+  assert.deepEqual(answer.nodes, ['parse'], 'a key `node` of a map is not a node');
+});
+
 test('errors are answers, and a refused load keeps what was loaded', {skip}, async () => {
   const engine = await loadQueryEngine(wasm);
   assert.equal(engine.query('MATCH (n) RETURN n').ok, false, 'nothing loaded');

@@ -91,6 +91,8 @@ pub struct Expand {
     pub types: Vec<String>,
     pub props: Vec<(String, Expr)>,
     pub to_bound: bool,
+    /// The variable in `rel` is bound already: only the edge (or, with `hops`, the list of edges) it holds fits.
+    pub rel_bound: bool,
     pub to_label: Option<String>,
     pub to_props: Vec<(String, Expr)>,
     pub distinct_from: Vec<Slot>,
@@ -154,6 +156,21 @@ pub enum Expr {
     },
     /// A scalar function with its arguments, as many as [`Function::arity`] allows.
     Call(Function, Vec<Expr>),
+    /// `{key: value, …}`; every key once.
+    Map(Vec<(String, Expr)>),
+    /// `base[index]`: an item of a list (from the end when negative), the value of a key of a map, or a property of a
+    /// node or relationship.
+    Index(Box<Expr>, Box<Expr>),
+    /// `list[from..to]`: `from` included, `to` not; either may be left out and negative counts from the end.
+    Slice(Box<Expr>, Option<Box<Expr>>, Option<Box<Expr>>),
+    /// `[x IN list WHERE filter | map]`: `slot` is `x`, which holds each item in turn and exists inside `filter` and
+    /// `map` only.
+    Comprehension {
+        slot: Slot,
+        list: Box<Expr>,
+        filter: Option<Box<Expr>>,
+        map: Option<Box<Expr>>,
+    },
 }
 
 /// A scalar function (ADR 0021, "The function table").
@@ -216,6 +233,70 @@ impl Function {
             Function::Substring => (2, 3),
             Function::Left | Function::Right | Function::Split => (2, 2),
             _ => (1, 1),
+        }
+    }
+}
+
+impl Expr {
+    /// Calls `f` on every expression directly inside this one.
+    pub fn for_each_child_mut(&mut self, f: &mut dyn FnMut(&mut Expr)) {
+        match self {
+            Expr::Literal(_) | Expr::Param(_) | Expr::Slot(_) => {}
+            Expr::Property(x, _)
+            | Expr::Not(x)
+            | Expr::Neg(x)
+            | Expr::IsNull(x, _)
+            | Expr::HasLabel(x, _) => f(x),
+            Expr::List(items) | Expr::Call(_, items) => items.iter_mut().for_each(f),
+            Expr::Binary(_, a, b) | Expr::In(a, b) => {
+                f(a);
+                f(b);
+            }
+            Expr::Map(entries) => entries.iter_mut().for_each(|(_, value)| f(value)),
+            Expr::Index(a, b) => {
+                f(a);
+                f(b);
+            }
+            Expr::Slice(list, from, to) => {
+                f(list);
+                if let Some(x) = from {
+                    f(x);
+                }
+                if let Some(x) = to {
+                    f(x);
+                }
+            }
+            Expr::Comprehension {
+                list, filter, map, ..
+            } => {
+                f(list);
+                if let Some(x) = filter {
+                    f(x);
+                }
+                if let Some(x) = map {
+                    f(x);
+                }
+            }
+            Expr::Compare(left, chain) => {
+                f(left);
+                chain.iter_mut().for_each(|(_, right)| f(right));
+            }
+            Expr::Case {
+                scrutinee,
+                alternatives,
+                default,
+            } => {
+                if let Some(s) = scrutinee {
+                    f(s);
+                }
+                for (when, then) in alternatives {
+                    f(when);
+                    f(then);
+                }
+                if let Some(d) = default {
+                    f(d);
+                }
+            }
         }
     }
 }
