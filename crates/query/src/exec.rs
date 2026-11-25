@@ -16,7 +16,6 @@ use crate::plan::{
 use crate::store::GraphStore;
 use crate::value::{EdgeId, NodeId, Value};
 use crate::QueryError;
-use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -384,11 +383,15 @@ impl Run<'_> {
             return Ok(());
         }
         let mut next = row.clone();
-        next[x.rel] = if as_list {
+        let taken = if as_list {
             Value::List(path.iter().map(|e| Value::Edge(*e)).collect())
         } else {
             Value::Edge(path[0])
         };
+        if x.rel_bound && row[x.rel] != taken {
+            return Ok(());
+        }
+        next[x.rel] = taken;
         if !x.to_bound {
             next[x.to] = Value::Node(node);
         }
@@ -551,8 +554,7 @@ impl Run<'_> {
                 None => row[*slot].clone(),
             },
             Expr::Property(base, key) => {
-                let base = self.borrow(base, row)?;
-                self.property(&base, key)?
+                self.with_value(base, row, |base| self.property(base, key))?
             }
             Expr::Map(entries) => {
                 let mut map = BTreeMap::new();
@@ -566,9 +568,8 @@ impl Run<'_> {
                 Value::Map(map)
             }
             Expr::Index(base, index) => {
-                let base = self.borrow(base, row)?;
                 let index = self.eval(index, row)?;
-                self.index(&base, &index)?
+                self.with_value(base, row, |base| self.index(base, &index))?
             }
             Expr::Slice(list, from, to) => self.slice(list, from.as_deref(), to.as_deref(), row)?,
             Expr::Comprehension {
@@ -693,15 +694,23 @@ impl Run<'_> {
             .map(|(_, item)| item.clone())
     }
 
-    /// The value of an expression, read in place when it is a variable of the row: a list or a map that is only looked
-    /// into is not copied.
-    fn borrow<'r>(&self, expr: &Expr, row: &'r Row) -> Result<Cow<'r, Value>, QueryError> {
+    /// Calls `read` on the value of an expression. A variable, of the row or of a comprehension, is read in place: a list
+    /// or a map that is only looked into is not copied. `read` evaluates nothing (the comprehension variables are borrowed
+    /// while it runs).
+    fn with_value<T>(
+        &self,
+        expr: &Expr,
+        row: &Row,
+        read: impl FnOnce(&Value) -> Result<T, QueryError>,
+    ) -> Result<T, QueryError> {
         if let Expr::Slot(slot) = expr {
-            if !self.locals.borrow().iter().any(|(s, _)| s == slot) {
-                return Ok(Cow::Borrowed(&row[*slot]));
-            }
+            let locals = self.locals.borrow();
+            return match locals.iter().rev().find(|(s, _)| s == slot) {
+                Some((_, item)) => read(item),
+                None => read(&row[*slot]),
+            };
         }
-        Ok(Cow::Owned(self.eval(expr, row)?))
+        read(&self.eval(expr, row)?)
     }
 
     /// `base.key`.
@@ -755,40 +764,45 @@ impl Run<'_> {
         to: Option<&Expr>,
         row: &Row,
     ) -> Result<Value, QueryError> {
-        let list = self.borrow(list, row)?;
-        let items = match list.as_ref() {
-            Value::Null => return Ok(Value::Null),
-            Value::List(items) => items,
-            other => {
-                return Err(QueryError::runtime(format!(
-                    "cannot slice a {}",
+        // A bound as written: `Some(None)` when it is null.
+        let bound = |expr: Option<&Expr>| -> Result<Option<Option<i64>>, QueryError> {
+            let Some(expr) = expr else { return Ok(None) };
+            match self.eval(expr, row)? {
+                Value::Null => Ok(Some(None)),
+                Value::Int(i) => Ok(Some(Some(i))),
+                other => Err(QueryError::runtime(format!(
+                    "a slice takes integers, not a {}",
                     other.kind()
-                )))
+                ))),
             }
         };
-        let length = items.len() as i64;
-        // A bound as a position within the list: from the end when negative, never outside it.
-        let bound = |expr: Option<&Expr>, missing: i64| -> Result<Option<usize>, QueryError> {
-            let at = match expr {
-                None => missing,
-                Some(e) => match self.eval(e, row)? {
-                    Value::Null => return Ok(None),
-                    Value::Int(i) if i < 0 => length.saturating_add(i),
-                    Value::Int(i) => i,
-                    other => {
-                        return Err(QueryError::runtime(format!(
-                            "a slice takes integers, not a {}",
-                            other.kind()
-                        )))
-                    }
-                },
+        let (from, to) = (bound(from)?, bound(to)?);
+        self.with_value(list, row, |list| {
+            let items = match list {
+                Value::Null => return Ok(Value::Null),
+                Value::List(items) => items,
+                other => {
+                    return Err(QueryError::runtime(format!(
+                        "cannot slice a {}",
+                        other.kind()
+                    )))
+                }
             };
-            Ok(Some(at.clamp(0, length) as usize))
-        };
-        let (from, to) = (bound(from, 0)?, bound(to, length)?);
-        Ok(match (from, to) {
-            (Some(from), Some(to)) => Value::List(items[from..to.max(from)].to_vec()),
-            _ => Value::Null,
+            let length = items.len() as i64;
+            // A position within the list: from the end when negative, never outside it.
+            let at = |bound: Option<Option<i64>>, missing: i64| -> Option<usize> {
+                let i = match bound {
+                    None => missing,
+                    Some(None) => return None,
+                    Some(Some(i)) if i < 0 => length.saturating_add(i),
+                    Some(Some(i)) => i,
+                };
+                Some(i.clamp(0, length) as usize)
+            };
+            Ok(match (at(from, 0), at(to, length)) {
+                (Some(from), Some(to)) => Value::List(items[from..to.max(from)].to_vec()),
+                _ => Value::Null,
+            })
         })
     }
 
@@ -1161,7 +1175,10 @@ fn arithmetic(op: BinOp, l: Value, r: Value) -> Result<Value, QueryError> {
     }
     // `+` with a list on either side: two lists joined, or a value put at the end or the start.
     if op == BinOp::Add && (matches!(l, Value::List(_)) || matches!(r, Value::List(_))) {
-        functions::fits(weight(&l) as u64 + weight(&r) as u64)?;
+        // The result's weight: two lists joined have one list around their items, not two.
+        let joined = matches!(l, Value::List(_)) && matches!(r, Value::List(_));
+        let bytes = weight(&l) as u64 + weight(&r) as u64 - if joined { 16 } else { 0 };
+        functions::fits(bytes)?;
         return Ok(Value::List(match (l, r) {
             (Value::List(mut x), Value::List(y)) => {
                 x.extend(y);
@@ -1201,7 +1218,7 @@ fn arithmetic(op: BinOp, l: Value, r: Value) -> Result<Value, QueryError> {
             })
         }
         (Value::String(x), Value::String(y)) if op == BinOp::Add => {
-            functions::fits(x.len() as u64 + y.len() as u64)?;
+            functions::fits(x.len() as u64 + y.len() as u64 + 16)?;
             Ok(Value::String(format!("{x}{y}")))
         }
         _ => Err(QueryError::runtime(format!(
@@ -1226,7 +1243,8 @@ enum State {
         sum: f64,
         n: u64,
     },
-    Collect(Vec<Value>),
+    /// The values and their weight with the list around them.
+    Collect(Vec<Value>, u64),
 }
 
 struct Acc {
@@ -1248,7 +1266,7 @@ impl Acc {
                 },
                 AggFunc::Min | AggFunc::Max => State::Extreme(None),
                 AggFunc::Avg => State::Avg { sum: 0.0, n: 0 },
-                AggFunc::Collect => State::Collect(Vec::new()),
+                AggFunc::Collect => State::Collect(Vec::new(), 16),
             },
             seen: distinct.then(HashSet::new),
         }
@@ -1321,7 +1339,11 @@ impl Acc {
                     *best = Some(value);
                 }
             }
-            State::Collect(items) => items.push(value),
+            State::Collect(items, bytes) => {
+                *bytes = bytes.saturating_add(weight(&value) as u64);
+                functions::fits(*bytes)?;
+                items.push(value);
+            }
         }
         Ok(())
     }
@@ -1348,7 +1370,7 @@ impl Acc {
                 }
             }
             State::Extreme(best) => best.unwrap_or(Value::Null),
-            State::Collect(items) => Value::List(items),
+            State::Collect(items, _) => Value::List(items),
         }
     }
 }
@@ -1818,6 +1840,7 @@ mod tests {
             types: types.iter().map(|t| t.to_string()).collect(),
             props: vec![],
             to_bound: false,
+            rel_bound: false,
             to_label: None,
             to_props: vec![],
             distinct_from: vec![],

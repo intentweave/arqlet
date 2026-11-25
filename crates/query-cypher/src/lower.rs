@@ -14,7 +14,7 @@ use arqlet_query::plan::{
 use arqlet_query::Direction;
 use arqlet_query::{QueryError, Value};
 use decypher::hir::arena::ExprId;
-use decypher::hir::arena::HirArenas;
+use decypher::hir::arena::{BindingId, HirArenas};
 use decypher::hir::expr::{BinaryOp, ComparisonOperator, ExprKind, Literal, UnaryOp};
 use decypher::hir::ops::{AggregateItem, Operation, SortDirection, UnionOp};
 use decypher::hir::pattern::{
@@ -190,6 +190,9 @@ fn check_ops(
                 read(x.from, there, arenas)?;
                 if x.to_bound {
                     read(x.to, there, arenas)?;
+                }
+                if x.rel_bound {
+                    read(x.rel, there, arenas)?;
                 }
                 for (_, e) in x.props.iter().chain(&x.to_props) {
                     check_expr(e, there, arenas)?;
@@ -411,6 +414,34 @@ impl Lowering<'_> {
         Ok(regroup(self.expr(id)?, &self.grouped))
     }
 
+    /// Refuses a comprehension variable that is named like a variable outside it. After a projection the HIR replaces
+    /// text that reads like a projected item by that item's column, also inside a comprehension whose own variable the
+    /// text means, and the query would answer from the column. Comprehensions may share a name among themselves.
+    fn own_name(&self, variable: BindingId) -> Result<(), QueryError> {
+        let name = &self.arenas.bindings.get(variable).name;
+        let comprehensions: BTreeSet<usize> = self
+            .arenas
+            .expressions
+            .iter()
+            .filter_map(|(_, e)| match &e.kind {
+                ExprKind::ListComprehension(c) => Some(c.variable.0),
+                _ => None,
+            })
+            .collect();
+        let taken = self
+            .arenas
+            .bindings
+            .iter()
+            .any(|(id, b)| b.name == *name && !comprehensions.contains(&id.0));
+        if taken {
+            return Err(QueryError::unsupported(format!(
+                "the comprehension variable `{name}` has the name of a variable outside it, which the parser can \
+                 mistake for it; give it another name"
+            )));
+        }
+        Ok(())
+    }
+
     fn optional(&self, id: Option<ExprId>) -> Result<Option<Box<Expr>>, QueryError> {
         id.map(|id| self.expr(id).map(Box::new)).transpose()
     }
@@ -480,8 +511,21 @@ impl Lowering<'_> {
         let was_bound: Vec<bool> = node_slots.iter().map(|s| self.bound.contains(s)).collect();
         let mut touched = vec![false; pattern.nodes.len()];
         let mut rel_slots: Vec<usize> = Vec::new();
+        // A node no relationship reaches is taken where it is written, before the relationships written after it, so
+        // that their properties can read it.
+        let mut alone = vec![true; pattern.nodes.len()];
+        for rel in &pattern.relationships {
+            alone[rel.left] = false;
+            alone[rel.right] = false;
+        }
 
         for rel in &pattern.relationships {
+            for i in 0..rel.left.min(rel.right) {
+                if alone[i] && !touched[i] {
+                    self.node(&pattern.nodes[i], node_slots[i])?;
+                    touched[i] = true;
+                }
+            }
             if rel.type_expression.is_some() {
                 return Err(QueryError::unsupported(
                     "a relationship type expression is undecided (ADR 0021, open)",
@@ -534,6 +578,7 @@ impl Lowering<'_> {
                 None => self.fresh(),
             };
             let to_bound = self.bound.contains(&node_slots[to]);
+            let rel_bound = self.bound.contains(&rel_slot);
             self.ops.push(Op::Expand(Expand {
                 from: node_slots[from],
                 rel: rel_slot,
@@ -542,6 +587,7 @@ impl Lowering<'_> {
                 types,
                 props: self.props(rel.properties)?,
                 to_bound,
+                rel_bound,
                 to_label,
                 to_props,
                 distinct_from: rel_slots.clone(),
@@ -554,16 +600,20 @@ impl Lowering<'_> {
         }
 
         for (i, node) in pattern.nodes.iter().enumerate() {
-            if touched[i] {
-                continue;
-            }
-            if self.bound.contains(&node_slots[i]) {
-                self.check(node, node_slots[i])?;
-            } else {
-                self.start(node, node_slots[i])?;
+            if !touched[i] {
+                self.node(node, node_slots[i])?;
             }
         }
         Ok(())
+    }
+
+    /// A node of a pattern on its own: checked when its variable is bound, else scanned.
+    fn node(&mut self, node: &NodePattern, slot: usize) -> Result<(), QueryError> {
+        if self.bound.contains(&slot) {
+            self.check(node, slot)
+        } else {
+            self.start(node, slot)
+        }
     }
 
     fn start(&mut self, node: &NodePattern, slot: usize) -> Result<(), QueryError> {
@@ -707,12 +757,15 @@ impl Lowering<'_> {
                 self.optional(*start)?,
                 self.optional(*end)?,
             ),
-            ExprKind::ListComprehension(c) => Expr::Comprehension {
-                slot: c.variable.0,
-                list: Box::new(self.expr(c.collection)?),
-                filter: self.optional(c.filter)?,
-                map: self.optional(c.map)?,
-            },
+            ExprKind::ListComprehension(c) => {
+                self.own_name(c.variable)?;
+                Expr::Comprehension {
+                    slot: c.variable.0,
+                    list: Box::new(self.expr(c.collection)?),
+                    filter: self.optional(c.filter)?,
+                    map: self.optional(c.map)?,
+                }
+            }
             ExprKind::IsNull { operand, negated } => {
                 Expr::IsNull(Box::new(self.expr(*operand)?), *negated)
             }

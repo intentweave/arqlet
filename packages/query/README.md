@@ -47,7 +47,8 @@ Errors are answers, not exceptions: `{ok: false, error}`. A query error reads `q
   `UNION [ALL]`, parameters, `CASE`, `IN`, `IS NULL`, `STARTS WITH`, `ENDS WITH`, `CONTAINS`.
 - The aggregates `count`, `sum`, `min`, `max`, `avg`, `collect`.
 - List and map literals, `[x IN list WHERE … | …]`, `list[i]`, `list[from..to]`, `map.key`, `map['key']` (also on a node
-  or relationship) and `+` on lists. In an answer a map is `{map: {…}}`, as a node is `{node: id}`.
+  or relationship) and `+` on lists. In an answer a map is `{map: {…}}`, as a node is `{node: id}`. The variable of a
+  comprehension needs a name that no variable or alias outside it has.
 - `id`, `elementId` (both give the string id; openCypher's `id` is an integer), `type`, `labels`, `size`, `coalesce`,
   `toString`, `toUpper`, `toLower`, `trim`, `ltrim`, `rtrim`, `replace`, `substring`, `left`, `right`, `split`,
   `reverse`. Text is counted in characters. `toString` of a float is limited to 0 and magnitudes from 0.001 up to

@@ -328,7 +328,11 @@ fn a_value_that_doubles_stops_at_the_value_limit() {
         "replace(".repeat(60),
         ", 'a', 'aaaaaaaaaa')".repeat(60)
     );
-    for query in [text, list, replaced] {
+    let collected = format!(
+        "WITH 'aaaaaaaaaaaaaaaa' AS a{} RETURN size(a) AS s",
+        " UNWIND [1, 2] AS i WITH collect(a) AS a".repeat(22)
+    );
+    for query in [text, list, replaced, collected] {
         let (class, message) = spike(&query).unwrap_err();
         assert_eq!(class, ErrorClass::Limit, "{message}");
         assert!(message.contains("value limit"), "{message}");
@@ -365,5 +369,58 @@ fn a_variable_without_a_value_is_refused_not_read_as_null() {
         "MATCH (a)-[r:KNOWS {since: b.age}]->(b) RETURN b",
     ] {
         assert_eq!(refused(query), ErrorClass::Unsupported, "{query}");
+    }
+}
+
+/// After a projection the parser replaces text that reads like a projected item, also inside a comprehension that means
+/// its own variable by it: such a name is refused instead of answered from the column.
+#[test]
+fn a_comprehension_variable_may_not_be_named_like_a_variable_outside() {
+    for query in [
+        "UNWIND [1, 2] AS x WITH x, count(*) AS c WHERE [x IN [7] | x][0] = 7 RETURN x, c",
+        "UNWIND [1, 2] AS x RETURN DISTINCT x ORDER BY [x IN [0] | x][0], x DESC",
+        "MATCH (a:Person) RETURN a.name AS n, count(*) AS c ORDER BY [a IN [{name: 'z'}] | a.name], n DESC",
+        "WITH 7 AS x RETURN [x IN [1, 2] | x] AS l, x",
+    ] {
+        assert_eq!(refused(query), ErrorClass::Unsupported, "{query}");
+    }
+    // Comprehensions may share a name among themselves, nested or side by side.
+    assert_eq!(
+        spike("RETURN [x IN [1] | x] + [x IN [2] | [x IN [x] | x * 10]] AS l"),
+        Ok(serde_json::json!([[[1, [20]]]]))
+    );
+}
+
+#[test]
+fn a_bound_relationship_variable_holds_a_later_match_to_its_edge() {
+    for (query, count) in [
+        // Six KNOWS edges, and each `r` can match only itself.
+        ("MATCH (a)-[r:KNOWS]->(b) WITH r, a MATCH (a)-[r]->(c) RETURN count(*)", 6),
+        ("MATCH ()-[r:FOLLOWS]->() MATCH (x)-[r]-(y) RETURN count(*)", 2),
+        // The end that does not fit the bound edge gives nothing.
+        ("MATCH (a)-[r:FOLLOWS]->(b) MATCH (b)-[r]->(c) RETURN count(*)", 0),
+        // The list of a variable-length path binds the same way.
+        (
+            "MATCH (a {name: 'Dee'})-[p:FOLLOWS|KNOWS*2]->(b) WITH a, p MATCH (a)-[p*2]->(c) RETURN count(*)",
+            3,
+        ),
+    ] {
+        assert_eq!(spike(query), Ok(serde_json::json!([[count]])), "{query}");
+    }
+}
+
+#[test]
+fn a_node_written_before_a_relationship_can_be_read_by_its_properties() {
+    for (query, count) in [
+        (
+            "MATCH (a:Person), (b:Person {name: a.name}) RETURN count(*)",
+            4,
+        ),
+        (
+            "MATCH (a:Person), (b:Person {name: a.name})-[:KNOWS]->(c) RETURN count(*)",
+            6,
+        ),
+    ] {
+        assert_eq!(spike(query), Ok(serde_json::json!([[count]])), "{query}");
     }
 }

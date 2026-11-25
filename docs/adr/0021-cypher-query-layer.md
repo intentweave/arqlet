@@ -427,9 +427,16 @@ negative, null outside), `list[from..to]` (`to` excluded, bounds clamped, null w
 - Two maps are equal with the same keys and equal values (null with a null value). `ORDER BY`, `min` and `max` put maps
   before lists, and compare maps by their keys, then their values; where maps rank is provisional, as the order of mixed
   values is.
-- Refused: a map with a key twice; `list[..]` without a bound (decypher does not parse it; it answers a syntax error).
+- Refused: a map with a key twice; `list[..]` without a bound (decypher does not parse it; it answers a syntax error);
+  a comprehension variable named like a variable or alias outside it. After a projection decypher replaces text that
+  reads like a projected item by that item's column, also inside a comprehension that means its own variable by it, so
+  the query would answer from the column. To be reported upstream; until then the name is refused.
 - The work budget counts the items a comprehension visits, not the size of the values it copies or scans, so a query can
   spend much time within its budget. Open, with the limit on the memory of a whole query.
+
+**Bound relationship variables (fixed 2026-11-25).** A relationship variable bound by an earlier clause did not
+constrain a later `MATCH` (item 6 asks for it), in 0.8.0 and 0.9.0. The plan now says that the variable is bound, and
+only its edge fits.
 
 **Grouping expressions (fixed 2026-11-25).** The HIR rewrites a grouping expression to its alias in some places only;
 elsewhere (in a list, in `n.name + toString(count(*))`) the expression read a variable the aggregation had emptied and

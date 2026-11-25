@@ -91,6 +91,8 @@ pub struct Expand {
     pub types: Vec<String>,
     pub props: Vec<(String, Expr)>,
     pub to_bound: bool,
+    /// The variable in `rel` is bound already: only the edge (or, with `hops`, the list of edges) it holds fits.
+    pub rel_bound: bool,
     pub to_label: Option<String>,
     pub to_props: Vec<(String, Expr)>,
     pub distinct_from: Vec<Slot>,

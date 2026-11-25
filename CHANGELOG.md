@@ -9,6 +9,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that
   names a variable the pattern binds itself) is refused as unsupported instead of answered with null.
+- **Fixed (query layer, wrong answers in 0.8.0 and 0.9.0):** a relationship variable bound by an earlier clause did not
+  constrain a later `MATCH`: `MATCH (a)-[r]->(b) WITH r, a MATCH (a)-[r]->(c)` matched every edge of `a`. It matches the
+  bound edge (or the bound list of a variable-length path) only. For users of `arqlet-query`: `plan::Expand` has the new
+  field `rel_bound`.
+- **Query layer, from the review:** `collect` stops at the value limit like the other ways to build a value, and the
+  limit counts every value the same way; a node written before a relationship of its pattern can be read by the
+  properties of what follows; a comprehension variable named like a variable outside the comprehension is refused (the
+  parser could answer from a result column instead); a property or item of a comprehension variable is read without
+  copying it. The playground shows maps in query rows.
 - **Query layer: maps and list expressions** (ADR 0021, provisional): map literals, list comprehension, `list[i]`,
   `list[from..to]`, `map['key']` and `+` on lists. The query module grows by 4.6 % (gzip 5.7 %,
   `benchmarks/results/query-expressions-20261125.md`). For users of `arqlet-query`: `Value` has the new variant `Map`,
