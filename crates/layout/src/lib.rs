@@ -25,6 +25,7 @@ mod directed;
 mod mirror;
 mod organic;
 pub mod overview;
+mod pinned;
 mod placement_geometry;
 mod placement_order;
 mod placement_region;
@@ -107,6 +108,8 @@ struct Run<'a> {
     /// (`constructive::Construction::narrow_channels`).
     narrow: Vec<(String, usize, f64)>,
     capacity_seeds: Vec<CapacitySeed>,
+    /// `pinsInSinglePass`: what the pins of the view being computed ask of their areas (`pinned`).
+    pins: std::rc::Rc<pinned::Places>,
     /// Provisional (consistent layered pipeline): the preparation of the last track count, which found no channel too
     /// narrow, so that the routing of the same drawing starts from it. The next `route_all` takes it, whichever engine it
     /// uses; the construction checks that boxes and ports are those it was computed on.
@@ -249,6 +252,7 @@ impl<'a> Run<'a> {
             earlier: Default::default(),
             narrow: Vec::new(),
             capacity_seeds: Vec::new(),
+            pins: Default::default(),
             prepared: None,
             #[cfg(test)]
             disable_phase_reuse: false,
@@ -1289,8 +1293,43 @@ fn compute_requested(
     run: &mut Run,
 ) -> Result<Snapshot, Abort> {
     let requested_options = options;
+    // `pinsInSinglePass`: the layout runs without the pins, which become places the arrangement holds (`pinned`). Their
+    // bands are those of the drawing it continues, or of a layout without them.
+    let unpinned;
+    let mut places = pinned::Places::new();
+    let options = if pinned::applies(graph, options) {
+        unpinned = LayoutOptions {
+            pins: Default::default(),
+            ..options.clone()
+        };
+        let computed;
+        let reference = match previous.filter(|p| pinned::covers(p, graph, &requested_options.pins))
+        {
+            Some(drawing) => drawing,
+            None => {
+                computed = compute_requested(
+                    graph,
+                    None,
+                    &BTreeSet::new(),
+                    optimize,
+                    &unpinned,
+                    &mut Run {
+                        earlier: run.earlier.clone(),
+                        ..Run::new(run.stop)
+                    },
+                )?;
+                &computed
+            }
+        };
+        places = pinned::places(graph, reference, &requested_options.pins);
+        &unpinned
+    } else {
+        options
+    };
+    let pinned_nodes = !places.is_empty();
+    run.pins = std::rc::Rc::new(places);
     let (selected_options, layout_diagnostics) =
-        select_pipeline(graph, requested_options).map_err(Abort::from)?;
+        select_pipeline(graph, options).map_err(Abort::from)?;
     if options.single_pass && !options.abstract_routing {
         return Err(Abort::Failed("singlePass requires abstractRouting".into()));
     }
@@ -1310,6 +1349,11 @@ fn compute_requested(
         compute_mode_selected(graph, previous, dirty, optimize, &selected_options, run)?;
     snapshot.options = requested_options.clone();
     snapshot.layout_diagnostics.extend(layout_diagnostics);
+    if pinned_nodes {
+        snapshot
+            .layout_diagnostics
+            .extend(pinned::diagnostics(&snapshot, &requested_options.pins));
+    }
     Ok(snapshot)
 }
 
@@ -2572,6 +2616,8 @@ fn align_lanes(
     room: &BTreeMap<id::Id, (f64, f64)>,
     shared: bool,
     stacked: &BTreeMap<(id::Id, id::Id), f64>,
+    // `pinsInSinglePass`: the places across the flow that pinned elements hold.
+    held: &BTreeMap<id::Id, f64>,
 ) -> (f64, BTreeMap<usize, Vec<id::Id>>) {
     let across = |r: &Rect| {
         if vertical {
@@ -2822,20 +2868,46 @@ fn align_lanes(
                 priority: *priority,
             })
             .collect();
-        let starts = block_placement::place(&block_placement::Input {
+        let mut starts = block_placement::place(&block_placement::Input {
             ranks: &ranks,
             size: &size,
             dummy: &dummy,
             segments: &segments,
             space: &space,
         });
+        for place in starts.iter_mut().flatten() {
+            *place += low;
+        }
+        if !held.is_empty() {
+            let fixed: Vec<Option<f64>> = names.iter().map(|id| held.get(*id).copied()).collect();
+            pinned::hold(&mut ranks, &mut starts, &size, &space, &fixed, low);
+            // The held elements left their blocks: what can be straightened around them is.
+            let mut x: Vec<f64> = starts.iter().map(|s| s.unwrap_or(low)).collect();
+            block_placement::straighten_around(
+                &block_placement::Input {
+                    ranks: &ranks,
+                    size: &size,
+                    dummy: &dummy,
+                    segments: &segments,
+                    space: &space,
+                },
+                &mut x,
+                &fixed.iter().map(Option::is_some).collect::<Vec<_>>(),
+                low,
+            );
+            for ids in &ranks {
+                for &i in ids {
+                    starts[i] = Some(x[i]);
+                }
+            }
+        }
         let mut reach: f64 = 0.;
         for (id, place) in names.iter().zip(&starts) {
             if let (Some(place), Some(rect)) = (place, placed.get_mut(*id)) {
                 if vertical {
-                    rect.x = place + low;
+                    rect.x = *place;
                 } else {
-                    rect.y = place + low;
+                    rect.y = *place;
                 }
             }
         }
@@ -2854,6 +2926,10 @@ fn align_lanes(
             .map(|(k, ids)| (*k, ids))
             .collect();
         return (reach, reordered);
+    }
+    if !held.is_empty() {
+        let fixed: Vec<Option<f64>> = names.iter().map(|id| held.get(*id).copied()).collect();
+        pinned::hold(&mut ranks, &mut start, &size, &space, &fixed, low);
     }
     for (id, place) in names.iter().zip(&start) {
         if let (Some(place), Some(rect)) = (place, placed.get_mut(*id)) {
@@ -4538,6 +4614,7 @@ fn compute_once(
 ) -> Result<Snapshot, Abort> {
     run.search.layout_passes += 1;
     let mut ordering = placement_order::Memo::default();
+    ordering.pins = run.pins.clone();
     #[cfg(test)]
     {
         ordering.disabled = run.disable_phase_reuse;
@@ -4630,7 +4707,7 @@ fn compute_once(
         && options.hierarchical_ordering
         && previous.is_none();
     if let Some(reversals) = reversals_known
-        .then(|| known_reversals(graph, &index, options))
+        .then(|| known_reversals(graph, &index, options, &ordering.pins))
         .flatten()
     {
         ordering.reversals = std::rc::Rc::new(reversals);
@@ -5883,6 +5960,7 @@ fn known_reversals(
     graph: &Graph,
     index: &GraphIndex<'_>,
     options: &LayoutOptions,
+    pins: &pinned::Places,
 ) -> Option<BTreeMap<String, BTreeSet<(String, String)>>> {
     let mut out = BTreeMap::new();
     for parent in std::iter::once(None).chain(index.nodes.iter().map(|n| Some(n.id.as_str()))) {
@@ -5902,7 +5980,7 @@ fn known_reversals(
         if !global::Flattening::of(parent, graph, index, options, &children).is_empty() {
             return None;
         }
-        let (_, links, ranks) = area_ranks(&children, index, options, false, 1., false);
+        let (_, links, ranks) = area_ranks(&children, index, options, false, 1., false, pins);
         out.insert(
             parent.unwrap_or("<root>").to_string(),
             links
@@ -6019,6 +6097,7 @@ fn area_ranks(
     flattened: bool,
     isolated_pitch: f64,
     vertical: bool,
+    pins: &pinned::Places,
 ) -> (
     Vec<Option<usize>>,
     BTreeSet<(String, String)>,
@@ -6154,6 +6233,9 @@ fn area_ranks(
         && !flattened
     {
         spread_isolated(&ids, &outgoing, &incoming, isolated_pitch, &mut ranks);
+    }
+    if !flattened {
+        pinned::rank(&mut ranks, &links, pins);
     }
     (child_position, links, ranks)
 }
@@ -6431,6 +6513,7 @@ fn place(
         Mode::Orientation(_) | Mode::Chooser(_)
     );
     let reversals = ordering.reversals.clone();
+    let pins = ordering.pins.clone();
     let mut structural_input = placement_structure::Input::new(
         parent, &children, graph, index, options, plans, &reversals,
     );
@@ -6467,6 +6550,7 @@ fn place(
             !flattening.is_empty(),
             isolated_pitch,
             matches!(direction_for(graph, parent), Mode::Orientation(o) if o.vertical()),
+            &pins,
         );
         let owner = |id: usize| owner_among(&child_position, index, id);
         let mut levels: BTreeMap<usize, Vec<String>> = BTreeMap::new();
@@ -7716,6 +7800,14 @@ fn place(
             } else {
                 BTreeMap::new()
             };
+            // `pinsInSinglePass`: the pinned children of this area at their places across the flow.
+            let held: BTreeMap<id::Id, f64> = children
+                .iter()
+                .filter_map(|c| {
+                    let at = &ordering.pins.get(&c.id)?.at;
+                    Some((id::Id::from(&c.id), if vertical { at.x } else { at.y }))
+                })
+                .collect();
             let planned_tracks = if reuse_cross {
                 let lanes = lanes.as_ref().expect("hierarchical lane planning");
                 let input = placement_geometry::Input {
@@ -7765,6 +7857,7 @@ fn place(
                             &lead_room,
                             options.shared_border_ranks,
                             &stacked,
+                            &held,
                         );
                         placement_geometry::CrossPlan {
                             tracks: channel_tracks_by_edges(
@@ -7818,6 +7911,7 @@ fn place(
                             &lead_room,
                             options.shared_border_ranks,
                             &stacked,
+                            &held,
                         );
                         *border_orders.borrow_mut() = reordered;
                         cross_extent = cross_extent.max(reach + cross_gap);

@@ -9,15 +9,17 @@ pub struct Drawing {
 }
 
 /// Check support for growth without changing ranks, cross coordinates or port order.
-/// Only non-flattened, uniformly positive-flow hierarchies without pins, fixed
-/// container sizes, placement grids or extent bounds are supported.
+/// Only non-flattened, uniformly positive-flow hierarchies without pins (other than
+/// the pinned leaves of `pinsInSinglePass`), fixed container sizes, placement grids
+/// or extent bounds are supported.
 pub fn check_capability(
     graph: &Graph,
     plans: &LayeredPlans,
     options: &LayoutOptions,
 ) -> Result<(), String> {
     crate::validate(graph)?;
-    if !options.pins.is_empty() {
+    // `pinsInSinglePass`: a pinned leaf is a constraint of the placement, which this drawing already holds.
+    if !options.pins.is_empty() && !crate::pinned::applies(graph, options) {
         return Err("Fixed-order channel growth does not support pinned nodes".into());
     }
     if options.placement_grid != 0. || options.max_extent.is_some() {

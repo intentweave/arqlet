@@ -1939,6 +1939,8 @@ fn move_on_single_pass(snapshot: &Snapshot, step: &MoveStep) -> Option<Result<Sn
                         options.pins.insert(step.node.clone(), dropped);
                     }
                     _ => {
+                        // A released node loses its pin (`pinsInSinglePass` keeps a pinned view on single pass).
+                        options.pins.remove(&step.node);
                         if let Some(hint) = drop_order(snapshot, &step.node, &dropped) {
                             options.order_hints.insert(step.node.clone(), hint);
                         }
