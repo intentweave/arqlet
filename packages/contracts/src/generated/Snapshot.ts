@@ -7,6 +7,7 @@ import type { EditReport } from "./EditReport";
 import type { GeometryIssue } from "./GeometryIssue";
 import type { Gesture } from "./Gesture";
 import type { Graph } from "./Graph";
+import type { HeldGroup } from "./HeldGroup";
 import type { HubRef } from "./HubRef";
 import type { LayoutOptions } from "./LayoutOptions";
 import type { LayoutStrategy } from "./LayoutStrategy";
@@ -93,4 +94,9 @@ gesture?: Gesture | null,
  * (`"<root>"` for the top level), kept so that a later pass reuses the plans of the areas it does not place again.
  * Empty (and omitted) without the option.
  */
-layeredPlans?: { [key in string]: StoredAreaPlan }, };
+layeredPlans?: { [key in string]: StoredAreaPlan },
+/**
+ * Provisional (ADR 0022 M3b): the membership groups this layout holds together inside their owner
+ * (`LayoutOptions::hold_memberships`). Omitted when empty.
+ */
+heldGroups?: Array<HeldGroup>, };

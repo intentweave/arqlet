@@ -357,6 +357,13 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','back to the containment');
   assert.equal(latest.options?.groupingPriority,undefined);
 
+  // Hold groups together (ADR 0022 M3b): an option like any other, carried by the snapshot and shown again.
+  get('membership-hold').checked=true;get('membership-hold').onchange();await flush();
+  assert.equal(latest.options.holdMemberships,true);
+  assert.equal(get('membership-hold').checked,true,'the control shows the option');
+  get('membership-hold').checked=false;get('membership-hold').onchange();await flush();
+  assert.equal(latest.options?.holdMemberships,undefined,'off is omitted');
+
   // Only some groups (ADR 0022 §2, consider; a multiple select): held softly they are the only hulls; first, the only
   // boxes of their dimension.
   const payments=JSON.stringify(['team','payments']);

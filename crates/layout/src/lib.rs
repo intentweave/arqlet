@@ -11,6 +11,7 @@ pub mod constructive;
 mod engine_choice;
 mod global;
 pub mod hierarchy_order;
+pub mod holding;
 mod id;
 mod labels;
 pub mod layered_plan;
@@ -414,6 +415,25 @@ fn compute_counted_unclocked(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Provisional (ADR 0022 M3b, `holdMemberships`): a complete layout tries to hold the soft groups; one that continues
+    // an earlier drawing starts from the held places.
+    if holding::applies(graph, options) {
+        if previous.is_none() || graph.nodes.iter().all(|n| dirty.contains(&n.id)) {
+            return holding::hold(graph, options);
+        }
+        let plain = LayoutOptions {
+            hold_memberships: false,
+            ..options.clone()
+        };
+        let mut dirty = dirty.clone();
+        if let Some(p) = previous {
+            dirty.extend(holding::owners(p));
+        }
+        let (mut snapshot, stages) = compute_counted_unclocked(graph, previous, &dirty, &plain)?;
+        let earlier = previous.map_or(&[][..], |p| p.held_groups.as_slice());
+        holding::kept(&mut snapshot, options, earlier);
+        return Ok((snapshot, stages));
+    }
     // Provisional (`hubRefs`): the edges of hubs are taken out of the layout and kept as references to draw as stubs.
     if let Some((view, refs)) = hub_refs(graph, options.hub_refs) {
         // Room between the ranks for the stubs and their names: out of a node on its right, into one on its left (as the
@@ -5771,6 +5791,7 @@ fn placed_snapshot(
             .iter()
             .map(|(area, plan)| (area.clone(), plan.to_stored()))
             .collect(),
+        held_groups: Vec::new(),
         options: options.clone(),
         source_graph: None,
         collapsed_ids: vec![],

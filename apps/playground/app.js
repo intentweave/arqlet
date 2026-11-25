@@ -1207,6 +1207,9 @@ function syncDetails(){
  for(const option of considerSelect.children??[])option.selected=option.value?considered.has(option.value):considered.size===0;
  $('membership-hull').disabled=dimensions.length===0;
  $('membership-hull').value=o.membershipHull??'rectangle';
+ // Provisional (ADR 0022 M3b): holding needs a soft dimension to hold.
+ $('membership-hold').disabled=dimensions.length===0;
+ $('membership-hold').checked=!!o.holdMemberships;
 }
 /** The ids of the membership dimensions the current graph declares, in their declared order. */
 function membershipDimensions(){
@@ -1308,6 +1311,8 @@ function applyGrouping(label){
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
 $('grouping-first').onchange=()=>applyGrouping('Structure first');
 $('grouping-consider').onchange=()=>applyGrouping('Only groups');
+// Provisional (ADR 0022 M3b): the layout keeps soft groups together where that stays cheap. It moves nodes.
+$('membership-hold').onchange=()=>setOption({holdMemberships:$('membership-hold').checked},'Hold groups');
 // Provisional (ADR 0022 §3): the hull's outline. Sent as it is; the engine omits the default (rectangle) when it writes
 // the options back, so a snapshot that never chose a shape stays unchanged.
 $('membership-hull').onchange=()=>setOption({membershipHull:$('membership-hull').value},'Hull shape');

@@ -7,6 +7,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `holdMemberships` (provisional, ADR 0022 M3b, off by default): the layout keeps a soft membership group whose shown members
+  share a container together there, where that stays within a budget of crossings and bends. Snapshot `heldGroups`, report
+  `held`. It costs a layout per group tried. Playground: *Hold groups together*.
 - **`@arqlet/query`** (new npm package, provisional): the query-only WASM module with a loader and types — read-only
   openCypher queries over an Arqlet graph in the browser and Node, without the layout engine (1.08 MB, 0.34 MB gzip;
   `benchmarks/results/query-npm-20261125.md`). ADR 0021, M5c.

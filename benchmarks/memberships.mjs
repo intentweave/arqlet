@@ -10,13 +10,16 @@
 // A group is `inside` when all its drawn leaves have one container in the view, else `across`. Inside groups are what
 // holding within an owner (M3b) can improve, across groups need regions across owners (M3c).
 //
-// Usage: node benchmarks/memberships.mjs [--out FILE.jsonl]      (needs target/release/layout-command)
+// With `--hold`, every view is laid out with `holdMemberships` (M3b) and compared with the same view without it.
+//
+// Usage: node benchmarks/memberships.mjs [--hold] [--out FILE.jsonl]      (needs target/release/layout-command)
 import {readFileSync, writeFileSync, readdirSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {ROOT, LAYOUT_COMMAND, normalizeArqlet, metrics, round} from './eval/lib.mjs';
 
 const SEED = 22, SIZE = 4, LIMIT = 200;
 const at = process.argv.indexOf('--out');
+const HOLD = process.argv.includes('--hold');
 const OUT = at >= 0 ? process.argv[at + 1] : null;
 
 function run(request) {
@@ -71,8 +74,8 @@ function plant(graph, kind) {
 }
 
 const QUALITY = ['lineNodeHits', 'crossings', 'sharedEndpointCrossings', 'bends', 'length', 'area'];
-function view(graph, priority) {
-  const options = priority.length ? {groupingPriority: priority} : {};
+function view(graph, priority, hold = false) {
+  const options = {...(priority.length ? {groupingPriority: priority} : {}), ...(hold ? {holdMemberships: true} : {})};
   const {snapshot} = run({op: 'import', graph, limit: LIMIT, options});
   const m = metrics(normalizeArqlet(snapshot));
   return {snapshot, quality: Object.fromEntries(QUALITY.map(k => [k, round(m[k])]))};
@@ -110,8 +113,15 @@ function record(source, input, graph, dimensions) {
       refused.push({source, input, first, refused: error.message});
       continue;
     }
-    if (first === 'parent' && JSON.stringify(quality) !== JSON.stringify(base.quality)) throw new Error(`${input}: a soft criterion changed the layout`);
-    const row = {source, input, first, quality, baseline: base.quality, soft: {}};
+    const without = quality;
+    let held = 0, plain = null;
+    if (HOLD) {
+      plain = Object.fromEntries(dimensions.filter(d => d !== first).map(d => [d, stages(graph, snapshot, d)]));
+      ({snapshot, quality} = view(graph, [{by: first}, ...soft.map(by => ({by}))], true));
+      held = (snapshot.heldGroups ?? []).length;
+    }
+    if (!HOLD && first === 'parent' && JSON.stringify(quality) !== JSON.stringify(base.quality)) throw new Error(`${input}: a soft criterion changed the layout`);
+    const row = {source, input, first, quality, baseline: HOLD ? without : base.quality, ...(HOLD ? {held, plain} : {}), soft: {}};
     for (const d of dimensions) if (d !== first) row.soft[d] = stages(graph, snapshot, d);
     rows.push(row);
   }
@@ -134,13 +144,13 @@ const show = s => `${s.groups}: ${s.whole}/${s.split}/${s.marked}${s.other ? `/+
 console.log('\n| Source | Input | First | Soft | Inside: whole/split/marked | Across: whole/split/marked | Overlapping pairs |\n| --- | --- | --- | --- | --- | --- | --- |');
 for (const r of rows) for (const [d, s] of Object.entries(r.soft)) console.log(`| ${r.source} | ${r.input} | ${r.first} | ${d} | ${show(s.inside)} | ${show(s.across)} | ${s.overlappingPairs} |`);
 console.log('\n| Source | Input | First | Line-node hits | Crossings | Bends | Length | Area |\n| --- | --- | --- | --- | --- | --- | --- | --- |');
-for (const r of rows) if (r.first !== 'parent') {
+for (const r of rows) if (HOLD ? r.held : r.first !== 'parent') {
   const pair = k => `${Math.round(r.baseline[k])} → ${Math.round(r.quality[k])}`;
   const cross = q => q.crossings + q.sharedEndpointCrossings;
-  console.log(`| ${r.source} | ${r.input} | ${r.first} | ${pair('lineNodeHits')} | ${cross(r.baseline)} → ${cross(r.quality)} | ${pair('bends')} | ${pair('length')} | ${pair('area')} |`);
+  console.log(`| ${r.source} | ${r.input} | ${r.first}${HOLD ? ` (${r.held} held)` : ''} | ${pair('lineNodeHits')} | ${cross(r.baseline)} → ${cross(r.quality)} | ${pair('bends')} | ${pair('length')} | ${pair('area')} |`);
 }
-const sum = (source, where, key) => rows.filter(r => r.source === source && r.first === 'parent').flatMap(r => Object.values(r.soft)).reduce((n, s) => n + s[where][key], 0);
+const sum = (source, where, key, which) => rows.filter(r => r.source === source && r.first === 'parent').flatMap(r => Object.values(which === 'plain' ? r.plain : r.soft)).reduce((n, s) => n + s[where][key], 0);
 console.log('\nParent first, totals (groups: whole/split/marked):');
-for (const source of ['fixture', 'near', 'far']) for (const where of ['inside', 'across']) console.log(`${source} ${where} ${show(Object.fromEntries(['groups', 'whole', 'split', 'marked', 'other'].map(k => [k, sum(source, where, k)])))}`);
+for (const which of HOLD ? ['plain', 'held'] : ['']) for (const source of ['fixture', 'near', 'far']) for (const where of ['inside', 'across']) console.log(`${which && which + ' '}${source} ${where} ${show(Object.fromEntries(['groups', 'whole', 'split', 'marked', 'other'].map(k => [k, sum(source, where, k, which)])))}`);
 for (const r of refused) console.log(`Refused: ${r.source} ${r.input}, ${r.first} first: ${r.refused}`);
 if (OUT) writeFileSync(OUT, [...rows, ...refused].map(r => JSON.stringify(r)).join('\n') + '\n');
