@@ -85,7 +85,7 @@ pub(crate) fn place(input: &Input<'_>) -> Vec<Option<f64>> {
     } else {
         variants.swap_remove(narrowest)
     };
-    straighten(input, &rank_of, &mut chosen);
+    straighten(input, &rank_of, &mut chosen, &[], f64::NEG_INFINITY);
     let (lo, _) = extent(input, &chosen);
     let mut out = vec![None; n];
     for ids in input.ranks {
@@ -96,9 +96,22 @@ pub(crate) fn place(input: &Input<'_>) -> Vec<Option<f64>> {
     out
 }
 
+/// Edge straightening of a placement whose elements moved after `place` (`pinsInSinglePass`): as the last step of `place`,
+/// without moving the `held` elements or any element before `least`. `x` holds a start for every element of the ranks.
+pub(crate) fn straighten_around(input: &Input<'_>, x: &mut [f64], held: &[bool], least: f64) {
+    let mut rank_of = vec![usize::MAX; input.size.len()];
+    for (r, ids) in input.ranks.iter().enumerate() {
+        for &id in ids {
+            rank_of[id] = r;
+        }
+    }
+    straighten(input, &rank_of, x, held, least);
+}
+
 /// Edge straightening: an element none of whose segments is straight moves onto the line of one of its neighbours'
-/// ports, the nearest one its rank's order and gaps allow. Moving it straightens a segment and bends none.
-fn straighten(input: &Input<'_>, rank_of: &[usize], x: &mut [f64]) {
+/// ports, the nearest one its rank's order and gaps allow. Moving it straightens a segment and bends none. An element
+/// marked in `held` stays, and no first element of a rank moves before `least`.
+fn straighten(input: &Input<'_>, rank_of: &[usize], x: &mut [f64], held: &[bool], least: f64) {
     let n = input.size.len();
     let mut ends: Vec<Vec<(usize, f64, f64)>> = vec![Vec::new(); n];
     for s in input.segments {
@@ -116,14 +129,14 @@ fn straighten(input: &Input<'_>, rank_of: &[usize], x: &mut [f64]) {
     for _ in 0..2 {
         for ids in input.ranks {
             for (i, &v) in ids.iter().enumerate() {
-                if ends[v].is_empty() || straight(x, v) {
+                if ends[v].is_empty() || held.get(v) == Some(&true) || straight(x, v) {
                     continue;
                 }
                 let low = if i > 0 {
                     let p = ids[i - 1];
                     x[p] + input.size[p] + (input.space)(p, v)
                 } else {
-                    f64::NEG_INFINITY
+                    least
                 };
                 let high = if i + 1 < ids.len() {
                     let q = ids[i + 1];

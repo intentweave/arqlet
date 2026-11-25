@@ -2278,6 +2278,14 @@ pub struct LayoutOptions {
     /// than the default leaves a route room to leave a node that faces a neighbour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_gap: Option<f64>,
+    /// Experimental (ADR 0016, amendment *Pins in single pass*, step P1): under single pass, and in the hierarchical
+    /// pipeline it falls back to, a pinned leaf of an area that flows left to right or top to bottom is a constraint of the
+    /// arrangement: the pin chooses its rank and its order there and holds its place across the flow, and along the flow it
+    /// stands in its rank's band (the difference is reported in the layout diagnostics). Without it, and when a pin is
+    /// another one (a container, another strategy, a reversed flow), such a pin takes the view off that pipeline. Omitted
+    /// when off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pins_in_single_pass: bool,
     /// Experimental minimum-displacement overlap constraints for organic placement and repair. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub vpsc_overlap_removal: bool,
@@ -2853,6 +2861,7 @@ impl Default for LayoutOptions {
             edge_routing: None,
             organic_iterations: None,
             organic_gap: None,
+            pins_in_single_pass: false,
             vpsc_overlap_removal: false,
             directed_repair: false,
             organic_forces: true,

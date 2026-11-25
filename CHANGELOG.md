@@ -5,6 +5,19 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- Pins in the layered pipelines, behind `pinsInSinglePass` (provisional, off; ADR 0016 amendment, step P1, #174): a
+  pinned leaf of a layered area no longer takes the view off single pass, or off the hierarchical pipeline behind it.
+  The pin chooses the node's rank and its order there and holds its place across the flow; along the flow the node
+  stands in its rank's band, and the layout diagnostics say how far from the pin. Buses stay buses, and a drag that keeps
+  the pin keeps the pipeline. Pinned containers are unchanged. The playground has a checkbox for it.
+
+### Fixed
+
+- A released drag (`move`, `finish` with `release`) of a pinned node kept the pin on a view whose options ask for single
+  pass but whose graph it does not take (`can-bus`): the node stayed pinned where it was dropped. The pin is removed.
+
 ## 0.9.0 — 2026-11-24
 
 A visual release: one appearance for every renderer and a metro-map style, the GPU scene renderer for large views, and
