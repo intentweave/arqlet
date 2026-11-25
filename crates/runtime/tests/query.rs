@@ -162,16 +162,36 @@ fn errors_name_their_class_and_a_limit_stops_the_query() {
     );
     // No query text, a bad parameter: refused with a reason.
     assert_eq!(s.run_value(&json!({"op": "query"}))["ok"], false);
-    let bad = s.run_value(&json!({"op": "query", "query": "RETURN $p", "params": {"p": {"k": 1}}}));
+    let bad = s.run_value(&json!({"op": "query", "query": "RETURN $p", "params": {"p": u64::MAX}}));
     assert!(bad["error"].as_str().unwrap().contains("$p"), "{bad}");
 }
 
 #[test]
-fn a_map_valued_property_reads_as_null_and_is_counted() {
+fn a_map_valued_property_and_a_map_parameter_are_maps() {
     let mut s = session();
-    ok(s.run_value(&json!({"op": "payload", "set": {"nodes": {"a": {"meta": {"k": 1}, "n": 3}}}})));
+    ok(s.run_value(
+        &json!({"op": "payload", "set": {"nodes": {"a": {"meta": {"node": "x", "k": [1]}}}}}),
+    ));
     let a = ok(s.run_value(&json!({
-        "op": "query", "query": "MATCH (a) WHERE a.id = 'a' RETURN a.meta, a.n",
+        "op": "query",
+        "query": "MATCH (a) WHERE a.id = 'a' AND a.meta.k[0] = $p.one RETURN a.meta, a",
+        "params": {"p": {"one": 1}},
+    })));
+    // A map is tagged, so its key `node` is not taken for a node; the ids of the answer name nodes only.
+    assert_eq!(
+        a["rows"],
+        json!([[{"map": {"k": [1], "node": "x"}}, {"node": "a"}]])
+    );
+    assert_eq!(a["nodes"], json!(["a"]));
+    assert!(a.get("skippedValues").is_none(), "{a}");
+}
+
+#[test]
+fn a_property_the_query_layer_has_no_type_for_reads_as_null_and_is_counted() {
+    let mut s = session();
+    ok(s.run_value(&json!({"op": "payload", "set": {"nodes": {"a": {"big": u64::MAX, "n": 3}}}})));
+    let a = ok(s.run_value(&json!({
+        "op": "query", "query": "MATCH (a) WHERE a.id = 'a' RETURN a.big, a.n",
     })));
     assert_eq!(a["rows"], json!([[null, 3]]));
     assert_eq!(a["skippedValues"], 1);

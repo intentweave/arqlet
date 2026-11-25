@@ -11,7 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// How many of the supported cases pass today. Raised by every stage that makes more of them pass.
-const MIN_PASSING: usize = 64;
+const MIN_PASSING: usize = 80;
 
 fn fixture(path: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -29,7 +29,12 @@ fn json_value(v: &serde_json::Value) -> Value {
             .map_or_else(|| Value::Float(n.as_f64().unwrap_or(f64::NAN)), Value::Int),
         serde_json::Value::String(s) => Value::String(s.clone()),
         serde_json::Value::Array(items) => Value::List(items.iter().map(json_value).collect()),
-        serde_json::Value::Object(_) => Value::Null, // maps are not values of this layer yet
+        serde_json::Value::Object(entries) => Value::Map(
+            entries
+                .iter()
+                .map(|(k, v)| (k.clone(), json_value(v)))
+                .collect(),
+        ),
     }
 }
 
@@ -157,6 +162,10 @@ fn to_json(v: &Value) -> serde_json::Value {
         Value::Float(f) => serde_json::json!(f),
         Value::String(s) => serde_json::json!(s),
         Value::List(items) => serde_json::Value::Array(items.iter().map(to_json).collect()),
+        Value::Map(entries) => serde_json::json!({ "map": entries
+            .iter()
+            .map(|(k, v)| (k.clone(), to_json(v)))
+            .collect::<serde_json::Map<_, _>>() }),
         Value::Node(n) => serde_json::json!(format!("node {}", n.0)),
         Value::Edge(e) => serde_json::json!(format!("edge {}", e.0)),
     }

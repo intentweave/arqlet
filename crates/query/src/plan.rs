@@ -154,6 +154,21 @@ pub enum Expr {
     },
     /// A scalar function with its arguments, as many as [`Function::arity`] allows.
     Call(Function, Vec<Expr>),
+    /// `{key: value, …}`; every key once.
+    Map(Vec<(String, Expr)>),
+    /// `base[index]`: an item of a list (from the end when negative), the value of a key of a map, or a property of a
+    /// node or relationship.
+    Index(Box<Expr>, Box<Expr>),
+    /// `list[from..to]`: `from` included, `to` not; either may be left out and negative counts from the end.
+    Slice(Box<Expr>, Option<Box<Expr>>, Option<Box<Expr>>),
+    /// `[x IN list WHERE filter | map]`: `slot` is `x`, which holds each item in turn and exists inside `filter` and
+    /// `map` only.
+    Comprehension {
+        slot: Slot,
+        list: Box<Expr>,
+        filter: Option<Box<Expr>>,
+        map: Option<Box<Expr>>,
+    },
 }
 
 /// A scalar function (ADR 0021, "The function table").
@@ -234,6 +249,31 @@ impl Expr {
             Expr::Binary(_, a, b) | Expr::In(a, b) => {
                 f(a);
                 f(b);
+            }
+            Expr::Map(entries) => entries.iter_mut().for_each(|(_, value)| f(value)),
+            Expr::Index(a, b) => {
+                f(a);
+                f(b);
+            }
+            Expr::Slice(list, from, to) => {
+                f(list);
+                if let Some(x) = from {
+                    f(x);
+                }
+                if let Some(x) = to {
+                    f(x);
+                }
+            }
+            Expr::Comprehension {
+                list, filter, map, ..
+            } => {
+                f(list);
+                if let Some(x) = filter {
+                    f(x);
+                }
+                if let Some(x) = map {
+                    f(x);
+                }
             }
             Expr::Compare(left, chain) => {
                 f(left);

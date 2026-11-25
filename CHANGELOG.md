@@ -9,6 +9,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that
   names a variable the pattern binds itself) is refused as unsupported instead of answered with null.
+- **Query layer: maps and list expressions** (ADR 0021, provisional): map literals, list comprehension, `list[i]`,
+  `list[from..to]`, `map['key']` and `+` on lists. The query module grows by 4.6 % (gzip 5.7 %,
+  `benchmarks/results/query-expressions-20261125.md`). For users of `arqlet-query`: `Value` has the new variant `Map`,
+  `plan::Expr` the variants `Map`, `Index`, `Slice` and `Comprehension`.
+- **Changed (query layer):** a map in a payload, in a session's content or in a parameter is a map; before, the payload
+  and parameters refused it and the engine's query read it as null (`skippedValues`). In a JSON answer a map is
+  `{"map": {…}}`.
 - **Query layer: functions and `UNION`** (ADR 0021, provisional): `id`, `elementId`, `type`, `labels`, `size`,
   `coalesce`, `toString`, `toUpper`, `toLower`, `trim`, `ltrim`, `rtrim`, `replace`, `substring`, `left`, `right`,
   `split`, `reverse`, and `UNION [ALL]`. `id` gives the model's string id. The query module grows by 2.2 % (gzip 2.4 %,

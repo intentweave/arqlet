@@ -254,6 +254,40 @@ def cases():
     add("union-05", "spike", "MATCH (n:Person) RETURN n.name AS x ORDER BY n.age DESC LIMIT 1 UNION ALL MATCH (n:Person) RETURN n.name AS x ORDER BY n.age LIMIT 1", "supported", lambda g: [[max(people(g), key=lambda p: p["age"])["name"]], [min(people(g), key=lambda p: p["age"])["name"]]], ["x"], payload=P, note="ORDER BY and LIMIT belong to their part")
     add("union-06", "spike", "MATCH ()-[r:KNOWS]->() RETURN count(r) AS c UNION ALL MATCH ()-[r:FOLLOWS]->() RETURN count(r) AS c", "supported", lambda g: [[len(g.of_kind("KNOWS"))], [len(g.of_kind("FOLLOWS"))]], ["c"], payload=P)
     add("union-07", "spike", "MATCH (n:Person) RETURN n.nick AS x UNION RETURN null AS x", "supported", lambda g: [[None]], ["x"], payload=P, note="null is a duplicate of null")
+
+    # Maps, list comprehension, indexing, slicing, `+` on lists, and grouping expressions beside an aggregate
+    # (2026-11-25). A map in a row is written `{"map": {...}}`, as nodes and edges are tagged.
+    def mp(**entries):
+        return {"map": entries}
+
+    def knows_by_source(g):
+        known = collections.defaultdict(list)
+        for e in g.of_kind("KNOWS"):
+            known[g.nodes[e["source"]]["name"]].append(g.nodes[e["target"]]["name"])
+        return known
+
+    def dee_paths(g):
+        first = [e for e in g.edges if e["source"] == "dee" and e["kind"] in ("FOLLOWS", "KNOWS")]
+        return [[g.nodes[b["target"]]["name"], [a["kind"], b["kind"]]] for a in first for b in g.of_kind("FOLLOWS", "KNOWS") if b["source"] == a["target"] and b["id"] != a["id"]]
+
+    TEN = [10, 20, 30]
+    FOUR = [1, 2, 3, 4]
+    add("expr-01", "spike", "RETURN {a: [1, 2, {b: 'c'}], d: null} AS m", "supported", lambda g: [[mp(a=[1, 2, mp(b="c")], d=None)]], ["m"], payload=P)
+    add("expr-02", "spike", "MATCH (n:Person) RETURN {name: n.name, adult: n.age >= 18} AS m", "supported", per_person(lambda p: [mp(name=p["name"], adult=p["age"] >= 18)]), ["m"], payload=P)
+    add("expr-03", "spike", "MATCH (n:Person) WITH {who: n.name, ages: [n.age]} AS m RETURN m.who, m['ages'][0], m.nope", "supported", per_person(lambda p: [p["name"], p["age"], None]), ["m.who", "m['ages'][0]", "m.nope"], payload=P)
+    add("expr-04", "spike", "RETURN [10, 20, 30][0] AS a, [10, 20, 30][-1] AS b, [10, 20, 30][3] AS c, [10, 20, 30][-4] AS d, [10, 20, 30][null] AS e", "supported", lambda g: [[TEN[0], TEN[-1], None, None, None]], ["a", "b", "c", "d", "e"], payload=P, note="outside the list is null")
+    add("expr-05", "spike", "RETURN [1, 2, 3, 4][1..3] AS a, [1, 2, 3, 4][..-1] AS b, [1, 2, 3, 4][2..] AS c, [1, 2, 3, 4][3..1] AS d, [1, 2, 3, 4][-9..9] AS e, [1, 2][null..] AS f", "supported", lambda g: [[FOUR[1:3], FOUR[:-1], FOUR[2:], FOUR[3:1], FOUR[-9:9], None]], ["a", "b", "c", "d", "e", "f"], payload=P)
+    add("expr-06", "spike", "RETURN [x IN [1, 2, 3, 4] WHERE x % 2 = 0 | x * x] AS a, [x IN [1, 2] | x + 1] AS b, [x IN [1, 2, 3] WHERE x > 1] AS c, [x IN [] | x] AS d, [x IN null | x] AS e", "supported", lambda g: [[[x * x for x in FOUR if x % 2 == 0], [2, 3], [2, 3], [], None]], ["a", "b", "c", "d", "e"], payload=P)
+    add("expr-07", "spike", "MATCH (n:Person) WITH collect(n) AS people RETURN [p IN people WHERE p.age > 28 | p.name] AS older", "supported", lambda g: [[older(g, 28)]], ["older"], payload=P)
+    add("expr-08", "spike", "MATCH (a:Person {name: 'Dee'})-[path:FOLLOWS|KNOWS*2]->(b) RETURN b.name, [r IN path | type(r)] AS types", "supported", dee_paths, ["b.name", "types"], payload=P, note="the edges of a path as a list")
+    add("expr-09", "spike", "WITH [1, 2] AS l RETURN [x IN l | [y IN l WHERE y >= x | y * 10]] AS n", "supported", lambda g: [[[[y * 10 for y in [1, 2] if y >= x] for x in [1, 2]]]], ["n"], payload=P, note="a comprehension inside a comprehension reads the outer variable")
+    add("expr-10", "spike", "RETURN [1] + [2, 3] AS a, [1] + 2 AS b, 0 + [1] AS c, [1] + null AS d", "supported", lambda g: [[[1, 2, 3], [1, 2], [0, 1], None]], ["a", "b", "c", "d"], payload=P)
+    add("expr-11", "spike", "RETURN {a: 1} = {a: 1} AS a, {a: 1} = {a: 2} AS b, {a: null} = {a: null} AS c, {a: 1} = {b: 1} AS d", "supported", lambda g: [[True, False, None, False]], ["a", "b", "c", "d"], payload=P)
+    add("expr-12", "spike", "MATCH (n:Person) RETURN DISTINCT {adult: n.age >= 18} AS m", "supported", lambda g: distinct([[mp(adult=p["age"] >= 18)] for p in people(g)]), ["m"], payload=P)
+    add("expr-13", "spike", "MATCH (n:Person) RETURN n['na' + 'me'] AS name, n['nope'] AS none", "supported", per_person(lambda p: [p["name"], None]), ["name", "none"], payload=P)
+    add("expr-14", "spike", "MATCH (a:Person)-[:KNOWS]->(b) RETURN a.name AS n, [a.name, count(*)] AS l", "supported", lambda g: [[k, [k, len(v)]] for k, v in knows_by_source(g).items()], ["n", "l"], payload=P, note="a grouping expression beside an aggregate keeps its value")
+    add("expr-15", "spike", "MATCH (a:Person)-[:KNOWS]->(b) RETURN a.name AS n, a.name + ':' + toString(count(*)) AS s", "supported", lambda g: [[k, f"{k}:{len(v)}"] for k, v in knows_by_source(g).items()], ["n", "s"], payload=P)
+    add("expr-16", "spike", "MATCH (a:Person)-[:KNOWS]->(b) RETURN a.name AS n, [x IN collect(b.name) WHERE x <> a.name | x + '<' + a.name] AS l", "supported", lambda g: [[k, [f"{x}<{k}" for x in v if x != k]] for k, v in knows_by_source(g).items()], ["n", "l"], payload=P, note="a comprehension over an aggregate that uses the grouping expression")
     return C
 
 

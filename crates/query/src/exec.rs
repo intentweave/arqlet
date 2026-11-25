@@ -16,6 +16,8 @@ use crate::plan::{
 use crate::store::GraphStore;
 use crate::value::{EdgeId, NodeId, Value};
 use crate::QueryError;
+use std::borrow::Cow;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -61,8 +63,9 @@ pub fn execute(
         store,
         params,
         limits,
-        steps: 0,
+        steps: Cell::new(0),
         slots: plan.slots,
+        locals: RefCell::new(Vec::new()),
     };
     run.run(plan)
 }
@@ -71,8 +74,11 @@ struct Run<'a> {
     store: &'a dyn GraphStore,
     params: &'a BTreeMap<String, Value>,
     limits: Limits,
-    steps: u64,
+    /// Counted in a cell: an expression that goes through a list counts too.
+    steps: Cell<u64>,
     slots: usize,
+    /// The variables of the comprehensions being evaluated, innermost last: each with its slot and its current item.
+    locals: RefCell<Vec<(usize, Value)>>,
 }
 
 impl Run<'_> {
@@ -106,7 +112,8 @@ impl Run<'_> {
         if rows > self.limits.max_rows {
             return Err(QueryError::limit(format!(
                 "stopped: more than {} rows (the row limit) after {} steps",
-                self.limits.max_rows, self.steps
+                self.limits.max_rows,
+                self.steps.get()
             )));
         }
         Ok(())
@@ -137,12 +144,13 @@ impl Run<'_> {
         Ok(out)
     }
 
-    fn tick(&mut self, n: usize) -> Result<(), QueryError> {
-        self.steps = self.steps.saturating_add(n as u64);
-        if self.steps > self.limits.max_steps {
+    fn tick(&self, n: usize) -> Result<(), QueryError> {
+        let steps = self.steps.get().saturating_add(n as u64);
+        self.steps.set(steps);
+        if steps > self.limits.max_steps {
             return Err(QueryError::limit(format!(
-                "stopped after {} steps (the work budget is {})",
-                self.steps, self.limits.max_steps
+                "stopped after {steps} steps (the work budget is {})",
+                self.limits.max_steps
             )));
         }
         Ok(())
@@ -538,18 +546,37 @@ impl Run<'_> {
             Expr::Param(name) => self.params.get(name).cloned().ok_or_else(|| {
                 QueryError::runtime(format!("the parameter ${name} was not supplied"))
             })?,
-            Expr::Slot(slot) => row[*slot].clone(),
-            Expr::Property(base, key) => match self.eval(base, row)? {
-                Value::Null => Value::Null,
-                Value::Node(node) => self.store.node_property(node, key),
-                Value::Edge(edge) => self.store.edge_property(edge, key),
-                other => {
-                    return Err(QueryError::runtime(format!(
-                        "cannot read the property `{key}` of a {}",
-                        other.kind()
-                    )))
-                }
+            Expr::Slot(slot) => match self.local(*slot) {
+                Some(item) => item,
+                None => row[*slot].clone(),
             },
+            Expr::Property(base, key) => {
+                let base = self.borrow(base, row)?;
+                self.property(&base, key)?
+            }
+            Expr::Map(entries) => {
+                let mut map = BTreeMap::new();
+                let mut bytes = 16u64;
+                for (key, expr) in entries {
+                    let value = self.eval(expr, row)?;
+                    bytes = bytes.saturating_add(key.len() as u64 + weight(&value) as u64);
+                    functions::fits(bytes)?;
+                    map.insert(key.clone(), value);
+                }
+                Value::Map(map)
+            }
+            Expr::Index(base, index) => {
+                let base = self.borrow(base, row)?;
+                let index = self.eval(index, row)?;
+                self.index(&base, &index)?
+            }
+            Expr::Slice(list, from, to) => self.slice(list, from.as_deref(), to.as_deref(), row)?,
+            Expr::Comprehension {
+                slot,
+                list,
+                filter,
+                map,
+            } => self.comprehension(*slot, list, filter.as_deref(), map.as_deref(), row)?,
             Expr::List(items) => {
                 // Weighed item by item: the list is refused before it holds much more than the limit.
                 let mut values = Vec::with_capacity(items.len());
@@ -653,6 +680,169 @@ impl Run<'_> {
                     None => Value::Null,
                 }
             }
+        })
+    }
+
+    /// The current item of the comprehension variable in `slot`, if `slot` is one.
+    fn local(&self, slot: usize) -> Option<Value> {
+        let locals = self.locals.borrow();
+        locals
+            .iter()
+            .rev()
+            .find(|(s, _)| *s == slot)
+            .map(|(_, item)| item.clone())
+    }
+
+    /// The value of an expression, read in place when it is a variable of the row: a list or a map that is only looked
+    /// into is not copied.
+    fn borrow<'r>(&self, expr: &Expr, row: &'r Row) -> Result<Cow<'r, Value>, QueryError> {
+        if let Expr::Slot(slot) = expr {
+            if !self.locals.borrow().iter().any(|(s, _)| s == slot) {
+                return Ok(Cow::Borrowed(&row[*slot]));
+            }
+        }
+        Ok(Cow::Owned(self.eval(expr, row)?))
+    }
+
+    /// `base.key`.
+    fn property(&self, base: &Value, key: &str) -> Result<Value, QueryError> {
+        Ok(match base {
+            Value::Null => Value::Null,
+            Value::Node(node) => self.store.node_property(*node, key),
+            Value::Edge(edge) => self.store.edge_property(*edge, key),
+            Value::Map(map) => map.get(key).cloned().unwrap_or(Value::Null),
+            other => {
+                return Err(QueryError::runtime(format!(
+                    "cannot read the property `{key}` of a {}",
+                    other.kind()
+                )))
+            }
+        })
+    }
+
+    /// `base[index]`.
+    fn index(&self, base: &Value, index: &Value) -> Result<Value, QueryError> {
+        match (base, index) {
+            (Value::Null, _) | (_, Value::Null) => Ok(Value::Null),
+            (Value::List(items), Value::Int(i)) => {
+                let at = if *i < 0 {
+                    (items.len() as i64).saturating_add(*i)
+                } else {
+                    *i
+                };
+                Ok(usize::try_from(at)
+                    .ok()
+                    .and_then(|at| items.get(at))
+                    .cloned()
+                    .unwrap_or(Value::Null))
+            }
+            (Value::Map(_) | Value::Node(_) | Value::Edge(_), Value::String(key)) => {
+                self.property(base, key)
+            }
+            _ => Err(QueryError::runtime(format!(
+                "cannot index a {} with a value of type {}",
+                base.kind(),
+                index.kind()
+            ))),
+        }
+    }
+
+    /// `list[from..to]`; null when the list or a bound is null.
+    fn slice(
+        &self,
+        list: &Expr,
+        from: Option<&Expr>,
+        to: Option<&Expr>,
+        row: &Row,
+    ) -> Result<Value, QueryError> {
+        let list = self.borrow(list, row)?;
+        let items = match list.as_ref() {
+            Value::Null => return Ok(Value::Null),
+            Value::List(items) => items,
+            other => {
+                return Err(QueryError::runtime(format!(
+                    "cannot slice a {}",
+                    other.kind()
+                )))
+            }
+        };
+        let length = items.len() as i64;
+        // A bound as a position within the list: from the end when negative, never outside it.
+        let bound = |expr: Option<&Expr>, missing: i64| -> Result<Option<usize>, QueryError> {
+            let at = match expr {
+                None => missing,
+                Some(e) => match self.eval(e, row)? {
+                    Value::Null => return Ok(None),
+                    Value::Int(i) if i < 0 => length.saturating_add(i),
+                    Value::Int(i) => i,
+                    other => {
+                        return Err(QueryError::runtime(format!(
+                            "a slice takes integers, not a {}",
+                            other.kind()
+                        )))
+                    }
+                },
+            };
+            Ok(Some(at.clamp(0, length) as usize))
+        };
+        let (from, to) = (bound(from, 0)?, bound(to, length)?);
+        Ok(match (from, to) {
+            (Some(from), Some(to)) => Value::List(items[from..to.max(from)].to_vec()),
+            _ => Value::Null,
+        })
+    }
+
+    /// `[x IN list WHERE filter | map]`. Every item visited is a step of the work budget.
+    fn comprehension(
+        &self,
+        slot: usize,
+        list: &Expr,
+        filter: Option<&Expr>,
+        map: Option<&Expr>,
+        row: &Row,
+    ) -> Result<Value, QueryError> {
+        let items = match self.eval(list, row)? {
+            Value::Null => return Ok(Value::Null),
+            Value::List(items) => items,
+            other => {
+                return Err(QueryError::runtime(format!(
+                    "a list comprehension goes through a list, not a {}",
+                    other.kind()
+                )))
+            }
+        };
+        let mut out = Vec::new();
+        let mut bytes = 16u64;
+        for item in items {
+            self.tick(1)?;
+            self.locals.borrow_mut().push((slot, item));
+            let found = self.comprehended(slot, filter, map, row);
+            self.locals.borrow_mut().pop();
+            if let Some(value) = found? {
+                bytes = bytes.saturating_add(weight(&value) as u64);
+                functions::fits(bytes)?;
+                out.push(value);
+            }
+        }
+        Ok(Value::List(out))
+    }
+
+    /// What one item of a comprehension gives, if it passes the filter.
+    fn comprehended(
+        &self,
+        slot: usize,
+        filter: Option<&Expr>,
+        map: Option<&Expr>,
+        row: &Row,
+    ) -> Result<Option<Value>, QueryError> {
+        if let Some(filter) = filter {
+            if truth(&self.eval(filter, row)?, "WHERE")? != Some(true) {
+                return Ok(None);
+            }
+        }
+        Ok(match map {
+            Some(map) => Some(self.eval(map, row)?),
+            None => self.local(slot),
         })
     }
 
@@ -813,6 +1003,20 @@ fn equals(a: &Value, b: &Value) -> Option<bool> {
             }
             result
         }
+        (Value::Map(x), Value::Map(y)) => {
+            if !x.keys().eq(y.keys()) {
+                return Some(false);
+            }
+            let mut result = Some(true);
+            for (p, q) in x.values().zip(y.values()) {
+                match equals(p, q) {
+                    Some(false) => return Some(false),
+                    None => result = None,
+                    Some(true) => {}
+                }
+            }
+            result
+        }
         _ => Some(false),
     }
 }
@@ -848,6 +1052,7 @@ fn compare_op(op: CmpOp, a: &Value, b: &Value) -> Option<bool> {
 fn total_order(a: &Value, b: &Value) -> Ordering {
     fn rank(v: &Value) -> u8 {
         match v {
+            Value::Map(_) => 0,
             Value::List(_) => 1,
             Value::String(_) => 2,
             Value::Bool(_) => 3,
@@ -871,6 +1076,14 @@ fn total_order(a: &Value, b: &Value) -> Ordering {
             }
             x.len().cmp(&y.len())
         }
+        // Maps: by their keys, then by the values of those keys (provisional).
+        (Value::Map(x), Value::Map(y)) => x.keys().cmp(y.keys()).then_with(|| {
+            x.values()
+                .zip(y.values())
+                .map(|(p, q)| null_last(p, q))
+                .find(|o| *o != Ordering::Equal)
+                .unwrap_or(Ordering::Equal)
+        }),
         (Value::Node(x), Value::Node(y)) => x.cmp(y),
         (Value::Edge(x), Value::Edge(y)) => x.cmp(y),
         _ => order(a, b).unwrap_or(Ordering::Equal),
@@ -906,6 +1119,14 @@ fn group_key<'a>(values: impl Iterator<Item = &'a Value>) -> String {
                 }
                 out.push_str("];");
             }
+            Value::Map(entries) => {
+                out.push('{');
+                for (key, value) in entries {
+                    out.push_str(&format!("{}:{key}", key.len()));
+                    push(value, out);
+                }
+                out.push_str("};");
+            }
             Value::Node(n) => out.push_str(&format!("N{};", n.0)),
             Value::Edge(e) => out.push_str(&format!("E{};", e.0)),
         }
@@ -937,6 +1158,22 @@ fn overflow() -> QueryError {
 fn arithmetic(op: BinOp, l: Value, r: Value) -> Result<Value, QueryError> {
     if l.is_null() || r.is_null() {
         return Ok(Value::Null);
+    }
+    // `+` with a list on either side: two lists joined, or a value put at the end or the start.
+    if op == BinOp::Add && (matches!(l, Value::List(_)) || matches!(r, Value::List(_))) {
+        functions::fits(weight(&l) as u64 + weight(&r) as u64)?;
+        return Ok(Value::List(match (l, r) {
+            (Value::List(mut x), Value::List(y)) => {
+                x.extend(y);
+                x
+            }
+            (Value::List(mut x), y) => {
+                x.push(y);
+                x
+            }
+            (x, Value::List(y)) => std::iter::once(x).chain(y).collect(),
+            (x, y) => vec![x, y], // unreachable: one side is a list
+        }));
     }
     match (&l, &r) {
         (Value::Int(x), Value::Int(y)) => {

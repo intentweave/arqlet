@@ -20,6 +20,8 @@ pub enum Value {
     Float(f64),
     String(String),
     List(Vec<Value>),
+    /// Keys in their order as strings.
+    Map(std::collections::BTreeMap<String, Value>),
     Node(NodeId),
     Edge(EdgeId),
 }
@@ -38,6 +40,7 @@ impl Value {
             Value::Float(_) => "float",
             Value::String(_) => "string",
             Value::List(_) => "list",
+            Value::Map(_) => "map",
             Value::Node(_) => "node",
             Value::Edge(_) => "relationship",
         }

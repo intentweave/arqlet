@@ -26,6 +26,9 @@ pub(crate) fn weight(v: &Value) -> usize {
         Value::List(items) => items
             .iter()
             .fold(16, |sum: usize, item| sum.saturating_add(weight(item))),
+        Value::Map(entries) => entries.iter().fold(16, |sum: usize, (key, value)| {
+            sum.saturating_add(key.len()).saturating_add(weight(value))
+        }),
         _ => 16,
     }
 }

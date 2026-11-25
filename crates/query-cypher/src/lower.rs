@@ -142,6 +142,22 @@ fn check_expr(expr: &Expr, there: &BTreeSet<usize>, arenas: &HirArenas) -> Resul
     if let Expr::Slot(slot) = expr {
         return read(*slot, there, arenas);
     }
+    // The variable of a comprehension is there inside its filter and its map, not in its list.
+    if let Expr::Comprehension {
+        slot,
+        list,
+        filter,
+        map,
+    } = expr
+    {
+        check_expr(list, there, arenas)?;
+        let mut inside = there.clone();
+        inside.insert(*slot);
+        for e in [filter, map].into_iter().flatten() {
+            check_expr(e, &inside, arenas)?;
+        }
+        return Ok(());
+    }
     let mut result = Ok(());
     expr.clone().for_each_child_mut(&mut |child| {
         if result.is_ok() {
@@ -393,6 +409,10 @@ impl Lowering<'_> {
     /// An expression of a clause that may follow an aggregation.
     fn after(&self, id: ExprId) -> Result<Expr, QueryError> {
         Ok(regroup(self.expr(id)?, &self.grouped))
+    }
+
+    fn optional(&self, id: Option<ExprId>) -> Result<Option<Box<Expr>>, QueryError> {
+        id.map(|id| self.expr(id).map(Box::new)).transpose()
     }
 
     fn fresh(&mut self) -> usize {
@@ -666,6 +686,33 @@ impl Lowering<'_> {
                 args,
                 *distinct,
             )?,
+            ExprKind::Map(entries) => {
+                let mut out: Vec<(String, Expr)> = Vec::new();
+                for (key, value) in entries {
+                    let key = self.arenas.property_keys.name_of(*key).unwrap_or("");
+                    if out.iter().any(|(k, _)| k == key) {
+                        return Err(QueryError::unsupported(format!(
+                            "a map with the key `{key}` twice is not decided (ADR 0021)"
+                        )));
+                    }
+                    out.push((key.to_string(), self.expr(*value)?));
+                }
+                Expr::Map(out)
+            }
+            ExprKind::ListIndex { list, index } => {
+                Expr::Index(Box::new(self.expr(*list)?), Box::new(self.expr(*index)?))
+            }
+            ExprKind::ListSlice { list, start, end } => Expr::Slice(
+                Box::new(self.expr(*list)?),
+                self.optional(*start)?,
+                self.optional(*end)?,
+            ),
+            ExprKind::ListComprehension(c) => Expr::Comprehension {
+                slot: c.variable.0,
+                list: Box::new(self.expr(c.collection)?),
+                filter: self.optional(c.filter)?,
+                map: self.optional(c.map)?,
+            },
             ExprKind::IsNull { operand, negated } => {
                 Expr::IsNull(Box::new(self.expr(*operand)?), *negated)
             }
