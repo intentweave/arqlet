@@ -417,6 +417,12 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   with a pin or an order hint, graphs with buses. A complete layout holds; an edit of a part starts from the held places and
   may release a group, which the snapshot then no longer lists (`heldGroups`). A drawing that holds something is not refined
   until candidates hold as well. Open for M3d: the budget, per group and in total, and the number of trials.
+  **M3c, across containers, probed and not built** (2026-11-25;
+  [levers](../../benchmarks/results/memberships-20261125-hold-across.md),
+  [alignment](../../benchmarks/results/memberships-20261125-hold-aligned.md)): nested pieces, pieces at the facing borders and
+  owners pulled together make 10 of 35 groups whole, 5 of them in the M3b budget. Aligning the pieces across the flow brings the
+  groups with two owners from 9 to 12 of 19, and none of the added ones is in the budget. Pieces and marks stay the answer for
+  groups across containers until real groupings say otherwise.
 - **M4 — lanes** (`as: lanes`): at rank 1 across the drawing, below a higher rank inside each owner, two of them as a grid.
   *Exit:* the gate; `pools-and-lanes.json` with its `groupingPriority` draws as the 2×3 grid with no lane violation;
   `three-dimensions.json` reports what it cannot satisfy.
