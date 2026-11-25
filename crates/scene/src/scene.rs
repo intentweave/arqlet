@@ -72,6 +72,10 @@ pub struct SceneMark {
     pub label: String,
     /// The box that carries the mark: the member's own box, or the box that stands for it.
     pub node: String,
+    /// The group's own box, when the view still draws it and this member left it: what the mark points back to.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub own_box: Option<String>,
 }
 
 /// Provisional (ADR 0022, first slice): the hull of one membership group, drawn behind the nodes. `points` is a closed
@@ -137,7 +141,7 @@ pub struct SceneMembershipReport {
     /// Kept beside `intruders` for one version: splitting lowers `intruders` by construction, which is not a layout gain.
     pub intruders_whole: usize,
     /// Groups the view still draws as a box that lost some members to another criterion: only those members are drawn,
-    /// joined to the box where that encloses nothing foreign (ADR 0022 §3). The box shows the rest.
+    /// joined to the box where that is compact and encloses nothing foreign, else marked (ADR 0022 §3). The box shows the rest.
     pub kept_box: usize,
     pub summary: String,
 }
@@ -697,10 +701,14 @@ const HULL_PADDING: f64 = 10.;
 /// drawn as hulls. A placeholder until M3 measures where the switch lies.
 pub const MARKS_ABOVE_PIECES: usize = 3;
 
+/// Provisional (ADR 0022 §3): a hull that joins a group's own box to the members that left it may add at most this many
+/// times the area of those members; beyond it the members are marked. A placeholder until M3 measures it.
+const JOINED_GROWTH_LIMIT: f64 = 4.;
+
 /// Provisional (ADR 0022 §2–§3, M1 and M2b): the hulls and marks of the soft criteria of the grouping priority, and the
 /// report of every criterion it lists. The first criterion owns: its groups are the view's containers
 /// (`with_grouping_priority`), so it draws no hull. Every later criterion holds its members softly — the parent hierarchy
-/// too, once it is moved down, around the descendants of each source container — and draws each group in the first form
+/// too, once it is moved down, around the children of each source container — and draws each group in the first form
 /// that encloses no foreign box (`hull::pieces`): one hull, else one per owner, else pieces by distance; a group in more
 /// than `MARKS_ABOVE_PIECES` pieces is marked instead. A hull that would only trace a box the view already draws (every
 /// member owned by that very group) is left out.
@@ -761,26 +769,13 @@ fn membership_overlays(
         }
         None
     };
-    // The descendants of every source container, for the parent hierarchy as a soft criterion.
+    // The children of every source container, for the parent hierarchy as a soft criterion.
     let mut children: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for n in &source.nodes {
         if let Some(p) = n.parent_id.as_deref() {
             children.entry(p).or_default().push(n.id.as_str());
         }
     }
-    let descendants = |root: &str| -> Vec<String> {
-        let mut out = Vec::new();
-        let mut stack: Vec<&str> = children.get(root).cloned().unwrap_or_default();
-        stack.reverse();
-        while let Some(id) = stack.pop() {
-            out.push(id.to_string());
-            if let Some(more) = children.get(id) {
-                stack.extend(more.iter().rev());
-            }
-        }
-        out
-    };
-
     let mut hulls = Vec::new();
     let mut marks = Vec::new();
     let mut reports = Vec::new();
@@ -801,8 +796,15 @@ fn membership_overlays(
         if criterion.by == PARENT {
             dimension_label = "Parent".into();
             for n in &source.nodes {
-                if children.contains_key(n.id.as_str()) {
-                    groups.push((n.id.clone(), n.label.clone(), descendants(&n.id)));
+                // Only the children, not every descendant: a nested hierarchy would repeat one hull per level around the
+                // same nodes. A child container the projection dropped has no box; its children are its own group.
+                if let Some(of) = children.get(n.id.as_str()) {
+                    let members = of
+                        .iter()
+                        .filter(|c| !children.contains_key(**c) || visible(c).is_some())
+                        .map(|c| c.to_string())
+                        .collect();
+                    groups.push((n.id.clone(), n.label.clone(), members));
                 }
             }
         } else if let Some(d) = source.memberships.dimension(&criterion.by) {
@@ -990,13 +992,27 @@ fn membership_overlays(
             }
             let centres: Vec<Point> = foreign.iter().map(|(_, c)| c.clone()).collect();
             drawn += 1;
-            // Joined to the box: one hull over the box and the members that left, where that encloses nothing foreign.
+            // Joined to the box: one hull over the box and the members that left, where that encloses nothing foreign and
+            // stays compact. Members far away would blow the hull up until it says nothing, and a hull around them alone
+            // does not show the box they left: they are marked instead, and the mark names the box.
             if let Some(own) = own_box {
                 kept_box += 1;
                 let mut joined = rects.clone();
                 joined.push(positions[own].clone());
                 let points = crate::hull::group_shape(&joined, HULL_PADDING, shape);
-                if points.len() >= 3 && inside(&points).is_empty() {
+                let padded =
+                    |r: &Rect| (r.width + 2. * HULL_PADDING) * (r.height + 2. * HULL_PADDING);
+                let left: f64 = rects.iter().map(padded).sum();
+                let corners = crate::hull::group_shape(&joined, HULL_PADDING, HullShape::Rectangle);
+                let side = |of: fn(&Point) -> f64| {
+                    let all = corners.iter().map(of);
+                    all.clone().fold(f64::MIN, f64::max) - all.fold(f64::MAX, f64::min)
+                };
+                let growth = side(|p| p.x) * side(|p| p.y) - padded(&positions[own]);
+                if points.len() >= 3
+                    && growth <= JOINED_GROWTH_LIMIT * left
+                    && inside(&points).is_empty()
+                {
                     let mut listed: Vec<String> = boxes.iter().map(|id| id.to_string()).collect();
                     listed.push(own.to_string());
                     hulls.push(SceneHull {
@@ -1010,8 +1026,20 @@ fn membership_overlays(
                         piece: 0,
                         pieces: 1,
                     });
-                    continue;
+                } else {
+                    marked += 1;
+                    for id in &boxes {
+                        marks.push(SceneMark {
+                            dimension: criterion.by.clone(),
+                            dimension_label: dimension_label.clone(),
+                            group: group.clone(),
+                            label: shown.clone(),
+                            node: id.to_string(),
+                            own_box: Some(own.to_string()),
+                        });
+                    }
                 }
+                continue;
             }
             // The pieces (M2b): whole if clean, else per owner, else by distance within an owner.
             let members: Vec<crate::hull::Member> = boxes
@@ -1033,6 +1061,7 @@ fn membership_overlays(
                         group: group.clone(),
                         label: shown.clone(),
                         node: id.to_string(),
+                        own_box: None,
                     });
                 }
                 continue;

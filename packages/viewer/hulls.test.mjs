@@ -139,3 +139,33 @@ test('a hull drawn in pieces says which piece it is', () => {
   const titles = svg.find('title').map(t => t.textContent ?? '');
   assert.ok(titles.some(t => t.includes('piece 2 of 2')), titles.join(' | '));
 });
+
+// Seen in the browser (ADR 0022): names on top of each other, outlines of two dimensions on one line, marks on the pin.
+test('names of hulls that start at the same place do not cover each other', () => {
+  const svg = new Element('svg');
+  const same = square(0, 0, 300, 100);
+  renderSvg(svg, sceneWith(['zone', 'team', 'layer'].map(d => hull(d, `${d}-name`, same))), {document});
+  const boxes = svg.find('text').filter(t => t.attrs.class === 'lw-hull-label')
+    .map(t => ({x: Number(t.attrs.x), y: Number(t.attrs.y), w: 6.2 * t.textContent.length}));
+  assert.equal(boxes.length, 3);
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) {
+    const [a, b] = [boxes[i], boxes[j]];
+    assert.ok(a.x + a.w <= b.x || b.x + b.w <= a.x || Math.abs(a.y - b.y) >= 11, `${JSON.stringify(a)} ${JSON.stringify(b)}`);
+  }
+});
+
+test('hulls of two dimensions around the same nodes are drawn apart', () => {
+  const svg = new Element('svg');
+  renderSvg(svg, sceneWith([hull('zone', 'a', square(0, 0, 100, 60)), hull('team', 'b', square(0, 0, 100, 60))]), {document});
+  assert.deepEqual(svg.find('polygon').map(p => p.attrs.points), ['0,0 100,0 100,60 0,60', '3,3 97,3 97,57 3,57']);
+});
+
+test('a mark stays off the pin and says when its member moved out of a box', () => {
+  const svg = new Element('svg');
+  const scene = sceneWith([]);
+  scene.membershipMarks = [{dimension: 'parent', dimensionLabel: 'Parent', group: 'file', label: 'File', node: 'a', ownBox: 'file'}];
+  renderSvg(svg, scene, {document});
+  const [mark] = svg.find('circle').filter(c => c.attrs.class === 'lw-mark');
+  assert.ok(Number(mark.attrs.cy) > 30, 'in the lower half of the box (y 10 to 50)');
+  assert.equal(mark.find('title')[0].textContent, 'Parent: File (moved out of this box)');
+});

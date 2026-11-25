@@ -787,3 +787,107 @@ fn a_container_that_kept_its_box_draws_only_the_members_that_left() {
         );
     }
 }
+
+/// Two levels of containers and a document that takes one function out of the inner one, with `far` other functions
+/// between them.
+fn nested_with_a_moved_member(far: usize) -> Scene {
+    let mut nodes = vec![
+        serde_json::json!({"id": "src", "kind": "dir", "label": "src"}),
+        serde_json::json!({"id": "file", "kind": "file", "label": "file", "parentId": "src"}),
+        serde_json::json!({"id": "moved", "kind": "symbol", "label": "moved", "parentId": "file"}),
+    ];
+    for i in 0..far {
+        nodes.push(serde_json::json!({"id": format!("s{i}"), "kind": "symbol", "label": format!("s{i}"), "parentId": "file"}));
+    }
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr", "nodes": nodes, "edges": [],
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "guide", "label": "Guide", "members": ["moved"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("doc"), by("parent")];
+    build_scene(&import_graph_with(graph, 100, &options).expect("imports")).expect("a scene")
+}
+
+#[test]
+fn a_moved_member_is_drawn_for_its_own_container_and_not_once_per_level() {
+    // Seen in the browser: a file and its class drew the same hull, and the root drew one around everything.
+    for far in [1, 40] {
+        let scene = nested_with_a_moved_member(far);
+        let groups: std::collections::BTreeSet<&str> = scene
+            .membership_hulls
+            .iter()
+            .map(|h| h.group.as_str())
+            .chain(scene.membership_marks.iter().map(|m| m.group.as_str()))
+            .collect();
+        assert_eq!(groups, ["file"].into(), "{far} functions stayed");
+    }
+}
+
+#[test]
+fn a_member_that_left_for_a_distant_place_is_marked_and_names_the_box_it_left() {
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr",
+        "nodes": (0..12).map(|i| serde_json::json!({"id": format!("c{i}"), "kind": "symbol", "label": "c"}))
+            .chain([
+                serde_json::json!({"id": "file", "kind": "file", "label": "file"}),
+                serde_json::json!({"id": "stays", "kind": "symbol", "label": "stays", "parentId": "file"}),
+                serde_json::json!({"id": "moved", "kind": "symbol", "label": "moved", "parentId": "file"}),
+            ]).collect::<Vec<_>>(),
+        "edges": (0..13).map(|i| {
+            let name = |k: usize| match k { 0 => "stays".to_string(), 13 => "moved".into(), k => format!("c{}", k - 1) };
+            serde_json::json!({"id": format!("e{i}"), "kind": "calls", "source": name(i), "target": name(i + 1)})
+        }).collect::<Vec<_>>(),
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "guide", "label": "Guide", "members": ["moved"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("doc"), by("parent")];
+    let scene =
+        build_scene(&import_graph_with(graph, 100, &options).expect("imports")).expect("a scene");
+    assert!(
+        scene.membership_hulls.is_empty(),
+        "no hull across the drawing"
+    );
+    let marks: Vec<_> = scene
+        .membership_marks
+        .iter()
+        .map(|m| (m.group.as_str(), m.node.as_str(), m.own_box.as_deref()))
+        .collect();
+    assert_eq!(marks, [("file", "moved", Some("file"))]);
+    let parent = report(&scene, "parent");
+    assert_eq!((parent.kept_box, parent.marked), (1, 1));
+}
+
+#[test]
+fn a_join_that_would_grow_out_of_proportion_is_marked_even_with_nothing_foreign_in_it() {
+    // A tall file and the one function that left it, beside it: the joint rectangle would be a strip as tall as the file.
+    // Nothing foreign is in the view at all, so only the compactness rule can decide.
+    let mut nodes = vec![
+        serde_json::json!({"id": "file", "kind": "file", "label": "file"}),
+        serde_json::json!({"id": "moved", "kind": "symbol", "label": "moved", "parentId": "file"}),
+    ];
+    for i in 0..20 {
+        nodes.push(serde_json::json!({"id": format!("s{i}"), "kind": "symbol", "label": format!("s{i}"), "parentId": "file"}));
+    }
+    let edges: Vec<_> = (0..20)
+        .map(|i| serde_json::json!({"id": format!("e{i}"), "kind": "calls", "source": format!("s{i}"), "target": "moved"}))
+        .collect();
+    let graph: Graph = serde_json::from_value(serde_json::json!({
+        "defaultDirection": "lr", "nodes": nodes, "edges": edges,
+        "memberships": {"dimensions": [{"id": "doc", "groups": [
+            {"id": "guide", "label": "Guide", "members": ["moved"]}
+        ]}]}
+    }))
+    .expect("a graph");
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![by("doc"), by("parent")];
+    let scene =
+        build_scene(&import_graph_with(graph, 100, &options).expect("imports")).expect("a scene");
+    assert!(scene.membership_hulls.is_empty());
+    assert_eq!(scene.membership_marks.len(), 1);
+}
