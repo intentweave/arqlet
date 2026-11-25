@@ -239,9 +239,9 @@ dependencies = [
 
 [[package]]
 name = "decypher"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc716d11c4e78ddf6c7c11d350a9b55d3ca440b88fe71f86ce491f09110a4ba"
+checksum = "f921cb0f868e9a961613782974cc4a60a76648a3e4f7719991cbdd53d35eaeed"
 dependencies = [
  "rowan",
  "ryu",

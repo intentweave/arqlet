@@ -31,7 +31,7 @@ unsupported	MATCH (n) DETACH DELETE n
 unsupported	MATCH (a)-[:KNOWS]->{1,3}(b) RETURN b
 ok:cd84319894a80e17	MATCH (a)-[r:KNOWS {since: 2020}]->(b) RETURN r.since
 ok:89d7f5d6919d8e5d	RETURN {a: [1, 2, {b: 'c'}], d: null}
-unsupported	MATCH (`my node`:`My Label`) RETURN `my node`.`a b`
+ok:434b5733d6cff2aa	MATCH (`my node`:`My Label`) RETURN `my node`.`a b`
 unsupported	MATCH (n:A|B) RETURN n
 unsupported	MATCH (n:!A&(B|C)) RETURN n
 ok:9250e12300848226	MATCH (n) RETURN toString(n.x) + 'a' AS s, coalesce(n.y, 0) AS y, n.z[0] AS z0, n.l[1..3] AS sl

@@ -18,10 +18,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
-- The Cypher front end uses decypher 0.3.0 (was 0.2.0), which keeps inline `WHERE`, path selectors and quantified paths
+- The Cypher front end uses decypher 0.4.0 (was 0.2.0). Since 0.3.0 it keeps inline `WHERE`, path selectors and quantified paths
   in its HIR instead of dropping them (upstream #132 to #134). The guard now rejects these constructs from the HIR rather
   than from the syntax tree, which also covers the GQL selectors 0.3.0 parses (`ANY`, `ANY SHORTEST`, `SHORTEST k`,
-  `SHORTEST k GROUPS`), and `MATCH ALL …` runs like a pattern without a selector. They are still unsupported; no plan of
+  `SHORTEST k GROUPS`), and `MATCH ALL …` runs like a pattern without a selector. They are still unsupported. 0.4.0 gives
+  the column order in the HIR, so the lowering no longer reads the syntax tree; a column without `AS` keeps its written
+  name, which lets `` RETURN `my node`.`a b` `` run (it was refused), and `RETURN *` is rejected by name. No other plan of
   a supported query changes (`crates/query-cypher/tests/grid.rs` pins the outcome of about 1 600 queries).
 
 ## 0.10.0 — 2026-11-27

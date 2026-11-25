@@ -3,56 +3,39 @@
 //! The executor never sees decypher. This module reads the HIR, which already resolves variables and scopes, and writes
 //! the plan. Whatever it cannot lower it refuses with a message that names it; it never guesses.
 //!
-//! What the HIR does not keep is taken from the syntax tree instead: the order of the columns. The HIR splits an
-//! aggregating `RETURN` into grouping keys and aggregates and drops the order the query wrote them in, so the names of the
-//! columns are read from the `RETURN` clause and matched to the aliases the HIR created. A name that does not match is a
-//! refusal.
+//! The columns of the answer come from the HIR too: the `RETURN` names its columns in output order.
 
 use arqlet_query::plan::{
     AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Function, Op, Plan, SortKey,
 };
 use arqlet_query::Direction;
 use arqlet_query::{QueryError, Value};
-use decypher::hir::arena::ExprId;
-use decypher::hir::arena::{BindingId, HirArenas};
+use decypher::hir::arena::{BindingId, ExprId, HirArenas};
 use decypher::hir::expr::{BinaryOp, ComparisonOperator, ExprKind, Literal, UnaryOp};
 use decypher::hir::ops::{AggregateItem, Operation, SortDirection, UnionOp};
 use decypher::hir::pattern::{
     GraphPattern, LabelExpr, NodePattern, RelationshipDirection, RelationshipLength,
 };
 use decypher::hir::HirQuery;
-use decypher::syntax::{SyntaxKind as K, SyntaxNode};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Checks a query (the parser and the guard), then lowers it into a plan.
 pub fn lower(query: &str) -> Result<Plan, QueryError> {
     let hir = crate::checked(query)?;
-    let tree = decypher::parse_cst(query).tree;
-    // The `RETURN` clauses in the order written: one for each part of a `UNION`, the last one for any other query.
-    let returns: Vec<SyntaxNode> = tree
-        .descendants()
-        .filter(|n| n.kind() == K::RETURN_CLAUSE)
-        .collect();
     if let [part] = hir.parts.as_slice() {
         if let [Operation::Union(u)] = part.operations.as_slice() {
-            return union(u, &returns);
+            return union(u);
         }
     }
-    single(&hir, returns.last())
+    single(&hir)
 }
 
 /// `UNION [ALL]`: every branch is a query of its own, with its own variables.
-fn union(u: &UnionOp, returns: &[SyntaxNode]) -> Result<Plan, QueryError> {
-    if u.branches.len() != returns.len() {
-        return Err(QueryError::unsupported(
-            "cannot match the parts of this UNION to their RETURN clauses",
-        ));
-    }
+fn union(u: &UnionOp) -> Result<Plan, QueryError> {
     let branches = u
         .branches
         .iter()
-        .zip(returns)
-        .map(|(query, clause)| single(query, Some(clause)))
+        .map(single)
         .collect::<Result<Vec<Plan>, _>>()?;
     let names = |p: &Plan| p.columns.iter().map(|c| c.name.clone()).collect::<Vec<_>>();
     let Some(first) = branches.first().map(names) else {
@@ -79,8 +62,8 @@ fn union(u: &UnionOp, returns: &[SyntaxNode]) -> Result<Plan, QueryError> {
     })
 }
 
-/// A query without `UNION`, with the `RETURN` clause that names its columns.
-fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryError> {
+/// A query without `UNION`; its `RETURN` names its columns.
+fn single(hir: &HirQuery) -> Result<Plan, QueryError> {
     let slots = hir.arenas.bindings.iter().count();
     let mut lowering = Lowering {
         arenas: &hir.arenas,
@@ -90,6 +73,7 @@ fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryE
         aliases: BTreeMap::new(),
         grouped: Vec::new(),
         distinct_return: false,
+        return_columns: None,
     };
     for part in &hir.parts {
         lowering.aliases.clear();
@@ -97,7 +81,7 @@ fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryE
             lowering.op(op)?;
         }
     }
-    let columns = lowering.columns(returning)?;
+    let columns = lowering.columns()?;
     if lowering.distinct_return {
         let slots = columns.iter().map(|c| c.slot).collect();
         lowering.ops.push(Op::Distinct(slots));
@@ -293,6 +277,8 @@ struct Lowering<'a> {
     grouped: Vec<(Expr, usize)>,
     /// `RETURN DISTINCT`: the HIR keeps the flag on the Return operation, not on the projection.
     distinct_return: bool,
+    /// The columns of the last `RETURN`, in output order.
+    return_columns: Option<Vec<BindingId>>,
 }
 
 /// The label and the `{key: value}` constraints of a node pattern.
@@ -408,6 +394,7 @@ impl Lowering<'_> {
             }
             Operation::Return(r) => {
                 self.distinct_return = r.distinct;
+                self.return_columns = Some(r.columns.clone());
                 Ok(())
             }
             Operation::Union(_) => Err(QueryError::unsupported(
@@ -908,16 +895,20 @@ impl Lowering<'_> {
         ))
     }
 
-    /// The columns of the answer, in the order the `RETURN` writes them, matched to the aliases of the last part.
-    fn columns(&self, returning: Option<&SyntaxNode>) -> Result<Vec<Column>, QueryError> {
-        let names = return_names(returning)?;
-        names
-            .into_iter()
-            .map(|name| match self.aliases.get(&name) {
-                Some(slot) => Ok(Column { name, slot: *slot }),
-                None => Err(QueryError::unsupported(format!(
-                    "cannot place the column `{name}`: the HIR names no alias for it"
-                ))),
+    /// The columns of the answer, in the order of the last `RETURN`, each an alias of the last part. A column that is not
+    /// one is a variable passed through by `RETURN *`.
+    fn columns(&self) -> Result<Vec<Column>, QueryError> {
+        let ids = self
+            .return_columns
+            .as_ref()
+            .ok_or_else(|| QueryError::unsupported("a query without RETURN has no columns"))?;
+        ids.iter()
+            .map(|id| {
+                let name = self.arenas.bindings.get(*id).name.clone();
+                match self.aliases.get(&name) {
+                    Some(&slot) if slot == id.0 => Ok(Column { name, slot }),
+                    _ => Err(QueryError::unsupported("RETURN * is not supported yet")),
+                }
             })
             .collect()
     }
@@ -961,42 +952,6 @@ fn scalar(name: &str) -> Option<Function> {
         "reverse" => Function::Reverse,
         _ => return None,
     })
-}
-
-/// The names of the columns of a `RETURN`, in the order written: the alias after `AS`, else the text of the item.
-fn return_names(returning: Option<&SyntaxNode>) -> Result<Vec<String>, QueryError> {
-    let clause = returning
-        .ok_or_else(|| QueryError::unsupported("a query without RETURN has no columns"))?;
-    let items = clause
-        .descendants()
-        .find(|n| n.kind() == K::PROJECTION_ITEMS)
-        .ok_or_else(|| QueryError::unsupported("the RETURN clause has no items"))?;
-    if items.children_with_tokens().any(|c| c.kind() == K::STAR) {
-        return Err(QueryError::unsupported("RETURN * is not supported yet"));
-    }
-    let mut names = Vec::new();
-    for item in items.children().filter(|n| n.kind() == K::PROJECTION_ITEM) {
-        let mut after_as = false;
-        let mut alias = None;
-        for child in item.children_with_tokens() {
-            if child.kind() == K::KW_AS {
-                after_as = true;
-            } else if after_as && child.kind() == K::VARIABLE {
-                alias = child.as_node().map(|n| n.text().to_string());
-            }
-        }
-        names.push(unquote(&alias.unwrap_or_else(|| item.text().to_string())));
-    }
-    Ok(names)
-}
-
-/// A name without its backticks (`` `my col` `` is `my col`); other text as it is, trimmed.
-fn unquote(text: &str) -> String {
-    let text = text.trim();
-    match text.strip_prefix('`').and_then(|t| t.strip_suffix('`')) {
-        Some(inner) => inner.replace("``", "`"),
-        None => text.to_string(),
-    }
 }
 
 #[cfg(test)]

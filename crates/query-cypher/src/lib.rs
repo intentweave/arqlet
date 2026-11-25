@@ -2,11 +2,11 @@
 //!
 //! [`check`] parses a query with decypher and runs the **guard**: every construct either runs correctly or is rejected,
 //! never silently changed. The guard walks the syntax tree for what is outside the first release (writes, procedures,
-//! subqueries, unknown functions), then the HIR's patterns for what the executor does not run yet (path selectors such as
+//! subqueries, unknown functions, `RETURN *`), then the HIR's patterns for what the executor does not run yet (path selectors such as
 //! `shortestPath`, quantified paths, `WHERE` inside a pattern, path variables). The lowering never sees those.
 //!
 //! [`lower`] then turns a checked query into a plan of `arqlet-query`, and [`run`] lowers and executes it. The lowering
-//! reads decypher's HIR and takes what the HIR loses (the order of the columns) from the syntax tree.
+//! reads decypher's HIR only, the order of the columns included.
 #![forbid(unsafe_code)]
 
 mod lower;
@@ -155,6 +155,14 @@ fn reject(element: &SyntaxElement) -> Option<String> {
             "EXISTS, COUNT and COLLECT subqueries are not supported yet (ADR 0021, Later)"
         }
         K::TILDE_EQ => "regular expressions (=~) are not supported yet (ADR 0021, Later)",
+        K::STAR => {
+            let items = element.parent()?;
+            if items.kind() == K::PROJECTION_ITEMS && items.ancestors().any(|a| a.kind() == K::RETURN_CLAUSE) {
+                "RETURN * is not supported yet"
+            } else {
+                return None;
+            }
+        }
         K::FUNCTION_INVOCATION => {
             let node = element.as_node()?;
             let name = node
@@ -307,6 +315,32 @@ mod tests {
         ] {
             assert_eq!(class(q), Some(ErrorClass::Unsupported), "{q}");
         }
+    }
+
+    #[test]
+    fn return_star_is_rejected() {
+        assert_eq!(class("MATCH (n) RETURN *"), Some(ErrorClass::Unsupported));
+        assert_eq!(class("MATCH (n) RETURN count(*) AS c"), None);
+    }
+
+    #[test]
+    fn columns_follow_the_return_in_written_order() {
+        let names = |q: &str| -> Vec<String> {
+            lower(q)
+                .unwrap()
+                .columns
+                .into_iter()
+                .map(|c| c.name)
+                .collect()
+        };
+        assert_eq!(
+            names("MATCH (n) RETURN count(*) AS c, n.x, n.y AS `a``b`"),
+            ["c", "n.x", "a`b"]
+        );
+        assert_eq!(
+            names("MATCH (`my node`) RETURN `my node`.`a b`"),
+            ["`my node`.`a b`"]
+        );
     }
 
     #[test]
