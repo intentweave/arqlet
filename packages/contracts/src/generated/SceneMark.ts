@@ -11,4 +11,8 @@ label: string,
 /**
  * The box that carries the mark: the member's own box, or the box that stands for it.
  */
-node: string, };
+node: string,
+/**
+ * The group's own box, when the view still draws it and this member left it: what the mark points back to.
+ */
+ownBox?: string, };

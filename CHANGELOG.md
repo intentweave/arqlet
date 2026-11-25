@@ -5,6 +5,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Changed
+
+- Membership hulls (provisional, ADR 0022): members that left a group's box are joined to it by a hull only where the hull
+  stays compact, else marked (mark `ownBox` names the box). The moved-down parent hierarchy draws each container's
+  children only, so nested levels no longer repeat one hull. In the SVG viewer hull names avoid each other and container
+  titles, hulls of different dimensions are drawn a step apart, and marks sit at the bottom right, off the pin.
+- Playground: the membership controls are a section of their own, *Groupings*, second in the side panel.
+
 ## 0.9.0 — 2026-11-24
 
 A visual release: one appearance for every renderer and a metro-map style, the GPU scene renderer for large views, and
