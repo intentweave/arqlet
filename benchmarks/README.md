@@ -345,3 +345,9 @@ Budgeted refinement is serial; `threads` remains the requested setting, not a gu
 execution. Time-budgeted snapshots may differ across repetitions. Historical reports without this
 policy measured budget overruns but did not stop refinement. Do not directly compare those runs as
 identical execution policies. The outer operation timeout remains a process-group kill.
+
+## Membership groups (ADR 0022)
+
+`node benchmarks/memberships.mjs [--out FILE.jsonl]` (needs the release `layout-command`) counts how soft membership groups
+are drawn (whole, split, marked) on the fixtures and on planted groups, and compares a dimension taken first with the default
+view. No timing; deterministic.

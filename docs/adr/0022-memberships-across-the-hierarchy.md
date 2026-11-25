@@ -401,6 +401,10 @@ Each step is behind an option and measured before the next. Nothing becomes a de
 - **M3 — holding.** Soft criteria as breakable containers within an owner and as regions across owners (members at the
   facing border), the switch per piece, and the measurement of §6 that places it. *Exit:* the gate of §6, the budgets and
   the threshold recorded with their run, and `overlapping-boxes.json` drawn as the target picture of §3.
+  **M3a, the baseline, done** (2026-11-25; `benchmarks/memberships.mjs`,
+  [results](../../benchmarks/results/memberships-20261125-baseline.md)): with the parent first and groups planted along the
+  edges, 11 of 24 groups inside one container are drawn whole and none of 30 across containers. Holding within an owner
+  (M3b) can improve at most 13 of these groups, regions across owners (M3c) at most 30. Planted groups, not real ones.
 - **M4 — lanes** (`as: lanes`): at rank 1 across the drawing, below a higher rank inside each owner, two of them as a grid.
   *Exit:* the gate; `pools-and-lanes.json` with its `groupingPriority` draws as the 2×3 grid with no lane violation;
   `three-dimensions.json` reports what it cannot satisfy.
@@ -439,6 +443,9 @@ proved by brute force over all orders.
   `visibility` with `--memberships`; the index has no namespace, and claim candidates bind one subject each. Which further
   dimensions are worth exporting, and how many criteria a view can carry, come from use; how many *groups* is answered
   by `consider`.
+- **A projection that breaks an arrangement.** With a dimension first, a graph whose root is arranged as a tree may no longer
+  be one, and the import is refused (`nested-tree-radial` in the M3a baseline). Falling back with a report would be kinder.
+- **Edges in the real export.** None of its call edges has a target, so it cannot measure what holding costs.
 - **A dimension at several ranks.** `values` lets a dimension order its groups; whether one dimension may also appear at two
   ranks (`[project: apollo, parent, project: the rest]`, one project first and the others after the reporting line) is
   open. The list's shape allows it later without a change of format.
