@@ -50,6 +50,9 @@ pub struct AreaPlan {
     /// dummy's start across the flow: the slots of a chain's edges keep the pattern of their lanes where the chain begins.
     /// Not kept with the snapshot.
     pub lane_offsets: BTreeMap<(String, String), f64>,
+    /// Provisional (ADR 0022 M4a): the lane of every element, where the area's nodes stand in lanes: every order keeps the
+    /// lanes as consecutive blocks. Not kept with the snapshot.
+    pub lanes: BTreeMap<String, usize>,
 }
 
 impl AreaPlan {
@@ -122,6 +125,7 @@ impl AreaPlan {
             fixed_borders: false,
             port_offsets: BTreeMap::new(),
             lane_offsets: BTreeMap::new(),
+            lanes: BTreeMap::new(),
         })
     }
 }

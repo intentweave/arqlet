@@ -433,6 +433,14 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   edges along it, 20 of 20 views have every node in its lane and phase, the 2×3 grid included, without a new hard violation; edges
   that run back between phases have to be turned for the layout. The crossings are the open part (`layerweave-code` 422 to 2559
   against the flat drawing, 469 with containers): the order has to know the bands, dummies included, which pins cannot say.
+  **M4a, lanes of the first criterion across the flow, done** (2026-11-25; `crates/layout/src/lanes.rs`,
+  [results](../../benchmarks/results/memberships-20261125-lanes-engine.md)). The projection makes no containers of them; in every order
+  of the top level the lanes are consecutive blocks in their declared order, dummies of long edges included, and each band is aligned
+  on its own and stacked behind the one before. A node of no lane, and a container that keeps one, come after the lanes. The report says
+  how many lanes are out of place, and that they are not applied where the top level has no flow. On twelve views no lane is out of place;
+  crossings are far below the probe with pins and at or above containers (`layerweave-code` 422 flat, 469 containers, 2559 pins, 726
+  lanes). The gate of §6 (comparison with elk-rs, recorded timing) is not met, so this stays an option. Open: lanes below a higher rank,
+  along the flow (M4b), and drawing the bands (M4c): until then a lane is seen by its place only.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.

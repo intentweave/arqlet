@@ -2771,7 +2771,7 @@ pub struct GroupingCriterion {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
     pub values: Vec<String>,
-    /// How the criterion's groups are rendered where it owns nodes. `lanes` is accepted and reported as not yet applied
+    /// How the criterion's groups are rendered where it owns nodes. `lanes` of the first criterion are bands across the flow of the top level (M4a); elsewhere it is accepted and reported as not yet applied
     /// (ADR 0022, M4); its groups are drawn as containers until then.
     #[serde(
         default,

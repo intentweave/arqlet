@@ -698,6 +698,51 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     })
 }
 
+/// Provisional (ADR 0022 M4a): the lanes of the first criterion that do not lie behind the ones before them, across the flow of
+/// the top level. `None` where the top level has no flow.
+fn lane_breaks(
+    snapshot: &Snapshot,
+    positions: &BTreeMap<&str, Rect>,
+    by: &str,
+    ownership: &arqlet_model::grouping::Ownership,
+) -> Option<usize> {
+    let orientation = match snapshot.area_orientations.get("<root>") {
+        Some(o) => *o,
+        None => match snapshot.graph.area_mode(None) {
+            Ok(Mode::Orientation(o)) => o,
+            _ => return None,
+        },
+    };
+    let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+    let dimension = source.memberships.dimension(by)?;
+    let mut extent: BTreeMap<&str, (f64, f64)> = BTreeMap::new();
+    for (id, r) in positions {
+        if let Some(arqlet_model::grouping::Owner::Group {
+            dimension: d,
+            group,
+        }) = ownership.owners.get(*id)
+        {
+            if d == by {
+                let (lo, hi) = if orientation.vertical() {
+                    (r.x, r.x + r.width)
+                } else {
+                    (r.y, r.y + r.height)
+                };
+                let e = extent.entry(group.as_str()).or_insert((lo, hi));
+                *e = (e.0.min(lo), e.1.max(hi));
+            }
+        }
+    }
+    let (mut end, mut breaks) = (f64::NEG_INFINITY, 0);
+    for g in &dimension.groups {
+        if let Some(&(lo, hi)) = extent.get(g.id.as_str()) {
+            breaks += usize::from(lo < end - 1e-6);
+            end = end.max(hi);
+        }
+    }
+    Some(breaks)
+}
+
 fn is_zero(value: &usize) -> bool {
     *value == 0
 }
@@ -790,6 +835,10 @@ fn membership_overlays(
     for (rank, criterion) in priority.iter().enumerate() {
         let owning = rank == 0;
         let lanes = criterion.render == GroupingRendering::Lanes;
+        // M4a: the first criterion's lanes, when the top level has a flow: how many lanes do not lie behind the one before.
+        let lane_breaks = (lanes && owning)
+            .then(|| lane_breaks(snapshot, positions, &criterion.by, &ownership))
+            .flatten();
         let shape = criterion.hull.unwrap_or(snapshot.options.membership_hull);
         let owned = ownership.rank.values().filter(|r| **r == rank).count();
         let multiple = ownership
@@ -1159,13 +1208,15 @@ fn membership_overlays(
                 .collect();
             summary.push_str(&format!(", not held: {}", list.join(", ")));
         }
-        if lanes {
+        if let Some(breaks) = lane_breaks {
+            summary.push_str(&format!(" as lanes, {breaks} out of place"));
+        } else if lanes {
             summary.push_str(", lanes not applied yet (ADR 0022, M4)");
         }
         reports.push(SceneMembershipReport {
             dimension: criterion.by.clone(),
             mode: if owning { "owner" } else { "soft" }.to_string(),
-            applied: !lanes,
+            applied: !lanes || lane_breaks == Some(0),
             groups: groups.len(),
             drawn,
             intruders,
