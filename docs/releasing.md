@@ -12,14 +12,16 @@ Provisional. Arqlet is a prototype; releases are `0.x` and may break any API.
 | npm | `@arqlet/engine-client` | `arqlet.wasm` (built by `prepack`), loader, worker, ELK-style call, presets |
 | npm | `@arqlet/viewer` | SVG renderer, navigation, route helpers, React Flow mapping |
 | npm | `@arqlet/contracts` | bundled TypeScript types (`dist/index.d.ts`, built by `prepack`) |
+| npm | `@arqlet/query` (provisional; not published yet) | `arqlet-query.wasm` (built by `prepack`), loader and types: queries without the layout engine |
 
 Not published: `arqlet-wasm` (its output ships in `@arqlet/engine-client`), `arqlet-contracts` (tooling), `arqlet-node`
-(placeholder), `arqlet-query-cli` and `arqlet-query-wasm` (provisional tools of the query layer), `@arqlet/containment-tree`, `@arqlet/playground`, the examples and the Intentweave exporter.
+(placeholder), `arqlet-query-cli` (provisional tool of the query layer), `arqlet-query-wasm` (its output ships in
+`@arqlet/query`), `@arqlet/containment-tree`, `@arqlet/playground`, the examples and the Intentweave exporter.
 
 ## Version bump
 
 1. Set `version` in `[workspace.package]` and every `=x.y.z` in `[workspace.dependencies]` of `Cargo.toml`.
-2. Set `version` in `packages/{arqlet,engine-client,viewer,contracts}/package.json`. Internal npm dependencies use
+2. Set `version` in `packages/{arqlet,engine-client,viewer,contracts,query}/package.json`. Internal npm dependencies use
    `workspace:^`; pnpm replaces them with the released version.
 3. In `CHANGELOG.md`, move the entries under *Unreleased* to a section `## x.y.z — <date>` with a short summary and,
    when anything breaks, an *Upgrading from* section; keep an empty *Unreleased* above it. Update the version in
@@ -38,13 +40,14 @@ and the WASM adapter with exactly that version. A change of edition is a separat
 ```sh
 cargo publish --dry-run --workspace --exclude arqlet-wasm --exclude arqlet-contracts --exclude arqlet-node \
   --exclude arqlet-query-cli --exclude arqlet-query-wasm
-for p in contracts engine-client viewer arqlet; do (cd packages/$p && pnpm pack --pack-destination /tmp/arqlet-pack); done
+for p in contracts engine-client viewer arqlet query; do (cd packages/$p && pnpm pack --pack-destination /tmp/arqlet-pack); done
 ```
 
-`prepack` (`tools/npm-prepack.mjs`) copies the license files, builds the WASM for `engine-client` (Rust with
-`wasm32-unknown-unknown`) and bundles the contract types. For `engine-client` it also writes `THIRD_PARTY_NOTICES.md`,
-the copyright and license notices of the Rust crates linked into the WASM (`tools/third-party-notices.mjs`; a crate
-without a license file fails `node tools/third-party-notices.mjs --check`, and a release waits for a decision on it).
+`prepack` (`tools/npm-prepack.mjs`) copies the license files, builds the WASM for `engine-client` and `query` (Rust with
+`wasm32-unknown-unknown`) and bundles the contract types. For those two packages it also writes
+`THIRD_PARTY_NOTICES.md`, the copyright and license notices of the Rust crates linked into their WASM
+(`tools/third-party-notices.mjs`; a crate without a license file fails `node tools/third-party-notices.mjs --check`, for
+the query module with `--package arqlet-query-wasm`, and a release waits for a decision on it).
 Check a tarball by installing it into an empty project.
 
 ## Publish with the release workflow
@@ -79,7 +82,9 @@ Afterwards, [check the release](#check-the-release).
 ### One-time setup
 
 Trusted publishing is configured per package on the registries. Each package must exist there already (all of them do
-since 0.8.0); a new crate or npm package is published once by hand (below) before it can be added.
+since 0.8.0 except `@arqlet/query`); a new crate or npm package is published once by hand (below) before it can be added.
+Until that is done for `@arqlet/query`, the workflow's `npm` job fails at it; it comes last, so the other packages are
+published, and the job is run again after the setup.
 
 - **GitHub:** an environment `release` (Settings → Environments). Required reviewers on it make every release wait for
   an approval before anything is published.
@@ -87,7 +92,7 @@ since 0.8.0); a new crate or npm package is published once by hand (below) befor
   `arqlet-scene`, `arqlet-view`, `arqlet-layout`, `arqlet-reference`, `arqlet-elk`, `arqlet-runtime`, `arqlet-query`,
   `arqlet-query-cypher`, `arqlet-query-model`, `arqlet-query-json`): Settings → Trusted Publishing → add GitHub, owner
   `intentweave`, repository `arqlet`, workflow `release.yml`, environment `release`.
-- **npm:** for `arqlet`, `@arqlet/contracts`, `@arqlet/engine-client` and `@arqlet/viewer`: Settings → Trusted
+- **npm:** for `arqlet`, `@arqlet/contracts`, `@arqlet/engine-client`, `@arqlet/viewer` and `@arqlet/query`: Settings → Trusted
   publisher → GitHub Actions, organization `intentweave`, repository `arqlet`, workflow `release.yml`, environment
   `release`. Then the package can forbid token publishing (Settings → Publishing access).
 
@@ -103,7 +108,7 @@ cargo login                       # token from crates.io
 cargo publish --workspace --exclude arqlet-wasm --exclude arqlet-contracts --exclude arqlet-node \
   --exclude arqlet-query-cli --exclude arqlet-query-wasm
 npm login                         # the account that owns the @arqlet organisation
-pnpm -r --filter @arqlet/contracts --filter @arqlet/engine-client --filter @arqlet/viewer --filter arqlet publish --access public
+pnpm -r --filter @arqlet/contracts --filter @arqlet/engine-client --filter @arqlet/viewer --filter arqlet --filter @arqlet/query publish --access public
 git tag -a vx.y.z -m x.y.z && git push origin vx.y.z
 ```
 
@@ -139,8 +144,9 @@ likewise for the other three).
 `cargo publish` needs every dependency, optional ones too, to exist on the registry, so since 0.8.0 `arqlet-query`,
 `arqlet-query-cypher`, `arqlet-query-model` and `arqlet-query-json` are published (provisional, with the publish metadata,
 a README and the licenses of the other crates); `cargo publish --workspace` publishes them before `arqlet-runtime`. Their
-one third-party dependency, `decypher`, is recorded in `docs/architecture.md`. The npm artifact is built without the
-feature, so `decypher` is not in the engine package and its notices need no entry there.
+one third-party dependency, `decypher`, is recorded in `docs/architecture.md`. The engine's npm artifact is built without
+the feature, so `decypher` is not in the engine package and its notices need no entry there. It is in `@arqlet/query`,
+whose notices `prepack` writes.
 
 ## Later
 
