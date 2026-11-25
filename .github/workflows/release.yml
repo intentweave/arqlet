@@ -20,7 +20,8 @@ concurrency:
 env:
   # Crates that are not published (publish = false); `cargo publish --workspace` excludes them.
   UNPUBLISHED: arqlet-wasm arqlet-contracts arqlet-node arqlet-query-cli arqlet-query-wasm
-  NPM_PACKAGES: contracts engine-client viewer arqlet
+  # In dependency order; `query` last, so that the others are published even if its publishing is not set up yet.
+  NPM_PACKAGES: contracts engine-client viewer arqlet query
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -58,9 +59,11 @@ jobs:
           mkdir -p "$RUNNER_TEMP/pack"
           for p in $NPM_PACKAGES; do (cd "packages/$p" && pnpm pack --pack-destination "$RUNNER_TEMP/pack"); done
           node tools/third-party-notices.mjs --check
+          node tools/third-party-notices.mjs --check --package arqlet-query-wasm
           mkdir -p "$RUNNER_TEMP/try" && cd "$RUNNER_TEMP/try" && npm init -y >/dev/null
           npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
           node --input-type=module -e "const m = await import('arqlet'); if (!Object.keys(m).length) throw Error('arqlet exports nothing');"
+          node --input-type=module -e "const {loadQueryEngine} = await import('@arqlet/query'); const q = await loadQueryEngine(); q.load({nodes: [{id: 'a', kind: 'k', label: 'a'}], edges: []}); const r = q.query('MATCH (n) RETURN count(*)'); if (r.rows?.[0]?.[0] !== 1) throw Error('@arqlet/query: ' + JSON.stringify(r));"
         env:
           RUSTUP_TOOLCHAIN: stable
 

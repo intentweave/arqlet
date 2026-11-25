@@ -348,7 +348,8 @@ What this means for the query layer:
 answers queries, built from the query crates and the graph part of `arqlet-model` only, with no layout engine. It shares
 the JSON request and answer with the engine's `query` operation through the crate `arqlet-query-json`, so the two cannot
 drift. It is `publish = false`, joins the isolation guard (host and wasm32), and is checked against the oracle through the
-real WASM file (`tools/query-wasm.test.mjs`, CI). **An npm package for it is not made yet.**
+real WASM file (`tools/query-wasm.test.mjs`, CI). **An npm package for it is not made yet** (changed on 2026-11-25, see
+below).
 
 **Why the crate.** Measured (`benchmarks/results/query-m5c-20261122.md`): the module is 1.08 MB (0.34 MB gzip) in the
 `wasm-size` profile, against 7.12 MB (1.84 MB gzip) for the engine with `query`; about a seventh of the bytes, a fifth
@@ -360,6 +361,19 @@ for it, and the cost of keeping the crate is small: about 120 lines, and no logi
 (`docs/releasing.md`: the query crates are not published yet), and a promise about the request format. The engine's own
 package keeps the feature off. **Revisit** when a host needs queries in a browser without layout, or when the query crates
 are published; then the package is the module, its loader and its types, built with the `wasm-size` profile.
+
+**Update (2026-11-25): the package.** The layer is to be offered on its own, and the query crates are published since
+0.8.0, so the package is made: `@arqlet/query` (`packages/query`, provisional) is the module in the `wasm-size` profile,
+its loader and hand-written types, and the third-party notices of what the module links. One engine is one module instance
+with one graph; a call that stops the module (a trap) ends that engine. It depends on the types of `@arqlet/contracts`
+only, not on the engine's package. Sizes: `benchmarks/results/query-npm-20261125.md`. It joins the release workflow; its
+first publication is by hand (`docs/releasing.md`). The engine's own package keeps the feature `query` off.
+
+**The napi path of M5b is not built.** The plan above names it for M5b; `crates/node` is still a placeholder, and the
+stage was closed without it. In Node the WASM module runs as it is. A native adapter is step S1 of ADR 0023 (proposed)
+and wraps the whole engine, so `query` would come with it through the feature. Open, and proposed: no native binding for
+queries alone before a measurement of native against WASM (load, query, memory) shows that a Node host without layout
+needs one.
 
 **What this does not settle.** The module sees the graph it was loaded with, whole: unlike a session (whose import keeps at
 most 10 000 nodes), it holds a large export if the host sends it, at the cost of the host's memory and one `load`. The time
@@ -374,6 +388,6 @@ crate would reduce it by that share).
 - Whether to propose the planner change to Grafeo upstream, and whether to fork.
 - Whether and when to contribute fixes for decypher #132 to #134 (item 9 sets the conditions).
 - The names of the traits and types (the crate names are fixed in M0).
-- An npm package for the query-only module (M5c kept the crate and not the package), and a smaller graph-only crate split from `arqlet-model` (item 12).
+- A native Node binding for queries (section M5c), and a smaller graph-only crate split from `arqlet-model` (item 12).
 - How the graph is shared between functions, processes, backend and browser, and any coordination or replication
   between them (ADR 0023); the payload representation beyond the first table.
