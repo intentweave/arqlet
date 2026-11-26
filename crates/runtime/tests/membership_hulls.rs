@@ -370,7 +370,8 @@ fn a_group_whose_hull_would_swallow_a_foreign_node_is_split_and_every_piece_is_c
 }
 
 #[test]
-fn lanes_are_accepted_and_reported_as_not_applied_yet() {
+fn lanes_below_the_parent_hierarchy_are_applied_inside_every_container() {
+    // M4d: once "not applied yet"; the zones now cut every container into bands, and the report says so.
     let mut options = LayoutOptions::default();
     options.grouping_priority = vec![
         by("parent"),
@@ -381,20 +382,17 @@ fn lanes_are_accepted_and_reported_as_not_applied_yet() {
     ];
     let (_, scene) = laid_out(THREE_DIMENSIONS, &options);
     let zone = report(&scene, "zone");
-    assert!(!zone.applied, "lanes arrive with M4");
+    assert!(zone.applied, "{}", zone.summary);
     assert!(
-        zone.summary.contains("not applied yet"),
-        "a host must learn that it asked for something the engine does not do yet: {}",
+        zone.summary
+            .contains("lanes inside each container, 0 out of place"),
+        "{}",
         zone.summary
     );
-    assert!(
-        zone.drawn > 0,
-        "until then the zone is held softly, as hulls"
-    );
-
-    // With the parent hierarchy first nothing is projected, so the drawing is the plain one.
-    let (_, plain) = laid_out(THREE_DIMENSIONS, &LayoutOptions::default());
-    assert_eq!(geometry(&plain), geometry(&scene));
+    assert_eq!(zone.drawn, 0, "bands, not hulls");
+    // Bands inside the deployments, and at the top level, where the deployments are the children.
+    assert!(scene.membership_lanes.iter().any(|l| l.area.is_some()));
+    assert!(!scene.membership_lanes.is_empty());
 }
 
 #[test]

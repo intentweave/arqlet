@@ -7113,10 +7113,12 @@ fn place(
             }
         }
         // Provisional (ADR 0022 M4a): the lanes of the top level are blocks of every rank, dummies included.
-        let in_lanes =
-            parent.is_none() && layered && flattening.is_empty() && crate::lanes::applies(options);
-        if in_lanes {
-            component_of = crate::lanes::of_nodes(graph, options);
+        let area_lanes = (layered && flattening.is_empty())
+            .then(|| crate::lanes::of_area(graph, options, parent))
+            .flatten();
+        let in_lanes = area_lanes.is_some();
+        if let Some(lanes) = area_lanes {
+            component_of = lanes;
             crate::lanes::extend(&mut component_of, &chains);
         }
         if options.component_packing
@@ -7411,7 +7413,7 @@ fn place(
                     reversed: o.reversed(),
                     ranks: id::rank_strings(levels.values()),
                     chains: id::chain_strings(&chains),
-                    lanes: if parent.is_none() && crate::lanes::applies(options) {
+                    lanes: if crate::lanes::of_area(graph, options, parent).is_some() {
                         component_of.clone()
                     } else {
                         BTreeMap::new()
@@ -8006,7 +8008,7 @@ fn place(
                     Some((id::Id::from(&c.id), if vertical { at.x } else { at.y }))
                 })
                 .collect();
-            let bands = (parent.is_none() && crate::lanes::applies(options) && !global)
+            let bands = (crate::lanes::of_area(graph, options, parent).is_some() && !global)
                 .then(|| component_of.clone());
             let planned_tracks = if reuse_cross {
                 let lanes = lanes.as_ref().expect("hierarchical lane planning");
@@ -8617,7 +8619,7 @@ fn place(
                     reversed: o.reversed(),
                     ranks: id::rank_strings(levels.values()),
                     chains: id::chain_strings(&chains),
-                    lanes: if parent.is_none() && crate::lanes::applies(options) {
+                    lanes: if crate::lanes::of_area(graph, options, parent).is_some() {
                         component_of.clone()
                     } else {
                         BTreeMap::new()

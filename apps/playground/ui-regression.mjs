@@ -389,9 +389,14 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   get('grouping-phases').value='';get('grouping-phases').onchange();await flush();
   get('grouping-lanes').checked=false;get('grouping-lanes').onchange();await flush();
   assert.equal(latest.options.groupingPriority[0].as,undefined);
-  assert.equal(get('grouping-phases').disabled,true);
   get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
   assert.equal(get('grouping-lanes').disabled,true,'the containment is no lane');
+  // Lanes inside every container (M4d): the same control behind the containment.
+  get('grouping-phases').value='zone';get('grouping-phases').onchange();await flush();
+  assert.deepEqual(latest.options.groupingPriority.slice(0,2),[{by:'parent'},{by:'zone',as:'lanes'}]);
+  assert.ok(sceneOf(engine,latest).membershipLanes.some(l=>l.area),'bands inside the containers');
+  get('grouping-phases').value='';get('grouping-phases').onchange();await flush();
+  assert.equal(latest.options?.groupingPriority,undefined,'back to the default');
 
   // Hold groups together (ADR 0022 M3b): an option like any other, carried by the snapshot and shown again.
   get('membership-hold').checked=true;get('membership-hold').onchange();await flush();

@@ -115,19 +115,22 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  const hueOf=dimension=>(membershipDimensions.indexOf(dimension)*67+191)%360;
  // Provisional (ADR 0022 M4c): the bands of lanes, behind everything else: a faint fill that alternates from band to band,
  // a line where two bands meet, and the lane's name at the start of its band. Like hulls they take no pointer events.
- const lanes=scene.membershipLanes??[];
- lanes.forEach((lane,i)=>{
+ const allLanes=scene.membershipLanes??[],lanes=allLanes.filter(l=>!l.area),innerLanes=allLanes.filter(l=>l.area);
+ const drawBands=list=>{
+ list.forEach((lane,i)=>{
   const r=lane.rect;
   const band=element('rect',{...r,fill:i%2?T.laneFill??'rgba(127,127,127,.06)':T.laneFillAlt??'rgba(127,127,127,.12)',stroke:'none','pointer-events':'none',class:'lw-lane','data-lane-dimension':lane.dimension,'data-lane-group':lane.group});
   band.append(element('title',{},`${lane.dimensionLabel||lane.dimension}: ${lane.label}`));
   svg.append(band);
  });
- for(const [i,lane] of lanes.entries()){
+ for(const [i,lane] of list.entries()){
   if(i>0){const r=lane.rect;svg.append(element('line',{...(lane.vertical?{x1:r.x,y1:r.y,x2:r.x,y2:r.y+r.height}:{x1:r.x,y1:r.y,x2:r.x+r.width,y2:r.y}),stroke:T.frameStroke,'stroke-width':1,'stroke-dasharray':'4 4','pointer-events':'none',class:'lw-lane-border'}));}
   // A phase whose band runs across x (a flow from top to bottom) has its name in a narrow strip at the left: turned.
   const r=lane.rect,turned=lane.phase&&!lane.vertical;
   svg.append(element('text',{x:turned?r.x+16:r.x+8,y:turned?r.y+8:r.y+14,...(turned?{transform:`rotate(90 ${r.x+16} ${r.y+8})`}:{}),fill:T.title,'font-size':12,'font-weight':600,'pointer-events':'none',class:lane.phase?'lw-lane-label lw-phase-label':'lw-lane-label'},lane.label));
  }
+ };
+ drawBands(lanes);
  const rings=[],top=[];
  for(const n of [...nodes.values()].filter(n=>parents.has(n.id)).sort((a,b)=>depth(a)-depth(b))){const r=absolute.get(n.id);
   // A circle container is a disc inscribed in its square box, like a circle leaf; its controls sit on the disc.
@@ -161,6 +164,8 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
   if(onResize){const handle=element('rect',{x:round?mx+on45-6:r.x+r.width-14,y:round?my+on45-6:r.y+r.height-14,width:12,height:12,rx:2,fill:T.control,class:'lw-resize','data-resize-id':n.id,style:'cursor:nwse-resize'});handle.onpointerdown=e=>{e.stopPropagation();onResize(n,e);};top.push(handle);}
   if(onReset)(sized.get(n.id)??[]).forEach((axis,index)=>top.push(round?resetControl(n,axis,mx-(index+1)*size-4,my+rad-size-10,size):resetControl(n,axis,r.x+r.width-(index+2)*size-12,r.y+6,size)));
  }
+ // Provisional (ADR 0022 M4d): lanes inside containers, above each container's frame and below the hulls.
+ for(const area of [...new Set(innerLanes.map(l=>l.area))])drawBands(innerLanes.filter(l=>l.area===area));
  // Provisional (ADR 0022): membership hulls, drawn after the container frames — whose fill would hide every hull inside
  // a container — and before routes and leaves, which stay on top. Outlines only, no fill: a hull crosses frames and other
  // hulls, and a fill would tint what it crosses. A hull takes no pointer events, because it is not a thing to select and

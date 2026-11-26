@@ -11,6 +11,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   the view out with network-simplex ranks and takes that drawing when its published key is better (strategy
   `simplex-ranks`); the options of the result then carry `simplexRanks`, so later edits keep the ranking. It costs a second
   layout per refinement. With the option off nothing changes.
+- Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
+  criterion `as: lanes` cuts every layered area into bands, the top level included; drawn inside each container. Playground:
+  *Second structure as bands* (phases with *As lanes*, lanes inside the containers without).
 - Phases (provisional, ADR 0022 M4b): with lanes first, a second criterion `as: lanes` lays its groups out one after the other
   along the flow, so that lanes and phases make a grid; drawn as bands with their names. Playground: *Phases along the flow*.
 - Compact bookmarks that fit into a URL (provisional, #151): `controller.compactBookmark()` gives a view as `b1.…`
@@ -66,6 +69,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 - `restore` (undo, redo, bookmarks) refused a view with a collapsed or partly shown community or group container
   ("unknown node"): containers that only the view has are accepted.
+- `refine` panicked on a view with buses given as data where one bus is drawn as lines and another as a bar (organic,
+  `busStyle: "lines"`; #197). An operation now takes back only what the layout had kept for the taps of the bars.
 - **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that

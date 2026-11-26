@@ -1185,11 +1185,29 @@ pub(crate) fn expand_snapshot(snapshot: &mut Snapshot) -> bool {
             snapshot.boxes.insert(bus.id.clone(), r);
         }
     }
+    // Only the taps expanded here get their state back. A bus that has since become lines of its own (`bars_to_lines`)
+    // keeps its edges in the view: what the layout had kept for its taps is stale, and the head's tap has no edge at all.
+    let expanded: BTreeSet<&str> = graph.edges[snapshot.graph.edges.len()..]
+        .iter()
+        .map(|e| e.id.as_str())
+        .collect();
     let kept = std::mem::take(&mut snapshot.bus_taps);
     snapshot.bus_taps.roots = kept.roots;
-    snapshot.routes.extend(kept.routes);
-    snapshot.resolved_ports.extend(kept.resolved_ports);
-    snapshot.boundary_crossings.extend(kept.boundary_crossings);
+    snapshot.routes.extend(
+        kept.routes
+            .into_iter()
+            .filter(|r| expanded.contains(r.id.as_str())),
+    );
+    snapshot.resolved_ports.extend(
+        kept.resolved_ports
+            .into_iter()
+            .filter(|p| expanded.contains(p.edge_id.as_str())),
+    );
+    snapshot.boundary_crossings.extend(
+        kept.boundary_crossings
+            .into_iter()
+            .filter(|c| expanded.contains(c.edge_id.as_str())),
+    );
     snapshot.bus_lines.clear();
     snapshot.graph = graph;
     true
