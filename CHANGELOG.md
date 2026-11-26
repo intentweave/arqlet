@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **Galaxy style on a light background** (overview, provisional): a light clear colour (`background`, new
+  `setBackground` for a host that switches themes, `tone`) draws the galaxy in ink instead of light — colours subtracted
+  from the background, so clouds deepen where they overlap, darker stars, a dark selection ring, light name tags and dark
+  texts. WebGPU, WebGL 2 and WebGL 1 draw it alike (`browser-checks/overview-backends.mjs`). Playground: *Light background*.
 - `holdMemberships` (provisional, ADR 0022 M3b, off by default): the layout keeps a soft membership group whose shown members
   share a container together there, where that stays within a budget of crossings and bends. Snapshot `heldGroups`, report
   `held`; `holding` says why each other group is not held and what holding costs, edges against the flow included. An edit
