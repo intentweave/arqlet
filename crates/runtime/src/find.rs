@@ -174,7 +174,9 @@ pub fn find_answer_on_with(
 }
 
 /// Provisional (bookmarks): the `digest` operation (read only): the fingerprint of the snapshot's source graph
-/// (`arqlet_model::source_digest`), so that a host can tell whether a kept view (a bookmark) belongs to this graph.
+/// (`arqlet_model::source_digest`) as it is, with the shapes, directions, strategies, routing and ports the view changed.
+/// A bookmark keeps it; whether a bookmark belongs to a graph is answered by `readBookmark` (`sameSource`), since another
+/// digest alone can come from those changes.
 pub fn digest_on(snapshot: &Snapshot) -> Value {
     let digest = snapshot.source_digest.clone().unwrap_or_else(|| {
         arqlet_model::source_digest(snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph))

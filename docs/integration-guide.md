@@ -238,6 +238,15 @@ highlight, the selection and the digest of the graph. `encodeBookmark` turns it 
 again as one step for `back`, and refuses the bookmark of another graph unless forced. Use it for saved views, or to hand
 a browser view back to a backend session. On a large view this long form is tens of kilobytes.
 
+**Which graph is another one.** The digest (the engine's `digest`) is of the whole source graph as the view had it, with
+the shapes, directions, strategies, routing and ports it changed; the intent holds those. So a bookmark belongs to a graph
+when its digest is that of the graph as it is, or of the graph with the intent's values written into it: a view that
+changed them opens on a new import of the same source. Any other difference (nodes, edges and their direction, labels,
+kinds, containment, weights, buses, memberships, also their order) makes another graph. A revision that differs only in
+declared shapes, directions, strategies, routing or ports counts as the same graph, as for the compact form below, and the
+bookmark restores its own values over the new ones. The engine answers this as `sameSource` of `readBookmark`; comparing
+`digest` alone is not enough. Bookmarks written by 0.8.0 and 0.9.0 are read the same way.
+
 ### Links: the compact bookmark (provisional)
 
 ```js
@@ -287,8 +296,9 @@ revision start open. Limits:
 Both engine operations are read only and go through `dispatch`, so they run in all three modes:
 `{op: 'compactBookmark', snapshot, defaults?, highlight?, selection?}` answers `{text}`, and
 `{op: 'readBookmark', snapshot, defaults?, text}` answers `{bookmark, sameSource, sameDefaults, missing, ignored}`, the
-bookmark in the long form, for `restore`. `readBookmark` also takes a long-form `bookmark` instead of `text`, which is
-what `openBookmark(bookmark, {force: true})` uses for another graph's.
+bookmark in the long form, for `restore`. `readBookmark` also takes a long-form `bookmark` instead of `text`:
+`openBookmark` asks it when the digest differs from the graph's, and uses what it read for another graph's bookmark
+opened with `force`.
 
 `back()` and `forward()` undo and redo the view's decisions as the engine's values (`intent` and `restore`), one engine
 step each, in every mode.

@@ -95,6 +95,15 @@ const small = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overv
   start: {x: before.overview.x, y: before.overview.y, r: before.overview.r}}), maxBuffer: 1 << 30}).toString()).overview;
 const parented = Object.fromEntries(small.ids.map((id, i) => [id, {x: small.x[i], y: small.y[i], r: small.r[i], parent: small.ids[small.parent[i]]}]));
 requests.push(['overview continued by id with parents', {op: 'overview', graph: changed, start: {nodes: parented}}]);
+// The long form of a view that changed its source graph (#195), read against the view as imported: its digest is found
+// again by writing the bookmark's decisions into that graph, with the same answer natively and in WASM.
+const ask = request => JSON.parse(execFileSync(native, {input: JSON.stringify(request), maxBuffer: 1 << 30}).toString());
+const reshaped = ask({op: 'shape', snapshot: abstract, nodeId: abstract.sourceGraph.nodes[0].id, shape: 'circle',
+  expectedRevision: abstract.revision, expectedLayoutVersion: abstract.layoutVersion}).snapshot;
+const long = {version: 1, digest: ask({op: 'digest', snapshot: reshaped}).digest, intent: ask({op: 'intent', snapshot: reshaped}).intent};
+const reread = {op: 'readBookmark', snapshot: abstract, bookmark: long};
+if (ask(reread).sameSource !== true) { console.error('readBookmark: a changed view is not the same source'); process.exit(1); }
+requests.push(['readBookmark, long form of a changed view', reread]);
 const digest = process.argv.includes('--digest');
 let differ = 0;
 for (const [name, request] of requests) {

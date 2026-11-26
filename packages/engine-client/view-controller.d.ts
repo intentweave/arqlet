@@ -2,7 +2,11 @@ import type {DetailsAnswer, FindAnswer, Graph, Hidden, Intent, NeighbourhoodAnsw
 import type {DetailTarget, PayloadAnswer, PayloadChange, PeekAnswer, ReadAnswer, RefineRun, Session, SessionResult} from './session.js';
 import type {EngineRequest} from './wasm-client.js';
 
-/** Provisional: a view as a value (`bookmark`): the engine's intent, the highlight, the selection, the graph's digest. */
+/**
+ * Provisional: a view as a value (`bookmark`): the engine's intent, the highlight, the selection, and the digest of the
+ * source graph as the view had it (with its changed shapes, directions, strategies, routing and ports). Whether it
+ * belongs to a graph is answered by `openBookmark` (or the engine's `readBookmark`), not by comparing digests.
+ */
 export interface ViewBookmark {
   version: 1;
   digest: string | null;
@@ -160,8 +164,10 @@ export interface ViewController {
    */
   compactBookmark(): Promise<{ok: true; text: string} | {ok: false; error?: string; cancelled?: boolean}>;
   /**
-   * Opens a bookmark (a step for `back`), a value or a text. Another graph's long form is refused unless `force`; a
-   * compact one, and a forced one, restores what the graph has and reports the rest (`BookmarkReport`).
+   * Opens a bookmark (a step for `back`), a value or a text. Another graph's long form is refused unless `force` (a graph
+   * that differs only in shapes, directions, strategies, routing and ports is the same one, and the bookmark's are
+   * restored); a compact one, and a forced one of another graph, restores what the graph has and reports the rest
+   * (`BookmarkReport`).
    */
   openBookmark(bookmark: ViewBookmark | string, options?: {force?: boolean}): Promise<ViewResult & Partial<BookmarkReport>>;
   back(): Promise<ViewResult>;

@@ -133,10 +133,19 @@ fn opened(snapshot: &Value, text: &str, defaults: Option<&Value>) -> (Value, Val
     (restored, answer)
 }
 
+/// The long (JSON) form of the view, as the view controller writes it.
+fn long_form(snapshot: &Value) -> Value {
+    let digest = ok(json!({"op": "digest", "snapshot": snapshot}))["digest"].clone();
+    json!({"version": 1, "digest": digest, "intent": intent(snapshot)})
+}
+
+fn read_long(snapshot: &Value, bookmark: &Value) -> Value {
+    ok(json!({"op": "readBookmark", "snapshot": snapshot, "bookmark": bookmark}))
+}
+
 /// The length of the JSON form as URL text (`encodeBookmark`): base64url without padding.
 fn json_form_length(snapshot: &Value, marks: &Value) -> usize {
-    let digest = ok(json!({"op": "digest", "snapshot": snapshot}))["digest"].clone();
-    let mut bookmark = json!({"version": 1, "digest": digest, "intent": intent(snapshot)});
+    let mut bookmark = long_form(snapshot);
     for (k, v) in marks.as_object().unwrap() {
         bookmark[k] = v.clone();
     }
@@ -533,4 +542,186 @@ fn the_operations_run_in_a_session_and_refuse_what_they_cannot_read() {
         call(json!({"op": "compactBookmark", "snapshot": view, "selection": {"node": "a"}}))["ok"],
         false
     );
+}
+
+/// [`authored`] with declared directions, strategy and routing too.
+fn declared() -> Value {
+    let mut graph = authored();
+    graph["defaultDirection"] = json!("tb");
+    graph["containerDirections"] = json!({"box": "lr"});
+    graph["containerStrategies"] = json!({"box": "none"});
+    graph["defaultRouting"] = json!("orthogonal");
+    graph
+}
+
+/// One change of each kind that is written into the view's source graph.
+fn source_changes() -> Vec<(&'static str, Value)> {
+    vec![
+        (
+            "shape",
+            json!({"op": "shape", "nodeId": "part-03", "shape": "circle"}),
+        ),
+        (
+            "default direction",
+            json!({"op": "direction", "direction": "bt"}),
+        ),
+        (
+            "container direction",
+            json!({"op": "direction", "nodeId": "box", "direction": "rl"}),
+        ),
+        (
+            "default strategy",
+            json!({"op": "strategy", "strategy": ["none", "tree"]}),
+        ),
+        (
+            "container strategy",
+            json!({"op": "strategy", "nodeId": "box", "strategy": "tree"}),
+        ),
+        (
+            "default routing",
+            json!({"op": "routing", "routing": "straight"}),
+        ),
+        (
+            "container routing",
+            json!({"op": "routing", "nodeId": "box", "routing": "polyline"}),
+        ),
+        (
+            "port",
+            json!({"op": "port", "edgeId": "wire-07", "endpoint": "target", "side": "top", "offset": 0.3}),
+        ),
+    ]
+}
+
+#[test]
+fn a_long_bookmark_of_changed_decisions_belongs_to_a_fresh_import() {
+    for graph in [authored(), declared()] {
+        let first = import(&graph, json!({}));
+        let mut all = first.clone();
+        let mut views = Vec::new();
+        for (name, change) in source_changes() {
+            views.push((name, edit(&first, change.clone())));
+            all = edit(&all, change);
+        }
+        views.push(("all", all));
+        // A declared value taken back is a change too.
+        if graph.get("containerDirections").is_some() {
+            views.push((
+                "inherited direction",
+                edit(&first, json!({"op": "direction", "nodeId": "box"})),
+            ));
+        }
+        for (name, view) in views {
+            assert_ne!(intent(&view), intent(&first), "{name}");
+            let bookmark = long_form(&view);
+            for (on, target) in [
+                ("a fresh import", import(&graph, json!({}))),
+                ("the view", view.clone()),
+            ] {
+                let read = read_long(&target, &bookmark);
+                assert_eq!(read["sameSource"], true, "{name} on {on}");
+                assert_eq!(read["missing"], json!([]), "{name} on {on}");
+                assert_eq!(read["ignored"], json!([]), "{name} on {on}");
+                assert_eq!(read["bookmark"]["intent"], intent(&view), "{name} on {on}");
+                let restored = edit(
+                    &target,
+                    json!({"op": "restore", "intent": bookmark["intent"]}),
+                );
+                assert_eq!(intent(&restored), intent(&view), "{name} on {on}");
+                assert_eq!(long_form(&restored), bookmark, "{name} on {on}");
+            }
+            // Resident, as the view controller asks.
+            let mut session = EngineSession::new();
+            session.load(serde_json::from_value(import(&graph, json!({}))).unwrap());
+            let resident = session.run_value(&json!({"op": "readBookmark", "bookmark": bookmark}));
+            assert_eq!(resident["sameSource"], true, "{name}: {resident}");
+        }
+    }
+}
+
+#[test]
+fn a_long_bookmark_of_another_graph_stays_one() {
+    let graph = declared();
+    let first = import(&graph, json!({}));
+    let mut changed = first.clone();
+    for (_, change) in source_changes() {
+        changed = edit(&changed, change);
+    }
+    // What no decision writes: a label, a kind, a parent, an edge's direction, a node and an edge more or less.
+    type Revision = fn(&mut Value);
+    let revisions: [(&str, Revision); 6] = [
+        ("label", |g| g["nodes"][5]["label"] = json!("renamed")),
+        ("kind", |g| g["nodes"][5]["kind"] = json!("other")),
+        ("parent", |g| g["nodes"][5]["parentId"] = Value::Null),
+        ("edge direction", |g| {
+            let edge = &mut g["edges"][20];
+            let (source, target) = (edge["source"].clone(), edge["target"].clone());
+            edge["source"] = target;
+            edge["target"] = source;
+            // Its port belongs to the former source.
+            g["edgePorts"].as_array_mut().unwrap().remove(20);
+        }),
+        ("node more", |g| {
+            g["nodes"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"id": "new", "kind": "unit", "label": "new"}))
+        }),
+        ("edge less", |g| {
+            g["edges"].as_array_mut().unwrap().pop();
+            g["edgePorts"].as_array_mut().unwrap().pop();
+        }),
+    ];
+    for (name, revise) in revisions {
+        let mut next = graph.clone();
+        revise(&mut next);
+        let fresh = import(&next, json!({}));
+        for bookmark in [long_form(&first), long_form(&changed)] {
+            assert_eq!(read_long(&fresh, &bookmark)["sameSource"], false, "{name}");
+        }
+    }
+    // A digest of something else, with the decisions of this graph.
+    let mut bookmark = long_form(&changed);
+    bookmark["digest"] = json!("0000000000000000");
+    assert_eq!(read_long(&first, &bookmark)["sameSource"], false);
+}
+
+#[test]
+fn declared_values_do_not_make_another_source_in_either_form() {
+    // As the compact form: a revision that differs only in what a decision writes is the same source, and a long
+    // bookmark restores its own values over the revision's.
+    let graph = declared();
+    let view = edit(
+        &import(&graph, json!({})),
+        json!({"op": "shape", "nodeId": "part-03", "shape": "circle"}),
+    );
+    let mut next = graph.clone();
+    next["nodes"][1]["shape"] = json!("circle");
+    next["containerDirections"] = json!({"box": "bt"});
+    let fresh = import(&next, json!({}));
+    let text = compact(&view, json!({}));
+    assert_eq!(read(&fresh, &text, None)["sameSource"], true);
+    let bookmark = long_form(&view);
+    assert_eq!(read_long(&fresh, &bookmark)["sameSource"], true);
+    let restored = edit(
+        &fresh,
+        json!({"op": "restore", "intent": bookmark["intent"]}),
+    );
+    assert_eq!(intent(&restored), intent(&view));
+}
+
+#[test]
+fn a_long_bookmark_is_read_against_a_snapshot_that_left_its_source_out() {
+    let graph = declared();
+    let lean = ok(json!({"op": "import", "graph": graph, "limit": 10000, "omitSource": true}))
+        ["snapshot"]
+        .clone();
+    assert!(lean["sourceDigest"].is_string() && lean["sourceGraph"].is_null());
+    let view = edit(
+        &import(&graph, json!({})),
+        json!({"op": "shape", "nodeId": "part-03", "shape": "circle"}),
+    );
+    let bookmark = long_form(&view);
+    let read =
+        ok(json!({"op": "readBookmark", "snapshot": lean, "source": graph, "bookmark": bookmark}));
+    assert_eq!(read["sameSource"], true, "{read}");
 }
