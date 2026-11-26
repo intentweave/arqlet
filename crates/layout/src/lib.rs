@@ -385,8 +385,33 @@ fn compute_counted_for(
     options: &LayoutOptions,
     compared: bool,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    compute_finished(options, |options| {
+        compute_counted_unclocked(graph, previous, dirty, options, compared)
+    })
+}
+
+/// One layout of a graph that is already the one the layout sees, as `region_ports` composes it from two: without the
+/// steps that turn a view into that graph (held groups, hub references, bus lines). Those ran once on the way in, and
+/// the caller gives their results back. Run again, they took the bus nodes out of the graph a second time (#204), and
+/// took the edges of a region's box for those of a hub. The two drawings are compared, so no step is left out.
+fn compute_counted_composed(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    compute_finished(options, |options| {
+        compute_counted_forced(graph, previous, dirty, options, false)
+    })
+}
+
+/// A layout by `lay` with what every complete layout adds: the second run without shared tracks, and the timings.
+fn compute_finished(
+    options: &LayoutOptions,
+    lay: impl Fn(&LayoutOptions) -> Result<(Snapshot, SearchCounters), String>,
+) -> Result<(Snapshot, SearchCounters), String> {
     let started = stage_timer_start();
-    let mut result = compute_counted_unclocked(graph, previous, dirty, options, compared);
+    let mut result = lay(options);
     // The completion found the lane orders cyclic and stopped at once (#152): the same as the fallback below.
     let cyclic = matches!(&result, Err(message) if message == SHARED_TRACKS_CYCLIC);
     // Provisional (`sharedTracks`): shared tracks made the lane orders cyclic for many edges; the placement had already made
@@ -404,13 +429,11 @@ fn compute_counted_for(
             shared_tracks: None,
             ..options.clone()
         };
-        result = compute_counted_unclocked(graph, previous, dirty, &plain, compared).map(
-            |(mut s, stages)| {
-                s.options.shared_tracks = options.shared_tracks;
-                s.layout_diagnostics.push(SHARED_TRACKS_FALLBACK.into());
-                (s, stages)
-            },
-        );
+        result = lay(&plain).map(|(mut s, stages)| {
+            s.options.shared_tracks = options.shared_tracks;
+            s.layout_diagnostics.push(SHARED_TRACKS_FALLBACK.into());
+            (s, stages)
+        });
     }
     // Provisional (phase timings): the time of this layout and its phases, for a host that installed a clock.
     if let Ok((_, stages)) = &result {
@@ -782,10 +805,10 @@ fn compute_counted_body(
             // is kept: ports in the order of the nodes keep the inner legs straight and apart, ports in the order outside
             // cross less there.
             let (mut first, first_stages) =
-                compute_counted_for(&split, earlier.as_ref(), dirty, &inner, true)?;
+                compute_counted_composed(&split, earlier.as_ref(), dirty, &inner)?;
             let placed = region_ports::with_ports(&split, &moved, &first);
             let (mut second, stages) =
-                compute_counted_for(&placed, earlier.as_ref(), dirty, &inner, true)?;
+                compute_counted_composed(&placed, earlier.as_ref(), dirty, &inner)?;
             // Each keeps the options its layout wrote (a layout that fell back to the other pipeline says so), so a later
             // edit or refinement goes on with the pipeline that drew it.
             for snapshot in [&mut first, &mut second] {
