@@ -1039,3 +1039,699 @@ fn a_leaf_moved_out_of_its_cluster_recentres_the_cluster_and_stays_put() {
     assert!(((mx - fx).powi(2) + (my - fy).powi(2)).sqrt() + r(leaf) <= r(file) + 0.05);
     assert_eq!(o["stats"]["overlaps"], 0);
 }
+
+/// Any `overview` request through `dispatch`, answered.
+fn answer(request: &Value) -> Value {
+    let response: Value = serde_json::from_str(&dispatch(&request.to_string())).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    response["overview"].clone()
+}
+
+/// The error of a refused request.
+fn refusal(request: &Value) -> String {
+    let response: Value = serde_json::from_str(&dispatch(&request.to_string())).unwrap();
+    assert_eq!(response["ok"], false, "{response}");
+    response["error"].as_str().unwrap().to_string()
+}
+
+#[test]
+fn edge_data_gives_every_edge_its_kind_and_weight_on_request() {
+    let mut graph = hierarchical(3, 3, 5);
+    let plain = answer(&json!({"op": "overview", "graph": graph}));
+    for key in ["edgeKinds", "edgeKind", "edgeWeight", "continuation"] {
+        assert!(plain.get(key).is_none(), "{key} only on request");
+    }
+    // `false` is the same as left out, byte for byte.
+    let off = json!({"op": "overview", "graph": graph, "edgeData": false});
+    assert_eq!(
+        dispatch(&off.to_string()),
+        dispatch(&json!({"op": "overview", "graph": graph}).to_string())
+    );
+    // Every edge counts 1: kinds only, and nothing else of the answer differs.
+    let mut asked = answer(&json!({"op": "overview", "graph": graph, "edgeData": true}));
+    assert_eq!(asked["edgeKinds"], json!(["call"]));
+    let edges = asked["edges"].as_array().unwrap().len() / 2;
+    assert_eq!(asked["edgeKind"], json!(vec![0; edges]));
+    assert!(asked.get("edgeWeight").is_none(), "every edge counts 1");
+    let o = asked.as_object_mut().unwrap();
+    o.remove("edgeKinds");
+    o.remove("edgeKind");
+    assert_eq!(asked, plain);
+
+    // Other kinds and weights; an unresolved edge first, which has no entry.
+    let list = graph["edges"].as_array_mut().unwrap();
+    for (k, e) in list.iter_mut().enumerate() {
+        if k % 3 == 1 {
+            e["kind"] = json!("import");
+        }
+        if k % 4 == 2 {
+            e["weight"] = json!(k);
+        }
+    }
+    list.insert(
+        0,
+        json!({"id": "first", "kind": "never", "source": "g0/f0/n0", "target": null, "weight": 9}),
+    );
+    let o = answer(&json!({"op": "overview", "graph": graph, "edgeData": true, "threads": 1}));
+    assert_eq!(
+        answer(&json!({"op": "overview", "graph": graph, "edgeData": true, "threads": 4})),
+        o
+    );
+    let resolved: Vec<&Value> = graph["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| !e["target"].is_null())
+        .collect();
+    assert_eq!(o["edgeKind"].as_array().unwrap().len(), resolved.len());
+    assert_eq!(o["edgeWeight"].as_array().unwrap().len(), resolved.len());
+    // The table in order of first use among the resolved edges.
+    assert_eq!(o["edgeKinds"], json!(["call", "import"]));
+    for (k, e) in resolved.iter().enumerate() {
+        let kind = o["edgeKind"][k].as_u64().unwrap() as usize;
+        assert_eq!(o["edgeKinds"][kind], e["kind"], "edge {k}");
+        assert_eq!(
+            o["edgeWeight"][k].as_u64().unwrap(),
+            e["weight"].as_u64().unwrap_or(1).max(1),
+            "edge {k}"
+        );
+        let source = o["edges"][2 * k].as_u64().unwrap() as usize;
+        assert_eq!(o["ids"][source], e["source"], "edge {k}");
+    }
+    let typed: arqlet_model::Overview = serde_json::from_value(o.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&typed).unwrap(), o);
+    assert!(
+        refusal(&json!({"op": "overview", "graph": graph, "edgeData": "yes"})).contains("edgeData")
+    );
+}
+
+#[test]
+fn edge_data_covers_the_taps_of_a_bus_given_as_data_and_graphs_without_edges() {
+    // The taps are edges of the overview that the input has no edge for.
+    let graph = json!({"nodes": [
+        {"id": "a", "kind": "ecu", "label": "a"}, {"id": "b", "kind": "ecu", "label": "b"}
+    ], "edges": [{"id": "e", "kind": "wire", "source": "a", "target": "b", "weight": 3}],
+    "buses": [{"id": "can", "taps": [
+        {"edge": "t1", "node": "a", "toBus": true, "kind": "sends"},
+        {"edge": "t2", "node": "b", "toBus": false, "kind": "receives"}
+    ]}]});
+    let o = answer(&json!({"op": "overview", "graph": graph, "edgeData": true}));
+    assert_eq!(o["ids"], json!(["a", "b", "can"]));
+    assert_eq!(o["edges"], json!([0, 1, 0, 2, 2, 1]));
+    assert_eq!(o["edgeKinds"], json!(["wire", "sends", "receives"]));
+    assert_eq!(o["edgeKind"], json!([0, 1, 2]));
+    assert_eq!(o["edgeWeight"], json!([3, 1, 1]));
+    // Asked for, the fields are there even without an edge.
+    let empty = json!({"nodes": [{"id": "a", "kind": "n", "label": "a"}], "edges": []});
+    let o = answer(&json!({"op": "overview", "graph": empty, "edgeData": true}));
+    assert_eq!((&o["edgeKinds"], &o["edgeKind"]), (&json!([]), &json!([])));
+    assert!(o.get("edgeWeight").is_none());
+}
+
+#[test]
+fn edge_data_comes_as_columns_and_a_session_sends_it_again_when_asked_anew() {
+    use arqlet_runtime::columns::Column;
+    use arqlet_runtime::engine_session::EngineSession;
+    let mut graph = hierarchical(3, 3, 5);
+    graph["edges"][0]["weight"] = json!(4);
+    let options = json!({"communities": 0});
+    let whole =
+        answer(&json!({"op": "overview", "graph": graph, "options": options, "edgeData": true}));
+    let mut session = EngineSession::new();
+    let first = session.run_value(
+        &json!({"op": "overview", "graph": graph, "options": options,
+        "edgeData": true, "columns": true}),
+    );
+    assert_eq!(first["ok"], true, "{first}");
+    let meta = &first["overview"];
+    assert_eq!(meta["edgeKinds"], whole["edgeKinds"]);
+    assert!(meta.get("edgeKind").is_none() && meta.get("edgeWeight").is_none());
+    let columns = session.overview_columns().unwrap().columns();
+    let names: Vec<&str> = columns.iter().map(|(n, _)| *n).collect();
+    assert_eq!(
+        names,
+        [
+            "x",
+            "y",
+            "r",
+            "parent",
+            "kind",
+            "edges",
+            "links",
+            "edgeKind",
+            "edgeWeight"
+        ]
+    );
+    for (name, column) in &columns[7..] {
+        let Column::U32(c) = column else {
+            panic!("{name}")
+        };
+        assert_eq!(json!(c), whole[name], "{name}");
+    }
+    assert_eq!(meta["columns"][8]["name"], "edgeWeight");
+    // The same edge data as before: only what moves, which leaves the edges out.
+    let next = json!({"op": "overview", "options": options, "start": {}, "positionsOnly": true,
+        "edgeData": true});
+    let moved = session.run_value(&next);
+    assert_eq!(moved["overview"]["positionsOnly"], true, "{moved}");
+    assert!(moved["overview"].get("edgeKind").is_none());
+    // Without it: the host may drop what it had, so the whole overview.
+    let mut without = next.clone();
+    without["edgeData"] = json!(false);
+    let o = session.run_value(&without);
+    assert!(o["overview"]["ids"].is_array() && o["overview"].get("edgeKind").is_none());
+    assert_eq!(
+        session.run_value(&without)["overview"]["positionsOnly"],
+        true
+    );
+    // Asked for again: whole, with the data.
+    let o = session.run_value(&next);
+    assert_eq!(o["overview"]["edgeKind"], whole["edgeKind"], "{o}");
+    // A graph whose edges all count 1 has no weight column.
+    let mut plain = EngineSession::new();
+    plain.run_value(
+        &json!({"op": "overview", "graph": hierarchical(2, 2, 3), "edgeData": true,
+        "columns": true}),
+    );
+    assert_eq!(plain.overview_columns().unwrap().columns().len(), 8);
+}
+
+/// Four rings of 40 nodes, each a dense neighbourhood, one edge between neighbouring rings, no containers: communities.
+fn rings() -> Value {
+    let mut nodes = Vec::new();
+    let mut edges = Vec::new();
+    for r in 0..4 {
+        for i in 0..40 {
+            nodes.push(
+                json!({"id": format!("r{r}n{i}"), "kind": "fn", "label": "n", "parentId": null}),
+            );
+            for d in 1..4 {
+                edges.push(json!({"id": format!("r{r}e{i}-{d}"), "kind": "call", "source": format!("r{r}n{i}"),
+                    "target": format!("r{r}n{}", (i + d) % 40)}));
+            }
+        }
+        edges.push(
+            json!({"id": format!("x{r}"), "kind": "call", "source": format!("r{r}n0"),
+            "target": format!("r{}n20", (r + 1) % 4)}),
+        );
+    }
+    json!({"nodes": nodes, "edges": edges})
+}
+
+/// An overview's places by id, as a host keeps them for a later `start.nodes`.
+fn places(o: &Value) -> Value {
+    let map: serde_json::Map<String, Value> = o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .map(|(i, id)| {
+            (
+                id.as_str().unwrap().to_string(),
+                json!({"x": o["x"][i], "y": o["y"][i], "r": o["r"][i]}),
+            )
+        })
+        .collect();
+    Value::Object(map)
+}
+
+fn at(o: &Value, id: &str) -> usize {
+    o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|x| x == id)
+        .unwrap_or_else(|| panic!("no {id}"))
+}
+
+/// How far node `id` lies from where it was.
+fn moved_by(before: &Value, after: &Value, id: &str) -> f64 {
+    let (a, b) = (at(before, id), at(after, id));
+    let d = |k: &str| after[k][b].as_f64().unwrap() - before[k][a].as_f64().unwrap();
+    d("x").hypot(d("y"))
+}
+
+/// Every node lies in its parent's disc, and no two discs of one container overlap.
+fn assert_nested(o: &Value) {
+    let n = o["ids"].as_array().unwrap().len();
+    let f = |k: &str, i: usize| o[k][i].as_f64().unwrap();
+    let distance = |i: usize, j: usize| (f("x", i) - f("x", j)).hypot(f("y", i) - f("y", j));
+    assert_eq!(o["stats"]["overlaps"], 0);
+    for i in 0..n {
+        let p = o["parent"][i].as_i64().unwrap();
+        if p >= 0 {
+            assert!(
+                distance(i, p as usize) + f("r", i) <= f("r", p as usize) + 0.05,
+                "{} leaves its container",
+                o["ids"][i]
+            );
+        }
+        for j in i + 1..n {
+            if o["parent"][j] == o["parent"][i] {
+                assert!(
+                    distance(i, j) >= f("r", i) + f("r", j) - 0.05,
+                    "{} and {} overlap",
+                    o["ids"][i],
+                    o["ids"][j]
+                );
+            }
+        }
+    }
+}
+
+/// An answer without what became of the places.
+fn without_continuation(mut o: Value) -> Value {
+    o.as_object_mut().unwrap().remove("continuation");
+    o
+}
+
+#[test]
+fn places_by_id_continue_an_unchanged_graph_as_places_by_index_do() {
+    let nested = hierarchical(5, 4, 8);
+    let flat = rings();
+    let mut bused = hierarchical(3, 2, 6);
+    bused["buses"] = json!([{"id": "can", "taps": [
+        {"edge": "t1", "node": "g0/f0/n1", "toBus": true, "kind": "sends"},
+        {"edge": "t2", "node": "g1/f0/n1", "toBus": false, "kind": "receives"}]}]);
+    for (graph, options) in [
+        (&nested, json!({})),
+        (&nested, json!({"communities": 3, "satellites": 0.5})),
+        (
+            &nested,
+            json!({"chains": true, "groups": {"g0/f0": ["A"], "g0/f1": ["A"]}}),
+        ),
+        (&flat, json!({})),
+        (&flat, json!({"communities": 30, "satellites": 0.3})),
+        (&bused, json!({"busRows": true})),
+    ] {
+        let first = answer(&json!({"op": "overview", "graph": graph, "options": options}));
+        // A cluster grown by the host, then back: both ways of giving the places answer the same.
+        let by_index = json!({"x": first["x"], "y": first["y"], "r": first["r"]});
+        let by_id = json!({"nodes": places(&first)});
+        let grown = &first["ids"][first["ids"].as_array().unwrap().len() / 3];
+        for settle in [false, true] {
+            for radii in [json!({}), json!({grown.as_str().unwrap(): 60.0})] {
+                let request = |mut start: Value| {
+                    start["settle"] = json!(settle);
+                    answer(
+                        &json!({"op": "overview", "graph": graph, "options": options,
+                        "radii": radii, "start": start, "threads": 4}),
+                    )
+                };
+                let (index, id) = (request(by_index.clone()), request(by_id.clone()));
+                let report = id["continuation"].clone();
+                assert_eq!(report["anew"], 0, "{options}");
+                assert_eq!(report["ignored"], json!([]), "{options}");
+                assert_eq!(
+                    report["continued"].as_u64().unwrap(),
+                    first["stats"]["nodes"].as_u64().unwrap()
+                        - first["stats"]["communities"].as_u64().unwrap(),
+                    "{options}"
+                );
+                assert!(index.get("continuation").is_none());
+                assert_eq!(
+                    without_continuation(id),
+                    index,
+                    "{options} {settle} {radii}"
+                );
+            }
+        }
+        // No place at all: as without a start.
+        let none = answer(
+            &json!({"op": "overview", "graph": graph, "options": options,
+            "start": {"nodes": {}}}),
+        );
+        assert_eq!(none["continuation"]["continued"], 0);
+        assert_eq!(without_continuation(none), first, "{options}");
+    }
+}
+
+#[test]
+fn an_added_node_is_placed_in_its_cluster_and_the_rest_stays() {
+    let graph = hierarchical(5, 4, 8);
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    let mut changed = graph.clone();
+    changed["nodes"].as_array_mut().unwrap().insert(
+        3,
+        json!({"id": "new", "kind": "fn", "label": "new", "parentId": "g2/f1"}),
+    );
+    changed["edges"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id": "to-new", "kind": "call", "source": "g2/f1/n3", "target": "new"}));
+    // A new container with two nodes of its own, which have no place either.
+    for node in [
+        json!({"id": "g1/new", "kind": "file", "label": "f", "parentId": "g1"}),
+        json!({"id": "g1/new/a", "kind": "fn", "label": "a", "parentId": "g1/new"}),
+        json!({"id": "g1/new/b", "kind": "fn", "label": "b", "parentId": "g1/new"}),
+    ] {
+        changed["nodes"].as_array_mut().unwrap().push(node);
+    }
+    for settle in [false, true] {
+        let request = json!({"op": "overview", "graph": changed,
+            "start": {"nodes": places(&first), "settle": settle}, "threads": 1});
+        let o = answer(&request);
+        let mut parallel = request.clone();
+        parallel["threads"] = json!(8);
+        assert_eq!(answer(&parallel), o);
+        assert_nested(&o);
+        let n = graph["nodes"].as_array().unwrap().len();
+        assert_eq!(
+            o["continuation"],
+            json!({"continued": n, "anew": 4, "ignored": []})
+        );
+        // The new node is near the node it is linked to.
+        let (new, linked) = (at(&o, "new"), at(&o, "g2/f1/n3"));
+        let apart = (o["x"][new].as_f64().unwrap() - o["x"][linked].as_f64().unwrap())
+            .hypot(o["y"][new].as_f64().unwrap() - o["y"][linked].as_f64().unwrap());
+        assert!(apart < o["r"][at(&o, "g2/f1")].as_f64().unwrap(), "{apart}");
+        // A group that took nothing new keeps its inside as it was.
+        for id in graph["nodes"].as_array().unwrap() {
+            let id = id["id"].as_str().unwrap();
+            if id.starts_with("g4/") {
+                let rel = |o: &Value, k: &str| {
+                    o[k][at(o, id)].as_f64().unwrap() - o[k][at(o, "g4")].as_f64().unwrap()
+                };
+                assert!(
+                    (rel(&first, "x") - rel(&o, "x")).abs() < 0.02
+                        && (rel(&first, "y") - rel(&o, "y")).abs() < 0.02,
+                    "{id}"
+                );
+            }
+        }
+        // The drawing moved little: no node further than a file is wide.
+        let wide = 2. * first["r"][at(&first, "g2/f1")].as_f64().unwrap();
+        let most = graph["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|node| moved_by(&first, &o, node["id"].as_str().unwrap()))
+            .fold(0., f64::max);
+        eprintln!("added, settle {settle}: moved at most {most:.2} (file {wide:.2})");
+        assert!(most < wide, "settle {settle}: {most} >= {wide}");
+    }
+}
+
+#[test]
+fn a_removed_node_is_ignored_and_reported_and_the_rest_stays() {
+    let graph = hierarchical(5, 4, 8);
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    let gone = ["g2/f1/n4", "g3/f2/n0"];
+    let mut changed = graph.clone();
+    changed["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|n| !gone.contains(&n["id"].as_str().unwrap()));
+    changed["edges"].as_array_mut().unwrap().retain(|e| {
+        ["source", "target"]
+            .iter()
+            .all(|k| e[k].as_str().is_none_or(|id| !gone.contains(&id)))
+    });
+    for settle in [false, true] {
+        let o = answer(&json!({"op": "overview", "graph": changed,
+            "start": {"nodes": places(&first), "settle": settle}}));
+        assert_nested(&o);
+        assert_eq!(
+            o["continuation"],
+            json!({"continued": changed["nodes"].as_array().unwrap().len(), "anew": 0,
+                "ignored": gone})
+        );
+        let wide = 2. * first["r"][at(&first, "g2/f1")].as_f64().unwrap();
+        let most = changed["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|node| moved_by(&first, &o, node["id"].as_str().unwrap()))
+            .fold(0., f64::max);
+        eprintln!("removed, settle {settle}: moved at most {most:.2} (file {wide:.2})");
+        assert!(most < wide, "settle {settle}: {most} >= {wide}");
+        // Without settling, a file that lost nothing keeps its nodes where they were.
+        if !settle {
+            for l in 0..8 {
+                assert!(moved_by(&first, &o, &format!("g4/f0/n{l}")) < wide / 4.);
+            }
+        } else {
+            // Settling, the file that lost a node settles again.
+            let still = answer(&json!({"op": "overview", "graph": changed,
+                "start": {"nodes": places(&first)}}));
+            assert!(
+                moved_by(&still, &o, "g2/f1/n3") > 0.02,
+                "g2/f1 did not settle"
+            );
+        }
+    }
+}
+
+/// The community of a node: its parent in the overview.
+fn community_of(o: &Value, id: &str) -> usize {
+    o["parent"][at(o, id)].as_i64().unwrap() as usize
+}
+
+#[test]
+fn renumbered_communities_continue_by_their_members() {
+    let graph = rings();
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    assert_eq!(first["stats"]["communities"], 4);
+    // The first ring's nodes last: Louvain numbers the communities by their first node, so the ids name other rings.
+    let mut turned = graph.clone();
+    turned["nodes"].as_array_mut().unwrap().rotate_left(40);
+    let o = answer(&json!({"op": "overview", "graph": turned,
+        "start": {"nodes": places(&first)}}));
+    let ring = |o: &Value, r: usize| {
+        o["ids"][community_of(o, &format!("r{r}n0"))]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    assert_ne!(ring(&o, 1), ring(&first, 1), "the ids are positions");
+    assert_eq!(
+        o["continuation"],
+        json!({"continued": 160, "anew": 0, "ignored": []})
+    );
+    for r in 0..4 {
+        for i in 0..40 {
+            assert!(
+                moved_by(&first, &o, &format!("r{r}n{i}")) < 0.02,
+                "r{r}n{i}"
+            );
+        }
+        let (a, b) = (
+            community_of(&first, &format!("r{r}n0")),
+            community_of(&o, &format!("r{r}n0")),
+        );
+        // Hundredths: a radius is measured again from rounded places.
+        for k in ["x", "y", "r"] {
+            let (was, is) = (first[k][a].as_f64().unwrap(), o[k][b].as_f64().unwrap());
+            assert!((was - is).abs() < 0.02, "ring {r}: {k} {was} {is}");
+        }
+    }
+}
+
+#[test]
+fn a_node_that_changed_its_community_is_placed_anew_there() {
+    let graph = rings();
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    // r0n7 now calls and is called by ring 2 instead of ring 0.
+    let mut changed = graph.clone();
+    for (k, e) in changed["edges"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .enumerate()
+    {
+        for end in ["source", "target"] {
+            if e[end] == "r0n7" {
+                let other = if end == "source" { "target" } else { "source" };
+                e[other] = json!(format!("r2n{}", k % 40));
+            }
+        }
+    }
+    for settle in [false, true] {
+        let o = answer(&json!({"op": "overview", "graph": changed,
+            "start": {"nodes": places(&first), "settle": settle}, "threads": 3}));
+        assert_eq!(
+            community_of(&o, "r0n7"),
+            community_of(&o, "r2n0"),
+            "it changed its community"
+        );
+        assert_nested(&o);
+        assert_eq!(
+            o["continuation"],
+            json!({"continued": 159, "anew": 1, "ignored": []})
+        );
+        // The others stay in their communities, which stay about where they were.
+        let wide = first["r"][community_of(&first, "r2n0")].as_f64().unwrap();
+        let most = (0..4)
+            .flat_map(|r| (0..40).map(move |i| format!("r{r}n{i}")))
+            .filter(|id| id != "r0n7")
+            .map(|id| moved_by(&first, &o, &id))
+            .fold(0., f64::max);
+        eprintln!("changed community, settle {settle}: moved at most {most:.2} (community radius {wide:.2})");
+        assert!(most < wide, "settle {settle}: {most} >= {wide}");
+        if !settle {
+            for i in 0..40 {
+                assert!(moved_by(&first, &o, &format!("r1n{i}")) < wide / 4.);
+            }
+        }
+    }
+    // The places of the graph's nodes alone do as well: each cluster's disc then follows from its members.
+    let mut leaves = places(&first);
+    leaves
+        .as_object_mut()
+        .unwrap()
+        .retain(|id, _| !id.starts_with("community:"));
+    let o = answer(&json!({"op": "overview", "graph": graph, "start": {"nodes": leaves}}));
+    assert_eq!(o["continuation"]["continued"], 160);
+    assert_nested(&o);
+    for i in 0..40 {
+        assert!(moved_by(&first, &o, &format!("r1n{i}")) < 1.);
+    }
+}
+
+#[test]
+fn a_node_that_changed_its_container_is_placed_anew() {
+    let graph = hierarchical(4, 3, 8);
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    let mut changed = graph.clone();
+    for node in changed["nodes"].as_array_mut().unwrap() {
+        if node["id"] == "g0/f0/n5" {
+            node["parentId"] = json!("g3/f2");
+        }
+    }
+    let o = answer(&json!({"op": "overview", "graph": changed,
+        "start": {"nodes": places(&first)}}));
+    assert_nested(&o);
+    assert_eq!(o["continuation"]["anew"], 1);
+    // Its new container grew by one node, not to where the node was.
+    let r = |o: &Value| o["r"][at(o, "g3/f2")].as_f64().unwrap();
+    assert!(r(&o) < 1.5 * r(&first), "{} -> {}", r(&first), r(&o));
+    // Moved up, to the group around its file or to the top level, it starts where it was, inside its old file's disc:
+    // the two part.
+    for parent in [json!("g0"), Value::Null] {
+        let mut changed = graph.clone();
+        for node in changed["nodes"].as_array_mut().unwrap() {
+            if node["id"] == "g0/f0/n5" {
+                node["parentId"] = parent.clone();
+            }
+        }
+        for settle in [false, true] {
+            let o = answer(&json!({"op": "overview", "graph": changed,
+                "start": {"nodes": places(&first), "settle": settle}}));
+            assert_nested(&o);
+        }
+    }
+    // A whole file moved to another group keeps its inside.
+    let mut changed = graph.clone();
+    for node in changed["nodes"].as_array_mut().unwrap() {
+        if node["id"] == "g0/f1" {
+            node["parentId"] = json!("g2");
+        }
+    }
+    let o = answer(&json!({"op": "overview", "graph": changed,
+        "start": {"nodes": places(&first)}}));
+    assert_nested(&o);
+    assert_eq!(o["continuation"]["anew"], 1);
+    for l in 0..8 {
+        let id = format!("g0/f1/n{l}");
+        let rel = |o: &Value, k: &str| {
+            o[k][at(o, &id)].as_f64().unwrap() - o[k][at(o, "g0/f1")].as_f64().unwrap()
+        };
+        assert!((rel(&first, "x") - rel(&o, "x")).abs() < 0.02, "{id}");
+        assert!((rel(&first, "y") - rel(&o, "y")).abs() < 0.02, "{id}");
+    }
+}
+
+#[test]
+fn places_by_id_are_checked_and_work_in_a_session() {
+    use arqlet_runtime::engine_session::EngineSession;
+    let graph = hierarchical(3, 3, 5);
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    let request = |start: Value| json!({"op": "overview", "graph": graph, "start": start});
+    for (start, needle) in [
+        (
+            json!({"nodes": places(&first), "x": first["x"]}),
+            "not both",
+        ),
+        (json!({"nodes": {}, "r": []}), "not both"),
+        (json!({"nodes": [1]}), "must be an object"),
+        (json!({"nodes": {"g0": {"x": 1, "y": 2}}}), "g0 needs"),
+        (
+            json!({"nodes": {"g0": {"x": 1, "y": 2, "r": -1}}}),
+            "g0 needs",
+        ),
+        (
+            json!({"nodes": {}, "moved": {"g0": {"x": 1, "y": 2}}}),
+            "no earlier place",
+        ),
+    ] {
+        let error = refusal(&request(start.clone()));
+        assert!(error.contains(needle), "{start}: {error}");
+    }
+    // A moved node with a place stays where it was put, as with places by index.
+    let id = "g1/f1/n2";
+    let to = json!({"x": first["x"][at(&first, id)].as_f64().unwrap() + 5.,
+        "y": first["y"][at(&first, id)]});
+    let moved = |mut start: Value| {
+        start["moved"] = json!({id: to});
+        answer(&request(start))
+    };
+    assert_eq!(
+        without_continuation(moved(json!({"nodes": places(&first)}))),
+        moved(json!({"x": first["x"], "y": first["y"], "r": first["r"]}))
+    );
+    // In a session, with the graph it has and with a changed one: as `dispatch` answers, in whole or what moves.
+    let mut session = EngineSession::new();
+    session.run_value(&json!({"op": "overview", "graph": graph}));
+    let same = session.run_value(
+        &json!({"op": "overview", "start": {"nodes": places(&first)},
+        "positionsOnly": true}),
+    );
+    assert_eq!(same["overview"]["positionsOnly"], true, "{same}");
+    let direct = answer(&request(json!({"nodes": places(&first)})));
+    assert_eq!(same["overview"]["continuation"], direct["continuation"]);
+    assert_eq!(same["overview"]["x"], direct["x"]);
+    let _: arqlet_model::OverviewPositions =
+        serde_json::from_value(same["overview"].clone()).unwrap();
+    let columnar = session.run_value(&json!({"op": "overview", "columns": true,
+        "positionsOnly": true, "start": {"nodes": places(&first)}}));
+    assert_eq!(columnar["overview"]["continuation"], direct["continuation"]);
+    let smaller = hierarchical(2, 3, 5);
+    let next = session.run_value(&json!({"op": "overview", "graph": smaller,
+        "start": {"nodes": places(&first)}}));
+    assert_eq!(
+        next["overview"],
+        answer(&json!({"op": "overview", "graph": smaller, "start": {"nodes": places(&first)}}))
+    );
+    assert!(!next["overview"]["continuation"]["ignored"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    // The session then continues from that answer without positions.
+    let after = session.run_value(&json!({"op": "overview", "start": {}}));
+    assert_eq!(after["ok"], true, "{after}");
+    // A typed request with places is a request the operation takes.
+    let typed = arqlet_model::OverviewRequest {
+        graph: Some(serde_json::from_value(graph).unwrap()),
+        start: Some(arqlet_model::OverviewStart {
+            nodes: Some(
+                [(
+                    "g0".to_string(),
+                    arqlet_model::OverviewPlace {
+                        x: 0.,
+                        y: 0.,
+                        r: 50.,
+                    },
+                )]
+                .into(),
+            ),
+            ..Default::default()
+        }),
+        edge_data: Some(true),
+        ..Default::default()
+    };
+    let mut v = serde_json::to_value(&typed).unwrap();
+    v["op"] = json!("overview");
+    let o = answer(&v);
+    let typed: arqlet_model::Overview = serde_json::from_value(o.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&typed).unwrap(), o);
+}

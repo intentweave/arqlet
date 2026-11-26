@@ -56,7 +56,8 @@ export async function createEngine(bytes,{onPublish}={}) {
         return {...result,...viewsOf(listed,index=>api.lw_session_column(id,index),false)};
       };
       // Provisional: an `overview` request whose numbers come back as typed arrays instead of JSON arrays (`parent`, `x`,
-      // `y`, `r`, `kind`, `edges`, `links`; a continuation with `positionsOnly` only `x`, `y` and `r`), in an answer shaped
+      // `y`, `r`, `kind`, `edges`, `links`, and with `edgeData` `edgeKind` and `edgeWeight`; a continuation with
+      // `positionsOnly` only `x`, `y` and `r`), in an answer shaped
       // like the JSON one. `copy` (default false) copies them out of the module's memory, for a host that keeps them past
       // its next request; views are valid only until then.
       const overview=(request,{copy=false}={})=>{

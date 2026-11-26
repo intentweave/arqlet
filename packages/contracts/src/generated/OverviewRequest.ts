@@ -16,9 +16,14 @@ export type OverviewRequest = { graph?: Graph, options?: OverviewLayoutOptions, 
 radii?: { [key in string]: number }, start?: OverviewStart,
 /**
  * Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
- * last overview; otherwise the whole overview.
+ * last overview and `edgeData` is as it was there; otherwise the whole overview.
  */
 positionsOnly?: boolean,
+/**
+ * Provisional: answer each edge's kind and weight too (`Overview::edge_kinds`, `edge_kind`, `edge_weight`), for a
+ * host that does not have the graph.
+ */
+edgeData?: boolean,
 /**
  * Worker threads (native only); the answer is the same for any number.
  */

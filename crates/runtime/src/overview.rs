@@ -5,8 +5,8 @@ use arqlet_layout::overview::{
     self, Arrangement, Container, OverviewHints, OverviewOptions, Previous,
 };
 use arqlet_model::{
-    validate, ConfigSet, Graph, Overview, OverviewConfig, OverviewIntent, OverviewPositions,
-    OverviewRepresentation, OverviewStats,
+    validate, ConfigSet, Graph, Overview, OverviewConfig, OverviewContinuation, OverviewIntent,
+    OverviewPlace, OverviewPositions, OverviewRepresentation, OverviewStats,
 };
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -75,17 +75,26 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
     Ok(options)
 }
 
-/// The hints of a request: `radii` (node id → radius, for clusters a host shows structured) and `start` (`{x, y, r}` of a
-/// previous overview of the same graph, in its node order) to continue from.
-fn hints_of(v: &Value, h: &overview::Hierarchy) -> Result<OverviewHints, String> {
+/// The hints of a request: `radii` (node id → radius, for clusters a host shows structured) and `start` to continue
+/// from: `{x, y, r}` of a previous overview of the same graph, in its node order, or `{nodes}`, its places by node id,
+/// of this graph or an earlier one. With the latter also what became of the places.
+fn hints_of(
+    v: &Value,
+    h: &overview::Hierarchy,
+    options: &OverviewOptions,
+) -> Result<(OverviewHints, Option<OverviewContinuation>), String> {
     let mut hints = OverviewHints::default();
-    if let Some(radii) = v.get("radii") {
-        let index: std::collections::BTreeMap<&str, usize> = h
-            .ids
+    let mut continuation = None;
+    let index: BTreeMap<&str, usize> = if v.get("radii").is_some() || v.get("start").is_some() {
+        h.ids
             .iter()
             .enumerate()
             .map(|(i, id)| (id.as_str(), i))
-            .collect();
+            .collect()
+    } else {
+        BTreeMap::new()
+    };
+    if let Some(radii) = v.get("radii") {
         for (id, r) in radii
             .as_object()
             .ok_or("Overview radii must be an object")?
@@ -101,61 +110,91 @@ fn hints_of(v: &Value, h: &overview::Hierarchy) -> Result<OverviewHints, String>
         }
     }
     if let Some(start) = v.get("start") {
-        let numbers = |key: &str| -> Result<Vec<f64>, String> {
-            let list = start[key]
-                .as_array()
-                .ok_or_else(|| format!("Overview start needs {key}"))?;
-            if list.len() != h.ids.len() {
-                return Err(format!(
-                    "Overview start {key} has {} values for {} nodes; it must come from the same graph",
-                    list.len(),
-                    h.ids.len()
-                ));
-            }
-            list.iter()
-                .map(|x| {
-                    x.as_f64()
-                        .filter(|x| x.is_finite())
-                        .ok_or_else(|| format!("Overview start {key} must be finite numbers"))
-                })
-                .collect()
-        };
-        let (x, y, r) = (numbers("x")?, numbers("y")?, numbers("r")?);
-        hints.start = Some(Previous {
-            centre: x.into_iter().zip(y).collect(),
-            radius: r,
-            // `settle: true` lets the changed containers settle again (for a host that animates the change).
-            settle: start["settle"].as_bool().unwrap_or(false),
-            moved: match start.get("moved") {
-                None => BTreeMap::new(),
-                Some(moved) => {
-                    let index: BTreeMap<&str, usize> = h
-                        .ids
-                        .iter()
-                        .enumerate()
-                        .map(|(i, id)| (id.as_str(), i))
-                        .collect();
-                    moved
-                        .as_object()
-                        .ok_or("Overview start moved must be an object: node id -> {x, y}")?
-                        .iter()
-                        .map(|(id, p)| {
-                            let i = *index.get(id.as_str()).ok_or_else(|| {
-                                format!("Overview start moved an unknown node: {id}")
-                            })?;
-                            let at = |k: &str| {
-                                p[k].as_f64().filter(|v| v.is_finite()).ok_or_else(|| {
-                                    format!("Overview start moved {id} needs finite x and y")
-                                })
-                            };
-                            Ok((i, (at("x")?, at("y")?)))
-                        })
-                        .collect::<Result<_, String>>()?
+        let mut previous = match start.get("nodes") {
+            Some(places) => {
+                if ["x", "y", "r"].iter().any(|k| start.get(k).is_some()) {
+                    return Err(
+                        "Overview start takes x, y and r (by node index) or nodes (by node id), not both"
+                            .into(),
+                    );
                 }
-            },
-        });
+                let (previous, report) = overview::continue_by_id(h, &places_of(places)?, options);
+                continuation = Some(report);
+                previous
+            }
+            None => {
+                let numbers = |key: &str| -> Result<Vec<f64>, String> {
+                    let list = start[key]
+                        .as_array()
+                        .ok_or_else(|| format!("Overview start needs {key}"))?;
+                    if list.len() != h.ids.len() {
+                        return Err(format!(
+                            "Overview start {key} has {} values for {} nodes; it must come from the same graph",
+                            list.len(),
+                            h.ids.len()
+                        ));
+                    }
+                    list.iter()
+                        .map(|x| {
+                            x.as_f64().filter(|x| x.is_finite()).ok_or_else(|| {
+                                format!("Overview start {key} must be finite numbers")
+                            })
+                        })
+                        .collect()
+                };
+                let (x, y, r) = (numbers("x")?, numbers("y")?, numbers("r")?);
+                Previous {
+                    centre: x.into_iter().zip(y).collect(),
+                    radius: r,
+                    ..Previous::default()
+                }
+            }
+        };
+        // `settle: true` lets the changed containers settle again (for a host that animates the change).
+        previous.settle = start["settle"].as_bool().unwrap_or(false);
+        if let Some(moved) = start.get("moved") {
+            previous.moved = moved
+                .as_object()
+                .ok_or("Overview start moved must be an object: node id -> {x, y}")?
+                .iter()
+                .map(|(id, p)| {
+                    let i = *index
+                        .get(id.as_str())
+                        .ok_or_else(|| format!("Overview start moved an unknown node: {id}"))?;
+                    if previous.anew.contains(&i) {
+                        return Err(format!(
+                            "Overview start moved {id}, which has no earlier place in its cluster"
+                        ));
+                    }
+                    let at = |k: &str| {
+                        p[k].as_f64().filter(|v| v.is_finite()).ok_or_else(|| {
+                            format!("Overview start moved {id} needs finite x and y")
+                        })
+                    };
+                    Ok((i, (at("x")?, at("y")?)))
+                })
+                .collect::<Result<_, String>>()?;
+        }
+        hints.start = Some(previous);
     }
-    Ok(hints)
+    Ok((hints, continuation))
+}
+
+/// `start.nodes`: node id → `{x, y, r}`.
+fn places_of(v: &Value) -> Result<BTreeMap<String, OverviewPlace>, String> {
+    v.as_object()
+        .ok_or("Overview start nodes must be an object: node id -> {x, y, r}")?
+        .iter()
+        .map(|(id, p)| {
+            let at = |k: &str| p[k].as_f64().filter(|v| v.is_finite());
+            match (at("x"), at("y"), at("r").filter(|r| *r >= 0.)) {
+                (Some(x), Some(y), Some(r)) => Ok((id.clone(), OverviewPlace { x, y, r })),
+                _ => Err(format!(
+                    "Overview start nodes {id} needs finite x, y and r >= 0"
+                )),
+            }
+        })
+        .collect()
 }
 
 /// The representation values of a request (ADR 0018, addendum; ADR 0015): `intent` (the user's decisions by node id)
@@ -292,7 +331,9 @@ fn lay_out(
     options: &OverviewOptions,
     threads: usize,
 ) -> Result<Overview, String> {
-    let mut hints = hints_of(v, h)?;
+    let (mut hints, continuation) = hints_of(v, h, options)?;
+    // `edgeData`: each edge's kind and weight in the answer.
+    let edge_data = edge_data_of(v)?;
     // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
     let rows_wanted = options.rows.contains_key(&usize::MAX);
     let mut options = options.clone();
@@ -364,6 +405,29 @@ fn lay_out(
         .collect();
     let representation = representation_of(v, h, &kinds)?;
     let labels: Vec<&str> = graph.nodes.iter().map(|n| n.label.as_str()).collect();
+    // Kinds as a table in order of first use, as for nodes; weights only when an edge counts more than once.
+    let (mut edge_kinds, mut edge_kind, mut edge_weight) = (None, None, None);
+    if edge_data {
+        let resolved = overview::resolved_edges(graph);
+        let mut table: Vec<String> = Vec::new();
+        let mut at: BTreeMap<&str, u32> = BTreeMap::new();
+        edge_kind = Some(
+            resolved
+                .iter()
+                .map(|e| {
+                    *at.entry(e.kind.as_str()).or_insert_with(|| {
+                        table.push(e.kind.clone());
+                        table.len() as u32 - 1
+                    })
+                })
+                .collect(),
+        );
+        edge_kinds = Some(table);
+        edge_weight = resolved
+            .iter()
+            .any(|e| e.count() > 1)
+            .then(|| resolved.iter().map(|e| e.count() as u32).collect());
+    }
     let count = |n: usize| n as u32;
     Ok(Overview {
         schema_version: 1,
@@ -404,21 +468,36 @@ fn lay_out(
             unresolved_edges: count(graph.edges.len() - h.edges.len()),
             overlaps: count(o.overlaps),
         },
+        edge_kinds,
+        edge_kind,
+        edge_weight,
+        continuation,
     })
+}
+
+/// The `edgeData` of a request.
+fn edge_data_of(v: &Value) -> Result<bool, String> {
+    match v.get("edgeData") {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Bool(b)) => Ok(*b),
+        Some(_) => Err("Overview edgeData must be true or false".into()),
+    }
 }
 
 /// Provisional (ADR 0019 for the overview): what an engine session keeps of an overview between requests: the graph,
 /// the cluster hierarchy with the options it was built with, and the last positions. A host sends the graph once; later
 /// requests leave it out, and a `start` without positions (`{"settle": …}` or `{}`) continues from the last layout, if
-/// the options the clusters depend on (`communities`, `satellites`, `groups`) are the same. The
+/// the options the clusters depend on (`communities`, `satellites`, `groups`) are the same. A `start` with `nodes`
+/// (places by id) continues from those instead, with a new graph too. The
 /// answers are the same as those of `dispatch` given the graph and the positions in full.
 #[derive(Default)]
 pub struct OverviewSession {
     graph: Option<Graph>,
     /// The options the hierarchy depends on, the graph with its groups, and the hierarchy.
     hierarchy: Option<(Value, Graph, overview::Hierarchy)>,
-    /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout.
-    last: Option<(Value, Value)>,
+    /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout, and whether it was
+    /// answered with the edges' data.
+    last: Option<(Value, Value, bool)>,
     /// The numbers of the last answer to a request with `columns: true`; dropped by the next request.
     columns: Option<crate::columns::OverviewColumns>,
 }
@@ -431,7 +510,7 @@ impl OverviewSession {
             + self.hierarchy.as_ref().map_or(0, |(options, graph, _)| {
                 crate::memory::value(options) + crate::memory::graph(graph)
             })
-            + self.last.as_ref().map_or(0, |(a, b)| {
+            + self.last.as_ref().map_or(0, |(a, b, _)| {
                 crate::memory::value(a) + crate::memory::value(b)
             })
     }
@@ -476,7 +555,8 @@ impl OverviewSession {
         }
     }
 
-    /// The overview, and whether it was laid out on the clusters of the session's last overview.
+    /// The overview, and whether it was laid out on the clusters of the session's last overview, with the same
+    /// `edgeData` (so that a positions-only answer is enough).
     fn overview(&mut self, v: &Value, threads: usize) -> Result<(Overview, bool), String> {
         let options = options_of(v)?;
         let new_graph = if v.get("graph").is_some() {
@@ -509,10 +589,10 @@ impl OverviewSession {
         // A start without positions continues from the last layout of the same clusters.
         let mut request = v.clone();
         if let Some(start) = request.get_mut("start").and_then(Value::as_object_mut) {
-            if !start.contains_key("x") {
+            if !start.contains_key("x") && !start.contains_key("nodes") {
                 let last =
                     match (&new_graph, &self.last) {
-                        (None, Some((clusters, last))) if *clusters == key => last,
+                        (None, Some((clusters, last, _))) if *clusters == key => last,
                         (None, Some(_)) => return Err(
                             "The clusters changed since the last overview; lay out without start."
                                 .into(),
@@ -529,16 +609,19 @@ impl OverviewSession {
             }
         }
         let overview = lay_out(grouped, h, &request, &options, threads)?;
-        // The same clusters as the last overview of this session: its ids, labels, parents, kinds, edges and links hold.
+        // The same clusters as the last overview of this session: its ids, labels, parents, kinds, edges and links hold,
+        // and so do the edges' data, which the host has when that answer had them.
+        let edge_data = edge_data_of(v)?;
         let same_clusters = new_graph.is_none()
             && self
                 .last
                 .as_ref()
-                .is_some_and(|(clusters, _)| *clusters == key);
+                .is_some_and(|(clusters, _, data)| *clusters == key && *data == edge_data);
         // Accepted: keep what the next request builds on.
         let last = (
             key.clone(),
             json!({"x": overview.x, "y": overview.y, "r": overview.r}),
+            edge_data,
         );
         if let Some((g, h)) = built {
             self.hierarchy = Some((key, g, h));

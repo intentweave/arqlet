@@ -1,7 +1,9 @@
 /**
  * The result of the engine's `overview` operation (`Overview` in `@arqlet/contracts`, ADR 0018). Provisional. Arrays are
  * indexed by node, in input order. A viewer also takes one without labels, kinds and representation (each node is then
- * named by its id; rules and the level of detail do not apply).
+ * named by its id; rules and the level of detail do not apply). A request with `edgeData: true` also answers each edge's
+ * kind (`edgeKinds[edgeKind[k]]`) and weight (`edgeWeight?.[k] ?? 1`) for edge `k` (`edges[2k]` to `edges[2k + 1]`),
+ * for a host without the graph.
  */
 export type OverviewResult = Omit<import('@arqlet/contracts').Overview, 'labels' | 'kinds' | 'kind' | 'representation'>
   & Partial<Pick<import('@arqlet/contracts').Overview, 'labels' | 'kinds' | 'kind' | 'representation'>>;

@@ -146,6 +146,32 @@ simulation runs in the browser), the browser only interpolates:
   transforms, about 0.4 s) and fades in routes and labels; off when the user asks for reduced motion, and never in the
   way of the change (a minimal DOM, as in the regression test, just skips it).
 
+## Addendum (2026-11-26): the overview as a server result (#209)
+
+A host may compute the overview on a server and give the browser only the answer. Both additions are provisional and
+change no answer that does not ask for them. Usage: [integration guide](../integration-guide.md).
+
+1. **Edge data on request** (`edgeData`): per resolved edge its kind (index into `edgeKinds`, as nodes have
+   `kinds`/`kind`) and its weight, the latter only when an edge counts more than once. The index of the input edge was
+   the alternative and was rejected: a client without the graph cannot resolve it, the taps of buses given as data have
+   no input edge, and a host with the graph already has the order (`resolvedEdgeIds`). On request, because it makes every
+   answer larger and most hosts have the graph.
+2. **Continuation by node id** (`start.nodes`, `id → {x, y, r}`; excluding `x`, `y`, `r`): read onto the current
+   hierarchy (`arqlet_layout::overview::continue_by_id`), then laid out as any continuation. A node without a usable
+   place (none, a new container, or an entry outside its container's earlier disc) is put next to the nodes it is linked
+   to, and its container makes room or settles. A container that lost a node counts as changed. The earlier disc of a
+   container judges its members only when it holds at least half of them or they gather elsewhere, so that a disc the
+   host set smaller than its content (`radii`) does not send them all anew.
+3. **Added clusters are matched by place.** Their ids are positions in a clustering. Discs of one container do not
+   overlap, so the earlier discs say which nodes shared a cluster: each cluster takes as its predecessor the earlier
+   cluster disc that holds at least half of the nodes below it with the best Jaccard share; members outside it are placed
+   anew; that disc is kept when it has the same id or is exactly the disc around the remaining members; otherwise the cluster
+   gets the smallest disc (nearly) around them. An unchanged graph therefore continues exactly as by node index,
+   whatever the ids say.
+
+Open: the drill-down from an `OverviewModel` without the input graph (part 2 of #209) builds on 1; it may want edge ids,
+which would be another request field.
+
 ## Real data (2026-11-11)
 
 On two real exports (Intentweave, 8 874 nodes; Backstage, 31 758 nodes; `benchmarks/results/overview-real-20261111.md`)

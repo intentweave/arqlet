@@ -11,8 +11,11 @@
 //! order in which the jobs of one level run.
 use crate::organic::QuadTree;
 use arqlet_model::math::PortableMath;
-use arqlet_model::Graph;
-use std::collections::BTreeMap;
+use arqlet_model::{Edge, Graph};
+use std::collections::{BTreeMap, BTreeSet};
+
+mod continuation;
+pub use continuation::continue_by_id;
 
 /// Provisional options of the overview.
 #[derive(Clone, Debug, PartialEq)]
@@ -68,14 +71,15 @@ impl Default for OverviewOptions {
 pub struct OverviewHints {
     /// Radii by node index, in place of the leaf radius or the container's arrangement.
     pub radius: BTreeMap<usize, f64>,
-    /// A previous overview of the same graph to start from: absolute centres and radii by node index.
+    /// A previous overview to start from: absolute centres and radii by node index (for a changed graph, as
+    /// `continue_by_id` reads them).
     pub start: Option<Previous>,
 }
 
 /// The places of a previous overview (its `x`, `y` and `radius`), by node index. A container none of whose children
 /// changed its radius keeps its arrangement exactly; in any other, the children keep their places and only make room
 /// (`make_room`): no forces run and the container is not centred again.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Previous {
     pub centre: Vec<(f64, f64)>,
     pub radius: Vec<f64>,
@@ -87,6 +91,13 @@ pub struct Previous {
     /// previous places with the moved node held where it was put (the first one of a container; the others are only
     /// put), and is not centred again, so that nothing else jumps.
     pub moved: BTreeMap<usize, (f64, f64)>,
+    /// Provisional: nodes without a place in their container, by index (new, or moved there from elsewhere): placed
+    /// among the others, which make room (or settle). A node with `centre` and `radius` keeps its inner arrangement all
+    /// the same. A container whose children are all here is arranged as without a start.
+    pub anew: BTreeSet<usize>,
+    /// Provisional: containers that changed although no radius of a child tells it (a child left, or a child's disc was
+    /// worked out anew): they make room, or settle, like those with a changed radius.
+    pub changed: BTreeSet<Container>,
 }
 
 /// An arrangement after a move (`Previous::moved`): the whole arrangement follows the anchor back to where it was (the
@@ -208,14 +219,38 @@ impl Hierarchy {
     }
 }
 
-/// Reads the hierarchy of a graph that `arqlet_model::validate` accepted. Unresolved edges (no target) are left out.
-pub fn hierarchy(graph: &Graph) -> Hierarchy {
-    let index: BTreeMap<&str, usize> = graph
+/// The index of every node of a graph by id.
+fn index_of(graph: &Graph) -> BTreeMap<&str, usize> {
+    graph
         .nodes
         .iter()
         .enumerate()
         .map(|(i, node)| (node.id.as_str(), i))
-        .collect();
+        .collect()
+}
+
+/// The ends of an edge as node indices, when both are nodes of the graph.
+fn ends_of(index: &BTreeMap<&str, usize>, e: &Edge) -> Option<(usize, usize)> {
+    Some((
+        *index.get(e.source.as_str())?,
+        *index.get(e.target.as_deref()?)?,
+    ))
+}
+
+/// Provisional: the edges behind `Hierarchy::edges` of `hierarchy(graph)` (and of the hierarchies made from it, which
+/// keep them), in the same order.
+pub fn resolved_edges(graph: &Graph) -> Vec<&Edge> {
+    let index = index_of(graph);
+    graph
+        .edges
+        .iter()
+        .filter(|e| ends_of(&index, e).is_some())
+        .collect()
+}
+
+/// Reads the hierarchy of a graph that `arqlet_model::validate` accepted. Unresolved edges (no target) are left out.
+pub fn hierarchy(graph: &Graph) -> Hierarchy {
+    let index = index_of(graph);
     let parent: Vec<Option<usize>> = graph
         .nodes
         .iter()
@@ -228,13 +263,7 @@ pub fn hierarchy(graph: &Graph) -> Hierarchy {
     let (edges, weights): (Vec<(usize, usize)>, Vec<f64>) = graph
         .edges
         .iter()
-        .filter_map(|e| {
-            let target = e.target.as_deref()?;
-            Some((
-                (*index.get(e.source.as_str())?, *index.get(target)?),
-                e.count() as f64,
-            ))
-        })
+        .filter_map(|e| Some((ends_of(&index, e)?, e.count() as f64)))
         .unzip();
     let ids = graph.nodes.iter().map(|node| node.id.clone()).collect();
     build(ids, parent, edges, weights, graph.nodes.len())
@@ -954,7 +983,9 @@ fn in_rows(
 /// the links, a Barnes–Hut many-body repulsion weighted by each disc's area, a gravity towards the centre and a collision
 /// of the discs. A final separation removes what overlap is left. With `start` (absolute centres by node, see
 /// `OverviewHints::start`) the children start from their places relative to the container's previous centre, cooler; and
-/// when no child's radius changed, the previous arrangement is kept as it was.
+/// when no child's radius changed, the previous arrangement is kept as it was. Children without a previous place
+/// (`Previous::anew`) are put among the others first (`place_anew`); with none that has one, the container is arranged as
+/// without `start`.
 pub fn arrange(
     h: &Hierarchy,
     container: Container,
@@ -987,13 +1018,15 @@ pub fn arrange(
         .iter()
         .map(|&(a, b, w)| (local[&a], local[&b], w))
         .collect();
+    // Whether anything of a previous arrangement is there to continue from.
+    let start = start.filter(|p| members.iter().any(|m| !p.anew.contains(m)));
     let mut x = match start {
         Some(previous) => {
             let origin = match container {
                 Container::Root => (0., 0.),
                 Container::Node(c) => previous.centre[c],
             };
-            let x: Vec<(f64, f64)> = members
+            let mut x: Vec<(f64, f64)> = members
                 .iter()
                 .map(|&m| {
                     (
@@ -1002,9 +1035,15 @@ pub fn arrange(
                     )
                 })
                 .collect();
-            let changed = members
-                .iter()
-                .any(|&m| (radius[m] - previous.radius[m]).abs() > SAME_RADIUS);
+            let placed: Vec<bool> = members.iter().map(|m| !previous.anew.contains(m)).collect();
+            let changed = placed.contains(&false)
+                || previous.changed.contains(&container)
+                || members
+                    .iter()
+                    .zip(&placed)
+                    .any(|(&m, &p)| p && (radius[m] - previous.radius[m]).abs() > SAME_RADIUS);
+            place_anew(&mut x, &placed, &r, &links, options.gap);
+            let x = x;
             // A child the user moved: put where it was put, held there while the others settle around it.
             let held = members
                 .iter()
@@ -1108,6 +1147,86 @@ pub fn arrange(
         radius: reach + options.padding,
         overlaps,
         shift: (0., 0.),
+    }
+}
+
+/// Places the children without a previous place (`placed` false) among those with one, in the container's frame. One
+/// linked to placed children goes to their centre (weighted by the links); more than one at the same strongest neighbour
+/// spread on a spiral about it. One without such a link goes outside what is there, and those linked to it follow it. The
+/// caller removes the overlaps.
+fn place_anew(
+    x: &mut [(f64, f64)],
+    placed: &[bool],
+    r: &[f64],
+    links: &[(usize, usize, f64)],
+    gap: f64,
+) {
+    if !placed.contains(&false) {
+        return;
+    }
+    let k = x.len();
+    let mut adjacent: Vec<Vec<(usize, f64)>> = vec![Vec::new(); k];
+    for &(a, b, w) in links {
+        adjacent[a].push((b, w));
+        adjacent[b].push((a, w));
+    }
+    let golden = std::f64::consts::PI * (3. - 5f64.sqrt());
+    let mut done = placed.to_vec();
+    let mut queue: std::collections::VecDeque<usize> = (0..k)
+        .filter(|&j| !done[j] && adjacent[j].iter().any(|&(i, _)| done[i]))
+        .collect();
+    // Per strongest neighbour, how many were put about it and the area they take.
+    let mut piles: BTreeMap<usize, (usize, f64)> = BTreeMap::new();
+    // The area of the disc about the origin that holds what was there, which those without a link go round.
+    let reach = (0..k)
+        .filter(|&j| placed[j])
+        .map(|j| (x[j].0 * x[j].0 + x[j].1 * x[j].1).sqrt() + r[j])
+        .fold(0., f64::max);
+    let (mut outer, mut outside) = (reach * reach, 0usize);
+    let mut next = 0;
+    loop {
+        while let Some(j) = queue.pop_front() {
+            if done[j] {
+                continue;
+            }
+            let (mut sx, mut sy, mut weight) = (0., 0., 0.);
+            let mut strongest: Option<(usize, f64)> = None;
+            for &(i, w) in adjacent[j].iter().filter(|&&(i, _)| done[i]) {
+                sx += x[i].0 * w;
+                sy += x[i].1 * w;
+                weight += w;
+                if strongest.is_none_or(|(s, most)| w > most || (w == most && i < s)) {
+                    strongest = Some((i, w));
+                }
+            }
+            let Some((anchor, _)) = strongest else {
+                continue;
+            };
+            let pile = piles.entry(anchor).or_default();
+            let distance = pile.1.sqrt() * 1.2;
+            let angle = pile.0 as f64 * golden;
+            x[j] = (
+                sx / weight + distance * angle.p_cos(),
+                sy / weight + distance * angle.p_sin(),
+            );
+            *pile = (pile.0 + 1, pile.1 + (r[j] + gap) * (r[j] + gap));
+            done[j] = true;
+            queue.extend(adjacent[j].iter().map(|&(i, _)| i).filter(|&i| !done[i]));
+        }
+        while next < k && done[next] {
+            next += 1;
+        }
+        if next == k {
+            break;
+        }
+        let j = next;
+        outer += (r[j] + gap) * (r[j] + gap);
+        let distance = (outer.sqrt() * 1.2).max(reach + r[j] + gap);
+        let angle = outside as f64 * golden;
+        x[j] = (distance * angle.p_cos(), distance * angle.p_sin());
+        outside += 1;
+        done[j] = true;
+        queue.extend(adjacent[j].iter().map(|&(i, _)| i).filter(|&i| !done[i]));
     }
 }
 
@@ -1653,7 +1772,7 @@ mod tests {
             centre: o.x.iter().copied().zip(o.y.iter().copied()).collect(),
             radius: o.radius.clone(),
             settle: false,
-            moved: BTreeMap::new(),
+            ..Previous::default()
         }
     }
 

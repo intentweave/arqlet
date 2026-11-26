@@ -65,6 +65,27 @@ const marked = {op: 'compactBookmark', snapshot: abstract, selection: {nodeId: a
 const bookmarked = JSON.parse(execFileSync(native, {input: JSON.stringify(marked), maxBuffer: 1 << 30}).toString());
 if (!bookmarked.ok) { console.error(`compactBookmark: ${bookmarked.error}`); process.exit(1); }
 requests.push(['compactBookmark', marked], ['readBookmark', {op: 'readBookmark', snapshot: abstract, text: bookmarked.text}]);
+// The overview as a server result (#209): the edges' data, and a changed graph continued from places by id (removed,
+// added and rewired nodes, communities matched by their members), natively and in WASM.
+const large = graph('benchmarks/datasets/overview-10000.json');
+const before = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overview', graph: large}), maxBuffer: 1 << 30}).toString());
+if (!before.ok) { console.error(`overview: ${before.error}`); process.exit(1); }
+const places = Object.fromEntries(before.overview.ids.map((id, i) => [id, {x: before.overview.x[i], y: before.overview.y[i], r: before.overview.r[i]}]));
+const containers = new Set(large.nodes.map(n => n.parentId));
+const gone = new Set(large.nodes.filter((n, i) => i % 97 === 5 && !containers.has(n.id)).map(n => n.id));
+const kept = large.nodes.filter(n => !gone.has(n.id));
+const added = kept.filter((_, i) => i % 89 === 7).map((n, i) => ({id: `added-${i}`, kind: n.kind, label: `added ${i}`, parentId: n.parentId}));
+const changed = {
+  nodes: [...added.slice(0, 20), ...kept, ...added.slice(20)],
+  edges: [
+    ...large.edges.filter(e => !gone.has(e.source) && !gone.has(e.target)).map((e, i) => (i % 13 === 0 ? {...e, weight: 1 + i % 5} : e)),
+    ...added.map((n, i) => ({id: `added-edge-${i}`, kind: 'added', source: n.id, target: kept[(i * 41) % kept.length].id})),
+  ],
+};
+requests.push(['overview with edge data', {op: 'overview', graph: changed, edgeData: true}]);
+for (const settle of [false, true]) {
+  requests.push([`overview continued by id${settle ? ', settling' : ''}`, {op: 'overview', graph: changed, edgeData: true, start: {nodes: places, settle}}]);
+}
 const digest = process.argv.includes('--digest');
 let differ = 0;
 for (const [name, request] of requests) {

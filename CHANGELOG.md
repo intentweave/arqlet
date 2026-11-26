@@ -7,6 +7,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- The cluster overview as a server result (provisional, #209): with `edgeData: true` the `overview` answer gives every
+  edge's kind and weight (`edgeKinds`, `edgeKind`, `edgeWeight`; with `columns`, two more `u32` columns), for a host
+  without the graph. `start.nodes` (`id → {x, y, r}`) continues the overview of a changed graph without a session: new
+  and moved nodes are placed anew among the others, removed ids are reported (`continuation`), and the clusters the
+  overview adds are matched by their members' places, not by their ids. Existing requests are answered as before. In a
+  session, `positionsOnly` answers a whole overview when `edgeData` differs from the last request's. For Rust users:
+  `Overview`, `OverviewPositions`, `OverviewRequest` and `OverviewStart` have new fields, `layout::overview::Previous`
+  has `anew` and `changed` (and implements `Default`).
+
 - Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
   criterion `as: lanes` cuts every layered area into bands, the top level included; drawn inside each container. Playground:
   *Second structure as bands* (phases with *As lanes*, lanes inside the containers without).

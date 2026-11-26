@@ -102,6 +102,54 @@ digest before use.
 finished scene first and the layout state as a lean snapshot; the browser renders the scene before it has loaded the
 engine, and starts the engine at the first local change, taking the structure from its replica.
 
+### The cluster overview as a server result (provisional)
+
+A backend may compute the cluster overview ([ADR 0018](adr/0018-cluster-overview.md)) and give the browser only the
+answer.
+
+**Edge kinds and weights.** The browser has no graph, so ask for them with `edgeData: true`. The answer then also holds,
+per edge `k` (the pair `edges[2k]`, `edges[2k + 1]`):
+
+| Field | Meaning |
+|---|---|
+| `edgeKinds` | the edge kinds, in order of first use |
+| `edgeKind[k]` | the edge's kind, an index into `edgeKinds` |
+| `edgeWeight[k]` | how many edges it stands for (`Edge.weight`); the field is left out when every edge counts 1 |
+
+Without `edgeData` the answer is as before. The taps of buses given as data are edges of the overview and carry their
+kinds. With `columns: true`, `edgeKind` and `edgeWeight` are two more `u32` columns after `links`; `edgeKinds` stays in
+the JSON. A positions-only answer leaves them out with the edges: a session answers one only while `edgeData` is the same
+as in its last overview, and a whole overview when it changed.
+
+**Continuing a changed graph, without a session.** Keep the places of an answer by id and send them with the next graph:
+
+```js
+const places = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id, {x: o.x[i], y: o.y[i], r: o.r[i]}]));
+const next = run({op: 'overview', graph: changed, start: {nodes: places(previous)}});
+next.overview.continuation;   // {continued, anew, ignored}
+```
+
+Give every node of the previous answer, the added clusters included. `start.nodes` excludes `start.x`, `y` and `r` (the
+same graph, by node index); a request with both is refused. `settle` and `moved` work as before; a moved node needs an
+earlier place in its cluster. A session takes `start.nodes` too, also together with a new graph.
+
+- A node continues from its entry. It is **placed anew** when it has none, when its container has none (a new container
+  and what it holds), or when its entry lies outside its container's earlier disc (it changed its container). A
+  container that changed its parent keeps its inner arrangement.
+- A node placed anew starts next to the nodes it is linked to (else outside what is there). Overlaps are then removed,
+  which can push others; with `settle` the changed containers settle by forces. The same holds for a node that moved to
+  a container around its old one: it starts where it was and the two part.
+- Entries for ids the graph no longer has are **ignored** and listed in `continuation.ignored`.
+- **Added clusters** (`community:…`, communities and satellite groups) have ids that are positions in a clustering, so
+  the same id may name other members on the next revision. Their entries are matched by place, not by id: a cluster
+  continues from the earlier cluster disc that held most of its members, members that were outside it are placed anew,
+  and a cluster no earlier disc fits gets the disc around its members' places. Their entries are never listed as
+  ignored. Compare clusters across revisions by their members, not by their ids; so does a host's own state by cluster id
+  (`intent`, `radii`).
+- Unchanged graph and options: the same answer as `start` by node index. A graph whose clustering changed thoroughly
+  (other `communities` or `satellites`, many rewired edges) moves much; lay it out without `start` if the old places no
+  longer help.
+
 ## 5. Offers from another engine: refinement
 
 A refinement improves a layout without changing the view's decisions. It can run anywhere and is applied only if the

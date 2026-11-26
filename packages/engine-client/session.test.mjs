@@ -289,6 +289,39 @@ test('an overview session that keeps the graph gets only the positions back and 
   assert.deepEqual(sent.at(-1), {asked: true, whole: false}, 'only the positions crossed');
 });
 
+test('an overview session passes edge data and places by id on, the same in both kinds', {skip: !engine}, async () => {
+  const kept = createOverviewSession(engine);
+  const sent = createOverviewSession(engine, {resident: false});
+  const both = async step => {
+    const [a, b] = [await step(kept), await step(sent)];
+    assert.equal(a.ok, true, a.error);
+    assert.deepEqual(a, b);
+    return a.overview;
+  };
+  const options = {communities: 0};
+  const first = await both(s => s.open(graph, {options}));
+  assert.equal(first.edgeKind, undefined);
+  const places = Object.fromEntries(first.ids.map((id, i) => [id, {x: first.x[i], y: first.y[i], r: first.r[i]}]));
+  // Asked for later, the edges' data come with a whole answer; then positions alone keep them.
+  const withData = await both(s => s.layOut({options, edgeData: true, start: {}}));
+  assert.equal(withData.edgeKind.length, withData.edges.length / 2);
+  const continued = await both(s => s.layOut({options, edgeData: true, start: {nodes: places}}));
+  assert.deepEqual(continued.edgeKind, withData.edgeKind);
+  assert.deepEqual(continued.continuation, {continued: graph.nodes.length, anew: 0, ignored: []});
+  // What became of places belongs to the request that gave them; edge data to the requests that ask.
+  const plain = await both(s => s.layOut({options, edgeData: true, start: {}}));
+  assert.equal(plain.continuation, undefined);
+  const without = await both(s => s.layOut({options, start: {}}));
+  assert.equal(without.edgeKind, undefined);
+  // A changed graph continues from places by id, in a session of either kind.
+  const gone = graph.nodes.at(-1).id;
+  const changed = {...graph, nodes: graph.nodes.slice(0, -1),
+    edges: graph.edges.filter(e => e.source !== gone && e.target !== gone)};
+  const next = await both(s => s.open(changed, {options, start: {nodes: places}}));
+  assert.deepEqual(next.continuation.ignored, [gone]);
+  await kept.close();
+});
+
 test('a compacting filter lays the view out again without the hidden, in both kinds of session', {skip: !engine}, async () => {
   const g = {nodes: [{id: 'p', kind: 'package', label: 'p'}, {id: 'q', kind: 'package', label: 'q'},
     ...['a', 'b'].map(id => ({id, kind: 'file', label: id, parentId: 'p'})),
