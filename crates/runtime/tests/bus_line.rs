@@ -1108,3 +1108,278 @@ fn expanding_a_view_restores_only_the_taps_of_its_bars() {
         );
     }
 }
+
+/// Two senders and two receivers on one explicit bus (a backbone, which the layout places as a node of its own) and one edge
+/// of its own, flowing in `direction`. Single pass takes `lr`; it takes no reversed flow (`rl`).
+fn backbone(direction: &str) -> Graph {
+    let node = |id: &str| json!({"id": id, "kind": "ecu", "label": id});
+    let edge =
+        |id: &str, s: &str, t: &str| json!({"id": id, "kind": "m", "source": s, "target": t});
+    serde_json::from_value(json!({"defaultDirection": direction,
+        "nodes": [node("a"), node("b"), node("c"), node("d")],
+        "edges": [edge("ac", "a", "c"), edge("bd", "b", "d"), edge("ad", "a", "d"), edge("cd", "c", "d")],
+        "buses": [{"id": "bus", "edges": ["ac", "bd", "ad"]}]}))
+    .unwrap()
+}
+
+fn call(request: serde_json::Value) -> serde_json::Value {
+    serde_json::from_str(&arqlet_runtime::dispatch(&request.to_string())).unwrap()
+}
+
+/// `request` on `snapshot`, which must succeed.
+fn on(snapshot: &serde_json::Value, mut request: serde_json::Value) -> serde_json::Value {
+    request["snapshot"] = snapshot.clone();
+    request["expectedRevision"] = snapshot["revision"].clone();
+    request["expectedLayoutVersion"] = snapshot["layoutVersion"].clone();
+    let response = call(request.clone());
+    assert_eq!(
+        response["ok"], true,
+        "{}: {}",
+        request["op"], response["error"]
+    );
+    response["snapshot"].clone()
+}
+
+fn imported(graph: &Graph, options: serde_json::Value) -> serde_json::Value {
+    let response = call(json!({"op": "import", "graph": graph, "limit": 100, "options": options}));
+    assert_eq!(response["ok"], true, "{response}");
+    response["snapshot"].clone()
+}
+
+fn fell_back(snapshot: &serde_json::Value) -> bool {
+    snapshot["layoutDiagnostics"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .any(|d| d.as_str().unwrap().starts_with("Single pass was not used"))
+}
+
+/// Every edge has a route that starts on its source and ends on its target.
+fn complete(snapshot: &serde_json::Value) {
+    let s: Snapshot = serde_json::from_value(snapshot.clone()).unwrap();
+    assert!(s.geometry_issues.is_empty(), "{:?}", s.geometry_issues);
+    assert_eq!(s.routes.len(), s.graph.edges.len());
+    for edge in &s.graph.edges {
+        let route = s.routes.iter().find(|r| r.id == edge.id).unwrap();
+        let target = edge.target.as_ref().unwrap();
+        assert!(
+            inside(&route.points[0], &s.boxes[&edge.source]),
+            "{}",
+            edge.id
+        );
+        assert!(
+            inside(route.points.last().unwrap(), &s.boxes[target]),
+            "{}",
+            edge.id
+        );
+    }
+}
+
+#[test]
+fn a_backbone_view_that_single_pass_does_not_take_records_it_and_refines() {
+    let first = imported(&backbone("rl"), json!({}));
+    assert!(fell_back(&first));
+    // As every other fallback: the options say which pipeline made the drawing, and the other options stay as requested.
+    assert_eq!(first["options"]["singlePass"], false);
+    assert_eq!(first["options"]["abstractRouting"], false);
+    assert!(first["options"].get("singlePassAuto").is_none());
+    assert_eq!(
+        first["options"]["nodeSizes"],
+        json!({}),
+        "no bus node's size"
+    );
+    complete(&first);
+    let refined = on(&first, json!({"op": "refine"}));
+    complete(&refined);
+    assert_eq!(refined["options"]["singlePass"], false);
+    // An edit that leaves the reason keeps the view there, and it refines again.
+    let edited = on(
+        &refined,
+        json!({"op": "configure", "options": {"nodeSpacing": 60}}),
+    );
+    assert_eq!(edited["options"]["singlePass"], false);
+    on(&edited, json!({"op": "refine"}));
+    // An edit that removes the reason gets single pass again, as before the options said that it had fallen back.
+    let turned = on(
+        &edited,
+        json!({"op": "direction", "nodeId": null, "direction": "lr"}),
+    );
+    assert!(turned["options"].get("singlePass").is_none(), "on: default");
+    assert!(turned["options"].get("abstractRouting").is_none());
+    assert!(!fell_back(&turned));
+    on(&turned, json!({"op": "refine"}));
+    // With `singlePassAuto` off the view stays on the pipeline before.
+    let off = on(
+        &turned,
+        json!({"op": "configure", "options":
+            {"singlePassAuto": false, "singlePass": false, "abstractRouting": false}}),
+    );
+    assert_eq!(off["options"]["singlePass"], false);
+    assert!(!fell_back(&off));
+}
+
+/// The nodes of a rank across the flow: the drag of a drawing that places a bus turns its drop into an order hint, also
+/// after a fallback.
+#[test]
+fn a_released_drag_on_a_backbone_view_that_fell_back_keeps_the_drop_order() {
+    let first = imported(&backbone("rl"), json!({}));
+    assert!(fell_back(&first));
+    let across = |s: &serde_json::Value, id: &str| s["boxes"][id]["y"].as_f64().unwrap();
+    let (upper, lower) = if across(&first, "a") < across(&first, "b") {
+        ("a", "b")
+    } else {
+        ("b", "a")
+    };
+    let at = json!({"x": first["boxes"][upper]["x"], "y": across(&first, lower) + 100.});
+    let mut s = first.clone();
+    for (seq, phase) in [(1, "begin"), (2, "update"), (3, "finish")] {
+        s = on(
+            &s,
+            json!({"op": "move", "gestureId": "g", "seq": seq, "phase": phase, "node": upper,
+                "position": at, "release": phase == "finish"}),
+        );
+    }
+    assert!(s["options"].get("pins").is_none(), "{}", s["options"]);
+    assert!(
+        s["options"]["orderHints"].get(upper).is_some(),
+        "{}",
+        s["options"]
+    );
+    assert!(across(&s, upper) > across(&s, lower));
+    assert_eq!(s["options"]["singlePass"], false);
+    on(&s, json!({"op": "refine"}));
+}
+
+#[test]
+fn a_backbone_view_that_single_pass_takes_refines_to_the_same_drawing() {
+    let first = imported(&backbone("lr"), json!({}));
+    assert!(!fell_back(&first));
+    assert!(first["options"].get("singlePass").is_none(), "on: default");
+    let refined = on(&first, json!({"op": "refine"}));
+    assert_eq!(refined["boxes"], first["boxes"]);
+    assert_eq!(refined["routes"], first["routes"]);
+    assert_eq!(refined["busBoxes"], first["busBoxes"]);
+    complete(&refined);
+}
+
+#[test]
+fn the_can_bus_example_refines() {
+    let graph: Graph =
+        serde_json::from_str(include_str!("../../../benchmarks/datasets/can-bus.json")).unwrap();
+    let first = imported(&graph, json!({}));
+    assert!(fell_back(&first));
+    assert_eq!(first["options"]["singlePass"], false);
+    let refined = on(&first, json!({"op": "refine"}));
+    assert_eq!(refined["graph"], first["graph"]);
+    assert_eq!(
+        refined["routes"].as_array().unwrap().len(),
+        first["routes"].as_array().unwrap().len()
+    );
+}
+
+/// The progressive operation as a browser or a backend runs it (`dispatch_streaming`): the same answer as `refine`, and
+/// publications that are views too.
+#[test]
+fn a_progressive_refinement_of_a_bus_view_answers_as_a_plain_one() {
+    // The pipeline before single pass plans routing candidates; with edges beside the bus they have routes to look at.
+    let before = json!({"singlePassAuto": false, "singlePass": false, "abstractRouting": false});
+    let mut wired = graph(6, Some("organic"));
+    for (i, (s, t)) in [(0, 3), (1, 4), (2, 5), (0, 4), (5, 1), (3, 2)]
+        .into_iter()
+        .enumerate()
+    {
+        wired.edges.push(
+            serde_json::from_value(json!({"id": format!("w{i}"), "kind": "wired",
+                "source": format!("ecu{s}"), "target": format!("ecu{t}")}))
+            .unwrap(),
+        );
+    }
+    for (graph, options) in [
+        (wired, before),
+        (graph(5, None), json!({})),
+        (graph(5, None), json!({"busStyle": "trunk"})),
+        (graph(5, Some("organic")), json!({})),
+        (backbone("lr"), json!({})),
+        (backbone("rl"), json!({})),
+    ] {
+        let first = imported(&graph, options.clone());
+        let plain = on(&first, json!({"op": "refine"}));
+        let request = json!({"op": "refineProgressive", "jobId": "j", "snapshot": first,
+            "expectedRevision": first["revision"], "expectedLayoutVersion": first["layoutVersion"]});
+        let mut published = Vec::new();
+        let answer: serde_json::Value = serde_json::from_str(&arqlet_runtime::dispatch_streaming(
+            &request.to_string(),
+            &mut |m| published.push(m.to_string()),
+        ))
+        .unwrap();
+        assert_eq!(answer["ok"], true, "{options}: {}", answer["error"]);
+        assert_eq!(answer["snapshot"]["graph"], plain["graph"], "{options}");
+        assert_eq!(answer["snapshot"]["boxes"], plain["boxes"], "{options}");
+        assert_eq!(answer["snapshot"]["routes"], plain["routes"], "{options}");
+        assert_eq!(
+            answer["snapshot"]["busLines"], plain["busLines"],
+            "{options}"
+        );
+        for message in published {
+            let value: serde_json::Value = serde_json::from_str(&message).unwrap();
+            assert_eq!(
+                value["publication"]["snapshot"]["graph"], first["graph"],
+                "{options}"
+            );
+        }
+    }
+}
+
+/// A view with backbone buses was never routed again by both engines to resolve a conflict (its options kept `singlePass`
+/// through a fallback); saying that it fell back does not change that, at an import or at an edit.
+#[test]
+fn a_backbone_view_that_fell_back_reports_its_route_conflicts() {
+    let node = |id: &str, parent: Option<&str>| json!({"id": id, "kind": "u", "label": id, "parentId": parent});
+    let edge =
+        |id: &str, s: &str, t: &str| json!({"id": id, "kind": "m", "source": s, "target": t});
+    let graph: Graph = serde_json::from_value(json!({
+        "nodes": [
+            {"id": "g0", "kind": "area", "label": "g0"}, {"id": "g1", "kind": "area", "label": "g1"},
+            {"id": "g2", "kind": "area", "label": "g2"},
+            node("n6", Some("g1")), node("n13", Some("g2")), node("n14", Some("g1")), node("n17", None),
+            node("n18", Some("g0")), node("n26", Some("g1"))],
+        "edges": [edge("e0", "n13", "n17"), edge("e1", "n6", "n14"), edge("e12", "n17", "n26")],
+        "buses": [{"id": "bus0", "edges": ["e0", "e1"]}],
+        "defaultDirection": "lr", "containerDirections": {"g0": "rl", "g1": "auto"}}))
+    .unwrap();
+    let first = imported(&graph, json!({}));
+    assert!(fell_back(&first));
+    assert_eq!(first["options"]["singlePass"], false);
+    let conflicts = |s: &serde_json::Value| s["routeConflicts"].as_array().map_or(0, Vec::len);
+    assert!(conflicts(&first) > 0);
+    let edited = on(
+        &first,
+        json!({"op": "direction", "nodeId": null, "direction": "lr"}),
+    );
+    assert!(conflicts(&edited) > 0);
+}
+
+#[test]
+fn a_session_refines_a_backbone_view_that_fell_back() {
+    let mut store = arqlet_runtime::session_store::SessionStore::with_limit(None);
+    let mut ask = |m: serde_json::Value| -> serde_json::Value {
+        serde_json::from_str(&store.handle(&m)).unwrap()
+    };
+    let id = ask(json!({"session": "open"}))["session"].clone();
+    let imported = ask(json!({"session": id, "request":
+        {"op": "import", "graph": backbone("rl"), "limit": 100}}));
+    assert_eq!(imported["ok"], true, "{imported}");
+    let refined = ask(json!({"session": id, "request": {"op": "refine",
+        "expectedRevision": imported["snapshot"]["revision"],
+        "expectedLayoutVersion": imported["snapshot"]["layoutVersion"]}}));
+    assert_eq!(refined["ok"], true, "{refined}");
+}
+
+#[test]
+fn an_empty_view_refines() {
+    let first = imported(
+        &serde_json::from_value(json!({"nodes": [], "edges": []})).unwrap(),
+        json!({}),
+    );
+    on(&first, json!({"op": "refine"}));
+}

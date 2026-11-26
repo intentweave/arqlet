@@ -104,6 +104,20 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   accepted there: where the model has that property the model's value silently won, elsewhere the given one was read.
 - A released drag (`move`, `finish` with `release`) of a pinned node kept the pin on a view whose options ask for single
   pass but whose graph it does not take (`can-bus`): the node stayed pinned where it was dropped. The pin is removed.
+- `refine` failed on every view with a backbone bus (an explicit bus with several sources and several targets, as the CAN
+  bus example; #205): where single pass did not take the view, because the options still asked for it ("Routing completion
+  requires the legacy router …"), and where it did, because the check read the view without the bus's node ("missing
+  dummy geometry"). It failed on an empty view too. A progressive refinement as the browser runs it
+  (`dispatch_streaming`) read a view with bus lines without their nodes; it now answers as `refine` does. A view that
+  fell back is refined as on the pipeline that drew it; as there before, the routing candidates may draw members of a bus
+  apart when that removes conflicts.
+- Snapshot of a view with backbone buses that single pass did not take: `options.singlePass` and
+  `options.abstractRouting` are `false`, as on every other view that falls back (the `options` object is then written in
+  full). The drawing of an import is unchanged. Such a view still tries single pass again at every edit that keeps a
+  backbone bus in it (while `singlePassAuto` is on), and a released drag still keeps the drop's order. An edit that takes
+  the last backbone bus out of the view (collapsing its members' containers) now stays on the pipeline that drew it, as on
+  other views; `configure` with `singlePassAuto` tries single pass again. For users of `arqlet-layout`:
+  `retries_single_pass`.
 
 ## 0.9.0 — 2026-11-24
 
