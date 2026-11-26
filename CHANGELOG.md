@@ -13,6 +13,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   texts. WebGPU, WebGL 2 and WebGL 1 draw it alike (`browser-checks/overview-backends.mjs`). Playground: *Light background*.
   For a dark drawing in a light page instead, `setEdgeFade(px)` (option `edgeFade`, helper `edgeFadeMask`) fades the canvas
   and its texts out at the edges with an eased CSS mask, so the page shows through. Playground: *Fade into a light page*.
+- Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
+  criterion `as: lanes` cuts every layered area into bands, the top level included; drawn inside each container. Playground:
+  *Second structure as bands* (phases with *As lanes*, lanes inside the containers without).
+- Phases (provisional, ADR 0022 M4b): with lanes first, a second criterion `as: lanes` lays its groups out one after the other
+  along the flow, so that lanes and phases make a grid; drawn as bands with their names. Playground: *Phases along the flow*.
+- Compact bookmarks that fit into a URL (provisional, #151): `controller.compactBookmark()` gives a view as `b1.…`
+  (base64url), holding only what differs from the view as imported, every id once. `openBookmark` takes the text; on
+  another revision of the graph it restores what still exists and reports `missing` ids and `ignored` decisions. Engine
+  operations `compactBookmark` and `readBookmark` (read only). A 6 360-node view with 12 opened modules: 855 characters
+  against 26 508 for the long form (`benchmarks/results/bookmarks-20261126.md`). The playground's *Link to this view*
+  uses it; old links still open.
 - `as: lanes` on the first criterion of `groupingPriority` (provisional, ADR 0022 M4a) lays its groups out as bands across the flow of
   the top level, in their declared order, instead of as containers. The scene draws them as bands
   (`membershipLanes`), the SVG viewer behind everything with the lane's name; playground *As lanes*. The report counts lanes out of
@@ -33,14 +44,26 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `list[from..to]`, `map['key']` and `+` on lists. The query module grows by 4.6 % (gzip 5.7 %,
   `benchmarks/results/query-expressions-20261125.md`). For users of `arqlet-query`: `Value` has the new variant `Map`,
   `plan::Expr` the variants `Map`, `Index`, `Slice` and `Comprehension`.
-- Pins in the layered pipelines, behind `pinsInSinglePass` (provisional, off; ADR 0016 amendment, step P1, #174): a
-  pinned leaf of a layered area no longer takes the view off single pass, or off the hierarchical pipeline behind it.
+- Pins in the layered pipelines, behind `pinsInSinglePass` (provisional, off; ADR 0016 amendment, steps P1 and P2, #174):
+  a pinned leaf or container of a layered area no longer takes the view off single pass, or off the hierarchical pipeline
+  behind it.
   The pin chooses the node's rank and its order there and holds its place across the flow; along the flow the node
   stands in its rank's band, and the layout diagnostics say how far from the pin. Buses stay buses, and a drag that keeps
-  the pin keeps the pipeline. Pinned containers are unchanged. The playground has a checkbox for it.
+  the pin keeps the pipeline. A pinned container's inside is laid out as without the pin. Pins in organic, tree, radial
+  and reversed areas are unchanged. The playground has a checkbox for it.
 
 ### Changed
 
+- **Bus lines, faster:** where every bus of a view is drawn as lines (no bar left), the routes of the taps that run
+  through boxes are no longer routed a second time; nothing draws or reads them (#150). A generated view with its
+  one-bus containers collapsed imported in up to 5.5 times the time of the open view; it no longer pays for that pass
+  (`benchmarks/results/bus-collapse-20261126.md`). The drawing is unchanged. `busTaps` (the routes, ports and border
+  crossings kept for the taps) and `recomputedContainers` can differ, and so can one line of `layoutDiagnostics`
+  ("Engine choice not tried"), which stays where that pass had left no route through a box. Views with bars are laid out
+  as before, and stay slower collapsed than open.
+- `arqlet-layout` (Rust): `compute_compared`, the layout for a drawing that is compared with another one.
+- `openBookmark(bookmark, {force: true})` of another graph's long-form bookmark restores what the graph has and reports
+  the rest (`missing`, `ignored`); before, one unknown id refused the whole restore. `openBookmark` also takes text.
 - Membership hulls (provisional, ADR 0022): members that left a group's box are joined to it by a hull only where the hull
   stays compact, else marked (mark `ownBox` names the box). The moved-down parent hierarchy draws each container's
   children only, so nested levels no longer repeat one hull. In the SVG viewer hull names avoid each other and container
@@ -54,6 +77,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- **Query layer, wrong answers up to 0.9.0** (#184): the `WHERE` of a `WITH` applied before the `ORDER BY`, `SKIP` and
+  `LIMIT` of the same clause; it now filters what they leave.
+- **Query layer, wrong answers up to 0.9.0** (#185): a label or property map on a variable written again was dropped when
+  a later relationship of the same `MATCH` started at that node.
+- `restore` (undo, redo, bookmarks) refused a view with a collapsed or partly shown community or group container
+  ("unknown node"): containers that only the view has are accepted.
+- `refine` panicked on a view with buses given as data where one bus is drawn as lines and another as a bar (organic,
+  `busStyle: "lines"`; #197). An operation now takes back only what the layout had kept for the taps of the bars.
 - **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that

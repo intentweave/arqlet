@@ -152,8 +152,60 @@ that holds the snapshot at `n` can apply them and arrive at the same state, byte
 
 `controller.bookmark()` returns the view as a value: the engine's intent (open groups, pages, filter, options), the
 highlight, the selection and the digest of the graph. `encodeBookmark` turns it into URL text; `openBookmark` opens it
-again as one step for `back`, and refuses the bookmark of another graph unless forced. Use it for links, saved views, or
-to hand a browser view back to a backend session.
+again as one step for `back`, and refuses the bookmark of another graph unless forced. Use it for saved views, or to hand
+a browser view back to a backend session. On a large view this long form is tens of kilobytes.
+
+### Links: the compact bookmark (provisional)
+
+```js
+const {text} = await view.compactBookmark();     // 'b1.…', base64url
+location.hash = `view=${text}`;
+// later, on an import of the same graph or of its next revision:
+const opened = await view.openBookmark(text);    // {ok, sameSource, sameDefaults, missing, ignored}
+```
+
+Sizes for generated views are in
+[`benchmarks/results/bookmarks-20261126.md`](../benchmarks/results/bookmarks-20261126.md): the text grows with what the
+user changed, not with the view. With path-like ids of about 30 characters it is about 850 characters for 12 opened
+modules, 1 600 for 50 and 4 000 for 200, against 18 000 to 37 000 for the long form of the same views.
+
+**Format.** `b1.` and the base64url of a small JSON document. `b1` is the version: a reader refuses any other, and a
+later format gets another number. The long form's text holds no `.`, so the two cannot be confused, and the long form
+keeps working unchanged. The document's inside is private to the engine.
+
+- **Only what differs from the defaults.** The collapsed containers are compared with those an import of this graph with
+  these options starts with (the shorter of that difference and the whole list). Every other decision is compared with the
+  view as it was imported, which the controller takes from the decisions it reads before the first change (`intent`). The
+  defaults are unknown, and everything is kept, when the view was adopted from a snapshot that had already gone through
+  changes (`layoutVersion` above 0), or when its first change was not remembered for `back` (`remember: false`, or
+  `adopt` without `remember`; settling does not count). Changes made on the session beside the controller are not seen.
+- **Every id once**, in a table that stores for each id only what differs from the one before; the decisions name places
+  in the table. The ids travel, not positions in the graph, so another revision can say which ones it lost.
+- **Two fingerprints**: of the source graph without the fields a decision writes into it (shapes, directions, strategies,
+  routing, ports), and of the defaults compared with.
+
+**What a mismatch does.** Opening never refuses a compact bookmark for what the graph lost. Every decision that fits is
+restored; `missing` lists the ids that no longer exist and `ignored` the decisions left out (`{field, id}`: a missing id,
+or one that no longer fits, such as a container that became a leaf). `sameSource: false` says the graph differs,
+`sameDefaults: false` that the view as imported differs (another revision, other import options): the user's changes
+are then applied to the new defaults, so containers and declared values the user did not touch follow the new graph. When
+the whole list of collapsed containers was the shorter form (such as after opening everything), containers new in the
+revision start open. Limits:
+
+- The ids of communities (`communities`) are positions in a clustering; on another revision such an id may be gone, or
+  name another community. Node ids of the graph and of given groups are stable.
+- A decision that exists but cannot be laid out in the new graph (a tree strategy on what is no longer a tree) makes the
+  engine refuse the restore, with its message.
+- A graph that declares shapes, directions, strategies, routing or ports needs the defaults to be read (the controller
+  supplies them); a controller whose view has unknown defaults refuses such a bookmark and says so. A compact bookmark
+  made without defaults holds those declared values itself and restores them over a new revision's.
+- There is no checksum: truncated text is refused, a hand-edited one may be read as another view.
+
+Both engine operations are read only and go through `dispatch`, so they run in all three modes:
+`{op: 'compactBookmark', snapshot, defaults?, highlight?, selection?}` answers `{text}`, and
+`{op: 'readBookmark', snapshot, defaults?, text}` answers `{bookmark, sameSource, sameDefaults, missing, ignored}`, the
+bookmark in the long form, for `restore`. `readBookmark` also takes a long-form `bookmark` instead of `text`, which is
+what `openBookmark(bookmark, {force: true})` uses for another graph's.
 
 `back()` and `forward()` undo and redo the view's decisions as the engine's values (`intent` and `restore`), one engine
 step each, in every mode.

@@ -2,6 +2,10 @@
 //! level. The projection makes no containers of them (`communities::with_grouping_priority`); every rank keeps the lanes as
 //! consecutive blocks in their declared order, dummies of long edges included, and after the placement across the flow each
 //! lane is moved behind the one before it, so that no element of a lane stands in the band of another.
+//!
+//! M4b: the groups of the second criterion `as: lanes` are phases along the flow of the top level. The ranking takes the phases
+//! one after the other (an edge from a later phase to an earlier one is turned for the layout and keeps its direction), and a
+//! phase begins in the rank after the last of the one before.
 
 use arqlet_model::{
     grouping::{self, Owner, PARENT},
@@ -18,6 +22,72 @@ pub(crate) fn applies(options: &LayoutOptions) -> bool {
         .grouping_priority
         .first()
         .is_some_and(|c| c.by != PARENT && c.render == GroupingRendering::Lanes)
+}
+
+/// Provisional (ADR 0022 M4b): the phase of every node at the top level, when the first criterion is drawn as lanes and the
+/// second too: the
+/// earliest group of its dimension, in the declared order, that names the node or a node below it as a member; a nested group
+/// is a phase of its own. A node of no group comes after all phases. Empty without such a criterion.
+pub(crate) fn phases(graph: &Graph, options: &LayoutOptions) -> BTreeMap<String, usize> {
+    // Phases make a grid with the lanes of the first criterion; below another first criterion they would be lanes inside each
+    // owner, which is not built (M4).
+    if !applies(options) {
+        return BTreeMap::new();
+    }
+    let Some(criterion) = options
+        .grouping_priority
+        .get(1)
+        .filter(|c| c.by != PARENT && c.render == GroupingRendering::Lanes)
+    else {
+        return BTreeMap::new();
+    };
+    let Some(dimension) = graph.memberships.dimension(&criterion.by) else {
+        return BTreeMap::new();
+    };
+    let mut phase = grouping::top_level_phases(graph, &criterion.by);
+    for n in graph.nodes.iter().filter(|n| n.parent_id.is_none()) {
+        phase.entry(n.id.clone()).or_insert(dimension.groups.len());
+    }
+    phase
+}
+
+/// Provisional (ADR 0022 M4d): whether the second criterion is drawn as lanes inside every area, behind a first criterion that
+/// is not: the containers it gives (the parent hierarchy, or a dimension's boxes) are cut into bands.
+pub(crate) fn inner(options: &LayoutOptions) -> bool {
+    options
+        .grouping_priority
+        .first()
+        .is_some_and(|c| c.render != GroupingRendering::Lanes || c.by == PARENT)
+        && options
+            .grouping_priority
+            .get(1)
+            .is_some_and(|c| c.by != PARENT && c.render == GroupingRendering::Lanes)
+}
+
+/// The lanes of the children of `area`, where it has any: the first criterion's at the top level (M4a), or the second's in
+/// every area (M4d); a child of no lane comes after all of them.
+pub(crate) fn of_area(
+    graph: &Graph,
+    options: &LayoutOptions,
+    area: Option<&str>,
+) -> Option<BTreeMap<String, usize>> {
+    if area.is_none() && applies(options) {
+        return Some(of_nodes(graph, options));
+    }
+    if !inner(options) {
+        return None;
+    }
+    let by = &options.grouping_priority[1].by;
+    let count = graph.memberships.dimension(by)?.groups.len();
+    let mut lanes = grouping::area_groups(graph, by, area);
+    for n in graph
+        .nodes
+        .iter()
+        .filter(|n| n.parent_id.as_deref() == area)
+    {
+        lanes.entry(n.id.clone()).or_insert(count);
+    }
+    Some(lanes)
 }
 
 /// The lane of every node at the top level, by its group's place in the dimension; a node of no group comes after all of them.

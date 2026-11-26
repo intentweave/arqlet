@@ -1,26 +1,47 @@
 // Pins in single pass (ADR 0016, amendment, step P1): pins leaves of the example datasets by hand and measures the
 // drawing with `pinsInSinglePass` against the same pin without the option, the unpinned drawing and a control.
 //
-// Usage: node benchmarks/eval/pins-single-pass.mjs LAYOUT_COMMAND [--json OUT] [DATASET ...]
+// Usage: node benchmarks/eval/pins-single-pass.mjs LAYOUT_COMMAND [--containers] [--json OUT [--resume]] [DATASET ...]
+// Every case is appended to OUT as it is measured; `--resume` keeps the cases OUT already has (of the same binary and
+// script: it is on the caller to resume only such a run) and measures the rest. A request has fifteen minutes and one
+// second attempt (also after a SIGKILL from outside); after two cases of a dataset whose pin without the option did not
+// finish, that side is not run for the dataset's remaining cases.
 // LAYOUT_COMMAND is a release build of `layout-command`. The datasets are `benchmarks/datasets/*.json` (generate them
 // first with `python3 benchmarks/generate.py --no-manifest`). Per dataset up to `NODES` leaves of areas with a ranked
-// plan are pinned, each in three places: further across the flow, in the band of another rank, and both.
+// plan are pinned, each in three places: further across the flow, in the band of another rank, and both. With
+// `--containers`, containers are pinned instead of leaves (step P2); the control then gives the container an order hint
+// that names the place it has.
 import {execFileSync} from 'node:child_process';
-import {readFileSync, writeFileSync} from 'node:fs';
+import {appendFileSync, existsSync, readFileSync, writeFileSync} from 'node:fs';
 
 const NODES = 4;
+const TIMEOUT_MS = 15 * 60 * 1000;
 const DATASETS = ['can-bus', 'activity-order', 'bpmn-pools', 'cloud-architecture', 'deployment-cluster', 'er-diagram',
   'fixed-ports', 'layerweave-code', 'metro-map', 'org-chart', 'petri-net', 'self-loops', 'state-order', 'state-tcp',
   'uml-class', 'vehicle-buses', 'vehicle-trunk', 'vehicle-zonal', 'workflow-dag'];
 
 const args = process.argv.slice(2);
 const command = args.shift();
+const pinContainers = args[0] === '--containers' && Boolean(args.shift());
 const out = args[0] === '--json' ? args.splice(0, 2)[1] : null;
-const datasets = args.length ? args : DATASETS;
+const resume = Boolean(out) && args[0] === '--resume' && Boolean(args.shift());
+const datasets = args.length ? args
+  : pinContainers ? [...DATASETS, 'arqlet-pipeline', 'mixed-large', 'mixed-layouts', 'network-vlan', 'synthetic-2k'] : DATASETS;
 
 function run(request) {
-  const started = process.hrtime.bigint();
-  const text = execFileSync(command, {input: JSON.stringify(request), maxBuffer: 1 << 30, encoding: 'utf8'});
+  let started = process.hrtime.bigint();
+  const spawn = () => execFileSync(command, {input: JSON.stringify(request), maxBuffer: 1 << 30, encoding: 'utf8',
+    timeout: TIMEOUT_MS, killSignal: 'SIGKILL'});
+  let text;
+  try {
+    text = spawn();
+  } catch (error) {
+    if (error.code !== 'ETIMEDOUT' && error.signal !== 'SIGKILL') throw error;
+    // Once more: a process can hang before it runs (seen once on macOS, with no CPU time at all).
+    console.error(`${request.op}: no answer (${error.code ?? error.signal}), trying once more`);
+    started = process.hrtime.bigint();
+    text = spawn();
+  }
   const reply = JSON.parse(text);
   if (!reply.ok) throw new Error(reply.error);
   return {...reply, ms: Number(process.hrtime.bigint() - started) / 1e6};
@@ -41,9 +62,17 @@ function absolute(snapshot) {
 function drawingOf(snapshot) {
   const at = absolute(snapshot);
   const containers = new Set(snapshot.graph.nodes.map(n => n.parentId).filter(Boolean));
-  const routes = new Map(snapshot.routes.map(r => [r.id, r]));
+  // With a routing style the drawing is what the scene draws (a polyline pulled taut, octilinear segments).
+  let drawn = snapshot.routes;
+  if (snapshot.graph.defaultRouting || Object.keys(snapshot.graph.containerRouting ?? {}).length) {
+    const points = new Map(run({op: 'scene', snapshot}).scene.routes.map(r => [r.id, r.points]));
+    drawn = drawn.map(r => ({...r, points: points.get(r.id) ?? r.points}));
+  }
+  const routes = new Map(drawn.map(r => [r.id, r]));
   const ports = new Map((snapshot.resolvedPorts ?? []).map(p => [`${p.edgeId}\0${p.endpoint}`, p.id]));
-  const nodes = snapshot.graph.nodes.map(n => ({id: n.id, parentId: n.parentId ?? null, container: containers.has(n.id), ...at(n.id)}));
+  // With the shape: a circle is measured as its disc, so an edge that ends on it does not count as a hit.
+  const nodes = snapshot.graph.nodes.map(n => ({id: n.id, parentId: n.parentId ?? null, container: containers.has(n.id),
+    shape: n.shape ?? 'rect', ...at(n.id)}));
   const edges = [];
   let missing = 0;
   for (const e of snapshot.graph.edges) {
@@ -102,7 +131,7 @@ function cases(snapshot) {
   const containers = new Set(snapshot.graph.nodes.map(n => n.parentId).filter(Boolean));
   const eligible = [];
   for (const n of [...snapshot.graph.nodes].sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    if (containers.has(n.id)) continue;
+    if (containers.has(n.id) !== pinContainers) continue;
     const plan = snapshot.layeredPlans?.[n.parentId ?? '<root>'];
     if (!plan) continue;
     const ranks = plan.ranks.map(r => r.filter(id => snapshot.boxes[id])).filter(r => r.length);
@@ -120,7 +149,9 @@ function cases(snapshot) {
   });
 }
 
-const rows = [];
+const rows = resume && existsSync(out) ? readFileSync(out, 'utf8').split('\n').filter(Boolean).map(JSON.parse) : [];
+if (out) writeFileSync(out, rows.map(r => JSON.stringify(r) + '\n').join(''));
+const done = new Set(rows.map(r => `${r.dataset}\0${r.node}\0${r.kind}`));
 for (const name of datasets) {
   const graph = JSON.parse(readFileSync(new URL(`../datasets/${name}.json`, import.meta.url)));
   const imported = run({op: 'import', graph, limit: 10000});
@@ -131,13 +162,24 @@ for (const name of datasets) {
   const opted = chosen.length ? run({op: 'import', graph, limit: 10000, options: {pinsInSinglePass: true}}).snapshot : null;
   if (!chosen.length) { console.error(`${name}: no leaf in a ranked plan, skipped`); continue; }
   for (const c of chosen) {
+    if (done.has(`${name}\0${c.node}\0${c.kind}`)) continue;
     const row = {dataset: name, ...c, unpinned: {...measure(base, c.node, null), ms: Math.round(imported.ms)}};
-    // The control: the same local placement without any pin (the same node asked one unit taller).
+    // The control: the same local placement without any pin (a leaf asked one unit taller; a container, which takes no
+    // size of its own that way, hinted to the place in its rank that it has).
     const own = base.boxes[c.node];
+    const parent = base.graph.nodes.find(n => n.id === c.node).parentId ?? '<root>';
+    const rank = base.layeredPlans[parent].ranks.find(r => r.includes(c.node)).filter(id => base.boxes[id]);
     const resized = run({op: 'configure', snapshot: base, expectedRevision: base.revision, expectedLayoutVersion: base.layoutVersion ?? 0,
-      options: {nodeSizes: {[c.node]: {width: own.width, height: own.height + 1}}}});
+      options: pinContainers
+        ? {orderHints: {[c.node]: {after: rank[rank.indexOf(c.node) - 1] ?? null}}}
+        : {nodeSizes: {[c.node]: {width: own.width, height: own.height + 1}}}});
     row.control = {...measure(resized.snapshot, c.node, null), ms: Math.round(resized.ms)};
     for (const [key, from] of [['before', base], ['option', opted]]) {
+      // The pipeline before can need longer than any host waits on a large view: that is recorded, not repeated.
+      if (key === 'before' && rows.filter(r => r.dataset === name && r.before.error?.includes('ETIMEDOUT')).length >= 2) {
+        row[key] = {error: 'not run: two cases of this dataset did not finish in 900 s'};
+        continue;
+      }
       try {
         const reply = run({op: 'configure', snapshot: from, expectedRevision: from.revision,
           expectedLayoutVersion: from.layoutVersion ?? 0, options: {pins: {[c.node]: c.pin}}});
@@ -147,10 +189,10 @@ for (const name of datasets) {
       }
     }
     rows.push(row);
+    if (out) appendFileSync(out, JSON.stringify(row) + '\n');
     console.error(`${name} ${c.node} ${c.kind}`);
   }
 }
-if (out) writeFileSync(out, rows.map(r => JSON.stringify(r)).join('\n') + '\n');
 
 const keys = ['geometryIssues', 'routingIssues', 'busIssues', 'missing', 'reversed', 'lineNodeHits',
   'containerTraversals', 'sharedLinePairs', 'crossings', 'bends'];

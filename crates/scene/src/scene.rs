@@ -77,6 +77,16 @@ pub struct SceneLane {
     pub label: String,
     pub rect: Rect,
     pub vertical: bool,
+    /// A phase along the flow (the second criterion as lanes, M4b), not a lane across it. Phases have a header strip for their
+    /// names on the side where the lanes start.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<bool>"))]
+    pub phase: bool,
+    /// Provisional (ADR 0022 M4d): the container whose children the band divides, for lanes of a later criterion inside every
+    /// container. Absent for bands over the whole drawing. A renderer draws such a band above its container's frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub area: Option<String>,
 }
 
 /// Provisional (ADR 0022 §3, M2b): one member of a marked group — the box to mark, and the group it belongs to.
@@ -622,12 +632,8 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
         }
     }
     // Provisional (ADR 0022 M4c): the bands span what is drawn along the flow, and they widen the extent by their margin.
-    let along = if lane_vertical(snapshot) {
-        (top, bottom)
-    } else {
-        (left, right)
-    };
-    let membership_lanes = lane_bands(snapshot, &positions, along);
+    let mut membership_lanes = bands(snapshot, &positions, (left, top, right, bottom));
+    membership_lanes.extend(inner_bands(snapshot, &positions, (left, top, right, bottom)).0);
     for lane in &membership_lanes {
         let r = &lane.rect;
         left = left.min(r.x);
@@ -732,114 +738,319 @@ fn build_scene_with(snapshot: &Snapshot, arcs: bool) -> Result<Scene, String> {
     })
 }
 
-/// Provisional (ADR 0022 M4a): how far each lane of the first criterion reaches across the flow of the top level, in the
-/// declared order of its groups (a group without a box is left out), and whether that flow runs along y. `None` where the top
-/// level has no flow.
-fn lane_extents<'a>(
+/// Provisional (ADR 0022 M4a, M4b): how far each band of the criterion at `rank` reaches, in the declared order of its groups (a
+/// group without a box is left out), and whether the top level flows along y. Rank 0 are lanes across the flow, by the node's
+/// owner; rank 1 are phases along it, by `grouping::top_level_phases`. `None` where the top level has no flow.
+fn band_extents<'a>(
     snapshot: &'a Snapshot,
     positions: &BTreeMap<&str, Rect>,
-    by: &str,
-    ownership: &arqlet_model::grouping::Ownership,
+    rank: usize,
 ) -> Option<(bool, Vec<(&'a MembershipGroup, f64, f64)>)> {
-    let orientation = match snapshot.area_orientations.get("<root>") {
-        Some(o) => *o,
-        None => match snapshot.graph.area_mode(None) {
-            Ok(Mode::Orientation(o)) => o,
-            _ => return None,
-        },
-    };
-    let vertical = orientation.vertical();
+    let criterion = snapshot.options.grouping_priority.get(rank)?;
+    let vertical = lane_vertical(snapshot)?;
     let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
-    let dimension = source.memberships.dimension(by)?;
-    let mut extent: BTreeMap<&str, (f64, f64)> = BTreeMap::new();
+    let dimension = source.memberships.dimension(&criterion.by)?;
+    // Across the flow for lanes, along it for phases.
+    let across = (rank == 0) == vertical;
+    let place: BTreeMap<String, usize> = if rank == 0 {
+        let ownership = arqlet_model::grouping::owners(source, &snapshot.options.grouping_priority);
+        let index: BTreeMap<&str, usize> = dimension
+            .groups
+            .iter()
+            .enumerate()
+            .map(|(i, g)| (g.id.as_str(), i))
+            .collect();
+        ownership
+            .owners
+            .iter()
+            .filter_map(|(id, owner)| match owner {
+                arqlet_model::grouping::Owner::Group {
+                    dimension: d,
+                    group,
+                } if *d == criterion.by => Some((id.clone(), *index.get(group.as_str())?)),
+                _ => None,
+            })
+            .collect()
+    } else {
+        arqlet_model::grouping::top_level_phases(&snapshot.graph, &criterion.by)
+    };
+    let nested: BTreeSet<&str> = snapshot
+        .graph
+        .nodes
+        .iter()
+        .filter(|n| n.parent_id.is_some())
+        .map(|n| n.id.as_str())
+        .collect();
+    let mut extent: BTreeMap<usize, (f64, f64)> = BTreeMap::new();
     for (id, r) in positions {
-        if let Some(arqlet_model::grouping::Owner::Group {
-            dimension: d,
-            group,
-        }) = ownership.owners.get(*id)
-        {
-            if d == by {
-                let (lo, hi) = if vertical {
-                    (r.x, r.x + r.width)
-                } else {
-                    (r.y, r.y + r.height)
-                };
-                let e = extent.entry(group.as_str()).or_insert((lo, hi));
-                *e = (e.0.min(lo), e.1.max(hi));
-            }
+        // A phase holds a node of the top level with everything inside it; the box of the top-level node stands for it.
+        if rank == 1 && nested.contains(id) {
+            continue;
+        }
+        if let Some(&i) = place.get(*id) {
+            let (lo, hi) = if across {
+                (r.x, r.x + r.width)
+            } else {
+                (r.y, r.y + r.height)
+            };
+            let e = extent.entry(i).or_insert((lo, hi));
+            *e = (e.0.min(lo), e.1.max(hi));
         }
     }
-    let lanes = dimension
+    let bands = dimension
         .groups
         .iter()
-        .filter_map(|g| extent.get(g.id.as_str()).map(|&(lo, hi)| (g, lo, hi)))
+        .enumerate()
+        .filter_map(|(i, g)| extent.get(&i).map(|&(lo, hi)| (g, lo, hi)))
         .collect();
-    Some((vertical, lanes))
+    Some((vertical, bands))
 }
 
-/// Provisional (ADR 0022 M4a): the lanes of the first criterion that do not lie behind the ones before them. `None` where
-/// the top level has no flow.
-fn lane_breaks(
+/// The bands of the criterion at `rank` that do not lie behind the ones before them. `None` where the top level has no flow.
+fn band_breaks(
     snapshot: &Snapshot,
     positions: &BTreeMap<&str, Rect>,
-    by: &str,
-    ownership: &arqlet_model::grouping::Ownership,
+    rank: usize,
 ) -> Option<usize> {
-    let (_, lanes) = lane_extents(snapshot, positions, by, ownership)?;
+    let (_, bands) = band_extents(snapshot, positions, rank)?;
     let (mut end, mut breaks) = (f64::NEG_INFINITY, 0);
-    for (_, lo, hi) in lanes {
+    for (_, lo, hi) in bands {
         breaks += usize::from(lo < end - 1e-6);
         end = end.max(hi);
     }
     Some(breaks)
 }
 
-/// Provisional (ADR 0022 M4c): the bands of the lanes of the first criterion, over the whole drawing along the flow
-/// (`along`: its start and end there) and, across it, from the middle of the gap before a lane to the middle of the gap after
-/// it. Nothing where the lanes are not applied: the top level has no flow, or a lane is out of place.
-fn lane_bands(
+/// Whether the criterion at `rank` is drawn as bands: the first as lanes, the second as phases (`as: lanes`), and not the
+/// parent hierarchy.
+fn banded(snapshot: &Snapshot, rank: usize) -> bool {
+    rank < 2
+        && snapshot
+            .options
+            .grouping_priority
+            .get(rank)
+            .is_some_and(|c| {
+                c.render == GroupingRendering::Lanes && c.by != arqlet_model::grouping::PARENT
+            })
+        && (rank == 0 || banded(snapshot, 0))
+}
+
+/// Provisional (ADR 0022 M4d): whether the second criterion is drawn as lanes inside every area, behind a first criterion that is
+/// not drawn as lanes.
+fn inner_lanes(snapshot: &Snapshot) -> bool {
+    let p = &snapshot.options.grouping_priority;
+    p.first().is_some_and(|c| {
+        c.render != GroupingRendering::Lanes || c.by == arqlet_model::grouping::PARENT
+    }) && p.get(1).is_some_and(|c| {
+        c.render == GroupingRendering::Lanes && c.by != arqlet_model::grouping::PARENT
+    })
+}
+
+/// The flow of an area of the view: `Some(true)` along y; `None` where it has none.
+fn area_vertical(snapshot: &Snapshot, area: Option<&str>) -> Option<bool> {
+    match snapshot.area_orientations.get(area.unwrap_or("<root>")) {
+        Some(o) => Some(o.vertical()),
+        None => match snapshot.graph.area_mode(area) {
+            Ok(Mode::Orientation(o)) => Some(o.vertical()),
+            _ => None,
+        },
+    }
+}
+
+/// Provisional (ADR 0022 M4d): the bands of the second criterion's lanes inside every area with a flow and more than one lane,
+/// and how many lanes are out of place over all of them (`None` where no area has a flow). A band reaches over the area along
+/// its flow (inside the container's padding, over the drawing at the top level) and, across it, from the middle of the gap
+/// before its lane to the middle of the gap after it. An area with a lane out of place gets no bands.
+fn inner_bands(
     snapshot: &Snapshot,
     positions: &BTreeMap<&str, Rect>,
-    along: (f64, f64),
-) -> Vec<SceneLane> {
-    let Some(criterion) = snapshot.options.grouping_priority.first() else {
-        return Vec::new();
-    };
-    if criterion.render != GroupingRendering::Lanes
-        || criterion.by == arqlet_model::grouping::PARENT
-    {
-        return Vec::new();
+    span: (f64, f64, f64, f64),
+) -> (Vec<SceneLane>, Option<usize>) {
+    if !inner_lanes(snapshot) {
+        return (Vec::new(), None);
     }
+    let criterion = &snapshot.options.grouping_priority[1];
     let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
-    let ownership = arqlet_model::grouping::owners(source, &snapshot.options.grouping_priority);
-    if lane_breaks(snapshot, positions, &criterion.by, &ownership) != Some(0) {
-        return Vec::new();
-    }
-    let Some((vertical, lanes)) = lane_extents(snapshot, positions, &criterion.by, &ownership)
-    else {
-        return Vec::new();
+    let Some(dimension) = source.memberships.dimension(&criterion.by) else {
+        return (Vec::new(), None);
     };
-    let dimension_label = source
-        .memberships
-        .dimension(&criterion.by)
-        .map(|d| d.label.clone())
-        .unwrap_or_default();
-    let margin = 20.;
-    (0..lanes.len())
-        .map(|i| {
-            let (group, lo, hi) = lanes[i];
-            let start = if i == 0 {
-                lo - margin
-            } else {
-                (lanes[i - 1].2 + lo) / 2.
+    let mut areas: Vec<Option<&str>> = vec![None];
+    let mut seen = BTreeSet::new();
+    for n in &snapshot.graph.nodes {
+        if let Some(p) = n.parent_id.as_deref() {
+            if seen.insert(p) {
+                areas.push(Some(p));
+            }
+        }
+    }
+    let (margin, inset) = (12., 12.);
+    let (mut out, mut breaks, mut any) = (Vec::new(), 0usize, false);
+    for area in areas {
+        let Some(vertical) = area_vertical(snapshot, area) else {
+            continue;
+        };
+        any = true;
+        let groups = arqlet_model::grouping::area_groups(&snapshot.graph, &criterion.by, area);
+        let mut extent: BTreeMap<usize, (f64, f64)> = BTreeMap::new();
+        for (id, &i) in &groups {
+            let Some(r) = positions.get(id.as_str()) else {
+                continue;
             };
-            let end = if i + 1 == lanes.len() {
-                hi + margin
+            let (lo, hi) = if vertical {
+                (r.x, r.x + r.width)
             } else {
-                (hi + lanes[i + 1].1) / 2.
+                (r.y, r.y + r.height)
             };
-            let (a, z) = (along.0 - margin, along.1 + margin);
+            let e = extent.entry(i).or_insert((lo, hi));
+            *e = (e.0.min(lo), e.1.max(hi));
+        }
+        let list: Vec<(usize, f64, f64)> =
+            extent.iter().map(|(&i, &(lo, hi))| (i, lo, hi)).collect();
+        let here = list.windows(2).filter(|w| w[1].1 < w[0].2 - 1e-6).count();
+        breaks += here;
+        if list.len() < 2 || here > 0 {
+            continue;
+        }
+        // The area along the flow, and across it, as far as the bands may reach.
+        let frame = match area {
+            None => Rect {
+                x: span.0,
+                y: span.1,
+                width: span.2 - span.0,
+                height: span.3 - span.1,
+            },
+            Some(a) => match positions.get(a) {
+                Some(r) => Rect {
+                    x: r.x + inset,
+                    y: r.y + inset,
+                    width: r.width - 2. * inset,
+                    height: r.height - 2. * inset,
+                },
+                None => continue,
+            },
+        };
+        let (along0, along1, across0, across1) = if vertical {
+            (
+                frame.y,
+                frame.y + frame.height,
+                frame.x,
+                frame.x + frame.width,
+            )
+        } else {
+            (
+                frame.x,
+                frame.x + frame.width,
+                frame.y,
+                frame.y + frame.height,
+            )
+        };
+        for k in 0..list.len() {
+            let (i, b0, b1) = list[k];
+            let start = if k == 0 {
+                (b0 - margin).max(across0)
+            } else {
+                (list[k - 1].2 + b0) / 2.
+            };
+            let end = if k + 1 == list.len() {
+                (b1 + margin).min(across1)
+            } else {
+                (b1 + list[k + 1].1) / 2.
+            };
             let rect = if vertical {
+                Rect {
+                    x: start,
+                    y: along0,
+                    width: end - start,
+                    height: along1 - along0,
+                }
+            } else {
+                Rect {
+                    x: along0,
+                    y: start,
+                    width: along1 - along0,
+                    height: end - start,
+                }
+            };
+            let group = &dimension.groups[i];
+            out.push(SceneLane {
+                dimension: criterion.by.clone(),
+                dimension_label: dimension.label.clone(),
+                group: group.id.clone(),
+                label: if group.label.is_empty() {
+                    group.id.clone()
+                } else {
+                    group.label.clone()
+                },
+                rect,
+                vertical,
+                phase: false,
+                area: area.map(str::to_string),
+            });
+        }
+    }
+    (out, any.then_some(breaks))
+}
+
+/// The room before the first phase, across the flow, for the phases' names.
+const PHASE_HEADER: f64 = 24.;
+
+/// Provisional (ADR 0022 M4c): the bands of the lanes (rank 0, across the flow) and the phases (rank 1, along it), each over the
+/// whole drawing in the other direction, neighbours meeting in the middle of the gap between them; phases with a header
+/// strip for their names before the lanes. `span` is the drawing's extent: left, top, right, bottom. Nothing for a criterion
+/// that is not applied: the top level has no flow, or a band is out of place.
+fn bands(
+    snapshot: &Snapshot,
+    positions: &BTreeMap<&str, Rect>,
+    span: (f64, f64, f64, f64),
+) -> Vec<SceneLane> {
+    let margin = 20.;
+    let mut out = Vec::new();
+    let phases = banded(snapshot, 1) && band_breaks(snapshot, positions, 1) == Some(0);
+    for rank in 0..2 {
+        if !banded(snapshot, rank) || band_breaks(snapshot, positions, rank) != Some(0) {
+            continue;
+        }
+        let Some((vertical, list)) = band_extents(snapshot, positions, rank) else {
+            continue;
+        };
+        let criterion = &snapshot.options.grouping_priority[rank];
+        let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
+        let dimension_label = source
+            .memberships
+            .dimension(&criterion.by)
+            .map(|d| d.label.clone())
+            .unwrap_or_default();
+        // The bands stand side by side across x when lanes run along y (`vertical` flow) or phases along x.
+        let side_by_side = (rank == 0) == vertical;
+        let (lo, hi) = if side_by_side {
+            (span.1, span.3)
+        } else {
+            (span.0, span.2)
+        };
+        let header = if rank == 1 || phases {
+            PHASE_HEADER
+        } else {
+            0.
+        };
+        let (a, z) = if rank == 1 {
+            (lo - margin - header, hi + margin)
+        } else {
+            (lo - margin, hi + margin)
+        };
+        let _ = header;
+        for i in 0..list.len() {
+            let (group, b0, b1) = list[i];
+            let start = if i == 0 {
+                b0 - margin
+            } else {
+                (list[i - 1].2 + b0) / 2.
+            };
+            let end = if i + 1 == list.len() {
+                b1 + margin
+            } else {
+                (b1 + list[i + 1].1) / 2.
+            };
+            let rect = if side_by_side {
                 Rect {
                     x: start,
                     y: a,
@@ -854,7 +1065,7 @@ fn lane_bands(
                     height: end - start,
                 }
             };
-            SceneLane {
+            out.push(SceneLane {
                 dimension: criterion.by.clone(),
                 dimension_label: dimension_label.clone(),
                 group: group.id.clone(),
@@ -864,17 +1075,23 @@ fn lane_bands(
                     group.label.clone()
                 },
                 rect,
-                vertical,
-            }
-        })
-        .collect()
+                vertical: side_by_side,
+                phase: rank == 1,
+                area: None,
+            });
+        }
+    }
+    out
 }
 
-/// Whether the top level flows along y (its lanes stand side by side across x).
-fn lane_vertical(snapshot: &Snapshot) -> bool {
+/// Whether the top level flows along y (its lanes stand side by side across x); `None` where it has no flow.
+fn lane_vertical(snapshot: &Snapshot) -> Option<bool> {
     match snapshot.area_orientations.get("<root>") {
-        Some(o) => o.vertical(),
-        None => matches!(snapshot.graph.area_mode(None), Ok(Mode::Orientation(o)) if o.vertical()),
+        Some(o) => Some(o.vertical()),
+        None => match snapshot.graph.area_mode(None) {
+            Ok(Mode::Orientation(o)) => Some(o.vertical()),
+            _ => None,
+        },
     }
 }
 
@@ -970,10 +1187,18 @@ fn membership_overlays(
     for (rank, criterion) in priority.iter().enumerate() {
         let owning = rank == 0;
         let lanes = criterion.render == GroupingRendering::Lanes;
-        // M4a: the first criterion's lanes, when the top level has a flow: how many lanes do not lie behind the one before.
-        let lane_breaks = (lanes && owning)
-            .then(|| lane_breaks(snapshot, positions, &criterion.by, &ownership))
-            .flatten();
+        // M4a, M4b: the lanes of the first criterion and the phases of the second, when the top level has a flow: how many do not
+        // lie behind the one before. Phases are drawn as bands, not as hulls.
+        let inner = rank == 1 && inner_lanes(snapshot);
+        let lane_breaks = if inner {
+            inner_bands(snapshot, positions, (0., 0., 0., 0.)).1
+        } else {
+            (rank < 2 && banded(snapshot, rank))
+                .then(|| band_breaks(snapshot, positions, rank))
+                .flatten()
+        };
+        // Phases and lanes inside the containers are drawn as bands, not as hulls.
+        let phases = rank == 1 && lane_breaks.is_some();
         let shape = criterion.hull.unwrap_or(snapshot.options.membership_hull);
         let owned = ownership.rank.values().filter(|r| **r == rank).count();
         let multiple = ownership
@@ -1051,7 +1276,7 @@ fn membership_overlays(
         let mut kept_box = 0usize;
         let mut drawn = 0usize;
         let first = hulls.len();
-        for (group, label, members) in &groups {
+        for (group, label, members) in groups.iter().filter(|_| !phases) {
             let mut boxes: Vec<&str> = Vec::new();
             let mut all_owned_here = !members.is_empty();
             for member in members {
@@ -1344,7 +1569,16 @@ fn membership_overlays(
             summary.push_str(&format!(", not held: {}", list.join(", ")));
         }
         if let Some(breaks) = lane_breaks {
-            summary.push_str(&format!(" as lanes, {breaks} out of place"));
+            summary.push_str(&format!(
+                " as {}, {breaks} out of place",
+                if rank == 0 {
+                    "lanes"
+                } else if inner {
+                    "lanes inside each container"
+                } else {
+                    "phases along the flow"
+                }
+            ));
         } else if lanes {
             summary.push_str(", lanes not applied yet (ADR 0022, M4)");
         }

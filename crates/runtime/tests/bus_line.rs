@@ -955,3 +955,156 @@ fn organic_gap_keeps_boxes_apart_and_is_omitted_by_default() {
         gap_of(&plain)
     );
 }
+
+/// Areas of `units` units on buses given as data, each area on one bus and every `gateway`-th on two (the generator of
+/// `benchmarks/experiments/bus-collapse.mjs`), organic.
+fn areas(containers: usize, units: usize, buses: usize, gateway: usize) -> Graph {
+    // In floating point, as the script's numbers are.
+    let mut seed = 7_f64;
+    let mut rnd = |n: usize| {
+        seed = (seed * 1_103_515_245. + 12_345.) % 2_147_483_648.;
+        (seed / 2_147_483_648. * n as f64) as usize
+    };
+    let mut nodes = Vec::new();
+    let mut taps = vec![Vec::new(); buses];
+    let tap = |b: usize, node: String| json!({"edge": format!("t{b}-{node}"), "node": node, "toBus": true, "kind": "on"});
+    for c in 0..containers {
+        let home = rnd(buses);
+        let two = c % gateway == 0;
+        nodes.push(
+            json!({"id": format!("c{c}"), "kind": if two { "gateway" } else { "single" },
+            "label": format!("Area {c}")}),
+        );
+        for u in 0..units {
+            nodes.push(
+                json!({"id": format!("c{c}u{u}"), "kind": "unit", "label": format!("U{c}.{u}"),
+                "parentId": format!("c{c}")}),
+            );
+            taps[home].push(tap(home, format!("c{c}u{u}")));
+        }
+        if two {
+            let other = (home + 1 + rnd(buses - 1)) % buses;
+            taps[other].push(tap(other, format!("c{c}u0")));
+        }
+    }
+    let buses: Vec<serde_json::Value> = taps
+        .into_iter()
+        .enumerate()
+        .filter(|(_, t)| !t.is_empty())
+        .map(|(b, t)| json!({"id": format!("bus{b}"), "kind": "bus", "label": format!("Bus {b}"), "taps": t}))
+        .collect();
+    serde_json::from_value(json!({"nodes": nodes, "edges": [], "buses": buses,
+        "defaultStrategy": "organic", "defaultDirection": "auto"}))
+    .unwrap()
+}
+
+/// #150: where every bus becomes lines, nothing draws or reads the routes of the taps, and `compute` does not route the
+/// ones in conflict a second time. `compute_compared` leaves nothing out, so the two show what the step changes: the
+/// routes kept for the taps, and no part of the drawing. Wherever those routes could reach the result, the two are equal.
+#[test]
+fn taps_of_bus_lines_are_not_routed_twice_and_nothing_drawn_changes() {
+    let both = |graph: Graph, options: serde_json::Value| {
+        let options: LayoutOptions = serde_json::from_value(options).unwrap();
+        let view = import_graph_with(graph, 10_000, &options).unwrap();
+        let none = std::collections::BTreeSet::new();
+        let plain = arqlet_layout::compute(&view.graph, None, &none, &view.options).unwrap();
+        let complete =
+            arqlet_layout::compute_compared(&view.graph, None, &none, &view.options).unwrap();
+        (plain, complete)
+    };
+    let collapsed = json!({"busStyle": "lines", "levelOfDetail": {"kinds": ["single"]}});
+    let large = || areas(24, 4, 3, 2);
+    let (plain, complete) = both(large(), collapsed.clone());
+    assert!(plain.bus_lines.is_empty(), "every bus is drawn as lines");
+    // This view has routes in conflict that routing again improves: the kept tap routes differ.
+    let routes = |s: &Snapshot| serde_json::to_value(&s.bus_taps.routes).unwrap();
+    assert_ne!(routes(&plain), routes(&complete));
+    assert_eq!(plain.bus_taps.routes.len(), complete.bus_taps.routes.len());
+    assert_eq!(plain.bus_taps.roots, complete.bus_taps.roots);
+    // Everything else is the same, but for the report of the containers routed again.
+    let rest = |s: &Snapshot| {
+        let mut v = serde_json::to_value(s).unwrap();
+        let map = v.as_object_mut().unwrap();
+        map.remove("busTaps");
+        map.remove("recomputedContainers");
+        v
+    };
+    assert_eq!(rest(&plain), rest(&complete));
+
+    let same = |graph: Graph, options: serde_json::Value, why: &str| {
+        let (plain, complete) = both(graph, options);
+        assert_eq!(
+            serde_json::to_value(&plain).unwrap(),
+            serde_json::to_value(&complete).unwrap(),
+            "{why}"
+        );
+    };
+    // A bar's tap routes are restored for later operations.
+    let mut bar = collapsed.clone();
+    bar["busStyle"] = json!("bar");
+    same(large(), bar, "bars");
+    // Few boxes: the engine choice may run, and it judges the drawing with the tap routes.
+    same(areas(16, 3, 3, 2), collapsed.clone(), "engine choice");
+    // A label beside a tap's route is placed along it.
+    let mut labelled = collapsed;
+    let options: LayoutOptions = serde_json::from_value(labelled.clone()).unwrap();
+    let first = import_graph_with(large(), 10_000, &options).unwrap();
+    let tap = first.graph.edges[0].id.clone();
+    labelled["edgeLabels"] = json!({tap: {"text": "tap", "width": 20.0, "height": 10.0}});
+    same(large(), labelled, "an edge label");
+}
+
+/// A bus of an organic area becomes lines of its own, while a bus with one tap stays a bar. What the layout had kept for
+/// the taps of the first must not come back with the second's: the head's tap has no edge (`refine` panicked on it).
+#[test]
+fn expanding_a_view_restores_only_the_taps_of_its_bars() {
+    let tap = |bus: &str, node: &str| json!({"edge": format!("{bus}-{node}"), "node": node, "toBus": true, "kind": "on"});
+    let nodes: Vec<_> = ["a", "b", "c", "d"]
+        .iter()
+        .map(|id| json!({"id": id, "kind": "unit", "label": id}))
+        .collect();
+    let wide: Vec<_> = ["a", "b", "c"].iter().map(|n| tap("wide", n)).collect();
+    let lone = vec![tap("lone", "d")];
+    let graph: Graph = serde_json::from_value(json!({
+        "defaultStrategy": "organic",
+        "defaultDirection": "auto",
+        "nodes": nodes,
+        "edges": [],
+        "buses": [
+            {"id": "wide", "kind": "bus", "label": "Wide", "taps": wide},
+            {"id": "lone", "kind": "bus", "label": "Lone", "taps": lone},
+        ],
+    }))
+    .unwrap();
+    let options = LayoutOptions {
+        bus_style: arqlet_model::BusStyle::Lines,
+        ..Default::default()
+    };
+    let snapshot = import_graph_with(graph, 100, &options).unwrap();
+    // The case at hand: one bus drawn as lines (edges of the view), one as a bar.
+    assert!(!snapshot.graph.edges.is_empty());
+    assert!(snapshot.bus_lines.contains_key("lone") && !snapshot.bus_lines.contains_key("wide"));
+
+    let mut expanded = snapshot.clone();
+    assert!(arqlet_layout::expand_bus_lines(&mut expanded));
+    let edges: std::collections::BTreeSet<&str> =
+        expanded.graph.edges.iter().map(|e| e.id.as_str()).collect();
+    assert_eq!(edges.len(), expanded.graph.edges.len());
+    let mut routed = std::collections::BTreeSet::new();
+    for route in &expanded.routes {
+        assert!(
+            edges.contains(route.id.as_str()),
+            "no edge for {}",
+            route.id
+        );
+        assert!(routed.insert(route.id.as_str()), "twice: {}", route.id);
+    }
+    assert_eq!(routed, edges);
+    for port in &expanded.resolved_ports {
+        assert!(
+            edges.contains(port.edge_id.as_str()),
+            "port of {}",
+            port.edge_id
+        );
+    }
+}

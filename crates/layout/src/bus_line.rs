@@ -758,6 +758,22 @@ fn axes(r: &Rect, horizontal: bool) -> ((f64, f64), (f64, f64)) {
     }
 }
 
+/// Whether every edge of a graph the layout sees is a tap of a `busLine` node: an edge with such a node at an end. The
+/// view draws none of their routes (`collapse`). `false` without a bus node.
+pub(crate) fn only_taps(graph: &Graph) -> bool {
+    let buses: BTreeSet<&str> = graph
+        .nodes
+        .iter()
+        .filter(|n| n.shape == NodeShape::BusLine)
+        .map(|n| n.id.as_str())
+        .collect();
+    !buses.is_empty()
+        && graph.edges.iter().all(|e| {
+            buses.contains(e.source.as_str())
+                || e.target.as_deref().is_some_and(|t| buses.contains(t))
+        })
+}
+
 /// Provisional: the edges of the `busLine` nodes, turned for the layering so that the bus network reads as a tree: in every
 /// connected network of nodes and buses one root (`root_of`: a gateway, else the middle of the network), a breadth-first
 /// search goes node → bus → node from it, and every bus edge points from the end reached first to the end
@@ -1185,11 +1201,29 @@ pub(crate) fn expand_snapshot(snapshot: &mut Snapshot) -> bool {
             snapshot.boxes.insert(bus.id.clone(), r);
         }
     }
+    // Only the taps expanded here get their state back. A bus that has since become lines of its own (`bars_to_lines`)
+    // keeps its edges in the view: what the layout had kept for its taps is stale, and the head's tap has no edge at all.
+    let expanded: BTreeSet<&str> = graph.edges[snapshot.graph.edges.len()..]
+        .iter()
+        .map(|e| e.id.as_str())
+        .collect();
     let kept = std::mem::take(&mut snapshot.bus_taps);
     snapshot.bus_taps.roots = kept.roots;
-    snapshot.routes.extend(kept.routes);
-    snapshot.resolved_ports.extend(kept.resolved_ports);
-    snapshot.boundary_crossings.extend(kept.boundary_crossings);
+    snapshot.routes.extend(
+        kept.routes
+            .into_iter()
+            .filter(|r| expanded.contains(r.id.as_str())),
+    );
+    snapshot.resolved_ports.extend(
+        kept.resolved_ports
+            .into_iter()
+            .filter(|p| expanded.contains(p.edge_id.as_str())),
+    );
+    snapshot.boundary_crossings.extend(
+        kept.boundary_crossings
+            .into_iter()
+            .filter(|c| expanded.contains(c.edge_id.as_str())),
+    );
     snapshot.bus_lines.clear();
     snapshot.graph = graph;
     true
@@ -1610,6 +1644,30 @@ pub(crate) fn heads(
 #[cfg(test)]
 mod geometry_tests {
     use super::*;
+
+    #[test]
+    fn only_a_graph_whose_edges_are_all_taps_has_only_taps() {
+        let graph = |edges: serde_json::Value, shape: &str| -> Graph {
+            serde_json::from_value(serde_json::json!({"nodes": [
+                {"id": "bus", "kind": "bus", "label": "bus", "shape": shape},
+                {"id": "a", "kind": "k", "label": "a"}, {"id": "b", "kind": "k", "label": "b"}],
+                "edges": edges}))
+            .unwrap()
+        };
+        let taps = serde_json::json!([{"id": "ta", "kind": "k", "source": "a", "target": "bus"},
+            {"id": "tb", "kind": "k", "source": "bus", "target": "b"}]);
+        assert!(only_taps(&graph(taps.clone(), "busLine")));
+        assert!(!only_taps(&graph(taps.clone(), "rect")), "no bus node");
+        let mut mixed = taps;
+        mixed
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"id": "ab", "kind": "k", "source": "a", "target": "b"}));
+        assert!(
+            !only_taps(&graph(mixed, "busLine")),
+            "an edge that is drawn"
+        );
+    }
 
     fn rect(x: f64, y: f64, w: f64, h: f64) -> Rect {
         Rect {

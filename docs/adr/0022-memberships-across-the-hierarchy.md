@@ -1,15 +1,17 @@
 # ADR 0022: Memberships across the hierarchy
 
 Date: 2026-11-21; revised 2026-11-22 (grouping priority, §2–§4).
-Status: accepted and implemented through M2b (2026-11-23), off by default. Implemented: the model and its refusals (M0),
+Status: accepted and implemented through M4 (2026-11-26), off by default. Implemented: the model and its refusals (M0),
 the hull drawn from boxes already placed, as a rectangle or a convex polygon (M2, `membershipHull`), memberships through
 `patch` (§5b, with the change log of ADR 0023 R2), and **the grouping priority as a projection** (M1): `groupingPriority`
 ranks the parent hierarchy and the dimensions, the first criterion that assigns a node owns it (its container in the view),
 the value order decides among several groups, every later criterion is drawn as hulls, `details` names the groups per
 criterion, and the playground offers *Structure first*. `membershipViews` is gone. And **the display stages** (M2b): a soft
 group is drawn whole where its hull encloses no foreign node, else in pieces — one per owner, then by distance — and a
-group in more than three pieces is marked member by member, and a group that is still a box draws only the members that left it. A criterion can `consider` only some of its groups (one document among hundreds). Proposed still: holding with a measured switch (M3), lanes
-(M4) and the later display options (M5).
+group in more than three pieces is marked member by member, and a group that is still a box draws only the members that left it. A criterion can `consider` only some of its groups (one document among hundreds). Since then, all as options: **holding** inside an owner (M3b, `holdMemberships`; across owners probed and not built, M3c),
+and **lanes** (M4): the first criterion across the flow (M4a), a second behind it as phases along the flow (M4b), a second
+behind another first criterion as lanes inside every container (M4d), drawn as bands (M4c). Open: the measured switches of
+holding (M3d) and the later display options (M5).
 
 Related: [ADR 0003](0003-container-direction-constraints.md) (direction and strategy per area), [ADR 0005](0005-routing-constraints.md)
 (routing per container, the outline contract), [ADR 0007](0007-recursive-strategy-orchestration.md) (containment, optimization
@@ -445,6 +447,19 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   meeting in the middle of the gap between them; the SVG viewer draws them behind everything, alternating, with a dashed line between
   two and the lane's name at its start; the playground has *As lanes*. No band where the lanes are not applied. Not drawn by the GPU
   layer yet.
+  **M4b, phases along the flow, done** (2026-11-26; [results](../../benchmarks/results/memberships-20261126-phases.md)):
+  the second criterion `as: lanes`, behind lanes of the first, is a sequence of phases. The ranking takes them one after the other
+  (an edge from a later phase to an earlier one is turned for it and keeps its direction), and a phase starts in the rank after
+  the last of the one before. A top-level node is in the earliest group, in the declared order, that names it or a node below it;
+  a nested group is a phase of its own. The scene draws phases as bands with a header strip for their names, not as hulls, and
+  the report counts phases out of place. `pools-and-lanes` with its own priority is the 2×3 grid.
+  **M4d, lanes below a higher rank, done** (2026-11-26): the second criterion `as: lanes`, behind a first criterion that is not
+  drawn as lanes (the parent hierarchy, or a dimension's boxes), cuts every layered area into lanes, the top level included: the
+  children of an area are blocks of every order by their lane, and each band is aligned on its own and stacked, as in M4a. A child
+  container sits in one lane, the earliest of the groups of what it holds; it is never cut. The scene draws the bands inside each
+  container (`SceneLane::area`), above the container's frame; the report counts lanes out of place over all areas. Tested on the
+  fixtures with single pass and the pipeline before it, through an edit and a refinement. **M4 is complete** with that, as an option:
+  the gate of §6 (elk-rs, timing) is not met.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.

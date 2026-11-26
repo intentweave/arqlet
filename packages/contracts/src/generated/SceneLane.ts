@@ -9,4 +9,14 @@ export type SceneLane = { dimension: string, dimensionLabel: string, group: stri
 /**
  * What to write on the band: the group's label, or its id where it has none.
  */
-label: string, rect: Rect, vertical: boolean, };
+label: string, rect: Rect, vertical: boolean,
+/**
+ * A phase along the flow (the second criterion as lanes, M4b), not a lane across it. Phases have a header strip for their
+ * names on the side where the lanes start.
+ */
+phase?: boolean,
+/**
+ * Provisional (ADR 0022 M4d): the container whose children the band divides, for lanes of a later criterion inside every
+ * container. Absent for bands over the whole drawing. A renderer draws such a band above its container's frame.
+ */
+area?: string, };
