@@ -256,7 +256,7 @@ export function representationsOf(model, view, width, height, {
  * scene), and per structured cluster its `back` boxes (containers), `routes` (lines), `arrows` (triangles at each route's
  * target, so the logical direction shows) and `front` boxes (leaves).
  */
-export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null, galaxy = false, style = null, structured = 'cluster'} = {}) {
+export function overviewBuffers(model, expanded = new Map(), collapsed = new Set(), selected = -1, {shapes = {}, trace = null, galaxy = false, style = null, structured = 'cluster', tone = 'dark'} = {}) {
   const {overview: o, n, children, depth, cluster, tops} = model;
   // The appearance (style.js, ADR 0026): with a style that is not the default, the trace, the routes inside structured
   // clusters, the lines between clusters and the buses take its theme's colours, and the clusters its palette when it
@@ -267,6 +267,12 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const NEUTRAL = themed ? rgb(look.theme.row) : [0.62, 0.7, 0.82], ROUTE = themed ? rgb(look.theme.route) : [0.6, 0.85, 0.75];
   const onPath = i => !!trace && (trace.nodes.has(i) || trace.clusters.has(i));
   const dim = (rgb, i) => (trace?.fade && !onPath(i) ? rgb.map(v => v * 0.35) : rgb);
+  // Provisional: the galaxy style on a light background (`tone: 'light'`) is ink, not light: the renderer subtracts each
+  // colour's complement from the background (where clouds overlap they grow deeper, as light adds up on dark), so the
+  // buffers hold absorptions (1 - colour, inverted at the end). Stars are darker than their cloud instead of brighter,
+  // and the selection is a dark ring, as white would absorb nothing.
+  const ink = galaxy && tone === 'light';
+  const MARK = ink ? [0.1, 0.13, 0.18] : [1, 1, 1];
   // The outline of a node by its kind, as a tenth added to the shape kind (the shader reads it back).
   const outlineCode = OUTLINES.map((_, k) => k / 10);
   const outline = i => {
@@ -290,9 +296,11 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
       // A cluster is a cloud of light (a glow fainter the deeper it is, so nested clouds add up towards their cores),
       // a collapsed one a brighter glow, a leaf a star; the colours of the clusters as in the disc style.
       const [red, green, blue] = dim(colour(i), i);
-      if (children[i].length > 0 && !collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.15, o.r[i] * 1.15, [red, green, blue], 0.22 / (1 + depth[i]), 4);
-      else if (collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.3, o.r[i] * 1.3, [red, green, blue], 0.45, 4);
-      else pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.6, o.r[i] * 1.6, [Math.min(1, red * 1.25 + 0.1), Math.min(1, green * 1.25 + 0.1), Math.min(1, blue * 1.25 + 0.1)], 0.95, 5);
+      // The cluster colours are light, so as ink they absorb little: their clouds are laid on thicker.
+      const thick = ink ? 1.6 : 1;
+      if (children[i].length > 0 && !collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.15, o.r[i] * 1.15, [red, green, blue], thick * 0.22 / (1 + depth[i]), 4);
+      else if (collapsed.has(i)) pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.3, o.r[i] * 1.3, [red, green, blue], Math.min(1, thick * 0.45), 4);
+      else pushShape(discs, o.x[i], o.y[i], o.r[i] * 1.6, o.r[i] * 1.6, ink ? [red * 0.6, green * 0.6, blue * 0.6] : [Math.min(1, red * 1.25 + 0.1), Math.min(1, green * 1.25 + 0.1), Math.min(1, blue * 1.25 + 0.1)], 0.95, 5);
       continue;
     }
     // A collapsed cluster is one filled disc, a little darker than a leaf.
@@ -312,7 +320,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
     }
   }
   // The selected cluster: a bright ring on top of its disc.
-  if (selected >= 0 && owner[selected] < 0 && !lines.has(selected)) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], [1, 1, 1], 1, 1 + outline(selected));
+  if (selected >= 0 && owner[selected] < 0 && !lines.has(selected)) pushShape(discs, o.x[selected], o.y[selected], o.r[selected], o.r[selected], MARK, 1, 1 + outline(selected));
   // Scene geometry per structured cluster, where each of its nodes' boxes is, and the border port of each edge that
   // leaves it.
   const back = [], routes = [], arrows = [], front = [];
@@ -416,7 +424,7 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
   const BUS = themed ? rgb(look.theme.bus) : [0.44, 0.58, 0.72], buses = [];
   for (const [i, l] of lines) {
     const lit = !!trace && trace.nodes.has(i);
-    const [red, green, blue] = i === selected ? [1, 1, 1] : lit ? AMBER : dim(BUS, i);
+    const [red, green, blue] = i === selected ? MARK : lit ? AMBER : dim(BUS, i);
     const half = Math.max(o.r[i] * 0.12, 0.25), across = l.y1 === l.y2;
     thickSegment(buses, [l.x1, l.y1], [l.x2, l.y2], half, [red, green, blue], 1);
     l.taps.forEach((m, k) => {
@@ -430,16 +438,19 @@ export function overviewBuffers(model, expanded = new Map(), collapsed = new Set
       const away = Math.hypot(corner[0] - centre[0], corner[1] - centre[1]);
       const start = away > rim ? [centre[0] + (corner[0] - centre[0]) / away * rim, centre[1] + (corner[1] - centre[1]) / away * rim] : corner;
       const tapLit = lit && (trace.nodes.has(m) || trace.clusters.has(shown));
-      const [tr, tg, tb] = tapLit ? AMBER : i === selected ? [1, 1, 1] : dim(BUS, i);
+      const [tr, tg, tb] = tapLit ? AMBER : i === selected ? MARK : dim(BUS, i);
       const alpha = tapLit || i === selected ? 1 : trace?.fade ? 0.35 : 0.9;
       if (away > rim) thickSegment(buses, start, corner, half * 0.8, [tr, tg, tb], alpha);
       if (Math.hypot(foot[0] - corner[0], foot[1] - corner[1]) > 1e-6) thickSegment(buses, corner, foot, half * 0.8, [tr, tg, tb], alpha);
       thickSegment(buses, [foot[0] - half * 1.6, foot[1]], [foot[0] + half * 1.6, foot[1]], half * 1.6, [red, green, blue], 1);
     });
   }
-  const f = a => new Float32Array(a);
+  // Ink: every colour becomes the absorption the renderer subtracts (see `ink` above).
+  const absorb = (list, stride, at) => { if (ink) for (let k = at; k < list.length; k += stride) for (let c = k; c < k + 3; c++) list[c] = 1 - list[c]; return list; };
+  const f = (a, stride = LINE_STRIDE, at = 2) => absorb(new Float32Array(a), stride, at);
+  const s = a => f(a, SHAPE_STRIDE, 6);
   return {
-    discs: f(discs), edges: f(edges), buses: f(buses), back: f(back), routes: f(routes), arrows: f(arrows), front: f(front),
+    discs: s(discs), edges: f(edges), buses: f(buses), back: s(back), routes: f(routes), arrows: f(arrows), front: s(front),
     count: {
       discs: discs.length / SHAPE_STRIDE, edges: edges.length / LINE_STRIDE, buses: buses.length / LINE_STRIDE, back: back.length / SHAPE_STRIDE,
       routes: routes.length / LINE_STRIDE, arrows: arrows.length / LINE_STRIDE, front: front.length / SHAPE_STRIDE,

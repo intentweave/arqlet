@@ -99,13 +99,15 @@ export function ownersOf(model: OverviewModel, expanded?: Expanded, collapsed?: 
 export type Outline = 'circle' | 'square' | 'octagon' | 'diamond';
 export const OUTLINES: Outline[];
 /** Vertex data; clusters of `expanded` drawn structured, of `collapsed` as one disc with their edges bundled per pair;
- * `shapes` gives an outline per node kind (default: circle); `trace` (from `pathOf`) draws a path in amber. */
+ * `shapes` gives an outline per node kind (default: circle); `trace` (from `pathOf`) draws a path in amber. Provisional:
+ * `tone: 'light'` with `galaxy` gives the ink variant for a light background: the colours are absorptions (1 - colour)
+ * for a renderer that subtracts them from the background. */
 export function overviewBuffers(
   model: OverviewModel,
   expanded?: Expanded,
   collapsed?: Set<number>,
   selected?: number,
-  options?: {shapes?: Record<string, Outline>; trace?: OverviewPath | null; galaxy?: boolean; structured?: 'cluster' | 'scene'; style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null},
+  options?: {shapes?: Record<string, Outline>; trace?: OverviewPath | null; galaxy?: boolean; structured?: 'cluster' | 'scene'; style?: import('./style.js').StyleSheet | import('./style.js').ResolvedStyle | null; tone?: 'dark' | 'light'},
 ): OverviewBuffers;
 
 /** Provisional: a path or neighbourhood in model indices (`pathOf`). */

@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **Galaxy style on a light background** (overview, provisional): a light clear colour (`background`, new
+  `setBackground` for a host that switches themes, `tone`) draws the galaxy in ink instead of light — colours subtracted
+  from the background, so clouds deepen where they overlap, darker stars, a dark selection ring, light name tags and dark
+  texts. WebGPU, WebGL 2 and WebGL 1 draw it alike (`browser-checks/overview-backends.mjs`). Playground: *Light background*.
+  For a dark drawing in a light page instead, `setEdgeFade(px)` (option `edgeFade`, helper `edgeFadeMask`) fades the canvas
+  and its texts out at the edges with an eased CSS mask, so the page shows through. Playground: *Fade into a light page*.
 - Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
   criterion `as: lanes` cuts every layered area into bands, the top level included; drawn inside each container. Playground:
   *Second structure as bands* (phases with *As lanes*, lanes inside the containers without).
