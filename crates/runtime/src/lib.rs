@@ -1831,11 +1831,12 @@ pub fn configure_snapshot(
     recompute_with(snapshot, &options)
 }
 
-/// A drag of one node on a drawing that single pass made (`single_pass_auto`), which has no pins. Its steps move the node
+/// A drag of one node on a drawing that single pass made (`single_pass_auto`). Its steps move the node
 /// and route again only what the move touches (its edges, and the routes into its old or new box), as a preview, so that
 /// the edges follow the node and the drawing stays a single-pass one (`arqlet_layout::preview_move`). A release turns the drop into an order hint: the node
 /// stands after the sibling whose place across the flow is before the drop's, in its rank, and the layout is made again
-/// with single pass. A finish without release pins the node where it was dropped, which leaves single pass. A cancel puts
+/// with single pass. A finish without release pins the node where it was dropped, which leaves single pass (unless
+/// `pinsInSinglePass` takes the pin). A cancel puts
 /// the node back. `None` for every other gesture, which the pins handle.
 fn move_on_single_pass(snapshot: &Snapshot, step: &MoveStep) -> Option<Result<Snapshot, String>> {
     let options = &snapshot.options;
