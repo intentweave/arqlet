@@ -83,8 +83,17 @@ pub fn with_grouping_priority(
     // group met already (its ancestors are in), and after as many steps as the dimension has groups (a cycle, refused
     // earlier). A group the criterion does not consider is passed over, never made a container.
     let mut needed: std::collections::BTreeSet<(String, String)> = Default::default();
+    // The groups of a first criterion drawn as lanes (M4a) are bands of the top level, not containers.
+    let in_lanes = |dimension: &str| {
+        priority.first().is_some_and(|c| {
+            c.by == dimension && c.render == arqlet_model::GroupingRendering::Lanes
+        })
+    };
     for owner in ownership.owners.values() {
         if let Owner::Group { dimension, group } = owner {
+            if in_lanes(dimension) {
+                continue;
+            }
             let Some(parent_of) = parents.get(dimension.as_str()) else {
                 continue;
             };
@@ -133,6 +142,7 @@ pub fn with_grouping_priority(
     for node in &mut out.nodes {
         node.parent_id = match ownership.owners.get(&node.id) {
             Some(Owner::Parent(parent)) => parent.clone(),
+            Some(Owner::Group { dimension, .. }) if in_lanes(dimension) => None,
             Some(Owner::Group { dimension, group }) => Some(container_id(dimension, group)),
             Some(Owner::Unassigned) | None => None,
         };

@@ -8,6 +8,7 @@ import type { SceneBusLine } from "./SceneBusLine";
 import type { SceneConflict } from "./SceneConflict";
 import type { SceneHubRef } from "./SceneHubRef";
 import type { SceneHull } from "./SceneHull";
+import type { SceneLane } from "./SceneLane";
 import type { SceneMark } from "./SceneMark";
 import type { SceneMembershipReport } from "./SceneMembershipReport";
 import type { SceneNode } from "./SceneNode";
@@ -54,6 +55,11 @@ membershipReport?: Array<SceneMembershipReport>,
  * marked one by one instead (a colour or a badge on the box, no polygon). Omitted when there is none.
  */
 membershipMarks?: Array<SceneMark>,
+/**
+ * Provisional (ADR 0022 M4c): the bands of the first criterion's lanes (`as: lanes`), in their declared order, to be
+ * drawn behind everything else. Omitted when there is none.
+ */
+membershipLanes?: Array<SceneLane>,
 /**
  * Extent of everything drawn, with a 30-unit margin. May start at negative coordinates.
  */

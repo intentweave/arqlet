@@ -194,6 +194,8 @@ struct Area {
     container: Vec<Option<usize>>,
     /// The ranks, each in its current order.
     ranks: Vec<Vec<u32>>,
+    /// By element: its lane; empty where the area has no lanes.
+    lane: Vec<usize>,
     /// By element: its rank and its place in it.
     rank_of: Vec<u32>,
     pos: Vec<u32>,
@@ -259,7 +261,11 @@ impl Area {
             .chain(self.side_block(r, Some(true)))
             .collect()
     }
-    fn set_rank(&mut self, r: usize, order: Vec<u32>) {
+    fn set_rank(&mut self, r: usize, mut order: Vec<u32>) {
+        // Lanes (ADR 0022 M4a) stay blocks in every order a sweep makes.
+        if !self.lane.is_empty() {
+            order.sort_by_key(|&e| self.lane[e as usize]);
+        }
         for (i, &e) in order.iter().enumerate() {
             self.pos[e as usize] = i as u32;
         }
@@ -798,8 +804,18 @@ fn model_of(
             }
             side_child
         };
+        let lane = if plan.lanes.is_empty() {
+            Vec::new()
+        } else {
+            let last = plan.lanes.values().max().map_or(0, |l| l + 1);
+            elems
+                .iter()
+                .map(|id| plan.lanes.get(id).copied().unwrap_or(last))
+                .collect()
+        };
         areas.push(Area {
             container: vec![None; n],
+            lane,
             elems,
             ranks,
             rank_of,

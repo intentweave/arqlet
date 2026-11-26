@@ -113,6 +113,19 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  // One hue per dimension, shared by its hulls and its marks (ADR 0022 §3, M2b).
  const membershipDimensions=[...new Set([...hulls,...marks].map(h=>h.dimension))];
  const hueOf=dimension=>(membershipDimensions.indexOf(dimension)*67+191)%360;
+ // Provisional (ADR 0022 M4c): the bands of lanes, behind everything else: a faint fill that alternates from band to band,
+ // a line where two bands meet, and the lane's name at the start of its band. Like hulls they take no pointer events.
+ const lanes=scene.membershipLanes??[];
+ lanes.forEach((lane,i)=>{
+  const r=lane.rect;
+  const band=element('rect',{...r,fill:i%2?T.laneFill??'rgba(127,127,127,.06)':T.laneFillAlt??'rgba(127,127,127,.12)',stroke:'none','pointer-events':'none',class:'lw-lane','data-lane-dimension':lane.dimension,'data-lane-group':lane.group});
+  band.append(element('title',{},`${lane.dimensionLabel||lane.dimension}: ${lane.label}`));
+  svg.append(band);
+ });
+ for(const [i,lane] of lanes.entries()){
+  if(i>0){const r=lane.rect;svg.append(element('line',{...(lane.vertical?{x1:r.x,y1:r.y,x2:r.x,y2:r.y+r.height}:{x1:r.x,y1:r.y,x2:r.x+r.width,y2:r.y}),stroke:T.frameStroke,'stroke-width':1,'stroke-dasharray':'4 4','pointer-events':'none',class:'lw-lane-border'}));}
+  const r=lane.rect;svg.append(element('text',{x:r.x+8,y:r.y+14,fill:T.title,'font-size':12,'font-weight':600,'pointer-events':'none',class:'lw-lane-label'},lane.label));
+ }
  const rings=[],top=[];
  for(const n of [...nodes.values()].filter(n=>parents.has(n.id)).sort((a,b)=>depth(a)-depth(b))){const r=absolute.get(n.id);
   // A circle container is a disc inscribed in its square box, like a circle leaf; its controls sit on the disc.

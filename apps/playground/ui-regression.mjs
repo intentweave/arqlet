@@ -363,6 +363,19 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','back to the containment');
   assert.equal(latest.options?.groupingPriority,undefined);
 
+  // As lanes (ADR 0022 M4): the first structure as bands; the scene draws one band per group of the dimension shown.
+  get('grouping-first').value='team';get('grouping-first').onchange();await flush();
+  assert.equal(get('grouping-lanes').disabled,false);
+  get('grouping-lanes').checked=true;get('grouping-lanes').onchange();await flush();
+  assert.equal(latest.options.groupingPriority[0].as,'lanes');
+  assert.ok(!latest.graph.nodes.some(n=>n.id.startsWith('membership:')),'a lane is no container');
+  const banded=sceneOf(engine,latest);
+  assert.ok(banded.membershipLanes?.length>1,'the bands are drawn');
+  get('grouping-lanes').checked=false;get('grouping-lanes').onchange();await flush();
+  assert.equal(latest.options.groupingPriority[0].as,undefined);
+  get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
+  assert.equal(get('grouping-lanes').disabled,true,'the containment is no lane');
+
   // Hold groups together (ADR 0022 M3b): an option like any other, carried by the snapshot and shown again.
   get('membership-hold').checked=true;get('membership-hold').onchange();await flush();
   assert.equal(latest.options.holdMemberships,true);
