@@ -7,6 +7,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- Phases (provisional, ADR 0022 M4b): with lanes first, a second criterion `as: lanes` lays its groups out one after the other
+  along the flow, so that lanes and phases make a grid; drawn as bands with their names. Playground: *Phases along the flow*.
 - `as: lanes` on the first criterion of `groupingPriority` (provisional, ADR 0022 M4a) lays its groups out as bands across the flow of
   the top level, in their declared order, instead of as containers. The scene draws them as bands
   (`membershipLanes`), the SVG viewer behind everything with the lane's name; playground *As lanes*. The report counts lanes out of

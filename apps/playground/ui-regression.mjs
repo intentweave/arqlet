@@ -371,8 +371,17 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   assert.ok(!latest.graph.nodes.some(n=>n.id.startsWith('membership:')),'a lane is no container');
   const banded=sceneOf(engine,latest);
   assert.ok(banded.membershipLanes?.length>1,'the bands are drawn');
+  // Phases (M4b): a second dimension along the flow makes a grid with the lanes.
+  assert.equal(get('grouping-phases').disabled,false);
+  get('grouping-phases').value='zone';get('grouping-phases').onchange();await flush();
+  assert.deepEqual(latest.options.groupingPriority.slice(0,2),[{by:'team',as:'lanes'},{by:'zone',as:'lanes'}]);
+  const grid=sceneOf(engine,latest);
+  assert.ok(grid.membershipLanes.some(l=>l.phase)&&grid.membershipLanes.some(l=>!l.phase),'lanes and phases are drawn');
+  assert.equal(get('grouping-phases').value,'zone','the control shows the view it asked for');
+  get('grouping-phases').value='';get('grouping-phases').onchange();await flush();
   get('grouping-lanes').checked=false;get('grouping-lanes').onchange();await flush();
   assert.equal(latest.options.groupingPriority[0].as,undefined);
+  assert.equal(get('grouping-phases').disabled,true);
   get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
   assert.equal(get('grouping-lanes').disabled,true,'the containment is no lane');
 
