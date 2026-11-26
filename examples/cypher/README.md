@@ -59,7 +59,7 @@ the ADR is clarified.
 The oracle was cross-checked on 2026-11-21 (and again after `spike-11` moved to `later` and `spike-20` was added) against
 Grafeo 0.6.2 running the same queries on a store built from the same graph and payload files (a throw-away checker, not
 part of this repository): all 40 `supported` cases there were then and the four `later` or `open` cases with rows agreed. The cases `fn-*`,
-`union-*` and `expr-*` (2026-11-25) have not been compared with Grafeo: their expectations are the oracle's alone. Changing two
+`union-*`, `expr-*`, `where-*` and `repeat-*` have not been compared with Grafeo: their expectations are the oracle's alone. Changing two
 expected values by hand made the checker fail, so the comparison is not vacuous. This is evidence that the oracle and an independent engine read these queries alike. It is not the openCypher
 TCK, and it covers only these queries on these graphs.
 
