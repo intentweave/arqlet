@@ -39,6 +39,23 @@ Two panics on views with bus lines are fixed, and `refine` works on views with a
 
 ### Added
 
+- The cluster overview as a server result (provisional, #209): with `edgeData: true` the `overview` answer gives every
+  edge's kind and weight (`edgeKinds`, `edgeKind`, `edgeWeight`; with `columns`, two more `u32` columns), for a host
+  without the graph. `start.nodes` (`id → {x, y, r, parent?}`) continues the overview of a changed graph without a
+  session: the clusters the overview added continue with their ids instead of the graph being clustered anew, new and
+  moved nodes are placed anew among the others, and removed ids are reported (`continuation`). An entry's optional
+  `parent` says what held the node, so that a cluster the host set smaller than its content keeps its members.
+  Existing requests are answered as before. The typed `OverviewStart` now has `moved`, which the engine already took. In a session,
+  `positionsOnly` answers a whole overview when `edgeData` differs from the last request's. For Rust users: `Overview`,
+  `OverviewPositions`, `OverviewRequest` and `OverviewStart` have new fields, `layout::overview::Previous` has `anew`
+  and `changed` (and implements `Default`).
+- `sparseRepairGrid` (provisional, off, #203): on views over the repair grid's bound the default router first searches a
+  sparse grid of the whole view (a line only in the gaps between boxes that matter, a cost per bend). On 24 generated
+  views with containers and bus meshes the routes the router draws through boxes fell from 1 091 to 52, with fewer
+  crossings, bends and shared lines in sum and 5 % longer routes; some views get more shared lines or import up to 13.7
+  times slower (a second routing pass they now get), and line-node hits are not 0, so it stays off
+  (`benchmarks/results/router-sparse-grid-20261126.md`). Views within the bound are unchanged. For users of
+  `arqlet-routing`: `Params` has the new field `sparse_grid`, `SearchCounters` the field `sparse_grids`.
 - **Galaxy style on a light background** (overview, provisional): a light clear colour (`background`, new
   `setBackground` for a host that switches themes, `tone`) draws the galaxy in ink instead of light — colours subtracted
   from the background, so clouds deepen where they overlap, darker stars, a dark selection ring, light name tags and dark
@@ -156,6 +173,11 @@ Two panics on views with bus lines are fixed, and `refine` works on views with a
   the last backbone bus out of the view (collapsing its members' containers) now stays on the pipeline that drew it, as on
   other views; `configure` with `singlePassAuto` tries single pass again. For users of `arqlet-layout`:
   `retries_single_pass`.
+- A long-form bookmark (`bookmark`, `encodeBookmark`) of a view with a changed shape, direction, strategy, routing or
+  port was refused on a new import of the same source as "The bookmark belongs to another graph" (#195). `openBookmark`
+  and `readBookmark` (`sameSource`) now know it as the same source; bookmarks written by 0.8.0 and 0.9.0 included. As for
+  compact bookmarks, a revision that differs from the bookmarked source only in declared shapes, directions, strategies,
+  routing or ports is therefore no longer refused: the bookmark's values replace the new ones. `digest` is unchanged.
 
 ## 0.9.0 — 2026-11-24
 

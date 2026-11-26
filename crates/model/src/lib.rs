@@ -2388,6 +2388,13 @@ pub struct LayoutOptions {
     /// than the default leaves a route room to leave a node that faces a neighbour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_gap: Option<f64>,
+    /// Provisional (#203): the repair of the default router, when the grid of the whole view is over its bound, searches a
+    /// sparse grid of the whole view first, with a cost per bend: a line only in a gap between box edges that offers a way
+    /// no neighbouring gap offers, which still holds a way whenever the rectangles leave one wider than a rounding error.
+    /// Without it such a route is searched only on grids around it, and one without a way there keeps its shape through the
+    /// boxes. Views within the bound are drawn as without the option. Omitted when off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub sparse_repair_grid: bool,
     /// Experimental (ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass, and in the
     /// hierarchical pipeline it falls back to, a pinned node (leaf or container) of an area that flows left to right or top
     /// to bottom is a constraint of the arrangement: the pin chooses its rank and its order there and holds its place
@@ -2972,6 +2979,7 @@ impl Default for LayoutOptions {
             edge_routing: None,
             organic_iterations: None,
             organic_gap: None,
+            sparse_repair_grid: false,
             pins_in_single_pass: false,
             vpsc_overlap_removal: false,
             directed_repair: false,
@@ -3681,6 +3689,39 @@ pub struct Overview {
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<OverviewBusLine>>"))]
     pub bus_lines: Vec<OverviewBusLine>,
     pub stats: OverviewStats,
+    /// Provisional, for a request with `edgeData`: the edge kinds in order of first use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub edge_kinds: Option<Vec<String>>,
+    /// Provisional, for a request with `edgeData`: each edge's kind as an index into `edgeKinds`; entry `k` belongs to
+    /// the edge `edges[2k]` to `edges[2k + 1]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number[]"))]
+    pub edge_kind: Option<Vec<u32>>,
+    /// Provisional, for a request with `edgeData`: how many edges each edge stands for (`Edge::weight`), indexed as
+    /// `edgeKind`. Omitted when every edge counts 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number[]"))]
+    pub edge_weight: Option<Vec<u32>>,
+    /// Provisional, for a request with `start.nodes`: what became of the earlier places.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub continuation: Option<OverviewContinuation>,
+}
+
+/// Provisional: what became of the places given by node id (`OverviewStart::nodes`).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewContinuation {
+    /// Nodes of the graph that continued from their entry. Clusters the overview added are not counted.
+    pub continued: u32,
+    /// Nodes of the graph placed anew: without an entry, in a container without one, or in another container than the
+    /// one the entry lay in.
+    pub anew: u32,
+    /// Ids of entries that name no node of the overview (removed nodes), in id order. Ids of clusters the overview
+    /// added (`community:…`) that are gone are not listed.
+    pub ignored: Vec<String>,
 }
 
 /// Provisional: a bus of the overview drawn as a line (`Overview::bus_lines`): the bus node's index, the line from
@@ -3961,8 +4002,8 @@ pub struct NeighbourhoodAnswer {
 }
 
 /// Provisional (sessions): the part of an overview that changes while the clusters stay the same, answered for a request
-/// with `positionsOnly` laid out on the clusters of the session's last overview. The host keeps ids, labels, parents,
-/// kinds, edges and links from that answer.
+/// with `positionsOnly` laid out on the clusters of the session's last overview, with the same `edgeData`. The host keeps
+/// ids, labels, parents, kinds, edges (with their data) and links from that answer.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -3980,6 +4021,10 @@ pub struct OverviewPositions {
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<OverviewBusLine>>"))]
     pub bus_lines: Vec<OverviewBusLine>,
     pub stats: OverviewStats,
+    /// For a request with `start.nodes` (`Overview::continuation`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub continuation: Option<OverviewContinuation>,
 }
 
 impl OverviewPositions {
@@ -3995,6 +4040,7 @@ impl OverviewPositions {
             root_radius: overview.root_radius,
             bus_lines: overview.bus_lines,
             stats: overview.stats,
+            continuation: overview.continuation,
         }
     }
 }
@@ -4081,10 +4127,15 @@ pub struct OverviewRequest {
     #[cfg_attr(feature = "ts", ts(optional))]
     pub start: Option<OverviewStart>,
     /// Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
-    /// last overview; otherwise the whole overview.
+    /// last overview and `edgeData` is as it was there; otherwise the whole overview.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub positions_only: Option<bool>,
+    /// Provisional: answer each edge's kind and weight too (`Overview::edge_kinds`, `edge_kind`, `edge_weight`), for a
+    /// host that does not have the graph.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub edge_data: Option<bool>,
     /// Worker threads (native only); the answer is the same for any number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
@@ -4144,8 +4195,9 @@ pub struct OverviewLayoutOptions {
     pub hubs: Option<CommunityHubs>,
 }
 
-/// Provisional: where an overview continues from. Positions (`x`, `y`, `r`) of a previous overview of the same
-/// clusters, or none in a session (its last overview); `settle` lets the changed containers settle again.
+/// Provisional: where an overview continues from. Positions of a previous overview, either `x`, `y`, `r` by node index
+/// (the same clusters) or `nodes` by node id (also a changed graph), or neither in a session (its last overview);
+/// `settle` lets the changed containers settle again.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -4159,9 +4211,36 @@ pub struct OverviewStart {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub r: Option<Vec<f64>>,
+    /// Provisional: the places of an earlier overview by node id, added clusters included, for the overview of a graph
+    /// that may have changed: those clusters continue with their ids. Not with `x`, `y` or `r`. A later request without
+    /// a session continues the answer by id again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub nodes: Option<BTreeMap<String, OverviewPlace>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub settle: Option<bool>,
+    /// Provisional: nodes the user moved, by id, to their new centres: each one's container settles around it. Needs
+    /// earlier places (`x`, `y`, `r`, `nodes`, or a session's), and with `nodes` an earlier place of that node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub moved: Option<BTreeMap<String, Point>>,
+}
+
+/// Provisional: the disc of a node in an earlier overview (its `x`, `y` and `r`), and what held it.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewPlace {
+    pub x: f64,
+    pub y: f64,
+    pub r: f64,
+    /// The id of its parent in that overview (`ids[parent[i]]`), a node of the graph or an added cluster; left out at
+    /// the top level. Where given, it says what held the node instead of the discs, which cannot tell it for a cluster
+    /// the host set smaller than its content (`radii`). A parent that names nothing counts as left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub parent: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

@@ -36,6 +36,9 @@ const requests = [
   ['elkLayout refined', {op: 'elkLayout', graph: elk, refine: true}],
   ['overview 10 000', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json')}],
 ];
+// A view whose repair grid is over its bound, with the sparse grid (#203).
+const mesh = JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '100', '0', 'organic', 'lines', '120', '500'], {maxBuffer: 1 << 30}).toString());
+requests.push(['import over the grid bound, sparse repair', {...mesh, options: {...mesh.options, sparseRepairGrid: true}}]);
 // The operation `query` (ADR 0021, M5b) on a snapshot and its content, without a session: the rows must be the same
 // natively and in WASM. (Without the cargo feature both engines answer the same refusal, which also compares equal.)
 const imported = JSON.parse(execFileSync(native, {
@@ -65,6 +68,42 @@ const marked = {op: 'compactBookmark', snapshot: abstract, selection: {nodeId: a
 const bookmarked = JSON.parse(execFileSync(native, {input: JSON.stringify(marked), maxBuffer: 1 << 30}).toString());
 if (!bookmarked.ok) { console.error(`compactBookmark: ${bookmarked.error}`); process.exit(1); }
 requests.push(['compactBookmark', marked], ['readBookmark', {op: 'readBookmark', snapshot: abstract, text: bookmarked.text}]);
+// The overview as a server result (#209): the edges' data, and a changed graph continued from places by id (removed,
+// added and rewired nodes, communities matched by their members), natively and in WASM.
+const large = graph('benchmarks/datasets/overview-10000.json');
+const before = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overview', graph: large}), maxBuffer: 1 << 30}).toString());
+if (!before.ok) { console.error(`overview: ${before.error}`); process.exit(1); }
+const places = Object.fromEntries(before.overview.ids.map((id, i) => [id, {x: before.overview.x[i], y: before.overview.y[i], r: before.overview.r[i]}]));
+const containers = new Set(large.nodes.map(n => n.parentId));
+const gone = new Set(large.nodes.filter((n, i) => i % 97 === 5 && !containers.has(n.id)).map(n => n.id));
+const kept = large.nodes.filter(n => !gone.has(n.id));
+const added = kept.filter((_, i) => i % 89 === 7).map((n, i) => ({id: `added-${i}`, kind: n.kind, label: `added ${i}`, parentId: n.parentId}));
+const changed = {
+  nodes: [...added.slice(0, 20), ...kept, ...added.slice(20)],
+  edges: [
+    ...large.edges.filter(e => !gone.has(e.source) && !gone.has(e.target)).map((e, i) => (i % 13 === 0 ? {...e, weight: 1 + i % 5} : e)),
+    ...added.map((n, i) => ({id: `added-edge-${i}`, kind: 'added', source: n.id, target: kept[(i * 41) % kept.length].id})),
+  ],
+};
+requests.push(['overview with edge data', {op: 'overview', graph: changed, edgeData: true}]);
+for (const settle of [false, true]) {
+  requests.push([`overview continued by id${settle ? ', settling' : ''}`, {op: 'overview', graph: changed, edgeData: true, start: {nodes: places, settle}}]);
+}
+// With each entry's parent, from an answer whose first containers are set far smaller than what they hold.
+const radii = Object.fromEntries(before.overview.ids.filter((id, i) => i % 211 === 0 && containers.has(id)).map(id => [id, 5]));
+const small = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overview', graph: large, radii,
+  start: {x: before.overview.x, y: before.overview.y, r: before.overview.r}}), maxBuffer: 1 << 30}).toString()).overview;
+const parented = Object.fromEntries(small.ids.map((id, i) => [id, {x: small.x[i], y: small.y[i], r: small.r[i], parent: small.ids[small.parent[i]]}]));
+requests.push(['overview continued by id with parents', {op: 'overview', graph: changed, start: {nodes: parented}}]);
+// The long form of a view that changed its source graph (#195), read against the view as imported: its digest is found
+// again by writing the bookmark's decisions into that graph, with the same answer natively and in WASM.
+const ask = request => JSON.parse(execFileSync(native, {input: JSON.stringify(request), maxBuffer: 1 << 30}).toString());
+const reshaped = ask({op: 'shape', snapshot: abstract, nodeId: abstract.sourceGraph.nodes[0].id, shape: 'circle',
+  expectedRevision: abstract.revision, expectedLayoutVersion: abstract.layoutVersion}).snapshot;
+const long = {version: 1, digest: ask({op: 'digest', snapshot: reshaped}).digest, intent: ask({op: 'intent', snapshot: reshaped}).intent};
+const reread = {op: 'readBookmark', snapshot: abstract, bookmark: long};
+if (ask(reread).sameSource !== true) { console.error('readBookmark: a changed view is not the same source'); process.exit(1); }
+requests.push(['readBookmark, long form of a changed view', reread]);
 const digest = process.argv.includes('--digest');
 let differ = 0;
 for (const [name, request] of requests) {

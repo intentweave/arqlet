@@ -42,3 +42,17 @@ corridors (#156): every repair of a route writes `EXP`, its id, the obstacles, w
 whether one exists on the grid of the whole view, to standard error. `organic_corridors.py --bin` (branch
 `organic-corridor-plan`, 6f8277e) with a `layout-command` built with it records why routes end up through boxes
 (`benchmarks/results/organic-corridor-plan-20261126.md`). Not meant to be merged: it searches every failed route again.
+
+## `router-grid-variants.patch`
+
+Applies to main `231c010`. The comparison of searches for the repair of a view over the router's grid bound (#203). With
+`ARQLET_GRID_DUMP=FILE`, `layout-command` appends every such repair problem (the route, the obstacles, the stubs, and
+whether today's windows find a way) to `FILE`; the example `grid_variants` of `arqlet-routing` runs variants on them:
+`cargo run --release -p arqlet-routing --example grid_variants -- FILE full,gap,gap-turn24,lazy,follow`. Results in
+`benchmarks/results/router-sparse-grid-20261126.md`. The variant that was chosen is in the router behind
+`sparseRepairGrid`; the patch is not meant to be merged.
+
+## `bus-tap-causes.patch`
+
+Applies to main `231c010`. With `ARQLET_TAP_LOG=1`, `layout-command` logs how every bus tap was drawn and the bars of the
+bus lines. `bus_tap_causes.py --bin BINARY --work DIR` classifies the taps through boxes (#203, same results file).

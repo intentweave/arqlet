@@ -465,18 +465,26 @@ fn changes<'a>(table: &mut Table<'a>, now: &'a Intent, base: &'a Intent) -> Chan
 /// routing, ports), so that a view that changed them still belongs to the same source.
 pub fn source_fingerprint(source: &Graph) -> String {
     let mut graph = source.clone();
-    for node in &mut graph.nodes {
-        node.shape = NodeShape::default();
-    }
-    graph.default_direction = Default::default();
-    graph.container_directions = Default::default();
-    graph.default_strategy = Default::default();
-    graph.container_strategies = Default::default();
-    graph.default_routing = Default::default();
-    graph.container_routing = Default::default();
-    graph.ports = Default::default();
-    graph.edge_ports = Default::default();
+    crate::history::write_decisions(&mut graph, &Intent::default());
     arqlet_model::source_digest(&graph)
+}
+
+/// Whether a bookmark in the JSON form was made on the snapshot's source. Its `digest` (the operation of that name) is of
+/// the whole source graph as the bookmarked view had it, with the shapes, directions, strategies, routing and ports its
+/// intent holds. So the source is the same when the digest is that of this source as it is, or of this source with the
+/// intent's values written into it: the two then differ at most in what a decision writes (as for `source_fingerprint`).
+/// Nothing else is needed, so a bookmark of an earlier engine is read alike.
+fn same_source_json(snapshot: &Snapshot, digest: &str, intent: &Intent) -> bool {
+    if crate::find::digest_on(snapshot)["digest"] == digest {
+        return true;
+    }
+    let mut source = snapshot
+        .source_graph
+        .as_deref()
+        .unwrap_or(&snapshot.graph)
+        .clone();
+    crate::history::write_decisions(&mut source, intent);
+    arqlet_model::source_digest(&source) == digest
 }
 
 /// FNV-1a (64 bits) of the defaults compared with: the collapsed containers when the difference from them is kept, and
@@ -1218,7 +1226,8 @@ pub fn read_on(snapshot: &Snapshot, v: &Value) -> Result<Value, String> {
         };
         let same_source = form
             .digest
-            .is_none_or(|d| crate::find::digest_on(snapshot)["digest"] == d.as_str());
+            .as_deref()
+            .is_none_or(|digest| same_source_json(snapshot, digest, &form.intent));
         let source = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
         let (view, _) = crate::default_view(snapshot)?;
         Reading {

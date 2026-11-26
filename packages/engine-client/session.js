@@ -574,6 +574,10 @@ const plain = request => {
   return {...request, start: fixed};
 };
 
+// An overview's places by node id, as `start.nodes` takes them, each with its parent's id.
+const placesOf = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id,
+  {x: o.x[i], y: o.y[i], r: o.r[i], ...(o.parent[i] >= 0 ? {parent: o.ids[o.parent[i]]} : {})}]));
+
 // The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
 // Defaults as the engine's (`communities` 120, `satellites` 0); `groups` and `hubs` compared as given.
 const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null, options?.hubs ?? null]);
@@ -582,7 +586,8 @@ const clustersOf = options => JSON.stringify([options?.communities ?? 120, optio
  * Provisional (ADR 0019 for the overview): an overview of one graph, laid out again as the host asks, with the graph kept
  * in the engine where it can keep a session (`run.openSession`). `open(graph, request)` lays out a graph; `layOut(request)`
  * lays it out again (other options, `radii`, `intent`, `configSet`); a `start` without positions (`{settle}` or `{}`)
- * continues from the last overview. Without a resident session the graph and the last positions stay here and are sent
+ * continues from the last overview, and `{nodes}` (places by node id) from those places, also on a new graph (`open`).
+ * Without a resident session the graph and the last positions stay here and are sent
  * along; the answers are the same. A new `open` overtakes what is still under way (`{ok: false, stale: true}`).
  */
 export function createOverviewSession(run, {resident: wanted = 'auto', columns = false} = {}) {
@@ -591,6 +596,9 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
   const opened = resident ? Promise.resolve(run.openSession()) : null;
   // `graph` is kept here only without a resident session; `started`: an `open` was asked for (it may still run).
   let graph = null, started = false, last = null, clusters = null, generation = 0, queue = Promise.resolve();
+  // Whether the last overview's clusters are those of places by id: an engine given the graph again would cluster it
+  // anew, so a continuation of it is sent by id too.
+  let byPlaces = false;
 
   const send = async request => {
     if (resident) {
@@ -604,15 +612,23 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
       const answer = await (columns ? kept.overview(plain(asked), {copy: true}) : kept.run(asked));
       if (answer.ok && answer.overview?.positionsOnly) {
         const {positionsOnly: _moved, ...moved} = answer.overview;
-        return {...answer, overview: {...last, ...moved}};
+        // What became of places by id belongs to the answer that was asked with them.
+        const {continuation: _earlier, ...kept} = last;
+        return {...answer, overview: {...kept, ...moved}};
       }
       return answer;
     }
     const sent = {...request, graph: request.graph ?? graph};
     const start = request.start;
-    if (start && start.x === undefined) {
+    if (start && start.x === undefined && start.nodes === undefined) {
       if (!last || request.graph) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
       if (clustersOf(request.options) !== clusters) return {ok: false, error: 'The clusters changed since the last overview; lay out without start.'};
+      if (byPlaces) {
+        const answer = await run({...sent, start: {...start, nodes: placesOf(last)}});
+        if (!answer.ok) return answer;
+        const {continuation: _own, ...overview} = answer.overview;
+        return {...answer, overview};
+      }
       sent.start = {...start, x: last.x, y: last.y, r: last.r};
     }
     return run(sent);
@@ -638,6 +654,7 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
       if (answer.ok) {
         last = answer.overview;
         clusters = clustersOf(request.options);
+        byPlaces = !!request.start && (request.start.nodes !== undefined || (byPlaces && request.start.x === undefined));
         if (fresh && !resident) graph = request.graph;
       }
       return answer;
