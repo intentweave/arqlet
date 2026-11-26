@@ -104,8 +104,31 @@ The 9 differing drawings ([rows](bus-collapse-drawing-20261126.jsonl),
 
 The view of the third row also carries routes without an edge after the move, with and without the option (below).
 
-So a later move or refinement can come out better or worse, because it continues from other tap routes. That is why the
-option is off: whether it becomes the default is open.
+So a later move or refinement can come out better or worse. There are two causes: in a view with bars, later operations
+read the kept tap routes (`bus_line::expand_snapshot`); and the later layout leaves the pass out too, together with the
+engine choice behind it (below), which can replace the drawing. That is why the option is off: whether it becomes the
+default is open.
+
+## Deferring the pass to the first later operation (considered, not built)
+
+The idea: leave the pass out at an import and run it before the first operation that needs the repaired tap routes, so
+that every drawing stays as on `main`. Probes with a temporary build (not committed) showed what stands against it:
+
+- **The pass cannot simply run at every later operation.** Applied to its own result, it left fewer routes through boxes
+  again in two of the six slow cases (`48 / 3 / 3 / 2`: 308, then 220, then 218; `48 / 5 / 4 / 2`: 46, then 23, then 22),
+  so by its own rule that result would be taken too. A later operation therefore has to know whether the pass is still
+  owed.
+- **The snapshot does not say so.** `baseRevision` is absent only on an untouched import; a toggle (which lays out from
+  scratch, like an import), a refinement and an appearance change all set it. Using it would cover imports only, and would
+  make an existing field carry a new meaning. A general solution needs new snapshot state.
+- **The drawing can depend on the tap routes at once.** Where single pass is not used (as in these organic views) and the
+  work estimate allows it, the engine choice runs after the pass, judges the drawings with the tap routes in them, and can
+  replace the drawing: in `16 / 2 / 3 / 2` open, a move on `main` takes the other engine's drawing (box coordinates differ
+  in the last bit, 4 routes differ). Such a layout has to run the pass at once.
+- **Not every view reads the kept routes.** Where every bus is drawn as lines (no bar left), `expand_snapshot` restores
+  nothing, so no later operation reads `busTaps.routes`. All six slow collapsed views are of this kind, and their work
+  estimate rules the engine choice out. Leaving the pass out there needs no deferral and no new state. This was read from
+  the code and not compared over the operations; it also depends on what `expand_snapshot` restores.
 
 ## Default output
 

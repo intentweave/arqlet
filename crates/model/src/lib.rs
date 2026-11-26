@@ -2390,9 +2390,9 @@ pub struct LayoutOptions {
     pub organic_gap: Option<f64>,
     /// Provisional (#150): where every edge of a view is a tap of a bus drawn from a bar (also as the lines made from
     /// one), a layout does not route the routes in conflict a second time. Those routes are never drawn (the bar and its
-    /// taps come from the boxes), but routing them again can take most of the layout's time. An imported view is drawn
-    /// the same; the routes kept for later operations (`Snapshot::bus_taps`) and `recomputed_containers` can differ, so
-    /// a later move or refinement can place boxes differently. Off by default (omitted).
+    /// taps come from the boxes), but routing them again can take most of the layout's time. On the measured views an
+    /// import is drawn the same; the routes kept for later operations (`Snapshot::bus_taps`) and
+    /// `recomputed_containers` can differ, and a later move or refinement can draw differently. Off by default (omitted).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub skip_tap_reroute: bool,
     /// Experimental (ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass, and in the
