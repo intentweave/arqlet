@@ -85,6 +85,13 @@ pub fn has_strict_track_conflicts(snapshot: &Snapshot) -> bool {
 
 /// Validate explicit opt-in requests even when their work budget runs no layouts.
 pub fn check_capability(snapshot: &Snapshot) -> Result<(), String> {
+    // An empty drawing has no plan and nothing to construct; it keeps its options for the next edit to try single pass.
+    if snapshot.graph.nodes.is_empty() {
+        return Ok(());
+    }
+    // The plans name the graph the layout saw, with the buses as nodes: check that one, not the view.
+    let seen = (!snapshot.graph.buses.is_empty()).then(|| crate::seen_by_layout(snapshot));
+    let snapshot = seen.as_ref().unwrap_or(snapshot);
     let options = &snapshot.options;
     if !options.layered_construction
         || !options.hierarchical_ordering
