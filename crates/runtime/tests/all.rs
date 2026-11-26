@@ -134,6 +134,8 @@ mod session_store;
 mod shape_change;
 #[path = "shape_geometry.rs"]
 mod shape_geometry;
+#[path = "simplex_refinement.rs"]
+mod simplex_refinement;
 #[path = "single_pass.rs"]
 mod single_pass;
 #[path = "single_pass_reversed.rs"]

@@ -2531,6 +2531,12 @@ pub struct LayoutOptions {
     /// weighted by their edges (network simplex), instead of the longest paths. Off by default; omitted when off.
     #[serde(default, skip_serializing_if = "is_false")]
     pub simplex_ranks: bool,
+    /// Experimental (ADR 0027, step 1): the refinement of a single-pass drawing also lays the view out again with
+    /// `simplex_ranks` and takes that drawing when its published key is better. Its options then carry `simplex_ranks`, so
+    /// later edits keep the ranking until a new import. No effect on other drawings, or on a drawing that has
+    /// `simplex_ranks` already. Off by default; omitted when off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub simplex_ranks_candidate: bool,
     /// Experimental (derived by the runtime, not set by a user): the size a collapsed container takes, estimated from its
     /// content (inside out), so that expanding it moves the outer picture little. Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -2998,6 +3004,7 @@ impl Default for LayoutOptions {
             global_layering: false,
             hierarchical_ordering: true,
             simplex_ranks: false,
+            simplex_ranks_candidate: false,
             collapsed_sizes: BTreeMap::new(),
             aggregate_weights: BTreeMap::new(),
             max_extent: None,

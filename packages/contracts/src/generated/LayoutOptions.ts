@@ -414,6 +414,13 @@ hierarchicalOrdering?: boolean,
  */
 simplexRanks?: boolean,
 /**
+ * Experimental (ADR 0027, step 1): the refinement of a single-pass drawing also lays the view out again with
+ * `simplex_ranks` and takes that drawing when its published key is better. Its options then carry `simplex_ranks`, so
+ * later edits keep the ranking until a new import. No effect on other drawings, or on a drawing that has
+ * `simplex_ranks` already. Off by default; omitted when off.
+ */
+simplexRanksCandidate?: boolean,
+/**
  * Experimental (derived by the runtime, not set by a user): the size a collapsed container takes, estimated from its
  * content (inside out), so that expanding it moves the outer picture little. Omitted when empty.
  */

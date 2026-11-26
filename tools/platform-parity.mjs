@@ -65,6 +65,15 @@ const marked = {op: 'compactBookmark', snapshot: abstract, selection: {nodeId: a
 const bookmarked = JSON.parse(execFileSync(native, {input: JSON.stringify(marked), maxBuffer: 1 << 30}).toString());
 if (!bookmarked.ok) { console.error(`compactBookmark: ${bookmarked.error}`); process.exit(1); }
 requests.push(['compactBookmark', marked], ['readBookmark', {op: 'readBookmark', snapshot: abstract, text: bookmarked.text}]);
+// The refinement candidate of ADR 0027 (`simplexRanksCandidate`), on a view where it is taken: the same choice and drawing.
+const candidate = JSON.parse(execFileSync(native, {
+  input: JSON.stringify({op: 'import', graph: graph('benchmarks/inputs/bpmn-pools.json'), limit: 100, options: {simplexRanksCandidate: true}}),
+  maxBuffer: 1 << 30,
+}).toString()).snapshot;
+const refinement = {op: 'refine', snapshot: candidate, expectedRevision: candidate.revision, expectedLayoutVersion: candidate.layoutVersion ?? 0};
+const strategy = JSON.parse(execFileSync(native, {input: JSON.stringify(refinement), maxBuffer: 1 << 30}).toString()).snapshot?.optimization?.strategy;
+if (strategy !== 'simplex-ranks') { console.error(`simplexRanksCandidate: expected the strategy simplex-ranks, got ${strategy}`); process.exit(1); }
+requests.push(['refine with simplexRanksCandidate', refinement]);
 const digest = process.argv.includes('--digest');
 let differ = 0;
 for (const [name, request] of requests) {

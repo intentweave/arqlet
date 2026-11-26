@@ -6,7 +6,8 @@
 /// Candidate identity, fixed before dispatch. Completion order and thread IDs never change it.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CandidateId {
-    /// Fixed strategy name (`ordering`, `routing`, `routing-last`, `search`, `flat-region`, `other-port-placement`).
+    /// Fixed strategy name (`ordering`, `routing`, `routing-last`, `search`, `flat-region`, `other-port-placement`,
+    /// `simplex-ranks`).
     pub strategy: &'static str,
     /// Stable numeric parameter (the ordering mode); `0` for strategies without one.
     pub parameter: usize,

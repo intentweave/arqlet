@@ -1182,6 +1182,24 @@ fn relayout_collapsed(
     result.omitted_unresolved_edges = snapshot.omitted_unresolved_edges;
     Ok(result)
 }
+/// The candidate of `LayoutOptions::simplex_ranks_candidate` (ADR 0027, step 1): the view of a single-pass drawing laid out
+/// again from the start with network-simplex ranks, as a view change lays it out. Its options carry `simplex_ranks`, which
+/// is how later edits keep the ranking. `None` when single pass cannot make that layout (the pipeline before single pass is
+/// not tried: the candidate is limited to single-pass drawings), or when it would not show the same view.
+fn with_simplex_ranks(snapshot: &Snapshot) -> Option<Snapshot> {
+    let ranked = LayoutOptions {
+        simplex_ranks: true,
+        single_pass_auto: false,
+        ..snapshot.options.clone()
+    };
+    let mut result =
+        relayout_collapsed(snapshot, &ranked, snapshot.collapsed_ids.clone(), &[]).ok()?;
+    result.options.single_pass_auto = snapshot.options.single_pass_auto;
+    // The keys of two drawings compare only when they draw the same view.
+    let view = |s: &Snapshot| serde_json::to_vec(&(&s.graph, s.hub_refs.len())).ok();
+    (view(&result) == view(snapshot)).then_some(result)
+}
+
 /// Provisional (path cut-out, step 2): makes the nodes `ids` visible by expanding the collapsed containers that hold them
 /// (in the view: communities and groups too); everything else stays as it is. With `partial`, a container opened this way
 /// shows only the children on the way to those nodes, the others gathered in a collapsed rest (`LayoutOptions::partial`);
@@ -2588,9 +2606,11 @@ fn refine_logged(
     // Candidates are chosen by the shared conflict key (the published result's measure), not by the engine's
     // quality: a candidate that cannot be measured is not eligible.
     // One measurement of the input gives its key and, when the input is kept, its near-node pairs.
-    // `singlePass` plans no candidate and no global round, so nothing is compared with the key and the input is kept.
+    // `singlePass` plans no global round and, without `simplexRanksCandidate` (ADR 0027), no candidate: then nothing is
+    // compared with the key and the input is kept. Under `singlePass` an input with geometry issues is measured too: its
+    // candidate replaces it only when the key is better.
     let compared = !(snapshot.options.single_pass && planned.is_empty());
-    let input_evaluation = if input_valid && compared {
+    let input_evaluation = if (input_valid || snapshot.options.single_pass) && compared {
         arqlet_layout::published_evaluation(snapshot).ok()
     } else {
         None
@@ -2692,6 +2712,7 @@ fn refine_logged(
                 continue;
             };
             completed.push(id.clone());
+            let only_when_better = id.strategy == SIMPLEX_RANKS;
             let origin = Origin {
                 input: &input,
                 phase: "candidate",
@@ -2720,11 +2741,17 @@ fn refine_logged(
             let Some(key) = key else {
                 continue;
             };
-            if !have_valid
-                || best_key
-                    .as_ref()
-                    .is_none_or(|known| arqlet_layout::improves(&key, known))
-            {
+            let better = best_key
+                .as_ref()
+                .map(|known| arqlet_layout::improves(&key, known));
+            // A candidate replaces an invalid or unmeasured incumbent whatever its key; the simplex ranks (ADR 0027) only
+            // a drawing they are better than.
+            let accept = if only_when_better {
+                better == Some(true)
+            } else {
+                !have_valid || better.unwrap_or(true)
+            };
+            if accept {
                 have_valid = true;
                 let improves_input = input_key
                     .as_ref()
@@ -2745,7 +2772,8 @@ fn refine_logged(
     // Archive refinement (opt-in): the archive entries after the incumbent each get one routing pass, in archive order.
     // The entries are chosen by their archive rank alone, not by whether they were published; the incumbent's geometry is
     // skipped. A pass that beats the incumbent wins under the shared key, like any round.
-    if snapshot.options.archive_refinement > 0 && !should_stop() {
+    // Not under `singlePass`: a routing pass would correct constructed routes.
+    if snapshot.options.archive_refinement > 0 && !snapshot.options.single_pass && !should_stop() {
         let incumbent = geometry_fingerprint(&candidate);
         let mut runners: Vec<(String, Snapshot)> = archive
             .slots
@@ -3147,7 +3175,26 @@ fn plan_first_stage(snapshot: &Snapshot) -> (Vec<Job>, Vec<Exclusion>) {
         ] {
             exclude(job, "singlePass constructs once");
         }
+        // ADR 0027, step 1: the one candidate of a single-pass drawing, a second layout of the whole view. Without its
+        // option nothing is planned or reported for it.
+        // A view with buses that fell back keeps the options of single pass; its diagnostic says it was not used.
+        let fell_back = snapshot
+            .layout_diagnostics
+            .iter()
+            .any(|d| d.starts_with("Single pass was not used"));
+        if options.simplex_ranks_candidate {
+            if fell_back {
+                exclude(Job::SimplexRanks, "needs a single-pass drawing");
+            } else if options.simplex_ranks {
+                exclude(Job::SimplexRanks, "simplexRanks is on already");
+            } else {
+                planned.push(Job::SimplexRanks);
+            }
+        }
         return (planned, excluded);
+    }
+    if options.simplex_ranks_candidate {
+        exclude(Job::SimplexRanks, "needs a single-pass drawing");
     }
     planned.extend(options.candidates.iter().map(|m| Job::Ordering(*m)));
     if options.routing_candidate {
@@ -3420,7 +3467,13 @@ enum Job {
     /// Routing with the extended conflict selection (experimental, P1): only when `extendedConflictSelection` is set.
     RoutingExtended,
     Search,
+    /// The same view laid out again with network-simplex ranks (ADR 0027, step 1): only on a single-pass drawing, when
+    /// `simplexRanksCandidate` is set.
+    SimplexRanks,
 }
+
+/// The strategy name of `Job::SimplexRanks`.
+const SIMPLEX_RANKS: &str = "simplex-ranks";
 
 impl Job {
     /// The declared capabilities of this strategy. The first-stage gates in `refine_logged` and the round job list
@@ -3461,6 +3514,13 @@ impl Job {
                 false,
                 Some("componentPacking"),
             ),
+            Job::SimplexRanks => (
+                SIMPLEX_RANKS,
+                true,
+                false,
+                false,
+                Some("simplexRanksCandidate"),
+            ),
         };
         StrategyCapabilities {
             name,
@@ -3490,6 +3550,7 @@ impl Job {
             Job::OtherPortPlacement => ("other-port-placement", 0),
             Job::RowPortMiddle => ("row-port-middle", 0),
             Job::UnpackedComponents => ("unpacked-components", 0),
+            Job::SimplexRanks => (SIMPLEX_RANKS, 0),
         }
     }
 }
@@ -3658,6 +3719,10 @@ fn evaluate_job(
             )?;
             ("unpacked-components".to_string(), refined)
         }
+        Job::SimplexRanks => match with_simplex_ranks(snapshot) {
+            Some(ranked) => (SIMPLEX_RANKS.to_string(), ranked),
+            None => return Ok(None),
+        },
         Job::Search => {
             let mut search = arqlet_layout::SearchCounters::default();
             let placement_started = stage_timer_start();
@@ -7071,6 +7136,7 @@ mod tests {
             Job::OtherPortPlacement,
             Job::UnpackedComponents,
             Job::RoutedOrdering(1),
+            Job::SimplexRanks,
         ];
         let mut names = BTreeSet::new();
         for job in jobs {
