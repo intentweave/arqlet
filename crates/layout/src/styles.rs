@@ -173,6 +173,15 @@ pub(crate) fn only_straight(graph: &Graph, options: &LayoutOptions) -> bool {
     })
 }
 
+/// Whether every edge of the graph can only be drawn orthogonally: nothing asks for another routing style.
+pub(crate) fn only_orthogonal(graph: &Graph, options: &LayoutOptions) -> bool {
+    edge_choices(graph, options).is_ok_and(|(choices, _)| {
+        choices
+            .values()
+            .all(|list| list.as_slice() == [RoutingStyle::Orthogonal])
+    })
+}
+
 fn edge_choices(graph: &Graph, options: &LayoutOptions) -> Result<Choices, String> {
     let refusals = straight_refusals(graph);
     let legacy = options.edge_routing.map(legacy_style);
