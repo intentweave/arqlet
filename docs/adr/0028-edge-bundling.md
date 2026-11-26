@@ -1,8 +1,9 @@
 # ADR 0028: Edge bundling: hierarchical bundles, drawn by the scene
 
 Date: 2026-11-26.
-Status: proposed (#133, milestone 0.10). Nothing below is built; the owner decides on the design first (open questions at
-the end).
+Status: proposed (#133, milestone 0.10). Nothing is built into the engine. The owner accepted the recommendations on
+2026-11-26 (decisions below). The probe B0 ran the same day: **no-go** for all three kinds of control points
+([B0 result](#b0-result-2026-11-26)).
 
 Related: [ADR 0004](0004-organic-placement-and-straight-routing.md) (organic placement, straight edges),
 [ADR 0005](0005-routing-constraints.md) (routing requirements, buses, shared segments),
@@ -117,7 +118,7 @@ published key stay as they are.
 - Not in the **renderers**: three renderers would compute geometry three times (against ADR 0008 and ADR 0013).
 - `build_corner_scene` does not bundle. So the engine's metrics, key and refinement judge the **unbundled** drawing; what
   differs in the drawn one is reported by the scene (section 6). This narrows ADR 0013's "what is drawn is what is
-  judged" for this option and is open question 5.
+  judged" for this option (decision 5).
 
 ### 3. One option, off by default
 
@@ -256,36 +257,117 @@ Each is accepted on its own; none changes a default.
 
 | Step | Content | Gate |
 | --- | --- | --- |
-| **B0 probe** | A script in `benchmarks/eval` computes the curves of sections 4 and 5 from the engine's scene, with centre, free-place and gate control points. No engine change. | Results file with machine and revision, drawings for the owner. Go (proposed thresholds, not derived from a measurement): on three gate views with 50 eligible edges or more, at strength 0.85, 60 % or more drawn bundled with no new entry, ink ratio 0.85 or less, mean distortion 1.2 or less. Else B4 first, or stop. |
+| **B0 probe** (ran: no-go, below) | A script in `benchmarks/eval` computes the curves of sections 4 and 5 from the engine's scene, with centre, free-place and gate control points. No engine change. | Results file with machine and revision, drawings for the owner. Go (proposed thresholds, not derived from a measurement): on three gate views with 50 eligible edges or more, at strength 0.85, 60 % or more drawn bundled with no new entry, ink ratio 0.85 or less, mean distortion 1.2 or less. Else B4 first, or stop. |
 | **B1 engine** | Option, `bundle.rs`, eligibility, offsets, ports, guard with grid, scene fields, contracts. | Default fingerprints and golden scenes unchanged; tests for direction, parallel and antiparallel edges, self-loops, nesting, circles, exclusions, strength 0; `platform-parity.mjs` with a bundled case identical native and WASM; both hard measures on every gate view; B0's numbers reproduced or the difference explained. |
 | **B2 viewers** | Picking and draw order, route details and conflicts, a playground control, ADR 0005 and docs amended. | `scene-gl.mjs`: SVG and both GPU backends within 1 % of the pixels; Node tests for pick and highlight; `ui-regression.mjs`; the React Flow example. |
 | **B3 acceptance** | Full sweep of the table above, including scene time while dragging. | Results file; the owner accepts the option and its default strength from numbers and drawings. |
 | **B4** (if B0 or B3 asks) | Better control points. | B1's gate; share bundled and ink ratio against B1 on the same views. |
 | **Later, own ADR** | A circular or hierarchy-radial arrangement; bundling for flat views (edge-path or ordered bundles, as a runtime job). | Decided there. |
 
-## Open questions for the owner
+## B0 result (2026-11-26)
 
-1. **Radial and circular.** Today's radial areas leave next to nothing to bundle. Is 0.10 done with nested organic views, or is an
-   arrangement of the containment hierarchy on rings or a circle part of it (a new strategy, its own ADR)? Recommended:
-   organic and nested views in 0.10, the arrangement afterwards if a user needs that picture.
-2. **Flat views.** Is bundling only along containment (`communities` included) enough for 0.10? Recommended: yes.
-3. **Guard.** No new node hit (recommended), or stronger bundles that pass through nodes and report it?
-4. **Scope under routing requirements.** May the option bend edges whose area fixes `straight` (recommended)? Should
-   orthogonal areas be bundled too (not recommended: it replaces their geometry)?
-5. **Metrics.** Accept that key, quality and refinement describe the unbundled drawing while bundles are on?
-6. **Same container.** Keep edges between two children of one container straight (recommended), or bend them to the
-   parent's centre as Holten does?
-7. **Excluded edges.** Are labelled, port-bound and bus edges allowed to stay unbundled in the first version?
-8. **Appearance.** Arrowheads as now (recommended), or also a direction gradient and fainter long curves (new style
-   properties in all three renderers)?
-9. **Thresholds** of B0.
+**No-go.** No gate view passes with any kind of control points; the gate asks for three. Numbers, machine, revision,
+build and command: [summary](../../benchmarks/results/bundling-probe-20261126.md) and
+[data](../../benchmarks/results/bundling-probe-20261126.jsonl). Script: `benchmarks/eval/bundling-probe.mjs` (curves
+and guard in `bundling.mjs`, tests beside it). The drawings are not in the repository; the command writes them again.
+
+At strength 0.85 with the guard; each cell is centre / free place / gate:
+
+| View | Eligible of routes | Drawn bundled | Ink ratio | Mean distortion | Fails |
+| --- | --- | --- | --- | --- | --- |
+| `org-chart` | 74 of 82 | 86 / 86 / 91 % | 1.03 / 1.03 / 1.00 | 1.11 / 1.11 / 1.00 | ink |
+| `layerweave-code` | 20 of 239 | 60 / 70 / 70 % | 1.02 / 1.02 / 1.03 | 1.04 / 1.06 / 1.04 | fewer than 50 eligible, ink |
+| `mixed-large` | 59 of 95 | 86 / 88 / 81 % | 1.04 / 1.04 / 1.01 | 1.14 / 1.14 / 1.02 | ink |
+| `workflow-dag` | 90 of 125 | 62 / 62 / 62 % | 1.05 / 1.05 / 1.02 | 1.14 / 1.14 / 1.08 | ink |
+| `phase-width-feedback` | 68 of 358 | 85 / 87 / 88 % | 1.02 / 1.02 / 1.01 | 1.04 / 1.04 / 1.03 | ink |
+| `synthetic-2k` | 1 373 of 5 824 | 41 / 42 / 43 % | 1.00 / 1.00 / 1.00 | 1.05 / 1.05 / 1.02 | bundled share, ink |
+
+**What holds.** No new node entry in any guarded drawing: the probe's test against every node, and the engine's
+`routeConflicts` on the 2 467 bundled curves at strength 0.85. Every eligible edge is drawn once, from border to border,
+in its direction. The trial runs before the recorded one gave the same counts, distortion and ink on all 108 rows.
+
+**Why so little is bundled.**
+
+1. **Shallow nesting.** A section of a cubic spline is the same for two edges only where they share four consecutive
+   control points, so only where they share four containers on their way. That holds for 2 of 74 eligible edges in
+   `org-chart`, 4 of 59 in `mixed-large`, none of 90 in `workflow-dag`, 8 of 20 in `layerweave-code`, 24 of 68 in
+   `phase-width-feedback` and 591 of 1 373 in `synthetic-2k`. In `org-chart`, 65 of 74 edges have three control points:
+   each is a curve of its own.
+2. **The guard removes the bundles where the structure has them.** Without it, at strength 1, centre control points
+   reach an ink ratio of 0.64 on `phase-width-feedback` and 0.52 on `synthetic-2k`, with visible trunks; the guard would
+   refuse 52 of 68 and 1 182 of 1 373 of those curves. With it the ratios are 1.02 and 1.00. In `synthetic-2k` the guard
+   keeps 776 to 805 edges unbundled at strength 0.85. Most refusals are a node that the curve enters and the straight
+   segment does not.
+3. **Many edges are not eligible.** A blocked straight edge is drawn as a detour (`straightDetours`, on by default) and
+   left out: 3 231 routes in `synthetic-2k`, 163 in `phase-width-feedback`, 101 in `layerweave-code`. Edges within one
+   container are another 918, 119 and 114.
+4. **Better control points do not change the verdict.** The gate points give the least distortion on every view and the
+   largest bundled share on `org-chart`, `phase-width-feedback` and `synthetic-2k`, but no ink ratio below 1.00. The free
+   place differs from the centre on 11 to 50 % of the containers on the paths and gives nearly the same numbers.
+
+**What the drawings show** (every view at 0.85, not every variant of each; the large view also in a crop):
+
+- `org-chart`, `mixed-large`, `workflow-dag`: no trunks. Single curves, some with hooks (a leaf behind its container's
+  centre leaves away from its target and turns back) or S-shaped kinks where control points lie close together. This
+  reads worse than the straight lines. A weakened or kept edge beside bent ones makes the picture uneven.
+- `phase-width-feedback`, gate points: the one useful case. The edges from the left containers towards the central node
+  close up into bands and free some space; without the guard the same drawing has clear trunks.
+- `layerweave-code`: 20 curves among 239 routes; nothing to see.
+- `synthetic-2k`: at a glance and in the crop, guarded and unbundled drawings cannot be told apart. Without the guard the
+  drawing has strong, readable trunks between the three large groups (with node hits).
+
+**The thresholds were badly chosen in one respect, and stay as they were.** The ink ratio on a 2-unit raster counts only
+strands that lie on each other. At strength 0.85 each strand keeps part of its own chord, so strands of one bundle run
+side by side, not on each other. A synthetic control (128 leaves of a deep hierarchy on a circle, 200 relations, no
+engine, no guard), which shows clear bundles to the eye, reaches 1.03 at 2 units, 0.87 at 8 and 0.81 at 16, and 0.49
+only at strength 1; its mean distortion at 0.85 is 1.38, above the limit of 1.2 as well. So the picture the method was
+made for fails this gate.
+
+The verdict does not rest on the raster alone: with the guard at strength 0.85, the ratio does not fall below 0.86 on
+any view with cells up to 32 units, and not below 0.92 except for the gate points of `phase-width-feedback`;
+`synthetic-2k` also fails the bundled share, and the drawings agree. But without an ink criterion at all, four views
+(`org-chart`, `mixed-large`, `workflow-dag`, `phase-width-feedback`) would pass the other criteria and the probe would
+read go. Share and distortion say that curves were drawn, not that anything was bundled.
+
+**Definitions the probe had to fix** (written into the script before its first run, except the last item):
+
+- Views: authored directions, strategies and routing removed; root and containers organic, routing straight; every node
+  in the view; all other options default (`straightDetours`, a required clearance of 6).
+- Free place: the point of a 4-unit grid in the container's content area (36 below the top, 12 from the other sides)
+  nearest to its centre with 12 units, else 6, else any room from every child; else the centre.
+- Gate: on the container's border towards the centre of the outermost box on the other side.
+- Segments by the length of the straightened polygon. Strands of the same two ends: spacing
+  `min(6, 2·(h − 1)/(n − 1))`, `h` half the smallest side of the two nodes.
+- Ink over the eligible edges; mean distortion over all eligible edges, kept ones counting 1.
+- Added after the first trial, beside the gate and deciding nothing: raster cells of 16 and 32 units, the counts of
+  shared sections and covered centres, and the control.
+
+Not measured: ambiguity, crossings, scene time and payload bytes (B3).
+
+## Decisions (owner, 2026-11-26)
+
+The recommendations of the proposal are accepted; the ADR stays proposed.
+
+1. **Radial and circular.** Nested organic views are enough for 0.10. No new circular or hierarchy-radial arrangement.
+2. **Flat views.** Bundling only along containment, `communities` included.
+3. **Guard.** Strict: bundling adds no node hit.
+4. **Routing requirements.** The option may bend edges whose area fixes `straight`. Orthogonal areas are not bundled.
+5. **Metrics.** Key, quality and refinement describe the unbundled drawing.
+6. **Same container.** Edges between two children of one container stay straight.
+7. **Excluded edges.** Labelled, port-bound and bus edges stay unbundled in the first version.
+8. **Appearance.** Arrowheads only.
+9. **B0 thresholds** as proposed in the steps below.
 
 ## Recommendation
 
-Build hierarchical edge bundling as an optional, off-by-default step of the scene, for straight edges that cross
-containers, with the guard that adds no node hit; probe it first (B0), because the guard and the control points decide
-whether it bundles enough in nested box drawings. Do not build force-directed bundling now. Do not promise radial or
-circular bundling until question 1 is decided.
+Before the probe: build hierarchical bundling as an optional step of the scene, and probe it first. After the probe:
+**do not build B1.** The strict guard (decision 3) and containment as the only hierarchy (decisions 1 and 2) leave the
+method too little to bundle on the gate views, and better control points (B4) were part of the probe. Take #133 out of
+0.10 and keep this ADR proposed, with the probe as its record. Should bundling still be wanted, each of these needs its
+own design and decision, and none was probed: bundles routed through the free space around nodes (ordered bundles, on
+ADR 0020's corridors), which would keep the strict guard's promise by construction; an arrangement of the hierarchy on
+a circle, the case the method was made for (decision 1 left it out of 0.10); or a bundled drawing that is allowed to
+pass through nodes (against decision 3), probed again with a measure of closeness instead of a 2-unit raster.
 
 ## Sources
 

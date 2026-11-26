@@ -437,7 +437,7 @@ md.push('', '## Control: a deep hierarchy on a circle (synthetic, no engine, no 
   '| strength | edges with a shared section | ink: 2 / 4 / 8 / 16 / 32 / screen (1.3 u) | distortion, mean |', '|---|---|---|---|');
 for (const c of lines.filter(l => l.type === 'control')) md.push(`| ${c.strength} | ${c.structure.withSharedSection} of ${c.edges} | ${['2', '4', '8', '16', '32', 'screen'].map(k => f(c.ink[k].ratio)).join(' / ')} | ${f(c.distortion.mean)} |`);
 md.push('', '## Strengths, with and without the guard', '', 'Without the guard every curve is drawn at the full strength through whatever it meets. It is not the design; it shows what the guard costs and what the method could reach.', '',
-  '| view | control points | strength | bundled, guard | ink, guard (2 / screen) | distortion, guard | ink, no guard (2 / screen) | distortion, no guard | curves adding a hit, no guard |', '|---|---|---|---|---|---|---|---|---|');
+  '| view | control points | strength | bundled, guard | ink, guard (2 / screen) | distortion, guard | ink, no guard (2 / screen) | distortion, no guard | no-guard curves the guard would refuse (hit or clearance) |', '|---|---|---|---|---|---|---|---|---|');
 for (const r of runs.filter(r => r.guard)) {
   const u = runs.find(x => !x.guard && x.view === r.view && x.variant === r.variant && x.strength === r.strength);
   md.push(`| ${r.view} | ${r.variant} | ${r.strength} | ${pct(r.share)} | ${f(r.ink['2'].eligible)} / ${f(r.ink.screen.eligible)} | ${f(r.distortion.mean)} | ${f(u.ink['2'].eligible)} / ${f(u.ink.screen.eligible)} | ${f(u.distortion.mean)} | ${u.entering} of ${u.eligible} |`);
