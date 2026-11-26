@@ -235,10 +235,16 @@ pub fn validate(priority: &[GroupingCriterion], memberships: &Memberships) -> Re
     Ok(())
 }
 
-/// Provisional (ADR 0022 M4b): the phase of every top-level node of `graph` that the dimension `by` places: the earliest of its
-/// groups, by their declared order, that names the node or a node below it as a member. A nested group is a phase of its own.
-/// Top-level nodes of no group are not in the result.
+/// Provisional (ADR 0022 M4b): the phase of every top-level node of `graph` that the dimension `by` places
+/// (`area_groups` of the top level).
 pub fn top_level_phases(graph: &Graph, by: &str) -> BTreeMap<String, usize> {
+    area_groups(graph, by, None)
+}
+
+/// Provisional (ADR 0022 M4b, M4d): the group of every child of `area` (the top level for `None`) that the dimension `by`
+/// places: the earliest of its groups, by their declared order, that names the child or a node below it as a member. A nested
+/// group is a group of its own. Children of no group are not in the result.
+pub fn area_groups(graph: &Graph, by: &str, area: Option<&str>) -> BTreeMap<String, usize> {
     let Some(dimension) = graph.memberships.dimension(by) else {
         return BTreeMap::new();
     };
@@ -247,26 +253,28 @@ pub fn top_level_phases(graph: &Graph, by: &str) -> BTreeMap<String, usize> {
         .iter()
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
         .collect();
-    let top = |id: &str| -> String {
+    // The child of `area` that holds `id`, or nothing when `id` is not inside `area`.
+    let child = |id: &str| -> Option<String> {
         let mut at = id;
         for _ in 0..=parent.len() {
-            match parent.get(at).copied().flatten() {
-                Some(p) => at = p,
-                None => break,
+            let up = parent.get(at).copied()?;
+            if up == area {
+                return Some(at.to_string());
             }
+            at = up?;
         }
-        at.to_string()
+        None
     };
-    let mut phase: BTreeMap<String, usize> = BTreeMap::new();
+    let mut out: BTreeMap<String, usize> = BTreeMap::new();
     for (i, g) in dimension.groups.iter().enumerate() {
         for m in &g.members {
-            if parent.contains_key(m.as_str()) {
-                let entry = phase.entry(top(m)).or_insert(i);
+            if let Some(c) = child(m) {
+                let entry = out.entry(c).or_insert(i);
                 *entry = (*entry).min(i);
             }
         }
     }
-    phase
+    out
 }
 
 /// Whether a criterion considers a group: every group of its dimension when `consider` is empty, else the listed ones.
