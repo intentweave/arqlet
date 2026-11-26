@@ -282,6 +282,62 @@ for (const resident of [false, true]) {
   });
 }
 
+for (const resident of [false, true]) {
+  test(`a long bookmark of changed shapes, directions and ports opens on a fresh import (resident ${resident})`, {skip: !engine || (resident && !engine.openSession)}, async () => {
+    const init = {limit: 100, options: {levelOfDetail: {depth: 0}}};
+    const fresh = async (of = graph()) => {
+      const view = createViewController(createSession(engine, {resident}));
+      assert.equal((await view.import(of, init)).ok, true);
+      return view;
+    };
+    const view = await fresh();
+    await view.open('box');
+    for (const request of [
+      {op: 'shape', nodeId: 'src', shape: 'circle'},
+      {op: 'direction', direction: 'tb'},
+      {op: 'strategy', nodeId: 'box', strategy: 'tree'},
+      {op: 'routing', nodeId: 'box', routing: 'straight'},
+      {op: 'port', edgeId: 'last', endpoint: 'target', side: 'top', offset: 0.3},
+    ]) {
+      const changed = await view.apply(request);
+      assert.equal(changed.ok, true, JSON.stringify(changed));
+    }
+    const {bookmark} = await view.bookmark();
+
+    const other = await fresh();
+    const start = (await other.bookmark()).bookmark;
+    assert.notEqual(bookmark.digest, start.digest, 'the digest is of the graph as the view changed it');
+    // As a value and as URL text, also forced: the same graph, so nothing is reported.
+    for (const [given, options] of [[bookmark], [encodeBookmark(bookmark)], [bookmark, {force: true}]]) {
+      const opened = await other.openBookmark(given, options);
+      assert.equal(opened.ok, true, JSON.stringify(opened));
+      assert.equal(opened.sameSource, undefined);
+      assert.deepEqual((await other.bookmark()).bookmark, bookmark);
+      assert.equal(other.getState().backLabel, 'Open bookmark');
+      assert.equal((await other.back()).ok, true);
+      assert.deepEqual((await other.bookmark()).bookmark, start);
+      assert.equal((await other.forward()).ok, true);
+      assert.deepEqual((await other.bookmark()).bookmark, bookmark);
+      // The bookmark of the view before the changes opens on the changed one.
+      assert.equal((await other.openBookmark(start)).ok, true);
+      assert.deepEqual((await other.bookmark()).bookmark, start);
+    }
+
+    // Another graph stays refused, and is read in part when forced.
+    const revised = graph();
+    revised.nodes[2].label = 'renamed';
+    const another = await fresh(revised);
+    const refused = await another.openBookmark(bookmark);
+    assert.equal(refused.ok, false);
+    assert.equal(refused.error, 'The bookmark belongs to another graph.');
+    assert.equal(another.getState().error, refused.error);
+    assert.equal(another.getState().canBack, false);
+    const forced = await another.openBookmark(bookmark, {force: true});
+    assert.equal(forced.ok, true, JSON.stringify(forced));
+    assert.deepEqual([forced.sameSource, forced.missing, forced.ignored], [false, [], []]);
+  });
+}
+
 test('a compact bookmark is compared with the view as imported, also when it was adopted', {skip: !engine}, async () => {
   // A graph that declares a shape: the compact bookmark leaves it to the defaults, if the view's are known.
   const shaped = () => {

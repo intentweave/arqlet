@@ -39,6 +39,11 @@ unchanged. Details and limits: [integration guide](../integration-guide.md), sec
 accepts the containers that only the view has (communities, groups) as collapsed or shown in part; before, it refused
 them as unknown nodes.
 
+The long form keeps the digest of the whole source graph, the changed shapes, directions, strategies, routing and ports
+included (#195). `readBookmark` therefore also compares it with the digest of the graph with the bookmark's intent written
+into it, which answers the same question as the compact form's source fingerprint and needs no new field, so bookmarks
+already written are read the same way.
+
 ## Consequences
 
 - Browser checks with real input: `gesture-robustness`, `history`, `selection-move`, `port-drag`, `label-drag`, `settle`, `rounded-routes`.

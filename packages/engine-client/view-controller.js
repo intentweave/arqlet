@@ -716,9 +716,10 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     /**
      * Opens a bookmark on the current graph (a step for `back`): its decisions, highlight and selection. `bookmark` is the
      * value of `bookmark()` or a text (of `compactBookmark` or `encodeBookmark`). A bookmark in the long form of another
-     * graph (another digest) is refused unless `force`. A compact one, and a forced one, is read against the graph (the
-     * engine's `readBookmark`): what names an id the graph no longer has is left out, and the result says so (`missing`,
-     * `ignored`, `sameSource`, `sameDefaults`).
+     * graph is refused unless `force`: one with another digest that the engine does not find to be this graph with the
+     * bookmark's own shapes, directions, strategies, routing and ports (`readBookmark`, `sameSource`). A compact one, and
+     * a forced one of another graph, is read against the graph (`readBookmark`): what names an id the graph no longer has
+     * is left out, and the result says so (`missing`, `ignored`, `sameSource`, `sameDefaults`).
      */
     openBookmark(bookmark, {force = false} = {}) {
       return enqueue(async current => {
@@ -732,7 +733,15 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           return {ok: false, error: 'Not a view bookmark.'};
         }
         const now = !compact && opened.digest ? await digest() : null;
-        const other = !!now && opened.digest !== now;
+        let other = false;
+        let read = null;
+        if (now && opened.digest !== now) {
+          // The digest is of the graph with the shapes, directions and so on of the bookmarked view: the engine says
+          // whether this is that graph.
+          read = await session.apply({op: 'readBookmark', bookmark: opened});
+          if (!current()) return {ok: false, cancelled: true};
+          other = !(read.ok && read.sameSource);
+        }
         if (other && !force) {
           const error = 'The bookmark belongs to another graph.';
           publish({error});
@@ -743,8 +752,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         await readDefaults(before);
         let report = {};
         if (compact || other) {
-          const read = await session.apply(compact ? withDefaults({op: 'readBookmark', text: bookmark})
-            : {op: 'readBookmark', bookmark: opened});
+          if (compact) read = await session.apply(withDefaults({op: 'readBookmark', text: bookmark}));
           if (!current()) return {ok: false, cancelled: true};
           if (!read.ok) {
             publish({error: read.error ?? 'The engine refused the bookmark.'});
