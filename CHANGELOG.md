@@ -5,6 +5,34 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+## 0.10.0 — 2026-11-26
+
+A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list
+expressions, and gets an npm package of its own, `@arqlet/query`, without the layout engine; several answers it gave
+wrongly in 0.8.0 and 0.9.0 are fixed. Memberships (ADR 0022) can be held together inside their container and drawn as
+lanes and phases, pinned nodes and containers can stay in single pass (behind an option), a view fits into a URL as a
+compact bookmark, and bus lines with closed containers import faster. Two panics on views with bus lines are fixed.
+
+### Upgrading from 0.9
+
+- **The engine version is `0.10.0`**: edits of a snapshot from an earlier engine are refused, so import the graph again.
+  Default layouts of the reference views are unchanged; the reference fingerprints are
+  `fingerprints-20261126-default-0.10.0.jsonl` (14 views differ from the 0.9.0 file only in metadata;
+  `layerweave-code`, which is generated from the source, has the same geometry as v0.9.0 on the same graph).
+- **Some drawings differ:** views where an edge or a tap leaves an organic, radial, tree or octilinear container of a
+  layered area next to a bus line, and views with `hubRefs` and region ports (see *Fixed*); membership hulls
+  (provisional). With bus lines, `busTaps`, `recomputedContainers` and one line of `layoutDiagnostics` can differ.
+- **Queries answer differently where 0.9.0 was wrong:** a `WHERE` after `ORDER BY`, `SKIP` or `LIMIT`, a label or
+  properties on a repeated node variable, a grouping expression beside an aggregate, and a relationship variable bound
+  by an earlier clause.
+- **Queries and content that are refused now:** properties named `id`, `kind`, `label`, `parentId` or `weight` beside
+  the graph; an expression that reads a variable without a value; a computed value beyond 16 MiB. A map in content or a
+  parameter is a map now, and a map in a JSON answer is `{"map": {…}}`.
+- **Rust hosts** that build these types field by field have new fields: `Snapshot`, `LayoutOptions`, `Scene`,
+  `SceneMark`, `SceneMembershipReport` and `AreaPlan`; `Request` has new variants. In `arqlet-query`: `Value::Map`, the
+  `plan::Expr` variants `Call`, `Map`, `Index`, `Slice` and `Comprehension`, `plan::Op::Union` and
+  `plan::Expand::rel_bound`.
+
 ### Added
 
 - Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
