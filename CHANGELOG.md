@@ -5,7 +5,7 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
-## 0.10.0 — 2026-11-26
+## 0.10.0 — 2026-11-27
 
 A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list
 expressions, and gets an npm package of its own, `@arqlet/query`, without the layout engine; several answers it gave
