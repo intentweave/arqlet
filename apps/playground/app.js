@@ -1771,12 +1771,14 @@ $('view-link').onclick=async()=>{
 async function openViewLink(){
  const hash=typeof location!=='undefined'?location.hash:'';
  if(!hash.startsWith('#view='))return;
- let missing=0;
+ let missing=0,other=false;
  const r=await edit({op:'restore'},{busy:'Opening the linked view …',fit:true,
-  via:()=>viewController.openBookmark(hash.slice(6)).then(opened=>{missing=opened.missing?.length??0;return opened;})});
+  via:()=>viewController.openBookmark(hash.slice(6)).then(opened=>{missing=opened.missing?.length??0;other=opened.sameSource===false;return opened;})});
  if(!r.ok){status(`Link not opened: ${r.error}`);return;}
  const chosen=viewController.getState().selection?.nodeId;
  if(chosen&&snapshot.graph.nodes.some(n=>n.id===chosen))selectNode(chosen);
- status(missing?`Linked view opened; ${missing} id${missing===1?'':'s'} of the link no longer exist${missing===1?'s':''}.`:'Linked view opened.');
+ // A link names no example: the page may hold another graph than the one it was made on, which must be said.
+ const gone=missing?`; ${missing} id${missing===1?'':'s'} of the link ${missing===1?'is':'are'} not in it`:'';
+ status(other?`The link was made on another graph or another version of it: what fits is shown${gone}.`:`Linked view opened${gone}.`);
 }
 
