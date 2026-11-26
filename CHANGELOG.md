@@ -9,6 +9,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 - Phases (provisional, ADR 0022 M4b): with lanes first, a second criterion `as: lanes` lays its groups out one after the other
   along the flow, so that lanes and phases make a grid; drawn as bands with their names. Playground: *Phases along the flow*.
+- Compact bookmarks that fit into a URL (provisional, #151): `controller.compactBookmark()` gives a view as `b1.…`
+  (base64url), holding only what differs from the view as imported, every id once. `openBookmark` takes the text; on
+  another revision of the graph it restores what still exists and reports `missing` ids and `ignored` decisions. Engine
+  operations `compactBookmark` and `readBookmark` (read only). A 6 360-node view with 12 opened modules: 855 characters
+  against 26 508 for the long form (`benchmarks/results/bookmarks-20261126.md`). The playground's *Link to this view*
+  uses it; old links still open.
 - `as: lanes` on the first criterion of `groupingPriority` (provisional, ADR 0022 M4a) lays its groups out as bands across the flow of
   the top level, in their declared order, instead of as containers. The scene draws them as bands
   (`membershipLanes`), the SVG viewer behind everything with the lane's name; playground *As lanes*. The report counts lanes out of
@@ -39,6 +45,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- `openBookmark(bookmark, {force: true})` of another graph's long-form bookmark restores what the graph has and reports
+  the rest (`missing`, `ignored`); before, one unknown id refused the whole restore. `openBookmark` also takes text.
 - Membership hulls (provisional, ADR 0022): members that left a group's box are joined to it by a hull only where the hull
   stays compact, else marked (mark `ownBox` names the box). The moved-down parent hierarchy draws each container's
   children only, so nested levels no longer repeat one hull. In the SVG viewer hull names avoid each other and container
@@ -52,6 +60,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- `restore` (undo, redo, bookmarks) refused a view with a collapsed or partly shown community or group container
+  ("unknown node"): containers that only the view has are accepted.
 - **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that

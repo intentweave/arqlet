@@ -4,6 +4,8 @@
 
 #[path = "abstract_pipeline.rs"]
 mod abstract_pipeline;
+#[path = "bookmark.rs"]
+mod bookmark;
 #[path = "bus_line.rs"]
 mod bus_line;
 #[path = "change_log.rs"]

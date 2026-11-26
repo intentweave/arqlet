@@ -10,7 +10,7 @@
 //! - every operation on a snapshot (`toggle`, `reveal`, `direction`, `move`, `refine`, …): applied to the session's
 //!   snapshot; `expectedRevision` and `expectedLayoutVersion` default to the session's own, and a request that names
 //!   other ones is refused as stale;
-//! - `scene`, `trace`, `neighbourhood`, `intent`: read the session's snapshot;
+//! - `scene`, `trace`, `neighbourhood`, `intent`, `compactBookmark`, `readBookmark`: read the session's snapshot;
 //! - `export`: the whole snapshot;
 //! - `keep` (provisional, #148): keeps the current snapshot under a mark (`{ok, mark}`; the same mark while the snapshot is
 //!   unchanged), at most `limit` (default 32, up to 1000) snapshots, the oldest dropped first; `recall` (`mark`) makes a
@@ -358,6 +358,8 @@ impl EngineSession {
             // Provisional (ADR 0021, M5b): a query over the source graph and the session's content.
             Some("query") => crate::query::query_on(self.current()?, Some(&self.content), v),
             Some("digest") => Ok(crate::find::digest_on(self.current()?)),
+            Some("compactBookmark") => crate::bookmark::compact_on(self.current()?, v),
+            Some("readBookmark") => crate::bookmark::read_on(self.current()?, v),
             Some("intent") => {
                 Ok(json!({"ok": true, "intent": crate::history::intent_of(self.current()?)}))
             }

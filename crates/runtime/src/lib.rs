@@ -1,6 +1,7 @@
 //! Import, bounded view selection and revision-checked editing.
 #[cfg(test)]
 use arqlet_model::math::PortableMath;
+pub mod bookmark;
 pub mod budget;
 /// Provisional (phase timings): the clock a host installs for `timings: true` (`arqlet_model::clock`).
 pub use arqlet_model::clock;
@@ -324,6 +325,30 @@ fn initially_collapsed_indexed(
         ),
         _ => named,
     }
+}
+
+/// The view of the snapshot's source without the decisions that restructure it (nothing shown in part or hidden), and
+/// the containers an import with the snapshot's options starts collapsed in it (a compact bookmark keeps the difference).
+pub(crate) fn default_view(
+    snapshot: &Snapshot,
+) -> Result<(std::sync::Arc<Graph>, BTreeSet<String>), String> {
+    let mut options = snapshot.options.clone();
+    options.partial.clear();
+    options.hidden = Default::default();
+    let (view, _, _) = structure_of(snapshot, &options)?;
+    let mut collapsed = if options.visible_node_budget > 0 {
+        budget::initial_collapse(&view, options.visible_node_budget)
+    } else {
+        BTreeSet::new()
+    };
+    if abstracts(&options) {
+        collapsed.extend(initially_collapsed_indexed(
+            &view,
+            &GraphIndex::of(&view),
+            &options,
+        ));
+    }
+    Ok((view, collapsed))
 }
 
 /// The view of a source graph (`project_view`).
@@ -4315,6 +4340,9 @@ pub(crate) fn dispatch_legacy(input: &str) -> String {
         }
         if v["op"].as_str() == Some("digest") {
             return find::digest_response(&v).to_string();
+        }
+        if matches!(v["op"].as_str(), Some("compactBookmark" | "readBookmark")) {
+            return bookmark::bookmark_response(&v).to_string();
         }
         if v["op"].as_str() == Some("componentRefine") {
             return component_response(&v);

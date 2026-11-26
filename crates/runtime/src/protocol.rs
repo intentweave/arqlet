@@ -207,6 +207,16 @@ pub enum Request {
         #[serde(flatten)]
         body: Map<String, Value>,
     },
+    /// The compact text of a view's decisions, for a link (read only, provisional).
+    CompactBookmark {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
+    /// A bookmark read against a snapshot: the decisions this graph can take, to `restore` (read only, provisional).
+    ReadBookmark {
+        #[serde(flatten)]
+        body: Map<String, Value>,
+    },
     /// The cluster overview of a whole graph.
     Overview {
         #[serde(flatten)]
@@ -586,6 +596,8 @@ impl Request {
             Some("details") => return Ok(Request::Details { body: body() }),
             Some("find") => return Ok(Request::Find { body: body() }),
             Some("digest") => return Ok(Request::Digest { body: body() }),
+            Some("compactBookmark") => return Ok(Request::CompactBookmark { body: body() }),
+            Some("readBookmark") => return Ok(Request::ReadBookmark { body: body() }),
             Some("peek") => return Ok(Request::Peek { body: body() }),
             Some("query") => return Ok(Request::Query { body: body() }),
             Some(op @ ("payload" | "change" | "changesSince" | "content" | "memory" | "release")) => {
@@ -1085,6 +1097,12 @@ fn handle_request(request: Request) -> Response {
         Request::Digest { body } => {
             Response::Encoded(crate::find::digest_response(&with_op("digest", body)).to_string())
         }
+        Request::CompactBookmark { body } => Response::Encoded(
+            crate::bookmark::bookmark_response(&with_op("compactBookmark", body)).to_string(),
+        ),
+        Request::ReadBookmark { body } => Response::Encoded(
+            crate::bookmark::bookmark_response(&with_op("readBookmark", body)).to_string(),
+        ),
         Request::Find { body } => {
             typed_answer(crate::find::find_answer(&with_op("find", body)), |a| {
                 Response::Find(Box::new(a))

@@ -56,6 +56,15 @@ for (const [name, query] of [
 ]) {
   requests.push([name, {op: 'query', query, snapshot: imported.snapshot, content, view: name.includes('view')}]);
 }
+// The compact bookmark (#151): the same text from a view, and the same reading of it, natively and in WASM.
+const abstract = JSON.parse(execFileSync(native, {
+  input: JSON.stringify({op: 'import', graph: graph('benchmarks/datasets/organic-100.json'), limit: 200, options: {communities: 8}}),
+  maxBuffer: 1 << 30,
+}).toString()).snapshot;
+const marked = {op: 'compactBookmark', snapshot: abstract, selection: {nodeId: abstract.graph.nodes[0].id}};
+const bookmarked = JSON.parse(execFileSync(native, {input: JSON.stringify(marked), maxBuffer: 1 << 30}).toString());
+if (!bookmarked.ok) { console.error(`compactBookmark: ${bookmarked.error}`); process.exit(1); }
+requests.push(['compactBookmark', marked], ['readBookmark', {op: 'readBookmark', snapshot: abstract, text: bookmarked.text}]);
 const digest = process.argv.includes('--digest');
 let differ = 0;
 for (const [name, request] of requests) {
