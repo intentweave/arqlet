@@ -160,8 +160,9 @@ a session must send `start.nodes` again; `start` by node index belongs to a requ
 
 Without `settle` the nodes move least, and gaps stay open, so the drawing grows slowly over many changes; with it the
 changed containers close up and move more. Lay out without `start` when the old places and clusters no longer help.
-On generated graphs with 0.1 to 5 % of the nodes changed, nodes moved less than without a start
-([movements](../benchmarks/results/overview-continuation-20261126.md)); this is no general guarantee.
+On two generated graphs with 0.1 to 5 % of the nodes changed, nodes moved less without `settle` than in a layout without
+`start`; with `settle` not in every case ([movements](../benchmarks/results/overview-continuation-20261126.md)). This is
+no general guarantee.
 
 Limits: other cluster options do not regroup a container that keeps its clusters. A cluster the host set smaller than
 its content (`radii`) does not hold all its members in the places, so those it does not hold leave it.

@@ -35,5 +35,6 @@ percent of the earlier root radius. No run had overlapping discs.
 
 - Without `settle` gaps are not closed, so the root disc grows with the share changed; one change is measured here, not
   a long series of them.
-- `settle` runs forces in every changed container, the top level among them, which moves more on these graphs.
+- `settle` runs forces in every changed container, the top level among them. It moves more than without it, except the median at
+  5 % on the hierarchical graph; at 0.1 % there its median and 90th percentile exceed those of no `start`.
 - The continuation keeps the earlier clusters; the layout without `start` clusters anew.
