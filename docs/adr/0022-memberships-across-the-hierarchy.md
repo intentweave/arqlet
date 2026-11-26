@@ -429,6 +429,10 @@ Each step is behind an option and measured before the next. Nothing becomes a de
 - **M4 — lanes** (`as: lanes`): at rank 1 across the drawing, below a higher rank inside each owner, two of them as a grid.
   *Exit:* the gate; `pools-and-lanes.json` with its `groupingPriority` draws as the 2×3 grid with no lane violation;
   `three-dimensions.json` reports what it cannot satisfy.
+  **Probed** (2026-11-25; [results](../../benchmarks/results/memberships-20261125-lanes.md)): with pins across the flow and helper
+  edges along it, 20 of 20 views have every node in its lane and phase, the 2×3 grid included, without a new hard violation; edges
+  that run back between phases have to be turned for the layout. The crossings are the open part (`layerweave-code` 422 to 2559
+  against the flat drawing, 469 with containers): the order has to know the bands, dummies included, which pins cannot say.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.
