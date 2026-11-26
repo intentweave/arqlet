@@ -131,7 +131,7 @@ for (const name of selected) {
 const total = k => rows.reduce((s, r) => s + (r.edits?.[k] ?? 0), 0);
 console.log(`\nViews: ${rows.length}; simplex ranks chosen on ${rows.filter(r => r.strategy === 'simplex-ranks').length}.`);
 console.log(`Edits after a chosen refinement: ${total('made')} made, ${total('kept')} keep the ranks, ${total('failed')} failed; against the same edit of the default drawing ${total('better')} better, ${total('equal')} equal, ${total('worse')} worse; area ${total('areaDefault') ? ((total('areaKept') / total('areaDefault') - 1) * 100).toFixed(1) : '–'} %.`);
-const failed = rows.filter(r => [r.baseline, r.sameError, r.defaultRanks, r.simplexIsImport, r.threads].includes(false) || (r.edits && r.edits.kept !== r.edits.made));
+const failed = rows.filter(r => [r.baseline, r.sameError, r.defaultRanks, r.simplexIsImport, r.threads].includes(false) || (r.edits && (r.edits.failed || r.edits.kept !== r.edits.made)));
 console.log(`Failed checks: ${failed.length ? failed.map(r => r.name).join(', ') : 'none'}.`);
 if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify({kind: 'simplex-refinement', pose: POSE, limit: LIMIT, baseline: Boolean(BASELINE), rows}, null, 1) + '\n');
 process.exit(failed.length ? 1 : 0);

@@ -154,8 +154,12 @@ Measured on both poses, limit 150, against the current corpus
 - **Acceptance 2 recorded:** single pass and delegated routes are unchanged.
 - **Acceptance 3 holds for identity:** with the option off, import and refinement answer byte for byte as the build
   without the change on all views of both poses, and the 15 reference fingerprints equal it; where the default ranks are
-  kept, the snapshot differs only in the option and the count of evaluated candidates. Times: see the results.
-- **The area is not a reason to expect:** the published key has no area (its last criterion is the route length), so
+  kept, the snapshot differs only in the option and the count of evaluated candidates.
+- **Times (noisy; the machine was loaded, load average 10 to 42 on 8 cores):** on the single-pass views of the uniform
+  task the refinement took 39 ms in sum without the option and 522 ms with it, against 407 ms for the imports; per view
+  it adds 1.1 times the import at the median (configured: 45 → 392 ms, 313 ms, 1.2 times). The measurement on an idle
+  machine that this step asks for is still open.
+- **Area plays no part in the choice:** the published key has no area (its last criterion is the route length), so
   all three chosen views of the configured pose, and three of the five uniform ones, get larger (by 0.5 to 11.6 %). The
   uniform sum comes from `org-chart` (−32.8 %) and `synthetic-2k` (−8.4 %).
 - **Why fewer views than step 0 predicted:** step 0 counted a choice by overlaps, hits, crossings, bends and then area,
@@ -169,8 +173,11 @@ Measured on both poses, limit 150, against the current corpus
   A later refinement does not try the default ranks again.
 
 Open for the decision: whether this gain is worth the second layout; whether the choice should weigh area (a different
-key for this candidate, not tried: it would not be "better by the published key"); and whether a refinement of a drawing
-with kept ranks should compare the default ranks too.
+key for this candidate, not tried: it would not be "better by the published key"); whether a refinement of a drawing
+with kept ranks should compare the default ranks too; and whether the candidate may move a continued drawing. It is a
+layout from the start, as measured here: after an added node, the continuation differs from a layout from the start on 43
+of 72 tries (default ranks, nine views), so a refinement there can exchange more than the ranks; the published key has no
+movement term. A candidate warm-started from the drawing gives other drawings than the measured ones and was not taken.
 
 ### Step 2: unlinked sibling areas spread along the flow
 
