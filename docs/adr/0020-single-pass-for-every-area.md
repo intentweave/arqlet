@@ -271,10 +271,14 @@ Built behind `organicCorridors` (a report, `corridorPlans`; the drawing is uncha
   may change them too, but not for the reason given here, and this measurement gives no reason to expect the planned
   demand to place that room well. C2 is not started. The nearer step is the router's search on large views, then this
   comparison again.
-- **Sizes and widths for a later decision.** About a third of all neighbour pairs would be short (one route already needs
-  30 against the gap of 24), and the busiest corridor of a view would need up to 1 638 units with one track per route.
-  The joint system has up to 1 605 variables and 17 679 constraints per axis on the generated views, 5 to 43 times the
+- **Sizes and widths for a later decision.** On the generated views about a third of all neighbour pairs would be short
+  (one route already needs 30 against the gap of 24), and the busiest corridor of a view would need up to 1 638 units
+  with one track per route.
+  The joint system has up to 1 605 variables and 17 679 constraints per axis on the bus views, 5 to 43 times the
   constraints of separation by demand; whether `vpsc` solves either was not tried.
+- **Large regions**: the corridors are linear in the boxes (about 6 per box), the junctions the routes are planned on are
+  not (60 per box at 300 boxes, 1 264 at 2 000 on a chain-like view): an import of 2 000 boxes peaks at 941 MB with the
+  report and 66 MB without. A later step needs another graph for the routes.
 - **Route cost**, measured: 1 by default (6 % more planned length for half the missing width); 24 lengthens the planned
   ways by a third.
 - **Departures from the text above**: the corridors are cut from the free space directly (a search radius of
