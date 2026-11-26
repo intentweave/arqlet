@@ -71,6 +71,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   ("unknown node"): containers that only the view has are accepted.
 - `refine` panicked on a view with buses given as data where one bus is drawn as lines and another as a bar (organic,
   `busStyle: "lines"`; #197). An operation now takes back only what the layout had kept for the taps of the bars.
+- Import and every later operation panicked (a resident session ended) on a view with a bus line where an edge or a tap
+  leaves an organic, radial, tree or octilinear container of a layered area (`regionPorts`, the default; #204): the two
+  layouts that place the border ports took the bus nodes out of the graph a second time. With `hubRefs` the same repeated
+  step could take a region's box for a hub, so that the edges of its nodes were neither drawn nor listed as references,
+  and it dropped the room between the ranks for the stubs whenever an edge left a region; such views are drawn
+  differently now.
 - **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that
