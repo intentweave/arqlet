@@ -1,0 +1,75 @@
+Temporary timing prints for benchmarks/results/bus-collapse-20261126.md (#150); not part of the engine.
+Apply with: git apply benchmarks/experiments/bus-collapse-phases.patch
+
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -552,9 +552,11 @@
+             options.bus_roots.as_slice()
+         };
+         let with_nodes = bus_line::expand(view);
++        let phase = std::time::Instant::now();
+         let (roots, levels) = bus_line::orient(with_nodes.as_ref().unwrap_or(graph), kept)
+             .map(|(_, _, roots, levels)| (roots, levels))
+             .unwrap_or_default();
++        eprintln!("PHASE busRoots {:.1}", phase.elapsed().as_secs_f64() * 1e3);
+         // A bus in an area that is not layered is laid out as a bar and turned into lines afterwards
+         // (`bus_line::bars_to_lines`): the bar keeps clear of the boxes, and the lines follow it orthogonally.
+         let layered = |b: &arqlet_model::Bus| {
+@@ -587,7 +589,9 @@
+         Some(expanded) => {
+             let (mut snapshot, stages) =
+                 compute_counted_forced(&expanded, earlier.as_ref(), dirty, options)?;
++            let phase = std::time::Instant::now();
+             bus_line::collapse(&mut snapshot, view);
++            eprintln!("PHASE busBars {:.1}", phase.elapsed().as_secs_f64() * 1e3);
+             (snapshot, stages)
+         }
+         None if trunk_roots.is_some() => {
+@@ -895,7 +899,14 @@
+     };
+     organic::check_organic_areas(graph, options.sparse_stress, options.scalable_stress)?;
+     let mut run = Run::new(&|| false);
++    let phase = std::time::Instant::now();
+     let mut snapshot = uninterrupted(compute_mode(graph, previous, dirty, 0, options, &mut run))?;
++    eprintln!(
++        "PHASE firstLayout {:.1} routes {} conflicts {}",
++        phase.elapsed().as_secs_f64() * 1e3,
++        snapshot.routes.len(),
++        snapshot.route_conflicts.len()
++    );
+     let stages = run.search.clone();
+     // An edit that laid out and routed only part of the drawing must not leave it worse than it was. Routes that run into a node
+     // are counted before and after. If the local result has more, the complete layout decides and is kept when it has fewer; a
+@@ -999,10 +1010,17 @@
+         && snapshot.route_conflicts.len() <= engine_choice::MAX_REROUTED_ROUTES
+         && snapshot.options.hierarchical_ordering
+     {
++        let phase = std::time::Instant::now();
+         let mut routed = reroute(&snapshot);
+         labels::decorate(&mut routed);
+         let mut repaired = finish(routed)?;
+         labels::decorate(&mut repaired);
++        eprintln!(
++            "PHASE secondRouting {:.1} conflicts {} -> {}",
++            phase.elapsed().as_secs_f64() * 1e3,
++            snapshot.route_conflicts.len(),
++            repaired.route_conflicts.len()
++        );
+         if repaired.route_conflicts.len() < snapshot.route_conflicts.len() {
+             snapshot = repaired;
+         }
+@@ -1112,7 +1130,13 @@
+     } else {
+         options.bus_roots.as_slice()
+     };
+-    if let Some((oriented, flipped, roots, _)) = bus_line::orient(graph, kept_roots) {
++    let phase = std::time::Instant::now();
++    let found = bus_line::orient(graph, kept_roots);
++    eprintln!(
++        "PHASE busRootsAgain {:.1} (part of firstLayout)",
++        phase.elapsed().as_secs_f64() * 1e3
++    );
++    if let Some((oriented, flipped, roots, _)) = found {
+         let mut snapshot = compute_mode_buses(&oriented, previous, dirty, optimize, options, run)?;
+         bus_line::restore(&mut snapshot, graph, &flipped);
+         snapshot.bus_taps.roots = roots;
