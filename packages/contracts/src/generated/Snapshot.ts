@@ -3,6 +3,7 @@ import type { BoundaryCrossing } from "./BoundaryCrossing";
 import type { BusLine } from "./BusLine";
 import type { BusTapLayout } from "./BusTapLayout";
 import type { CorridorGap } from "./CorridorGap";
+import type { CorridorPlan } from "./CorridorPlan";
 import type { EditReport } from "./EditReport";
 import type { GeometryIssue } from "./GeometryIssue";
 import type { Gesture } from "./Gesture";
@@ -32,6 +33,11 @@ layoutDiagnostics?: Array<string>,
  * Omitted when no corridor was widened.
  */
 corridorGaps?: Array<CorridorGap>,
+/**
+ * Provisional (`LayoutOptions::organic_corridors`, #156): the corridor plan of every organic area of the drawing the
+ * layout wrote. A report only; nothing reads it. Omitted without the option.
+ */
+corridorPlans?: Array<CorridorPlan>,
 /**
  * What an edit that laid out only part of the drawing did. Absent for a complete layout, so default output is unchanged.
  */

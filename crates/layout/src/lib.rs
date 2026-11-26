@@ -8,6 +8,7 @@ mod bus;
 mod bus_layout;
 mod bus_line;
 pub mod constructive;
+mod corridors;
 mod engine_choice;
 mod global;
 pub mod hierarchy_order;
@@ -641,6 +642,40 @@ pub fn expand_bus_lines(snapshot: &mut Snapshot) -> bool {
 }
 
 fn compute_counted_forced(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    let (mut snapshot, stages) = compute_chosen_forces(graph, previous, dirty, options)?;
+    report_corridors(&mut snapshot)?;
+    Ok((snapshot, stages))
+}
+
+/// Provisional (`organicCorridors`, #156): writes the corridor plan of every organic area onto a laid-out snapshot whose
+/// graph holds every node the router saw (bus lines as nodes). A report: it reads the drawing and changes nothing else.
+pub(crate) fn report_corridors(snapshot: &mut Snapshot) -> Result<(), String> {
+    snapshot.corridor_plans.clear();
+    if snapshot.options.organic_corridors.is_none() {
+        return Ok(());
+    }
+    let route_cost = corridors::route_cost(&snapshot.options)?;
+    let params = routing_params(&snapshot.options);
+    let distances = corridors::Distances {
+        clearance: params.clearance,
+        track: params.track,
+        // The router's stub at a port (`arqlet_routing` leaves a port at least this far).
+        stub: params.own_clearance.max(6.),
+        gap: snapshot
+            .options
+            .organic_gap
+            .map_or(organic::GAP, |gap| gap.max(organic::GAP)),
+    };
+    snapshot.corridor_plans = corridors::plan(snapshot, distances, route_cost);
+    Ok(())
+}
+
+fn compute_chosen_forces(
     graph: &Graph,
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
@@ -5861,6 +5896,7 @@ fn placed_snapshot(
         edit_report: None,
         area_orientations: orientations,
         area_strategies: Default::default(),
+        corridor_plans: Vec::new(),
         corridor_gaps: gaps
             .iter()
             .filter(|((a, b), _)| a < b)
@@ -10210,6 +10246,7 @@ fn assemble_with(
     let routed = routed_result.ok()?;
     let mut candidate = base.clone();
     candidate.boxes = boxes.clone();
+    candidate.corridor_plans.clear();
     candidate.routes = routed;
     finish_routes(&mut candidate, true);
     candidate.geometry_issues =
@@ -10377,6 +10414,7 @@ fn local_channel_candidate(
         }
         let mut candidate = base.clone();
         candidate.boxes = boxes.clone();
+        candidate.corridor_plans.clear();
         candidate.routes = routes;
         finish_routes(&mut candidate, true);
         candidate.geometry_issues =
@@ -10436,6 +10474,7 @@ pub fn preview_move(base: &Snapshot, node: &str, at: &Point) -> Snapshot {
         || {
             let mut moved = base.clone();
             moved.boxes = boxes;
+            moved.corridor_plans.clear();
             moved.layout_version = base.layout_version + 1;
             moved
         },
@@ -10489,6 +10528,7 @@ fn local_candidate(
     );
     let mut candidate = base.clone();
     candidate.boxes = boxes.clone();
+    candidate.corridor_plans.clear();
     candidate.routes = routes;
     finish_routes(&mut candidate, true);
     candidate.geometry_issues =

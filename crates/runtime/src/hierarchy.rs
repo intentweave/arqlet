@@ -253,6 +253,7 @@ fn compose(
     let (seed, seed_ports) = arqlet_layout::seed_drawing(graph, &boxes, options);
     let mut composed = base.clone();
     composed.boxes = boxes;
+    composed.corridor_plans.clear();
     composed.routes = seed;
     composed.resolved_ports = seed_ports;
     composed.labels = vec![];

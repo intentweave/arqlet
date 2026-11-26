@@ -127,6 +127,8 @@ pub fn refine_by_components(
 
     let mut composed = joint.clone();
     composed.boxes = pieces.iter().flat_map(|p| p.boxes.clone()).collect();
+    // The joint layout's corridor plan describes other boxes.
+    composed.corridor_plans.clear();
     composed.routes = pieces.iter().flat_map(|p| p.routes.clone()).collect();
     composed.resolved_ports = pieces
         .iter()

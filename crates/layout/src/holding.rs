@@ -239,6 +239,8 @@ fn dissolve(mut snapshot: Snapshot, graph: &Graph) -> Option<Snapshot> {
     for n in &mut snapshot.graph.nodes {
         n.parent_id = original.get(n.id.as_str()).copied()?.map(str::to_string);
     }
+    // The corridor plan was made with the holding containers as areas: made again on the drawing without them.
+    crate::report_corridors(&mut snapshot).ok()?;
     Some(snapshot)
 }
 

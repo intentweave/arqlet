@@ -15,6 +15,7 @@ import type { LevelOfDetail } from "./LevelOfDetail";
 import type { NodeSize } from "./NodeSize";
 import type { Objective } from "./Objective";
 import type { OrderHint } from "./OrderHint";
+import type { OrganicCorridors } from "./OrganicCorridors";
 import type { PackComponents } from "./PackComponents";
 import type { Point } from "./Point";
 import type { PortPlacement } from "./PortPlacement";
@@ -257,6 +258,12 @@ organicIterations?: number | null,
  * than the default leaves a route room to leave a node that faces a neighbour.
  */
 organicGap?: number | null,
+/**
+ * Provisional (#156, ADR 0020 amendment, step C1): report for every organic area the corridors between its boxes, the
+ * routes a plan would send through each and the gap each would need (`Snapshot::corridor_plans`). A measurement: the
+ * drawing is the same as without it. Omitted when unset, so default output does not change.
+ */
+organicCorridors?: OrganicCorridors | null,
 /**
  * Experimental (ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass, and in the
  * hierarchical pipeline it falls back to, a pinned node (leaf or container) of an area that flows left to right or top

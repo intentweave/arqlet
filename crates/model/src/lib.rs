@@ -583,6 +583,10 @@ pub struct Snapshot {
     /// Omitted when no corridor was widened.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub corridor_gaps: Vec<CorridorGap>,
+    /// Provisional (`LayoutOptions::organic_corridors`, #156): the corridor plan of every organic area of the drawing the
+    /// layout wrote. A report only; nothing reads it. Omitted without the option.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub corridor_plans: Vec<CorridorPlan>,
     /// What an edit that laid out only part of the drawing did. Absent for a complete layout, so default output is unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edit_report: Option<EditReport>,
@@ -2131,6 +2135,18 @@ impl CommunityHubs {
     }
 }
 
+/// Provisional (`LayoutOptions::organic_corridors`, #156): how the corridor plan of an organic area is made.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct OrganicCorridors {
+    /// What a route already planned in a corridor between two boxes costs the next route that enters it, in layout units
+    /// of length (default 1; 0 gives every route its shortest way). A finite value from 0 to 10000.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub route_cost: Option<f64>,
+}
+
 /// Experimental (`LayoutOptions::pack_components`): how the components of a container are packed.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2388,6 +2404,11 @@ pub struct LayoutOptions {
     /// than the default leaves a route room to leave a node that faces a neighbour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_gap: Option<f64>,
+    /// Provisional (#156, ADR 0020 amendment, step C1): report for every organic area the corridors between its boxes, the
+    /// routes a plan would send through each and the gap each would need (`Snapshot::corridor_plans`). A measurement: the
+    /// drawing is the same as without it. Omitted when unset, so default output does not change.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organic_corridors: Option<OrganicCorridors>,
     /// Experimental (ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass, and in the
     /// hierarchical pipeline it falls back to, a pinned node (leaf or container) of an area that flows left to right or top
     /// to bottom is a constraint of the arrangement: the pin chooses its rank and its order there and holds its place
@@ -2972,6 +2993,7 @@ impl Default for LayoutOptions {
             edge_routing: None,
             organic_iterations: None,
             organic_gap: None,
+            organic_corridors: None,
             pins_in_single_pass: false,
             vpsc_overlap_removal: false,
             directed_repair: false,
@@ -3539,6 +3561,121 @@ pub struct PublicationEnvelope {
     pub publication_version: u32,
     pub score: PublicationScore,
     pub archive: Vec<ArchiveSummary>,
+}
+
+/// Provisional (`LayoutOptions::organic_corridors`, #156): the corridor plan of one organic area, on the boxes the layout
+/// placed. Coordinates are in the area's frame, as `Snapshot::boxes`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct CorridorPlan {
+    /// The container's id, or `<root>`.
+    pub area: String,
+    /// The number of boxes (children of the area).
+    pub boxes: usize,
+    /// The distances a corridor's need is made of: the router's clearance from a box, the space between two routes, the
+    /// stub at a port, and the gap of a pair with no route between it.
+    pub clearance: f64,
+    pub track: f64,
+    pub stub: f64,
+    pub gap: f64,
+    /// What a route already in a corridor cost the next one (`OrganicCorridors::route_cost`).
+    pub route_cost: f64,
+    pub corridors: Vec<Corridor>,
+    /// The places where a corridor of one axis meets one of the other.
+    pub junctions: usize,
+    /// The planned way of every edge between two children, in the order of the edge ids.
+    pub routes: Vec<CorridorRoute>,
+    /// Edges of the area without a planned way, by reason.
+    pub skipped: CorridorSkipped,
+    /// The size of one constraint system per axis for nodes and route segments (the ADR's refinement of phases 3 and 4);
+    /// its node variables and node pairs alone are the system of a separation by demand.
+    pub x_system: CorridorSystem,
+    pub y_system: CorridorSystem,
+}
+
+/// The axis a corridor's width is measured on.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "lowercase")]
+pub enum CorridorAxis {
+    /// Between a box on the left and one on the right; its routes run along y.
+    #[default]
+    X,
+    /// Between a box above and one below; its routes run along x.
+    Y,
+}
+
+/// A free rectangle between two neighbouring boxes of an organic area (`CorridorPlan`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct Corridor {
+    pub axis: CorridorAxis,
+    /// The box on the left of it (axis `x`) or above it (axis `y`); absent at the outer edge of the area.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub before: Option<String>,
+    /// The box on the right of it or below it; absent at the outer edge of the area.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub after: Option<String>,
+    /// The free rectangle. Its extent on `axis` is the gap there is (not a bound at the outer edge, where the area can grow).
+    pub rect: Rect,
+    /// The planned routes that run along it.
+    pub demand: usize,
+    /// The planned route ends on a side of one of its two boxes that faces it.
+    pub ports: usize,
+    /// The gap it would need: with a route, the clearance on both sides, a track per route and a stub where a port faces
+    /// it, and never less than the gap; without a route, the gap.
+    pub need: f64,
+}
+
+/// The planned way of one edge through the corridors of its area (`CorridorPlan`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct CorridorRoute {
+    pub edge: String,
+    /// The side of the area's child that holds the source, and of the one that holds the target.
+    pub source_side: PortSide,
+    pub target_side: PortSide,
+    /// The corridors it runs along, as indices into `CorridorPlan::corridors`, in the order of its way.
+    pub corridors: Vec<usize>,
+    /// The planned way's length (an estimate over the junctions) and turns.
+    pub length: f64,
+    pub turns: usize,
+}
+
+/// Edges of an organic area that its corridor plan does not route.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct CorridorSkipped {
+    /// Loops of a child.
+    pub self_loops: usize,
+    /// Edges drawn straight.
+    pub straight: usize,
+    /// Edges with one end inside the area and one outside it.
+    pub leaving: usize,
+    /// No free way between the two ports (a box without room on any side, or overlapping boxes).
+    pub unrouted: usize,
+}
+
+/// The size of the constraint system of one axis (`CorridorPlan`): variables are the node positions and the interior
+/// route segments across the axis, constraints the separations between them.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub struct CorridorSystem {
+    pub node_variables: usize,
+    pub segment_variables: usize,
+    /// Distinct pairs of boxes with a corridor of this axis between them.
+    pub node_pairs: usize,
+    /// Distinct pairs of an interior segment and a box beside a corridor it runs along.
+    pub segment_node: usize,
+    /// Distinct pairs of interior segments next to each other in a corridor.
+    pub segment_pairs: usize,
 }
 
 /// The extra width of the corridor between two neighbouring siblings (see `Snapshot::corridor_gaps`).

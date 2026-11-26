@@ -217,6 +217,8 @@ pub fn refine_by_fixed_boundary(
         .map(|(id, r)| (id.clone(), r.clone()))
         .collect();
     composed.boxes.insert(container.clone(), frame);
+    // The whole layout's corridor plan describes other boxes.
+    composed.corridor_plans.clear();
     for (id, r) in &interior_snap.boxes {
         composed.boxes.insert(
             id.clone(),

@@ -4702,6 +4702,7 @@ mod tests {
             routing_issues: Vec::new(),
             layout_diagnostics: Vec::new(),
             corridor_gaps: Vec::new(),
+            corridor_plans: Vec::new(),
             edit_report: None,
             area_orientations: BTreeMap::new(),
             area_strategies: BTreeMap::new(),
