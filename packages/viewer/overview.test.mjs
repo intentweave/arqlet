@@ -483,6 +483,34 @@ test('the galaxy style draws glows for clusters and stars for leaves, edges in t
   assert.equal(galaxy.count.edges, plain.count.edges);
 });
 
+test('on a light background the galaxy style is ink: absorptions, darker stars, a dark selection', () => {
+  const m = overviewModel(overview);
+  const light = overviewBuffers(m, new Map(), new Set(), 0, {galaxy: true, tone: 'light'});
+  const dark = overviewBuffers(m, new Map(), new Set(), 0, {galaxy: true});
+  // The tone changes no geometry and nothing outside the galaxy style.
+  assert.deepEqual(Object.keys(light.count).map(k => light.count[k]), Object.keys(dark.count).map(k => dark.count[k]));
+  assert.deepEqual(overviewBuffers(m, new Map(), new Set(), 0, {tone: 'light'}).discs, overviewBuffers(m, new Map(), new Set(), 0).discs);
+  for (let k = 0; k < light.count.discs; k += 6) {
+    const at = k * SHAPE_STRIDE;
+    for (const offset of [0, 1, 2, 3, 10]) assert.equal(light.discs[at + offset], dark.discs[at + offset]);
+    const shown = [6, 7, 8].map(c => 1 - light.discs[at + c]);
+    const kind = light.discs[at + 10];
+    // A glow keeps its cluster's colour (stored as its complement); a star is darker than its glow, not brighter.
+    if (kind === 4) [6, 7, 8].forEach((c, j) => assert.ok(Math.abs(shown[j] - dark.discs[at + c]) < 1e-6));
+    if (kind === 5) [6, 7, 8].forEach((c, j) => assert.ok(shown[j] < dark.discs[at + c]));
+    // The selection ring: white on dark, near black on light (as an absorption close to 1).
+    if (kind === 1) {
+      assert.deepEqual([6, 7, 8].map(c => dark.discs[at + c]), [1, 1, 1]);
+      assert.ok(shown.every(v => v < 0.2));
+    }
+  }
+  // Edge colours are complements too.
+  for (let k = 0; k < light.count.edges; k++) {
+    const at = k * LINE_STRIDE;
+    [2, 3, 4].forEach(c => assert.ok(Math.abs(1 - light.edges[at + c] - dark.edges[at + c]) < 1e-6));
+  }
+});
+
 test('in the galaxy style a cluster is named in its middle on a tag of its colour', () => {
   const m = overviewModel(overview);
   const view = {centreX: 0, centreY: 0, scale: 10};

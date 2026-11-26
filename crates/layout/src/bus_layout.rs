@@ -279,7 +279,14 @@ pub(crate) fn collapse(
     }
     snapshot.straight_edges.dedup();
     snapshot.graph = graph.clone();
-    snapshot.options = options.clone();
+    // The options as requested, without the bus nodes' sizes and labels `expand` added. Which pipeline made the drawing
+    // stays as the layout wrote it: a single pass that fell back turns `singlePass` and `abstractRouting` off
+    // (`LayoutOptions::single_pass_auto`), and the refinement and later edits read them (#205).
+    snapshot.options = LayoutOptions {
+        abstract_routing: snapshot.options.abstract_routing,
+        single_pass: snapshot.options.single_pass,
+        ..options.clone()
+    };
     snapshot
 }
 

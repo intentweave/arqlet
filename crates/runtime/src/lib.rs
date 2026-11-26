@@ -1887,13 +1887,13 @@ pub fn configure_snapshot(
     recompute_with(snapshot, &options)
 }
 
-/// A drag of one node on a drawing that single pass made (`single_pass_auto`). Its steps move the node
-/// and route again only what the move touches (its edges, and the routes into its old or new box), as a preview, so that
-/// the edges follow the node and the drawing stays a single-pass one (`arqlet_layout::preview_move`). A release turns the drop into an order hint: the node
-/// stands after the sibling whose place across the flow is before the drop's, in its rank, and the layout is made again
-/// with single pass. A finish without release pins the node where it was dropped, which leaves single pass (unless
-/// `pinsInSinglePass` takes the pin). A cancel puts
-/// the node back. `None` for every other gesture, which the pins handle.
+/// A drag of one node on a drawing that single pass made (`single_pass_auto`), or on one with backbone buses that fell
+/// back from it (`arqlet_layout::retries_single_pass`): the pipeline that drew that one keeps a drop's order too (#205). Its steps move the node and route again only what the move touches (its edges, and the routes into its old or
+/// new box), as a preview, so that the edges follow the node and the drawing stays as it was made
+/// (`arqlet_layout::preview_move`). A release turns the drop into an order hint: the node stands after the sibling whose
+/// place across the flow is before the drop's, in its rank, and the layout is made again. A finish without release pins
+/// the node where it was dropped, which leaves single pass (unless `pinsInSinglePass` takes the pin). A cancel puts the
+/// node back. `None` for every other gesture, which the pins handle.
 fn move_on_single_pass(snapshot: &Snapshot, step: &MoveStep) -> Option<Result<Snapshot, String>> {
     let options = &snapshot.options;
     let active = snapshot.gesture.as_ref().filter(|g| g.active);
@@ -1913,10 +1913,9 @@ fn move_on_single_pass(snapshot: &Snapshot, step: &MoveStep) -> Option<Result<Sn
     };
     match step.phase {
         MovePhase::Begin => {
-            if !(options.single_pass && options.single_pass_auto)
-                || !step.others.is_empty()
-                || active.is_some()
-            {
+            let takes = (options.single_pass && options.single_pass_auto)
+                || arqlet_layout::retries_single_pass(snapshot);
+            if !takes || !step.others.is_empty() || active.is_some() {
                 return None;
             }
             Some((|| {
@@ -4196,15 +4195,17 @@ pub fn dispatch_streaming(input: &str, publish: &mut dyn FnMut(&str)) -> String 
             .as_u64()
             .unwrap_or(1)
             .clamp(1, MAX_THREADS as u64) as usize;
-        let snapshot: Snapshot =
+        let mut snapshot: Snapshot =
             serde_json::from_value(v["snapshot"].clone()).map_err(|e| e.to_string())?;
+        // As `protocol::handle` does for every operation: the layout sees a bus line as a node, the answers give the view.
+        arqlet_layout::expand_bus_lines(&mut snapshot);
         let expected = v["expectedRevision"]
             .as_u64()
             .ok_or("Missing expectedRevision")?;
         let version = v["expectedLayoutVersion"]
             .as_u64()
             .ok_or("Missing expectedLayoutVersion")?;
-        let (refined, _) = refine_snapshot_progressive(
+        let (mut refined, _) = refine_snapshot_progressive(
             &job_id,
             &snapshot,
             expected,
@@ -4226,7 +4227,11 @@ pub fn dispatch_streaming(input: &str, publish: &mut dyn FnMut(&str)) -> String 
                         base_layout_version: p.input.base_layout_version,
                         options_key: p.input.options_key.clone(),
                     },
-                    snapshot: p.snapshot.clone(),
+                    snapshot: {
+                        let mut view = p.snapshot.clone();
+                        arqlet_layout::apply_bus_lines(&mut view);
+                        view
+                    },
                     publication_version: execution::PUBLICATION_VERSION,
                     score: arqlet_model::PublicationScore {
                         quality_version: arqlet_scene::quality::QUALITY_VERSION,
@@ -4248,6 +4253,7 @@ pub fn dispatch_streaming(input: &str, publish: &mut dyn FnMut(&str)) -> String 
                 publish(&message.to_string());
             },
         )?;
+        arqlet_layout::apply_bus_lines(&mut refined);
         Ok(refined)
     })();
     match result {
