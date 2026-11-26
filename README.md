@@ -10,9 +10,9 @@ Arqlet is an incremental graph-layout engine in Rust. It lays out nested graphs
 with ports, routes their edges and keeps the layout up to date as the graph
 changes. The same engine runs natively and in the browser via WebAssembly.
 
-> **Status: prototype (engine `0.9.0`).** Arqlet works end to end and is
+> **Status: prototype (engine `0.10.0`).** Arqlet works end to end and is
 > tested, but every API, the JSON protocol and the snapshot format are
-> provisional and may change in any release. Version 0.9.0 is on
+> provisional and may change in any release. Version 0.10.0 is on
 > [crates.io](https://crates.io/crates/arqlet) and [npm](https://www.npmjs.com/package/arqlet). Large graphs (100K+ nodes) are a goal, not a measured result.
 
 Arqlet was developed under the working name Layerweave. Measurement records in
@@ -115,7 +115,7 @@ depend on the Git repository instead):
 
 ```toml
 [dependencies]
-arqlet = "0.9"
+arqlet = "0.10"
 ```
 
 ```rust
