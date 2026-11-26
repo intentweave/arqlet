@@ -172,6 +172,14 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
   const opened=await runInNewContext(`edit({op:'restore'},{via:()=>viewController.openBookmark(${JSON.stringify(bookmark)})})`,context);await settle();
   assert.equal(opened.ok,true,JSON.stringify(opened));
   assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'the bookmark restores the view');
+  // The compact form, as the view link keeps it: short text, opened by the controller as it is.
+  const compact=await runInNewContext('viewController.compactBookmark()',context);
+  assert.match(compact.text??'',/^b1\.[A-Za-z0-9_-]+$/,JSON.stringify(compact));
+  await get('undo').onclick();await settle();
+  assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),false);
+  const linked=await runInNewContext(`edit({op:'restore'},{via:()=>viewController.openBookmark(${JSON.stringify(compact.text)})})`,context);await settle();
+  assert.equal(linked.ok,true,JSON.stringify(linked));
+  assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'the compact bookmark restores the view');
   console.log('Search, focus and bookmarks passed: a hidden node found, focused, and a kept view opened again.');
   // Query (provisional, the engine's `query`): a node found by id lists its row, "Select all" selects the box that shows
   // it, and a click on the row focuses it.
