@@ -261,7 +261,8 @@ pub(crate) fn hold(
         hold_memberships: false,
         ..options.clone()
     };
-    let lay = |g: &Graph| compute_counted_unclocked(g, None, &BTreeSet::new(), &plain);
+    // Layouts compared with one another (`compute_compared`).
+    let lay = |g: &Graph| compute_counted_unclocked(g, None, &BTreeSet::new(), &plain, true);
     let (mut best, stages) = lay(graph)?;
     let found = candidates(graph, options);
     let finish = |mut snapshot: Snapshot,
@@ -534,7 +535,7 @@ pub(crate) fn resume(
         })
         .collect();
     let held = (!enclosed.is_empty())
-        .then(|| compute_counted_unclocked(&working, Some(&earlier), &redo, plain).ok())
+        .then(|| compute_counted_unclocked(&working, Some(&earlier), &redo, plain, true).ok())
         .flatten()
         .and_then(|(s, stages)| Some((dissolve(s, graph)?, stages)));
     let (mut snapshot, stages) = match held {
@@ -542,7 +543,7 @@ pub(crate) fn resume(
         None => {
             let mut redo = dirty.clone();
             redo.extend(owners(previous));
-            compute_counted_unclocked(graph, Some(previous), &redo, plain)?
+            compute_counted_unclocked(graph, Some(previous), &redo, plain, true)?
         }
     };
     kept(&mut snapshot, options, &previous.held_groups);

@@ -89,7 +89,7 @@ pub fn refine_by_components(
             buses: Vec::new(),
             memberships: Default::default(),
         };
-        let laid = arqlet_layout::compute(&sub, None, &no_dirty, options)?;
+        let laid = arqlet_layout::compute_compared(&sub, None, &no_dirty, options)?;
         let (mut refined, _, _) =
             refine_snapshot_logged(&laid, laid.revision, laid.layout_version, 1, None)?;
         let strategy = refined
@@ -120,7 +120,7 @@ pub fn refine_by_components(
     }
 
     // The joint layout of the whole graph is the comparison, and it supplies the fields the composition shares with it.
-    let joint = arqlet_layout::compute(graph, None, &no_dirty, options)?;
+    let joint = arqlet_layout::compute_compared(graph, None, &no_dirty, options)?;
     let (joint, _, _) =
         refine_snapshot_logged(&joint, joint.revision, joint.layout_version, 1, None)?;
     let joint_key = arqlet_layout::published_key(&joint).ok();

@@ -55,6 +55,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Changed
 
+- **Bus lines, faster:** where every bus of a view is drawn as lines (no bar left), the routes of the taps that run
+  through boxes are no longer routed a second time; nothing draws or reads them (#150). A generated view with its
+  one-bus containers collapsed imported in up to 5.5 times the time of the open view; it no longer pays for that pass
+  (`benchmarks/results/bus-collapse-20261126.md`). The drawing is unchanged. `busTaps` (the routes, ports and border
+  crossings kept for the taps) and `recomputedContainers` can differ, and so can one line of `layoutDiagnostics`
+  ("Engine choice not tried"), which stays where that pass had left no route through a box. Views with bars are laid out
+  as before, and stay slower collapsed than open.
+- `arqlet-layout` (Rust): `compute_compared`, the layout for a drawing that is compared with another one.
 - `openBookmark(bookmark, {force: true})` of another graph's long-form bookmark restores what the graph has and reports
   the rest (`missing`, `ignored`); before, one unknown id refused the whole restore. `openBookmark` also takes text.
 - Membership hulls (provisional, ADR 0022): members that left a group's box are joined to it by a hull only where the hull
@@ -78,6 +86,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   ("unknown node"): containers that only the view has are accepted.
 - `refine` panicked on a view with buses given as data where one bus is drawn as lines and another as a bar (organic,
   `busStyle: "lines"`; #197). An operation now takes back only what the layout had kept for the taps of the bars.
+- Import and every later operation panicked (a resident session ended) on a view with a bus line where an edge or a tap
+  leaves an organic, radial, tree or octilinear container of a layered area (`regionPorts`, the default; #204): the two
+  layouts that place the border ports took the bus nodes out of the graph a second time. With `hubRefs` the same repeated
+  step could take a region's box for a hub, so that the edges of its nodes were neither drawn nor listed as references,
+  and it dropped the room between the ranks for the stubs whenever an edge left a region; such views are drawn
+  differently now.
 - **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that

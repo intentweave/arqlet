@@ -1,0 +1,581 @@
+{
+ "kind": "elk-layerers",
+ "pose": "uniform",
+ "limit": 150,
+ "arms": [
+  [
+   "default",
+   {}
+  ],
+  [
+   "minWidth",
+   {
+    "elk.layered.layering.strategy": "MIN_WIDTH"
+   }
+  ],
+  [
+   "stretchWidth",
+   {
+    "elk.layered.layering.strategy": "STRETCH_WIDTH"
+   }
+  ]
+ ],
+ "rows": [
+  {
+   "name": "activity-order",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 36,
+    "bends": 90,
+    "length": 29218,
+    "width": 1636,
+    "height": 992,
+    "area": 1622912,
+    "ms": 13.7
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 32,
+    "bends": 84,
+    "length": 31668,
+    "width": 1366,
+    "height": 1150,
+    "area": 1570900,
+    "ms": 6.4
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 30,
+    "bends": 90,
+    "length": 40111,
+    "width": 1494,
+    "height": 1618,
+    "area": 2417292,
+    "ms": 8.2
+   }
+  },
+  {
+   "name": "arqlet-pipeline",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 5,
+    "bends": 56,
+    "length": 17420,
+    "width": 1404,
+    "height": 1394,
+    "area": 1957176,
+    "ms": 10.1
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 3,
+    "bends": 46,
+    "length": 12435,
+    "width": 1170,
+    "height": 1428,
+    "area": 1670760,
+    "ms": 6
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 2,
+    "bends": 46,
+    "length": 13250,
+    "width": 1205,
+    "height": 1640,
+    "area": 1976200,
+    "ms": 9.9
+   }
+  },
+  {
+   "name": "bpmn-pools",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 4,
+    "bends": 32,
+    "length": 14326,
+    "width": 2576,
+    "height": 331,
+    "area": 852656,
+    "ms": 7.6
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 4,
+    "bends": 34,
+    "length": 16679,
+    "width": 3210,
+    "height": 331,
+    "area": 1062510,
+    "ms": 6.9
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 4,
+    "bends": 34,
+    "length": 19501,
+    "width": 3800,
+    "height": 271,
+    "area": 1029800,
+    "ms": 8.4
+   }
+  },
+  {
+   "name": "can-bus",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 5,
+    "bends": 30,
+    "length": 4133,
+    "width": 1058,
+    "height": 675,
+    "area": 714150,
+    "ms": 7
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 6,
+    "bends": 30,
+    "length": 5374,
+    "width": 1134,
+    "height": 694,
+    "area": 786996,
+    "ms": 5.9
+   },
+   "stretchWidth": {
+    "failed": "did not finish within 90 s"
+   }
+  },
+  {
+   "name": "cloud-architecture",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 18,
+    "bends": 106,
+    "length": 28056,
+    "width": 3101,
+    "height": 608,
+    "area": 1884168,
+    "ms": 8.2
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 24,
+    "bends": 108,
+    "length": 33176,
+    "width": 3340,
+    "height": 819,
+    "area": 2735460,
+    "ms": 8.5
+   },
+   "stretchWidth": {
+    "failed": "did not finish within 90 s"
+   }
+  },
+  {
+   "name": "deployment-cluster",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 71,
+    "bends": 162,
+    "length": 46566,
+    "width": 1348,
+    "height": 1730,
+    "area": 2332040,
+    "ms": 10.8
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 63,
+    "bends": 156,
+    "length": 45771,
+    "width": 1613,
+    "height": 1778,
+    "area": 2867640,
+    "ms": 18.4
+   },
+   "stretchWidth": {
+    "failed": "did not finish within 90 s"
+   }
+  },
+  {
+   "name": "er-diagram",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 14,
+    "length": 2520,
+    "width": 886,
+    "height": 1540,
+    "area": 1364440,
+    "ms": 5
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 16,
+    "length": 4786,
+    "width": 2688,
+    "height": 567,
+    "area": 1523827,
+    "ms": 6.2
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 16,
+    "length": 8605,
+    "width": 4602,
+    "height": 496,
+    "area": 2282592,
+    "ms": 15
+   }
+  },
+  {
+   "name": "layerweave-code",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 880,
+    "bends": 1214,
+    "length": 1137691,
+    "width": 8423,
+    "height": 5651,
+    "area": 47602004,
+    "ms": 187.2
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 804,
+    "bends": 1358,
+    "length": 2137173,
+    "width": 19197,
+    "height": 6150,
+    "area": 118051952,
+    "ms": 636
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 845,
+    "bends": 1274,
+    "length": 1466190,
+    "width": 12113,
+    "height": 6121,
+    "area": 74149383,
+    "ms": 441.9
+   }
+  },
+  {
+   "name": "mixed-large",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 625,
+    "bends": 368,
+    "length": 322176,
+    "width": 5201,
+    "height": 3181,
+    "area": 16544381,
+    "ms": 61.6
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 636,
+    "bends": 366,
+    "length": 358132,
+    "width": 5611,
+    "height": 3769,
+    "area": 21147859,
+    "ms": 16.9
+   },
+   "stretchWidth": {
+    "failed": "did not finish within 90 s"
+   }
+  },
+  {
+   "name": "network-vlan",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 28,
+    "bends": 94,
+    "length": 52067,
+    "width": 3392,
+    "height": 939,
+    "area": 3185088,
+    "ms": 4.9
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 30,
+    "bends": 104,
+    "length": 58853,
+    "width": 3457,
+    "height": 1102,
+    "area": 3809063,
+    "ms": 5.1
+   },
+   "stretchWidth": {
+    "failed": "did not finish within 90 s"
+   }
+  },
+  {
+   "name": "org-chart",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 23,
+    "bends": 148,
+    "length": 63288,
+    "width": 5660,
+    "height": 1846,
+    "area": 10448360,
+    "ms": 12.6
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 23,
+    "bends": 148,
+    "length": 63288,
+    "width": 5660,
+    "height": 1846,
+    "area": 10448360,
+    "ms": 12.8
+   },
+   "stretchWidth": {
+    "failed": "did not finish within 90 s"
+   }
+  },
+  {
+   "name": "petri-net",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 58,
+    "bends": 66,
+    "length": 10769,
+    "width": 940,
+    "height": 691,
+    "area": 649916,
+    "ms": 3.2
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 46,
+    "bends": 72,
+    "length": 18150,
+    "width": 1510,
+    "height": 628,
+    "area": 948280,
+    "ms": 4.3
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 35,
+    "bends": 82,
+    "length": 29425,
+    "width": 2530,
+    "height": 666,
+    "area": 1684980,
+    "ms": 5.4
+   }
+  },
+  {
+   "name": "state-order",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 16,
+    "length": 1792,
+    "width": 1629,
+    "height": 170,
+    "area": 276930,
+    "ms": 2.6
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 16,
+    "length": 1792,
+    "width": 1629,
+    "height": 170,
+    "area": 276930,
+    "ms": 2.4
+   },
+   "stretchWidth": {
+    "failed": "did not finish within 90 s"
+   }
+  },
+  {
+   "name": "state-tcp",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 30,
+    "length": 7279,
+    "width": 1640,
+    "height": 189,
+    "area": 310147,
+    "ms": 2.2
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 30,
+    "length": 7612,
+    "width": 1640,
+    "height": 226,
+    "area": 370827,
+    "ms": 2.2
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 30,
+    "length": 7612,
+    "width": 1640,
+    "height": 226,
+    "area": 370827,
+    "ms": 2.2
+   }
+  },
+  {
+   "name": "synthetic-2k",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 3660,
+    "bends": 1558,
+    "length": 1559571,
+    "width": 15816,
+    "height": 4595,
+    "area": 72676892,
+    "ms": 44.4
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 3537,
+    "bends": 1650,
+    "length": 1843491,
+    "width": 23178,
+    "height": 4125,
+    "area": 95599979,
+    "ms": 54.3
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 3714,
+    "bends": 1632,
+    "length": 1909486,
+    "width": 20581,
+    "height": 4402,
+    "area": 90602854,
+    "ms": 55
+   }
+  },
+  {
+   "name": "uml-class",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 2,
+    "bends": 38,
+    "length": 9413,
+    "width": 1610,
+    "height": 626,
+    "area": 1007860,
+    "ms": 4.4
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 2,
+    "bends": 42,
+    "length": 9880,
+    "width": 954,
+    "height": 1758,
+    "area": 1677718,
+    "ms": 4.8
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 2,
+    "bends": 40,
+    "length": 10013,
+    "width": 1384,
+    "height": 1124,
+    "area": 1555616,
+    "ms": 4.5
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 278,
+    "bends": 434,
+    "length": 84680,
+    "width": 3552,
+    "height": 1028,
+    "area": 3649680,
+    "ms": 12.4
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 332,
+    "bends": 464,
+    "length": 105049,
+    "width": 5292,
+    "height": 729,
+    "area": 3857868,
+    "ms": 14.3
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 355,
+    "bends": 500,
+    "length": 222058,
+    "width": 11012,
+    "height": 727,
+    "area": 8005724,
+    "ms": 22.6
+   }
+  }
+ ]
+}

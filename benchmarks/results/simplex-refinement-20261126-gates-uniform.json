@@ -1,0 +1,751 @@
+{
+ "kind": "option-gates",
+ "pose": "uniform",
+ "limit": 150,
+ "refine": true,
+ "arms": [
+  [
+   "default",
+   {}
+  ],
+  [
+   "simplexRanksCandidate",
+   {
+    "simplexRanksCandidate": true
+   }
+  ]
+ ],
+ "rows": [
+  {
+   "name": "activity-order",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 14,
+    "bends": 82,
+    "length": 14583,
+    "width": 1746,
+    "height": 982,
+    "area": 1714572,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 7.2,
+    "refineMs": 4,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 14,
+    "bends": 82,
+    "length": 14583,
+    "width": 1746,
+    "height": 982,
+    "area": 1714572,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.6,
+    "refineMs": 7.9,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 36,
+    "bends": 90,
+    "length": 29218,
+    "width": 1636,
+    "height": 992,
+    "area": 1622912
+   }
+  },
+  {
+   "name": "arqlet-pipeline",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 5,
+    "bends": 64,
+    "length": 15681,
+    "width": 1725,
+    "height": 1936,
+    "area": 3339600,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.5,
+    "refineMs": 3.5,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 5,
+    "bends": 64,
+    "length": 15681,
+    "width": 1725,
+    "height": 1936,
+    "area": 3339600,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.4,
+    "refineMs": 8.2,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 5,
+    "bends": 56,
+    "length": 17420,
+    "width": 1404,
+    "height": 1394,
+    "area": 1957176
+   }
+  },
+  {
+   "name": "bpmn-pools",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 30,
+    "length": 8213,
+    "width": 2626,
+    "height": 519,
+    "area": 1362894,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 5.2,
+    "refineMs": 3,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 30,
+    "length": 8213,
+    "width": 2626,
+    "height": 519,
+    "area": 1362894,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 5.3,
+    "refineMs": 6.2,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 4,
+    "bends": 32,
+    "length": 14326,
+    "width": 2576,
+    "height": 331,
+    "area": 852656
+   }
+  },
+  {
+   "name": "can-bus",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 6,
+    "bends": 40,
+    "length": 8681,
+    "width": 1245,
+    "height": 986,
+    "area": 1227570,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 4.2,
+    "refineMs": 2.8,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 6,
+    "bends": 40,
+    "length": 8681,
+    "width": 1245,
+    "height": 986,
+    "area": 1227570,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 4.3,
+    "refineMs": 5.1,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 5,
+    "bends": 30,
+    "length": 4133,
+    "width": 1058,
+    "height": 675,
+    "area": 714150
+   }
+  },
+  {
+   "name": "cloud-architecture",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 14,
+    "bends": 98,
+    "length": 33758,
+    "width": 3632,
+    "height": 1170,
+    "area": 4249440,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 8.3,
+    "refineMs": 3.9,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 14,
+    "bends": 98,
+    "length": 33758,
+    "width": 3632,
+    "height": 1170,
+    "area": 4249440,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 8.1,
+    "refineMs": 9.7,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 18,
+    "bends": 106,
+    "length": 28056,
+    "width": 3101,
+    "height": 608,
+    "area": 1884168
+   }
+  },
+  {
+   "name": "deployment-cluster",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 96,
+    "bends": 212,
+    "length": 58226,
+    "width": 1769,
+    "height": 2248,
+    "area": 3977274,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 11.3,
+    "refineMs": 4.7,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 87,
+    "bends": 202,
+    "length": 52644,
+    "width": 1942,
+    "height": 2126,
+    "area": 4128161,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 11.1,
+    "refineMs": 13.9,
+    "strategy": "simplex-ranks"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 71,
+    "bends": 162,
+    "length": 46566,
+    "width": 1348,
+    "height": 1730,
+    "area": 2332040
+   }
+  },
+  {
+   "name": "er-diagram",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 15,
+    "length": 3079,
+    "width": 1146,
+    "height": 1502,
+    "area": 1720719,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 4.1,
+    "refineMs": 2.7,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 15,
+    "length": 3079,
+    "width": 1146,
+    "height": 1502,
+    "area": 1720719,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 4,
+    "refineMs": 4.7,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 14,
+    "length": 2520,
+    "width": 886,
+    "height": 1540,
+    "area": 1364440
+   }
+  },
+  {
+   "name": "layerweave-code",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1473,
+    "bends": 1171,
+    "length": 1401725,
+    "width": 7712,
+    "height": 11206,
+    "area": 86418744,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 69.9,
+    "refineMs": 23.3,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1473,
+    "bends": 1171,
+    "length": 1401725,
+    "width": 7712,
+    "height": 11206,
+    "area": 86418744,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 69.1,
+    "refineMs": 89.4,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 880,
+    "bends": 1214,
+    "length": 1137691,
+    "width": 8423,
+    "height": 5651,
+    "area": 47602004
+   }
+  },
+  {
+   "name": "mixed-large",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 531,
+    "bends": 421,
+    "length": 276653,
+    "width": 5223,
+    "height": 5369,
+    "area": 28044246,
+    "singlePass": true,
+    "delegated": 16,
+    "ms": 58.7,
+    "refineMs": 9,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 531,
+    "bends": 421,
+    "length": 276653,
+    "width": 5223,
+    "height": 5369,
+    "area": 28044246,
+    "singlePass": true,
+    "delegated": 16,
+    "ms": 58,
+    "refineMs": 57.7,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 625,
+    "bends": 368,
+    "length": 322176,
+    "width": 5201,
+    "height": 3181,
+    "area": 16544381
+   }
+  },
+  {
+   "name": "network-vlan",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 24,
+    "bends": 110,
+    "length": 53703,
+    "width": 3864,
+    "height": 1120,
+    "area": 4327680,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.5,
+    "refineMs": 3.5,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 24,
+    "bends": 110,
+    "length": 53703,
+    "width": 3864,
+    "height": 1120,
+    "area": 4327680,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.4,
+    "refineMs": 7.9,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 28,
+    "bends": 94,
+    "length": 52067,
+    "width": 3392,
+    "height": 939,
+    "area": 3185088
+   }
+  },
+  {
+   "name": "org-chart",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 29,
+    "bends": 172,
+    "length": 75978,
+    "width": 5820,
+    "height": 3418,
+    "area": 19892760,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 14.6,
+    "refineMs": 6.2,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 16,
+    "bends": 174,
+    "length": 72511,
+    "width": 3993,
+    "height": 3348,
+    "area": 13368564,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 14.5,
+    "refineMs": 19.3,
+    "strategy": "simplex-ranks"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 23,
+    "bends": 148,
+    "length": 63288,
+    "width": 5660,
+    "height": 1846,
+    "area": 10448360
+   }
+  },
+  {
+   "name": "petri-net",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 32,
+    "bends": 84,
+    "length": 24174,
+    "width": 1734,
+    "height": 801,
+    "area": 1388934,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.4,
+    "refineMs": 3.4,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 27,
+    "bends": 72,
+    "length": 14695,
+    "width": 1756,
+    "height": 795,
+    "area": 1396020,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.3,
+    "refineMs": 6.7,
+    "strategy": "simplex-ranks"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 58,
+    "bends": 66,
+    "length": 10769,
+    "width": 940,
+    "height": 691,
+    "area": 649916
+   }
+  },
+  {
+   "name": "state-order",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 19,
+    "length": 2002,
+    "width": 1772,
+    "height": 225,
+    "area": 398700,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3,
+    "refineMs": 2.3,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 19,
+    "length": 2002,
+    "width": 1772,
+    "height": 225,
+    "area": 398700,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3,
+    "refineMs": 3.4,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 16,
+    "length": 1792,
+    "width": 1629,
+    "height": 170,
+    "area": 276930
+   }
+  },
+  {
+   "name": "state-tcp",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 26,
+    "length": 5286,
+    "width": 1698,
+    "height": 210,
+    "area": 356580,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3.2,
+    "refineMs": 2.4,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 26,
+    "length": 5286,
+    "width": 1698,
+    "height": 210,
+    "area": 356580,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3.4,
+    "refineMs": 3.9,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 30,
+    "length": 7279,
+    "width": 1640,
+    "height": 189,
+    "area": 310147
+   }
+  },
+  {
+   "name": "synthetic-2k",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1789,
+    "bends": 1358,
+    "length": 838538,
+    "width": 15082,
+    "height": 6232,
+    "area": 93987254,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 148.9,
+    "refineMs": 28,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1753,
+    "bends": 1424,
+    "length": 727324,
+    "width": 15098,
+    "height": 5700,
+    "area": 86064262,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 150.7,
+    "refineMs": 191.5,
+    "strategy": "simplex-ranks"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 3660,
+    "bends": 1558,
+    "length": 1559571,
+    "width": 15816,
+    "height": 4595,
+    "area": 72676892
+   }
+  },
+  {
+   "name": "uml-class",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 37,
+    "length": 8440,
+    "width": 1730,
+    "height": 1520,
+    "area": 2628840,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.2,
+    "refineMs": 3.5,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 39,
+    "length": 6562,
+    "width": 1752,
+    "height": 1508,
+    "area": 2642016,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6,
+    "refineMs": 7.6,
+    "strategy": "simplex-ranks"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 2,
+    "bends": 38,
+    "length": 9413,
+    "width": 1610,
+    "height": 626,
+    "area": 1007860
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 230,
+    "bends": 300,
+    "length": 44324,
+    "width": 2756,
+    "height": 1098,
+    "area": 3026088,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 17.2,
+    "refineMs": 7.3,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 230,
+    "bends": 300,
+    "length": 44324,
+    "width": 2756,
+    "height": 1098,
+    "area": 3026088,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 17,
+    "refineMs": 22,
+    "strategy": "keep-existing"
+   },
+   "elkRs": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 278,
+    "bends": 434,
+    "length": 84680,
+    "width": 3552,
+    "height": 1028,
+    "area": 3649680
+   }
+  }
+ ]
+}

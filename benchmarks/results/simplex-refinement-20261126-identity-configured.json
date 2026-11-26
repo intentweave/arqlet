@@ -1,0 +1,172 @@
+{
+ "kind": "simplex-refinement",
+ "pose": "native",
+ "limit": 150,
+ "baseline": true,
+ "rows": [
+  {
+   "name": "activity-order",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "arqlet-pipeline",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "bpmn-pools",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 17,
+    "kept": 17,
+    "better": 15,
+    "equal": 2,
+    "worse": 0,
+    "areaKept": 32760303.5,
+    "areaDefault": 31341753,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "can-bus",
+   "baseline": true,
+   "error": "Routing completion requires the legacy router and unbundled default orthogonal routing",
+   "sameError": true
+  },
+  {
+   "name": "cloud-architecture",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 24,
+    "kept": 24,
+    "better": 15,
+    "equal": 1,
+    "worse": 8,
+    "areaKept": 99974765.25937499,
+    "areaDefault": 94479164.75937499,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "deployment-cluster",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "er-diagram",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "layerweave-code",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "mixed-large",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": false
+  },
+  {
+   "name": "network-vlan",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "org-chart",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "petri-net",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 12,
+    "kept": 12,
+    "better": 12,
+    "equal": 0,
+    "worse": 0,
+    "areaKept": 18231744,
+    "areaDefault": 17725689,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "state-order",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "state-tcp",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "synthetic-2k",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "uml-class",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "workflow-dag",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  }
+ ]
+}
