@@ -1,15 +1,16 @@
 // A synthetic bus view (#149): `units` nodes on `buses` buses given as data (each unit on 1 to 3 buses, seeded), as an
 // import request for `layout-command`. Public and deterministic.
 //
-// Usage: node benchmarks/experiments/bus-mesh.mjs UNITS BUSES [organic|layered] [lines|bar] [CHILDREN EDGES] > request.json
+// Usage: node benchmarks/experiments/bus-mesh.mjs UNITS BUSES [organic|layered] [lines|bar] [CHILDREN EDGES [SEED]]
+//        > request.json
 //
 // With CHILDREN and EDGES, a drill-down into the first bus (#156): CHILDREN nodes under up to 11 of its members, and
 // EDGES edges from those children to the other members (as frames to their receivers). With BUSES 0 there is no bus
-// and the children go under the first 11 units.
+// and the children go under the first 11 units. SEED (default 7) chooses the memberships of the units.
 const [units, nbus] = [Number(process.argv[2] ?? 100), Number(process.argv[3] ?? 30)];
 const strategy = process.argv[4] ?? 'organic';
 const style = process.argv[5] ?? 'lines';
-let seed = 7;
+let seed = Number(process.argv[8] ?? 7);
 const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
 const nodes = [];
 const buses = [];
