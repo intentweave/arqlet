@@ -1,0 +1,43 @@
+diff -ru a/crates/routing/src/lib.rs b/crates/routing/src/lib.rs
+--- a/crates/routing/src/lib.rs	2026-11-26 18:07:27
++++ b/crates/routing/src/lib.rs	2026-11-26 18:07:27
+@@ -1975,7 +1975,21 @@
+     counters: &mut channel::SearchCounters,
+ ) -> Option<Route> {
+     let before = counters.legacy_grid_pops;
+-    let found = grid_route_search(route, obstacles, own, own_clearance, counters);
++    let found = grid_route_search(route, obstacles, own, own_clearance, GRID_LIMIT, counters);
++    // Experiment (#156): every repair, and for a failed one whether a way exists on the grid of the whole view.
++    let unbounded = if found.is_none() {
++        let mut spare = channel::SearchCounters::default();
++        grid_route_search(route, obstacles, own, own_clearance, usize::MAX, &mut spare).is_some()
++    } else {
++        true
++    };
++    eprintln!(
++        "EXP\t{}\t{}\t{}\t{}",
++        route.id,
++        obstacles.len(),
++        u8::from(found.is_some()),
++        u8::from(unbounded)
++    );
+     *counters
+         .legacy_grid_pops_by_route
+         .entry(route.id.clone())
+@@ -1988,6 +2002,7 @@
+     obstacles: &[&Outline],
+     own: &[bool],
+     own_clearance: f64,
++    limit: usize,
+     counters: &mut channel::SearchCounters,
+ ) -> Option<Route> {
+     if route.points.len() < 2 {
+@@ -2111,7 +2126,7 @@
+         (xs, ys)
+     };
+     let (xs, ys) = lines(None);
+-    if xs.len().checked_mul(ys.len())? <= GRID_LIMIT {
++    if xs.len().checked_mul(ys.len())? <= limit {
+         return search_grid(route, obstacles, start, end, (&a, &b), xs, ys, counters);
+     }
+     // The whole view gives more grid lines than the search can hold. Before the route is given up, the lines are taken only from

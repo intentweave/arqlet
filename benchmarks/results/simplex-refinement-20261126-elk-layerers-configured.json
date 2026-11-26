@@ -1,0 +1,325 @@
+{
+ "kind": "elk-layerers",
+ "pose": "native",
+ "limit": 150,
+ "arms": [
+  [
+   "default",
+   {}
+  ],
+  [
+   "minWidth",
+   {
+    "elk.layered.layering.strategy": "MIN_WIDTH"
+   }
+  ],
+  [
+   "stretchWidth",
+   {
+    "elk.layered.layering.strategy": "STRETCH_WIDTH"
+   }
+  ]
+ ],
+ "rows": [
+  {
+   "name": "activity-order",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e2 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e2 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e2 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "arqlet-pipeline",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "bpmn-pools",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "can-bus",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e12 could not be found in the current layout scope. A"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e12 could not be found in the current layout scope. A"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e12 could not be found in the current layout scope. A"
+   }
+  },
+  {
+   "name": "cloud-architecture",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "deployment-cluster",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e12 could not be found in the current layout scope. A"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e12 could not be found in the current layout scope. A"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e12 could not be found in the current layout scope. A"
+   }
+  },
+  {
+   "name": "er-diagram",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1,
+    "bends": 14,
+    "length": 2520,
+    "width": 886,
+    "height": 1540,
+    "area": 1364440,
+    "ms": 3.3
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 16,
+    "length": 4786,
+    "width": 2688,
+    "height": 567,
+    "area": 1523827,
+    "ms": 3.3
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 16,
+    "length": 8605,
+    "width": 4602,
+    "height": 496,
+    "area": 2282592,
+    "ms": 3.2
+   }
+  },
+  {
+   "name": "layerweave-code",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 880,
+    "bends": 1214,
+    "length": 1137691,
+    "width": 8423,
+    "height": 5651,
+    "area": 47602004,
+    "ms": 37.5
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 804,
+    "bends": 1358,
+    "length": 2137173,
+    "width": 19197,
+    "height": 6150,
+    "area": 118051952,
+    "ms": 65.8
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 845,
+    "bends": 1274,
+    "length": 1466190,
+    "width": 12113,
+    "height": 6121,
+    "area": 74149383,
+    "ms": 41.5
+   }
+  },
+  {
+   "name": "mixed-large",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e13 could not be found in the current layout scope. A"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e13 could not be found in the current layout scope. A"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e13 could not be found in the current layout scope. A"
+   }
+  },
+  {
+   "name": "network-vlan",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e7 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e7 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The target of edge e7 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "org-chart",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "petri-net",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 58,
+    "bends": 66,
+    "length": 10769,
+    "width": 940,
+    "height": 691,
+    "area": 649916,
+    "ms": 3.2
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 46,
+    "bends": 72,
+    "length": 18150,
+    "width": 1510,
+    "height": 628,
+    "area": 948280,
+    "ms": 3.9
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 35,
+    "bends": 82,
+    "length": 29425,
+    "width": 2530,
+    "height": 666,
+    "area": 1684980,
+    "ms": 5
+   }
+  },
+  {
+   "name": "state-order",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e9 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "state-tcp",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 30,
+    "length": 7279,
+    "width": 1640,
+    "height": 189,
+    "area": 310147,
+    "ms": 2.2
+   },
+   "minWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 30,
+    "length": 7612,
+    "width": 1640,
+    "height": 226,
+    "area": 370827,
+    "ms": 2.3
+   },
+   "stretchWidth": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 30,
+    "length": 7612,
+    "width": 1640,
+    "height": 226,
+    "area": 370827,
+    "ms": 2.2
+   }
+  },
+  {
+   "name": "synthetic-2k",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3682 could not be found in the current layout scope."
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3682 could not be found in the current layout scope."
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e3682 could not be found in the current layout scope."
+   }
+  },
+  {
+   "name": "uml-class",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e6 could not be found in the current layout scope. An"
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "default": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e1 could not be found in the current layout scope. An"
+   },
+   "minWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e1 could not be found in the current layout scope. An"
+   },
+   "stretchWidth": {
+    "failed": "org.eclipse.elk.core.UnsupportedGraphException: The source of edge e1 could not be found in the current layout scope. An"
+   }
+  }
+ ]
+}

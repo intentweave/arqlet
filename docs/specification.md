@@ -457,7 +457,10 @@ the layout (it would double every interactive step and could flip the ranks with
 become the first refinement candidate under single pass (no view worse by construction; −9.4 % area on the comparison
 task, −3.2 % on the configured datasets; its time measured on an idle machine first). The main lever is the composition of
 the areas: unlinked sibling areas spread along the flow (step 2), its upper bound with ELK's layerers first; each behind an
-option, accepted only if no view gets worse.
+option, accepted only if no view gets worse. Outcome (2026-11-26,
+`benchmarks/results/simplex-refinement-20261126.md`): the refinement candidate makes no view worse, but takes 5 of 17
+views (−5.5 % area, two views carry it) and about one import per refinement; decided not to take it and not to build
+step 2 (ELK's `MIN_WIDTH` and `STRETCH_WIDTH` layerers come out larger). #119 stays open.
 
 `ENGINE_VERSION` follows the release (`0.6.0` with release 0.6.0; it stayed `0.2.0-prototype` from 0.2 to 0.4): the
 defaults changed in 0.5.0 and 0.6.0, and edits refuse snapshots of another engine version.

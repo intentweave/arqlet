@@ -1,6 +1,7 @@
 # Experiments (not merged)
 
-Patches that were measured and not merged. Each applies to commit `1a514c8` (A2, first step).
+Patches that were measured and not merged. Each applies to commit `1a514c8` (A2, first step) unless its section names
+another.
 Apply with `git apply benchmarks/experiments/<name>.patch`.
 
 ## `local-channel-candidate.patch`
@@ -33,3 +34,11 @@ full reroute on state-tcp, and the run time has to be measured against the full 
 
 Not a candidate: temporary timing prints for the phase table of `benchmarks/results/bus-collapse-20261126.md` (#150).
 It applies to commit `70b4b9a`. `bus-collapse.mjs` records the printed lines.
+
+## `corridor-router-failures.patch`
+
+Applies to `84d87af` and to main `70d744b` (the router is the same). An instrumented router for step C1 of the organic
+corridors (#156): every repair of a route writes `EXP`, its id, the obstacles, whether a way was found and, when not,
+whether one exists on the grid of the whole view, to standard error. `organic_corridors.py --bin` (branch
+`organic-corridor-plan`, 6f8277e) with a `layout-command` built with it records why routes end up through boxes
+(`benchmarks/results/organic-corridor-plan-20261126.md`). Not meant to be merged: it searches every failed route again.
