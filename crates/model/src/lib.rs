@@ -2388,6 +2388,13 @@ pub struct LayoutOptions {
     /// than the default leaves a route room to leave a node that faces a neighbour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_gap: Option<f64>,
+    /// Provisional (#203): the repair of the default router, when the grid of the whole view is over its bound, searches a
+    /// sparse grid of the whole view first, with a cost per bend: a line only in a gap between box edges that offers a way
+    /// no neighbouring gap offers, which still holds a way whenever the rectangles leave one wider than a rounding error.
+    /// Without it such a route is searched only on grids around it, and one without a way there keeps its shape through the
+    /// boxes. Views within the bound are drawn as without the option. Omitted when off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub sparse_repair_grid: bool,
     /// Experimental (ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass, and in the
     /// hierarchical pipeline it falls back to, a pinned node (leaf or container) of an area that flows left to right or top
     /// to bottom is a constraint of the arrangement: the pin chooses its rank and its order there and holds its place
@@ -2972,6 +2979,7 @@ impl Default for LayoutOptions {
             edge_routing: None,
             organic_iterations: None,
             organic_gap: None,
+            sparse_repair_grid: false,
             pins_in_single_pass: false,
             vpsc_overlap_removal: false,
             directed_repair: false,

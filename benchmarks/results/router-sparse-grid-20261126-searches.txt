@@ -1,0 +1,145 @@
+# #203: searches on the dumped repair problems (router-grid-variants.patch on main 231c010; cargo run --release; Apple M3).
+# Columns: problems found (of the listed, beyond what the windows find), against full: missed and extra; time ms; time of the failed searches; heap pops; mean cells; mean length and bends of the ways found.
+== mesh-100-0-120-500-s7 load { 2,60 3,29 6,62 }
+problems 546 (all 546) windowFound 524 windowMs 177
+full         found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    500.7 failMs      0.0 pops 5336264 meanCells 193600 len 2549 bends 15.05
+full-turn12  found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms   1031.4 failMs      0.0 pops 11418643 meanCells 193600 len 2549 bends 6.48
+gap          found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms     78.5 failMs      0.0 pops 522615 meanCells 16041 len 2597 bends 12.24
+gap-turn4    found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    125.0 failMs      0.0 pops 984379 meanCells 16041 len 2597 bends 6.40
+gap-turn12   found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    128.2 failMs      0.0 pops 1017442 meanCells 16041 len 2597 bends 6.38
+gap-turn24   found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    131.6 failMs      0.0 pops 1063629 meanCells 16041 len 2598 bends 6.34
+gap-turn48   found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    137.5 failMs      0.0 pops 1138577 meanCells 16041 len 2601 bends 6.25
+gap2         found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms     90.8 failMs      0.0 pops 681477 meanCells 18412 len 2690 bends 12.12
+gap2-turn12  found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    152.2 failMs      0.0 pops 1343662 meanCells 18412 len 2690 bends 6.51
+lazy         found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    192.5 failMs      0.0 pops 1593914 meanCells 5302 len 2677 bends 6.45
+follow       found   546 (beyondWindows    22) missedVsFull 0 extraVsFull 0 ms    536.1 failMs      0.0 pops 5638101 meanCells 41678 len 2560 bends 6.46
+== mesh-100-0-240-1000-s7 load { 2,47 3,25 6,58 }
+problems 965 (all 965) windowFound 787 windowMs 352
+full         found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms   1920.5 failMs      1.1 pops 21042406 meanCells 459680 len 3659 bends 16.43
+full-turn12  found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms   3720.7 failMs      2.4 pops 42269830 meanCells 459680 len 3659 bends 5.30
+gap          found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms    253.9 failMs      0.5 pops 2065304 meanCells 42098 len 3565 bends 15.09
+gap-turn4    found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms    431.2 failMs      0.7 pops 3941321 meanCells 42098 len 3565 bends 5.32
+gap-turn12   found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms    426.9 failMs      0.7 pops 3997086 meanCells 42098 len 3565 bends 5.32
+gap-turn24   found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms    433.5 failMs      0.7 pops 4074739 meanCells 42098 len 3565 bends 5.29
+gap-turn48   found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms    442.2 failMs      0.7 pops 4206903 meanCells 42098 len 3566 bends 5.29
+gap2         found   953 (beyondWindows   170) missedVsFull 4 extraVsFull 0 ms    278.3 failMs      0.7 pops 2417432 meanCells 42275 len 3706 bends 14.96
+gap2-turn12  found   953 (beyondWindows   170) missedVsFull 4 extraVsFull 0 ms    476.2 failMs      0.9 pops 4670172 meanCells 42275 len 3706 bends 5.16
+lazy         found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms    920.8 failMs      0.8 pops 10143201 meanCells 14672 len 4086 bends 5.43
+follow       found   957 (beyondWindows   170) missedVsFull 0 extraVsFull 0 ms   3715.2 failMs      4.1 pops 44612064 meanCells 159577 len 3954 bends 5.51
+== mesh-100-30-120-500-s11 load { 2,99 3,32 6,55 }
+problems 639 (all 639) windowFound 493 windowMs 253
+full         found   587 (beyondWindows    94) missedVsFull 0 extraVsFull 0 ms    906.3 failMs     82.1 pops 11573133 meanCells 250566 len 2701 bends 17.37
+full-turn12  found   587 (beyondWindows    94) missedVsFull 0 extraVsFull 0 ms   1885.2 failMs    173.1 pops 24048816 meanCells 250566 len 2703 bends 6.32
+gap          found   629 (beyondWindows   136) missedVsFull 0 extraVsFull 42 ms    112.9 failMs      2.6 pops 807315 meanCells 22728 len 2149 bends 15.07
+gap-turn4    found   629 (beyondWindows   136) missedVsFull 0 extraVsFull 42 ms    186.4 failMs      4.7 pops 1594265 meanCells 22728 len 2149 bends 7.50
+gap-turn12   found   629 (beyondWindows   136) missedVsFull 0 extraVsFull 42 ms    191.8 failMs      4.7 pops 1658297 meanCells 22728 len 2150 bends 7.38
+gap-turn24   found   629 (beyondWindows   136) missedVsFull 0 extraVsFull 42 ms    196.7 failMs      4.7 pops 1733106 meanCells 22728 len 2152 bends 7.27
+gap-turn48   found   629 (beyondWindows   136) missedVsFull 0 extraVsFull 42 ms    203.6 failMs      4.7 pops 1841914 meanCells 22728 len 2155 bends 7.20
+gap2         found   627 (beyondWindows   136) missedVsFull 2 extraVsFull 42 ms    123.0 failMs      3.3 pops 944505 meanCells 28292 len 2192 bends 15.12
+gap2-turn12  found   627 (beyondWindows   136) missedVsFull 2 extraVsFull 42 ms    213.2 failMs      6.0 pops 1929491 meanCells 28292 len 2193 bends 7.61
+lazy         found   587 (beyondWindows    94) missedVsFull 0 extraVsFull 0 ms   1101.6 failMs    474.2 pops 12678997 meanCells 27990 len 3006 bends 6.01
+follow       found   587 (beyondWindows    94) missedVsFull 0 extraVsFull 0 ms   1509.7 failMs    224.8 pops 18754886 meanCells 91555 len 2903 bends 6.03
+== mesh-100-30-120-500-s13 load { 3,23 3,37 6,55 }
+problems 773 (all 773) windowFound 612 windowMs 111
+full         found   628 (beyondWindows    16) missedVsFull 0 extraVsFull 0 ms    575.4 failMs    175.8 pops 7194824 meanCells 250721 len 1809 bends 12.36
+full-turn12  found   628 (beyondWindows    16) missedVsFull 0 extraVsFull 0 ms   1150.2 failMs    364.2 pops 14744930 meanCells 250721 len 1809 bends 5.07
+gap          found   631 (beyondWindows    19) missedVsFull 0 extraVsFull 3 ms    118.0 failMs     29.1 pops 904409 meanCells 28238 len 1829 bends 10.65
+gap-turn4    found   631 (beyondWindows    19) missedVsFull 0 extraVsFull 3 ms    190.8 failMs     52.3 pops 1741569 meanCells 28238 len 1829 bends 5.14
+gap-turn12   found   631 (beyondWindows    19) missedVsFull 0 extraVsFull 3 ms    192.9 failMs     52.2 pops 1774075 meanCells 28238 len 1829 bends 5.13
+gap-turn24   found   631 (beyondWindows    19) missedVsFull 0 extraVsFull 3 ms    193.6 failMs     51.6 pops 1802992 meanCells 28238 len 1829 bends 5.12
+gap-turn48   found   631 (beyondWindows    19) missedVsFull 0 extraVsFull 3 ms    201.5 failMs     53.0 pops 1862221 meanCells 28238 len 1831 bends 5.08
+gap2         found   628 (beyondWindows    16) missedVsFull 0 extraVsFull 0 ms    134.1 failMs     32.9 pops 1063012 meanCells 31878 len 1843 bends 10.70
+gap2-turn12  found   628 (beyondWindows    16) missedVsFull 0 extraVsFull 0 ms    224.8 failMs     59.7 pops 2091354 meanCells 31878 len 1843 bends 5.05
+lazy         found   625 (beyondWindows    14) missedVsFull 3 extraVsFull 0 ms   1172.4 failMs   1057.7 pops 14701522 meanCells 30374 len 1928 bends 5.06
+follow       found   628 (beyondWindows    16) missedVsFull 0 extraVsFull 0 ms    744.6 failMs    423.9 pops 9415269 meanCells 78305 len 1879 bends 5.17
+== mesh-100-30-120-500-s7 load { 3,21 3,36 6,52 }
+problems 993 (all 993) windowFound 798 windowMs 170
+full         found   839 (beyondWindows    41) missedVsFull 0 extraVsFull 0 ms    731.3 failMs    162.0 pops 8934667 meanCells 248614 len 2237 bends 11.48
+full-turn12  found   839 (beyondWindows    41) missedVsFull 0 extraVsFull 0 ms   1479.0 failMs    347.6 pops 17929209 meanCells 248614 len 2238 bends 5.14
+gap          found   855 (beyondWindows    57) missedVsFull 0 extraVsFull 16 ms    111.9 failMs     22.1 pops 758334 meanCells 20521 len 2234 bends 10.20
+gap-turn4    found   855 (beyondWindows    57) missedVsFull 0 extraVsFull 16 ms    177.2 failMs     39.2 pops 1425078 meanCells 20521 len 2234 bends 5.15
+gap-turn12   found   855 (beyondWindows    57) missedVsFull 0 extraVsFull 16 ms    177.9 failMs     39.3 pops 1451821 meanCells 20521 len 2234 bends 5.14
+gap-turn24   found   855 (beyondWindows    57) missedVsFull 0 extraVsFull 16 ms    179.7 failMs     39.1 pops 1483545 meanCells 20521 len 2234 bends 5.13
+gap-turn48   found   855 (beyondWindows    57) missedVsFull 0 extraVsFull 16 ms    186.1 failMs     39.0 pops 1543984 meanCells 20521 len 2234 bends 5.12
+gap2         found   842 (beyondWindows    48) missedVsFull 5 extraVsFull 8 ms    136.7 failMs     26.6 pops 1067921 meanCells 23390 len 2283 bends 10.50
+gap2-turn12  found   842 (beyondWindows    48) missedVsFull 5 extraVsFull 8 ms    227.9 failMs     49.0 pops 2069229 meanCells 23390 len 2283 bends 5.08
+lazy         found   835 (beyondWindows    37) missedVsFull 4 extraVsFull 0 ms   1073.7 failMs    857.4 pops 13760163 meanCells 19654 len 2318 bends 5.14
+follow       found   839 (beyondWindows    41) missedVsFull 0 extraVsFull 0 ms    808.8 failMs    271.9 pops 9557372 meanCells 57062 len 2250 bends 5.16
+== mesh-100-30-240-1000-s7 load { 3,35 3,39 6,52 }
+problems 1774 (all 1774) windowFound 1581 windowMs 221
+full         found  1635 (beyondWindows    54) missedVsFull 0 extraVsFull 0 ms   1666.0 failMs    275.3 pops 18734264 meanCells 543690 len 2703 bends 14.19
+full-turn12  found  1635 (beyondWindows    54) missedVsFull 0 extraVsFull 0 ms   3461.8 failMs    586.9 pops 39870392 meanCells 543690 len 2704 bends 5.75
+gap          found  1693 (beyondWindows   112) missedVsFull 0 extraVsFull 58 ms    295.9 failMs     21.5 pops 1961252 meanCells 52704 len 2754 bends 10.68
+gap-turn4    found  1693 (beyondWindows   112) missedVsFull 0 extraVsFull 58 ms    473.9 failMs     39.8 pops 3715904 meanCells 52704 len 2754 bends 5.91
+gap-turn12   found  1693 (beyondWindows   112) missedVsFull 0 extraVsFull 58 ms    484.5 failMs     39.6 pops 3821785 meanCells 52704 len 2754 bends 5.91
+gap-turn24   found  1693 (beyondWindows   112) missedVsFull 0 extraVsFull 58 ms    492.5 failMs     39.3 pops 3980640 meanCells 52704 len 2755 bends 5.90
+gap-turn48   found  1693 (beyondWindows   112) missedVsFull 0 extraVsFull 58 ms    514.6 failMs     39.2 pops 4260054 meanCells 52704 len 2759 bends 5.78
+gap2         found  1633 (beyondWindows    54) missedVsFull 2 extraVsFull 0 ms    283.9 failMs     38.2 pops 1977924 meanCells 42705 len 2749 bends 10.41
+gap2-turn12  found  1633 (beyondWindows    54) missedVsFull 2 extraVsFull 0 ms    474.5 failMs     72.2 pops 3983452 meanCells 42705 len 2749 bends 5.76
+lazy         found  1624 (beyondWindows    43) missedVsFull 11 extraVsFull 0 ms   1410.4 failMs    961.7 pops 17028353 meanCells 16712 len 2844 bends 5.58
+follow       found  1635 (beyondWindows    54) missedVsFull 0 extraVsFull 0 ms   1618.2 failMs    365.0 pops 18532270 meanCells 95651 len 2762 bends 5.77
+== mesh-100-30-60-250-s11 load { 3,46 3,41 6,49 }
+problems 619 (all 619) windowFound 526 windowMs 449
+full         found   559 (beyondWindows    33) missedVsFull 0 extraVsFull 0 ms    624.0 failMs     81.6 pops 7000345 meanCells 142883 len 2293 bends 18.11
+full-turn12  found   559 (beyondWindows    33) missedVsFull 0 extraVsFull 0 ms   1251.6 failMs    167.0 pops 14423018 meanCells 142883 len 2294 bends 6.54
+gap          found   591 (beyondWindows    65) missedVsFull 0 extraVsFull 32 ms    104.3 failMs      3.4 pops 758546 meanCells 15048 len 2243 bends 15.09
+gap-turn4    found   591 (beyondWindows    65) missedVsFull 0 extraVsFull 32 ms    176.5 failMs      6.0 pops 1450948 meanCells 15048 len 2243 bends 6.54
+gap-turn12   found   591 (beyondWindows    65) missedVsFull 0 extraVsFull 32 ms    177.4 failMs      6.0 pops 1465828 meanCells 15048 len 2244 bends 6.42
+gap-turn24   found   591 (beyondWindows    65) missedVsFull 0 extraVsFull 32 ms    177.1 failMs      5.9 pops 1489306 meanCells 15048 len 2248 bends 6.21
+gap-turn48   found   591 (beyondWindows    65) missedVsFull 0 extraVsFull 32 ms    176.3 failMs      5.8 pops 1498680 meanCells 15048 len 2262 bends 5.83
+gap2         found   583 (beyondWindows    57) missedVsFull 0 extraVsFull 24 ms    121.9 failMs      6.9 pops 986236 meanCells 18327 len 2475 bends 15.07
+gap2-turn12  found   583 (beyondWindows    57) missedVsFull 0 extraVsFull 24 ms    214.0 failMs     12.2 pops 1931152 meanCells 18327 len 2475 bends 5.92
+lazy         found   542 (beyondWindows    25) missedVsFull 17 extraVsFull 0 ms   1704.6 failMs   1124.7 pops 19687753 meanCells 48899 len 2477 bends 5.88
+follow       found   558 (beyondWindows    32) missedVsFull 1 extraVsFull 0 ms    985.1 failMs    201.8 pops 11243658 meanCells 55185 len 2385 bends 6.79
+== mesh-100-30-60-250-s13 load { 3,51 3,42 6,47 }
+problems 560 (all 560) windowFound 392 windowMs 113
+full         found   412 (beyondWindows    20) missedVsFull 0 extraVsFull 0 ms    231.3 failMs    110.5 pops 2791237 meanCells 142948 len 1432 bends 11.58
+full-turn12  found   412 (beyondWindows    20) missedVsFull 0 extraVsFull 0 ms    449.8 failMs    231.8 pops 5525996 meanCells 142948 len 1432 bends 4.78
+gap          found   448 (beyondWindows    56) missedVsFull 0 extraVsFull 36 ms     50.2 failMs     16.4 pops 300060 meanCells 15298 len 1412 bends 8.93
+gap-turn4    found   448 (beyondWindows    56) missedVsFull 0 extraVsFull 36 ms     75.3 failMs     29.0 pops 556823 meanCells 15298 len 1412 bends 4.84
+gap-turn12   found   448 (beyondWindows    56) missedVsFull 0 extraVsFull 36 ms     76.2 failMs     28.8 pops 570536 meanCells 15298 len 1412 bends 4.84
+gap-turn24   found   448 (beyondWindows    56) missedVsFull 0 extraVsFull 36 ms     76.8 failMs     28.6 pops 582741 meanCells 15298 len 1412 bends 4.84
+gap-turn48   found   448 (beyondWindows    56) missedVsFull 0 extraVsFull 36 ms     78.7 failMs     28.4 pops 606285 meanCells 15298 len 1413 bends 4.84
+gap2         found   434 (beyondWindows    42) missedVsFull 0 extraVsFull 22 ms     60.4 failMs     21.4 pops 438506 meanCells 17304 len 1452 bends 9.56
+gap2-turn12  found   434 (beyondWindows    42) missedVsFull 0 extraVsFull 22 ms     95.9 failMs     39.4 pops 840353 meanCells 17304 len 1452 bends 4.86
+lazy         found   407 (beyondWindows    20) missedVsFull 5 extraVsFull 0 ms    957.7 failMs    850.0 pops 12670492 meanCells 34452 len 1494 bends 4.67
+follow       found   412 (beyondWindows    20) missedVsFull 0 extraVsFull 0 ms    444.4 failMs    285.7 pops 5438642 meanCells 62401 len 1455 bends 4.78
+== mesh-100-30-60-250-s7 load { 3,31 3,38 6,44 }
+problems 403 (all 403) windowFound 305 windowMs 103
+full         found   338 (beyondWindows    33) missedVsFull 0 extraVsFull 0 ms    272.5 failMs     82.7 pops 3368396 meanCells 139754 len 1982 bends 13.76
+full-turn12  found   338 (beyondWindows    33) missedVsFull 0 extraVsFull 0 ms    556.6 failMs    178.5 pops 6894537 meanCells 139754 len 1982 bends 5.13
+gap          found   368 (beyondWindows    63) missedVsFull 0 extraVsFull 30 ms     46.2 failMs      6.1 pops 316075 meanCells 13652 len 1863 bends 10.75
+gap-turn4    found   368 (beyondWindows    63) missedVsFull 0 extraVsFull 30 ms     73.8 failMs     11.0 pops 608134 meanCells 13652 len 1863 bends 5.29
+gap-turn12   found   368 (beyondWindows    63) missedVsFull 0 extraVsFull 30 ms     74.6 failMs     11.0 pops 621895 meanCells 13652 len 1863 bends 5.29
+gap-turn24   found   368 (beyondWindows    63) missedVsFull 0 extraVsFull 30 ms     75.1 failMs     10.8 pops 634649 meanCells 13652 len 1863 bends 5.29
+gap-turn48   found   368 (beyondWindows    63) missedVsFull 0 extraVsFull 30 ms     76.8 failMs     10.8 pops 657148 meanCells 13652 len 1864 bends 5.28
+gap2         found   354 (beyondWindows    54) missedVsFull 5 extraVsFull 21 ms     55.3 failMs     10.4 pops 439750 meanCells 16196 len 1936 bends 10.88
+gap2-turn12  found   354 (beyondWindows    54) missedVsFull 5 extraVsFull 21 ms     92.9 failMs     19.1 pops 870697 meanCells 16196 len 1936 bends 5.40
+lazy         found   337 (beyondWindows    32) missedVsFull 1 extraVsFull 0 ms    645.3 failMs    506.5 pops 7544505 meanCells 28539 len 2042 bends 5.23
+follow       found   338 (beyondWindows    33) missedVsFull 0 extraVsFull 0 ms    423.3 failMs    220.4 pops 5174583 meanCells 49710 len 1996 bends 5.21
+== mesh-200-60-120-500-s7 load { 3,31 3,38 6,44 }
+problems 844 (all 1688) windowFound 422 windowMs 351
+full         found   609 (beyondWindows   187) missedVsFull 0 extraVsFull 0 ms   1951.0 failMs    404.1 pops 24894225 meanCells 569786 len 3270 bends 19.51
+full-turn12  found   609 (beyondWindows   187) missedVsFull 0 extraVsFull 0 ms   4009.1 failMs    841.4 pops 50946230 meanCells 569786 len 3270 bends 6.75
+gap          found   618 (beyondWindows   196) missedVsFull 0 extraVsFull 9 ms    254.3 failMs     48.8 pops 2157769 meanCells 51498 len 2854 bends 18.12
+gap-turn4    found   618 (beyondWindows   196) missedVsFull 0 extraVsFull 9 ms    444.3 failMs     87.0 pops 4251751 meanCells 51498 len 2854 bends 7.46
+gap-turn12   found   618 (beyondWindows   196) missedVsFull 0 extraVsFull 9 ms    445.7 failMs     86.2 pops 4321451 meanCells 51498 len 2855 bends 7.29
+gap-turn24   found   618 (beyondWindows   196) missedVsFull 0 extraVsFull 9 ms    449.5 failMs     85.5 pops 4409322 meanCells 51498 len 2860 bends 7.01
+gap-turn48   found   618 (beyondWindows   196) missedVsFull 0 extraVsFull 9 ms    454.6 failMs     85.4 pops 4506582 meanCells 51498 len 2876 bends 6.56
+gap2         found   518 (beyondWindows   107) missedVsFull 94 extraVsFull 3 ms    247.2 failMs    103.6 pops 2512237 meanCells 44110 len 2712 bends 13.56
+gap2-turn12  found   518 (beyondWindows   107) missedVsFull 94 extraVsFull 3 ms    439.5 failMs    195.8 pops 4962592 meanCells 44110 len 2712 bends 4.72
+lazy         found   563 (beyondWindows   145) missedVsFull 46 extraVsFull 0 ms   6406.4 failMs   4186.2 pops 82042120 meanCells 155911 len 3081 bends 5.90
+follow       found   531 (beyondWindows   109) missedVsFull 78 extraVsFull 0 ms   1993.0 failMs    964.2 pops 24587549 meanCells 186919 len 2674 bends 5.47
+== mesh-50-15-120-500-s7 load { 3,10 3,32 6,35 }
+problems 792 (all 792) windowFound 717 windowMs 264
+full         found   721 (beyondWindows     4) missedVsFull 0 extraVsFull 0 ms    513.6 failMs     58.3 pops 5893766 meanCells 135665 len 2263 bends 14.58
+full-turn12  found   721 (beyondWindows     4) missedVsFull 0 extraVsFull 0 ms   1013.3 failMs    125.3 pops 11930078 meanCells 135665 len 2263 bends 5.81
+gap          found   784 (beyondWindows    67) missedVsFull 0 extraVsFull 63 ms     88.2 failMs      1.8 pops 599166 meanCells 12564 len 2250 bends 12.71
+gap-turn4    found   784 (beyondWindows    67) missedVsFull 0 extraVsFull 63 ms    137.8 failMs      3.4 pops 1115824 meanCells 12564 len 2250 bends 5.84
+gap-turn12   found   784 (beyondWindows    67) missedVsFull 0 extraVsFull 63 ms    141.1 failMs      3.4 pops 1149443 meanCells 12564 len 2251 bends 5.82
+gap-turn24   found   784 (beyondWindows    67) missedVsFull 0 extraVsFull 63 ms    143.0 failMs      3.4 pops 1183860 meanCells 12564 len 2251 bends 5.78
+gap-turn48   found   784 (beyondWindows    67) missedVsFull 0 extraVsFull 63 ms    146.4 failMs      3.3 pops 1237063 meanCells 12564 len 2253 bends 5.74
+gap2         found   784 (beyondWindows    67) missedVsFull 0 extraVsFull 63 ms    117.7 failMs      2.4 pops 918119 meanCells 18983 len 2281 bends 13.53
+gap2-turn12  found   784 (beyondWindows    67) missedVsFull 0 extraVsFull 63 ms    196.6 failMs      4.6 pops 1785388 meanCells 18983 len 2281 bends 5.99
+lazy         found   709 (beyondWindows     4) missedVsFull 12 extraVsFull 0 ms    343.7 failMs    182.7 pops 3658816 meanCells 7287 len 2460 bends 5.76
+follow       found   721 (beyondWindows     4) missedVsFull 0 extraVsFull 0 ms    670.5 failMs    150.0 pops 7865203 meanCells 49822 len 2321 bends 5.84

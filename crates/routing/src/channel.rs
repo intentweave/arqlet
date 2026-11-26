@@ -134,6 +134,9 @@ pub struct SearchCounters {
     /// Legacy repair: routes found on a grid taken from the obstacles near them, because the grid of the whole view was over the
     /// limit of the search.
     pub windowed_grids: usize,
+    /// Legacy repair with `Params::sparse_grid`: routes found on the sparse grid of the whole view, because the full grid
+    /// of the view was over the limit of the search.
+    pub sparse_grids: usize,
     pub routes_rerouted: usize,
     /// Cumulative wall time spent in placement. This includes the organic stages below; native benchmark builds
     /// populate it, while the default core and WASM builds leave it zero. Stage times may overlap.

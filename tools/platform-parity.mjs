@@ -36,6 +36,9 @@ const requests = [
   ['elkLayout refined', {op: 'elkLayout', graph: elk, refine: true}],
   ['overview 10 000', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json')}],
 ];
+// A view whose repair grid is over its bound, with the sparse grid (#203).
+const mesh = JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '100', '0', 'organic', 'lines', '120', '500'], {maxBuffer: 1 << 30}).toString());
+requests.push(['import over the grid bound, sparse repair', {...mesh, options: {...mesh.options, sparseRepairGrid: true}}]);
 // The operation `query` (ADR 0021, M5b) on a snapshot and its content, without a session: the rows must be the same
 // natively and in WASM. (Without the cargo feature both engines answer the same refusal, which also compares equal.)
 const imported = JSON.parse(execFileSync(native, {
