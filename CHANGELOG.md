@@ -11,7 +11,8 @@ A query and grouping release. The read-only openCypher layer grows by the scalar
 expressions, and gets an npm package of its own, `@arqlet/query`, without the layout engine; several answers it gave
 wrongly in 0.8.0 and 0.9.0 are fixed. Memberships (ADR 0022) can be held together inside their container and drawn as
 lanes and phases, pinned nodes and containers can stay in single pass (behind an option), a view fits into a URL as a
-compact bookmark, and bus lines with closed containers import faster. Two panics on views with bus lines are fixed.
+compact bookmark, the galaxy overview draws on a light background, and bus lines with closed containers import faster.
+Two panics on views with bus lines are fixed, and `refine` works on views with a backbone bus.
 
 ### Upgrading from 0.9
 
@@ -22,6 +23,9 @@ compact bookmark, and bus lines with closed containers import faster. Two panics
 - **Some drawings differ:** views where an edge or a tap leaves an organic, radial, tree or octilinear container of a
   layered area next to a bus line, and views with `hubRefs` and region ports (see *Fixed*); membership hulls
   (provisional). With bus lines, `busTaps`, `recomputedContainers` and one line of `layoutDiagnostics` can differ.
+- **Views with a backbone bus that single pass did not take:** their snapshot says `singlePass: false` and
+  `abstractRouting: false`, and an edit that takes the last backbone bus out of the view stays on that pipeline (see
+  *Fixed*).
 - **Queries answer differently where 0.9.0 was wrong:** a `WHERE` after `ORDER BY`, `SKIP` or `LIMIT`, a label or
   properties on a repeated node variable, a grouping expression beside an aggregate, and a relationship variable bound
   by an earlier clause.
@@ -35,6 +39,12 @@ compact bookmark, and bus lines with closed containers import faster. Two panics
 
 ### Added
 
+- **Galaxy style on a light background** (overview, provisional): a light clear colour (`background`, new
+  `setBackground` for a host that switches themes, `tone`) draws the galaxy in ink instead of light — colours subtracted
+  from the background, so clouds deepen where they overlap, darker stars, a dark selection ring, light name tags and dark
+  texts. WebGPU, WebGL 2 and WebGL 1 draw it alike (`browser-checks/overview-backends.mjs`). Playground: *Light background*.
+  For a dark drawing in a light page instead, `setEdgeFade(px)` (option `edgeFade`, helper `edgeFadeMask`) fades the canvas
+  and its texts out at the edges with an eased CSS mask, so the page shows through. Playground: *Fade into a light page*.
 - Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
   criterion `as: lanes` cuts every layered area into bands, the top level included; drawn inside each container. Playground:
   *Second structure as bands* (phases with *As lanes*, lanes inside the containers without).
@@ -132,6 +142,20 @@ compact bookmark, and bus lines with closed containers import faster. Two panics
   accepted there: where the model has that property the model's value silently won, elsewhere the given one was read.
 - A released drag (`move`, `finish` with `release`) of a pinned node kept the pin on a view whose options ask for single
   pass but whose graph it does not take (`can-bus`): the node stayed pinned where it was dropped. The pin is removed.
+- `refine` failed on every view with a backbone bus (an explicit bus with several sources and several targets, as the CAN
+  bus example; #205): where single pass did not take the view, because the options still asked for it ("Routing completion
+  requires the legacy router …"), and where it did, because the check read the view without the bus's node ("missing
+  dummy geometry"). It failed on an empty view too. A progressive refinement as the browser runs it
+  (`dispatch_streaming`) read a view with bus lines without their nodes; it now answers as `refine` does. A view that
+  fell back is refined as on the pipeline that drew it; as there before, the routing candidates may draw members of a bus
+  apart when that removes conflicts.
+- Snapshot of a view with backbone buses that single pass did not take: `options.singlePass` and
+  `options.abstractRouting` are `false`, as on every other view that falls back (the `options` object is then written in
+  full). The drawing of an import is unchanged. Such a view still tries single pass again at every edit that keeps a
+  backbone bus in it (while `singlePassAuto` is on), and a released drag still keeps the drop's order. An edit that takes
+  the last backbone bus out of the view (collapsing its members' containers) now stays on the pipeline that drew it, as on
+  other views; `configure` with `singlePassAuto` tries single pass again. For users of `arqlet-layout`:
+  `retries_single_pass`.
 
 ## 0.9.0 — 2026-11-24
 

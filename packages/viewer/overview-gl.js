@@ -294,8 +294,9 @@ const SHAPE_PARTS = new Set(['discs', 'back', 'front']);
 const DRAW_ORDER = [['edges', 'lines'], ['buses', 'triangles'], ['discs', 'triangles'], ['back', 'triangles'], ['routes', 'lines'], ['arrows', 'triangles'], ['front', 'triangles']];
 
 // A backend draws layers (per part a buffer of a morph's start and one of its end) with the uniform values the renderer
-// computes: `layer(from, to)`, `drop(layer)`, `frame(draws, background, additive)` with draws = [{layer, uniforms}],
-// `destroy()`. WebGL 2 runs the GLSL ES 1.00 programs as they are; `webgl1` forces WebGL 1.
+// computes: `layer(from, to)`, `drop(layer)`, `frame(draws, background, blend)` with draws = [{layer, uniforms}] and blend
+// 'over' (alpha), 'add' (the galaxy style: light adds up) or 'ink' (the galaxy style on a light background: the colours,
+// absorptions, are subtracted; the alpha stays opaque), `destroy()`. WebGL 2 runs the GLSL ES 1.00 programs as they are; `webgl1` forces WebGL 1.
 function webglBackend(canvas, webgl1 = false) {
   const settings = {antialias: true, premultipliedAlpha: false};
   const gl = (webgl1 ? null : canvas.getContext('webgl2', settings)) ?? canvas.getContext('webgl', settings);
@@ -372,19 +373,25 @@ function webglBackend(canvas, webgl1 = false) {
       if (!l) return;
       for (const p of PARTS) { gl.deleteBuffer(l.buffers[p].a); if (l.buffers[p].b !== l.buffers[p].a) gl.deleteBuffer(l.buffers[p].b); }
     },
-    frame(draws, background, additive) {
+    frame(draws, background, blend) {
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.clearColor(...background);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.enable(gl.BLEND);
-      gl.blendFunc(gl.SRC_ALPHA, additive ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+      if (blend === 'ink') {
+        gl.blendEquationSeparate(gl.FUNC_REVERSE_SUBTRACT, gl.FUNC_ADD);
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ZERO, gl.ONE);
+      } else {
+        gl.blendEquation(gl.FUNC_ADD);
+        gl.blendFunc(gl.SRC_ALPHA, blend === 'add' ? gl.ONE : gl.ONE_MINUS_SRC_ALPHA);
+      }
       for (const {layer, uniforms} of draws) for (const [part, how] of DRAW_ORDER) drawPart(layer, part, how === 'lines' ? gl.LINES : gl.TRIANGLES, uniforms);
     },
     destroy() { gl.deleteProgram(shapes); gl.deleteProgram(lines); },
   };
 }
 
-// WebGPU: the WGSL programs, 4× multisampling, a pipeline per program, topology and blend (additive in the galaxy
+// WebGPU: the WGSL programs, 4× multisampling, a pipeline per program, topology and blend (additive or ink in the galaxy
 // style), one uniform block per draw at a dynamic offset. The canvas is opaque: the WebGL canvas composites its alpha
 // over the page, which matters only where the page differs from the clear colour.
 function webgpuBackend(canvas, device) {
@@ -401,17 +408,18 @@ function webgpuBackend(canvas, device) {
   const shapeBuffers = [attrs([[0, 2, 0], [1, 2, 2], [2, 2, 4], [3, 4, 6], [4, 1, 10]], SHAPE_STRIDE), attrs([[5, 2, 0], [6, 2, 2]], SHAPE_STRIDE)];
   const lineBuffers = [attrs([[0, 2, 0], [1, 4, 2]], LINE_STRIDE), attrs([[2, 2, 0]], LINE_STRIDE)];
   const modules = {shapes: device.createShaderModule({code: SHAPE_WGSL}), lines: device.createShaderModule({code: LINE_WGSL})};
-  const blendOf = additive => {
-    const c = {srcFactor: 'src-alpha', dstFactor: additive ? 'one' : 'one-minus-src-alpha'};
+  const blendOf = blend => {
+    if (blend === 'ink') return {color: {operation: 'reverse-subtract', srcFactor: 'src-alpha', dstFactor: 'one'}, alpha: {operation: 'add', srcFactor: 'zero', dstFactor: 'one'}};
+    const c = {srcFactor: 'src-alpha', dstFactor: blend === 'add' ? 'one' : 'one-minus-src-alpha'};
     return {color: c, alpha: c};
   };
   const pipelines = new Map();
-  const pipeline = (program, topology, additive) => {
-    const key = `${program}:${topology}:${additive}`;
+  const pipeline = (program, topology, blend) => {
+    const key = `${program}:${topology}:${blend}`;
     if (!pipelines.has(key)) pipelines.set(key, device.createRenderPipeline({
       layout,
       vertex: {module: modules[program], entryPoint: 'vs', buffers: program === 'shapes' ? shapeBuffers : lineBuffers},
-      fragment: {module: modules[program], entryPoint: 'fs', targets: [{format, blend: blendOf(additive)}]},
+      fragment: {module: modules[program], entryPoint: 'fs', targets: [{format, blend: blendOf(blend)}]},
       primitive: {topology},
       multisample: {count: 4},
     }));
@@ -442,7 +450,7 @@ function webgpuBackend(canvas, device) {
       if (!l) return;
       for (const p of PARTS) { l.buffers[p].a.destroy(); if (l.buffers[p].b !== l.buffers[p].a) l.buffers[p].b.destroy(); }
     },
-    frame(draws, background, additive) {
+    frame(draws, background, blend) {
       const t = targetFor(canvas.width, canvas.height);
       // All uniform blocks of the frame first, in one write; then the draws read them at their offsets.
       const list = [];
@@ -457,7 +465,7 @@ function webgpuBackend(canvas, device) {
       const pass = encoder.beginRenderPass({colorAttachments: [{view: t.view, resolveTarget: context.getCurrentTexture().createView(), loadOp: 'clear', storeOp: 'discard',
         clearValue: {r: background[0], g: background[1], b: background[2], a: background[3]}}]});
       list.forEach(({layer, part, how}, k) => {
-        pass.setPipeline(pipeline(SHAPE_PARTS.has(part) ? 'shapes' : 'lines', how === 'lines' ? 'line-list' : 'triangle-list', additive));
+        pass.setPipeline(pipeline(SHAPE_PARTS.has(part) ? 'shapes' : 'lines', how === 'lines' ? 'line-list' : 'triangle-list', blend));
         pass.setBindGroup(0, group, [k * SLOT]);
         pass.setVertexBuffer(0, layer.buffers[part].a);
         pass.setVertexBuffer(1, layer.buffers[part].b);
@@ -473,6 +481,24 @@ function webgpuBackend(canvas, device) {
 /** Ease in and out: a move starts and ends gently. */
 const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 
+// The default clear colour, and the tone of a clear colour: light above one half relative luminance (sRGB weights).
+const DARK_BACKGROUND = [0.047, 0.063, 0.094, 1];
+const toneOf = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5 ? 'light' : 'dark');
+
+/**
+ * Provisional: a CSS mask that fades an element out over `width` CSS pixels at each of its four edges (eased, so the
+ * transition has no visible band), for `mask-image` with `mask-composite: intersect`; '' for a width of 0 or less.
+ */
+export function edgeFadeMask(width) {
+  if (!(width > 0)) return '';
+  const steps = [0, 0.2, 0.4, 0.6, 0.8, 1].map(t => [t * t * (3 - 2 * t), t * width]);
+  const one = direction => `linear-gradient(${direction}, ${[
+    ...steps.map(([a, at]) => `rgba(0,0,0,${a.toFixed(3)}) ${at.toFixed(1)}px`),
+    ...[...steps].reverse().map(([a, at]) => `rgba(0,0,0,${a.toFixed(3)}) calc(100% - ${at.toFixed(1)}px)`),
+  ].join(', ')})`;
+  return `${one('to right')}, ${one('to bottom')}`;
+}
+
 /**
  * Draws `model` (from `overviewModel`) into `canvas`. Returns a renderer: `view` is `{centreX, centreY, scale}` with
  * `scale` in CSS pixels per unit; `setState({expanded, collapsed, selected, trace}, {fade})` draws clusters structured in
@@ -480,7 +506,9 @@ const ease = t => t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
  * milliseconds; `morph(model, {duration, view})` moves the drawing to a new layout of the same graph (and the view to
  * `view`). `options.labels` is a 2D canvas laid over `canvas` for texts; `options.onView(view)` is called after every
  * view change; `options.edgeAlpha` (default 1) scales the opacity of the overview's edges; `options.background` is the
- * clear colour (RGBA in 0..1).
+ * clear colour (RGBA in 0..1, `setBackground`). A light background (relative luminance above one half) sets the tone
+ * to light: texts are dark, and the galaxy style draws in ink instead of light. `options.edgeFade` (CSS pixels,
+ * `setEdgeFade`) fades the drawing out at the canvas edges into the page behind it.
  */
 export function createOverviewRenderer(canvas, initialModel, options = {}) {
   // WebGPU with a device (`options.device`, from `sceneBackend`), else WebGL 2, else WebGL 1; `options.backend: 'webgl'`
@@ -505,6 +533,20 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   let outlines = options.shapes ?? {};
   // Provisional: the galaxy style (`setGalaxy`): glows and stars instead of discs and rings, faint lines, light added.
   let galaxy = !!options.galaxy;
+  // The clear colour and the tone it gives (`setBackground`): on a light background the galaxy style is ink.
+  let background = options.background ?? DARK_BACKGROUND, tone = toneOf(background);
+  // Provisional: the fade at the edges (`setEdgeFade`), in CSS pixels; a CSS mask on the canvas and the texts' canvas, so
+  // the page shows through at the edges (a dark galaxy in a light host, for example). 0: none.
+  let edgeFade = 0;
+  const applyEdgeFade = () => {
+    const mask = edgeFadeMask(edgeFade);
+    for (const element of [canvas, options.labels]) {
+      if (!element?.style) continue;
+      for (const [name, value] of [['mask-image', mask], ['-webkit-mask-image', mask], ['mask-composite', mask && 'intersect'], ['-webkit-mask-composite', mask && 'source-in']]) {
+        if (value) element.style.setProperty(name, value); else element.style.removeProperty(name);
+      }
+    }
+  };
   // The appearance (style.js): the theme's trace, route, line and bus colours and a palette for the clusters.
   let style = options.style ?? null;
   // How structured clusters are drawn (ADR 0025 O3): 'cluster' (boxes in the cluster's colour) or 'scene' (as the scene view).
@@ -516,7 +558,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   // The edges' total length in world units, measured whenever the buffers are built (for the adaptive dimming).
   let edgeLength = 0;
   const data = () => {
-    const d = overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy, style, structured});
+    const d = overviewBuffers(model, expanded, collapsed, selected, {shapes: outlines, trace, galaxy, style, structured, tone});
     let sum = 0;
     for (let k = 0; k + 1 < d.count.edges; k += 2) {
       const a = k * LINE_STRIDE, b = (k + 1) * LINE_STRIDE;
@@ -564,14 +606,14 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     if (!c) return;
     const w = Math.round(c.clientWidth * ratio()), h = Math.round(c.clientHeight * ratio());
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-    const ctx = c.getContext('2d');
+    const ctx = c.getContext('2d'), ink = tone === 'light';
     ctx.setTransform(ratio(), 0, 0, ratio(), 0, 0);
     ctx.clearRect(0, 0, c.clientWidth, c.clientHeight);
     // The lens's rim, faint, so that one sees where the enlargement ends.
     if (lens) {
       ctx.beginPath();
       ctx.arc(lens.x, lens.y, lens.radius, 0, 2 * Math.PI);
-      ctx.strokeStyle = 'rgba(223,231,239,0.32)';
+      ctx.strokeStyle = ink ? 'rgba(27,42,58,0.32)' : 'rgba(223,231,239,0.32)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -582,24 +624,25 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     for (const label of labelsOf(model, expanded, view, c.clientWidth, c.clientHeight, {collapsed, lens, galaxy, orbit, names: names.nodes, details: names.details})) {
       ctx.font = `${label.kind === 'cluster' ? 600 : 400} ${label.size.toFixed(1)}px system-ui, sans-serif`;
       if (label.colour) {
-        // A galaxy's tag: a dark rounded box, a dot in its colour, its name.
+        // A galaxy's tag: a rounded box (dark, light on a light background), a dot in its colour, its name.
         const width = ctx.measureText(label.text).width, dot = label.size * 0.36, pad = label.size * 0.55;
         const w = width + dot * 2 + pad * 3, h = label.size * 1.8, left = label.x - w / 2, top = label.y - h / 2;
         ctx.beginPath();
         ctx.roundRect?.(left, top, w, h, h * 0.3) ?? ctx.rect(left, top, w, h);
-        ctx.fillStyle = 'rgba(16,20,28,0.82)';
+        ctx.fillStyle = ink ? 'rgba(255,255,255,0.86)' : 'rgba(16,20,28,0.82)';
         ctx.fill();
+        if (ink) { ctx.strokeStyle = 'rgba(27,42,58,0.18)'; ctx.lineWidth = 1; ctx.stroke(); }
         ctx.beginPath();
         ctx.arc(left + pad + dot, label.y, dot, 0, 2 * Math.PI);
         ctx.fillStyle = `rgb(${label.colour.map(v => Math.round(v * 255)).join(',')})`;
         ctx.fill();
         ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(236,241,247,0.95)';
+        ctx.fillStyle = ink ? 'rgba(27,42,58,0.95)' : 'rgba(236,241,247,0.95)';
         ctx.fillText(label.text, left + pad * 2 + dot * 2, label.y);
         ctx.textAlign = 'center';
         continue;
       }
-      ctx.fillStyle = label.kind === 'cluster' ? 'rgba(223,231,239,0.85)' : 'rgba(223,231,239,0.95)';
+      ctx.fillStyle = ink ? (label.kind === 'cluster' ? 'rgba(27,42,58,0.85)' : 'rgba(27,42,58,0.95)') : label.kind === 'cluster' ? 'rgba(223,231,239,0.85)' : 'rgba(223,231,239,0.95)';
       ctx.fillText(label.text, label.x, label.y);
     }
   };
@@ -670,6 +713,21 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     /** Provisional: draws in the galaxy style (glows, stars, faint lines, added light) or back in discs and rings. */
     get galaxy() { return galaxy; },
     setGalaxy(on) { if (galaxy !== !!on) { galaxy = !!on; renderer.setState({}); } },
+    /** Provisional: the width in CSS pixels over which the drawing fades out at the canvas edges (0: none). */
+    get edgeFade() { return edgeFade; },
+    setEdgeFade(width) { edgeFade = Math.max(0, Number(width) || 0); applyEdgeFade(); },
+    /** Provisional: 'light' when the background is light (texts dark, the galaxy style in ink), else 'dark'. */
+    get tone() { return tone; },
+    /** Provisional: the clear colour (RGBA in 0..1), for a host that switches between a dark and a light theme; its
+     * luminance sets the tone. Without an argument the default dark background. */
+    setBackground(rgba = DARK_BACKGROUND) {
+      background = [...rgba];
+      const next = toneOf(background);
+      if (next === tone) { renderer.draw(); return; }
+      tone = next;
+      // The galaxy's colours depend on the tone (light or ink); the other drawings only need their texts again.
+      if (galaxy) renderer.setState({}, {fade: 250}); else renderer.draw();
+    },
     /** Provisional: the appearance (style.js, ADR 0026); null for the overview's own colours. */
     setStyle(next) { style = next ?? null; renderer.setState({}); },
     /** Provisional: how structured clusters are drawn: 'cluster' or 'scene' (as the scene view, with the style). */
@@ -765,8 +823,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       const draws = [];
       if (previous) draws.push({layer: previous, uniforms: uniformsOf(view, 0, 1 - f)});
       draws.push({layer: current, uniforms: uniformsOf(view, t, 1)});
-      // Galaxy mode adds light: where many glows and lines meet it grows brighter.
-      backend.frame(draws, options.background ?? [0.047, 0.063, 0.094, 1], galaxy);
+      // Galaxy mode adds light: where many glows and lines meet it grows brighter; on a light background it adds ink.
+      backend.frame(draws, background, galaxy ? (tone === 'light' ? 'ink' : 'add') : 'over');
       if (labels) writeLabels(view, !morphing);
     },
     /** The world point under a CSS pixel of the canvas. */
@@ -786,11 +844,13 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     pickScene(clientX, clientY) { return pickExpanded(model, expanded, ...renderer.world(clientX, clientY)); },
     destroy() {
       if (frame) cancelAnimationFrame(frame);
+      if (edgeFade) { edgeFade = 0; applyEdgeFade(); }
       drop(current); drop(previous);
       backend.destroy();
       options.labels?.getContext('2d').clearRect(0, 0, options.labels.width, options.labels.height);
     },
   };
+  if (options.edgeFade) renderer.setEdgeFade(options.edgeFade);
   return renderer;
 }
 
