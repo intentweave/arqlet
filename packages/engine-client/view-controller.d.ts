@@ -11,7 +11,22 @@ export interface ViewBookmark {
   selection?: DetailTarget;
 }
 
-/** A bookmark as URL-safe text, and back (throws on text that is not one). */
+/**
+ * Provisional: what reading a bookmark against the current graph left out (`openBookmark` of a compact bookmark, or of a
+ * forced one of another graph).
+ */
+export interface BookmarkReport {
+  /** Whether the bookmark was made on this graph (not counting shapes, directions, strategies, routing and ports). */
+  sameSource: boolean;
+  /** Whether the view as imported that a compact bookmark was compared with is the one it was read with. */
+  sameDefaults: boolean;
+  /** The ids the bookmark names that the graph does not have. */
+  missing: string[];
+  /** The decisions left out, by kind (`collapsed`, `pins`, `partial`, `hidden`, `highlight`, `selection`, …) and id. */
+  ignored: {field: string; id: string}[];
+}
+
+/** A bookmark as URL-safe text, and back (throws on text that is not one, such as a compact bookmark). */
 export function encodeBookmark(bookmark: ViewBookmark): string;
 export function decodeBookmark(text: string): ViewBookmark;
 
@@ -137,10 +152,18 @@ export interface ViewController {
   cancelRefinement(): void;
   /** Moves the selection the way `direction` says and sets `state.focus` (nothing opened, not a step for `back`). */
   navigate(direction: NavigationDirection): Promise<ViewResult | {ok: false; none: true; collapsed?: boolean}>;
-  /** The view as a value to keep or share (`encodeBookmark` for a URL). */
+  /** The view as a value to keep or share (`encodeBookmark` for a URL; `compactBookmark` for a short one). */
   bookmark(): Promise<{ok: true; bookmark: ViewBookmark} | {ok: false; error?: string; cancelled?: boolean}>;
-  /** Opens a bookmark (a step for `back`); another graph's is refused unless `force`. */
-  openBookmark(bookmark: ViewBookmark, options?: {force?: boolean}): Promise<ViewResult>;
+  /**
+   * Provisional: the view as a short text for a URL (`b1.…`): what differs from the view as imported, with the highlight
+   * and the selection. `openBookmark` opens it.
+   */
+  compactBookmark(): Promise<{ok: true; text: string} | {ok: false; error?: string; cancelled?: boolean}>;
+  /**
+   * Opens a bookmark (a step for `back`), a value or a text. Another graph's long form is refused unless `force`; a
+   * compact one, and a forced one, restores what the graph has and reports the rest (`BookmarkReport`).
+   */
+  openBookmark(bookmark: ViewBookmark | string, options?: {force?: boolean}): Promise<ViewResult & Partial<BookmarkReport>>;
   back(): Promise<ViewResult>;
   forward(): Promise<ViewResult>;
   /** Any other change of the protocol, remembered for `back` under `label`. */

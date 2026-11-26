@@ -11,7 +11,7 @@ import {refinementFits} from './revisions.js';
 import {MoveGesture,releaseOnDrop} from './drag.js';
 import {trackGesture} from './gesture.js';
 import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
-import {createViewController,encodeBookmark,decodeBookmark} from '@arqlet/engine-client/view-controller.js';
+import {createViewController} from '@arqlet/engine-client/view-controller.js';
 import {placementOnBorder,positionOnBorder} from './port-drag.js';
 import {nearResizeCorner,resizedLeaf} from './resize.js';
 import {GeometryReports,labelSize} from './geometry.js';
@@ -1195,11 +1195,12 @@ function syncDetails(){
  if([...(phaseSelect.children??[])].map(c=>c.value).join('|')!==phaseChoices.join('|')){
   phaseSelect.replaceChildren(...phaseChoices.map(id=>{const option=document.createElement('option');option.value=id;option.textContent=id||'None';return option;}));
  }
- phaseSelect.disabled=!$('grouping-lanes').checked;
- phaseSelect.value=priority[0]?.as==='lanes'&&priority[1]?.as==='lanes'?priority[1].by:'';
+ // With lanes first a second dimension is phases along the flow; otherwise lanes inside every container (M4d).
+ phaseSelect.disabled=dimensions.length===0;
+ phaseSelect.value=priority[1]?.as==='lanes'?priority[1].by:'';
  // Hulls are on when a dimension after the first is listed for its own sake; one listed only to show a single group
  // (`consider`, the control below) does not turn them on.
- $('membership-hulls').checked=priority.slice(1).some((c,i)=>c.by!=='parent'&&!c.consider?.length&&!(i===0&&c.as==='lanes'&&priority[0].as==='lanes'));
+ $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent'&&!c.consider?.length&&c.as!=='lanes');
  // Provisional (ADR 0022 §2, consider): some groups, or all. A value is the JSON pair [dimension, group], since
  // group ids may hold any character (documents are paths).
  const graphDims=(snapshot?.sourceGraph??snapshot?.graph)?.memberships?.dimensions??[];
@@ -1317,8 +1318,8 @@ function applyGrouping(label){
  const first=$('grouping-first').value||'parent';
  // Phases (ADR 0022 M4b): a second dimension along the flow, right after the lanes, so that the two make a grid.
  const lanes=first!=='parent'&&$('grouping-lanes').checked;
- const phases=lanes?$('grouping-phases').value:'';
- const order=[first,...(phases?[phases]:[])];
+ const phases=$('grouping-phases').value;
+ const order=[first,...(phases&&phases!==first?[phases]:[])];
  if(first!=='parent')order.push('parent');
  if($('membership-hulls').checked)order.push(...dimensions.filter(d=>!order.includes(d)));
  // Only some groups: each chosen group's dimension keeps its rank, or joins as a soft criterion when it is not listed
@@ -1330,7 +1331,7 @@ function applyGrouping(label){
  for(const by of consider.keys())if(!order.includes(by))order.push(by);
  const criteria=order.map(by=>consider.has(by)?{by,consider:consider.get(by)}:{by});
  if(lanes)criteria[0].as='lanes';
- if(phases)criteria[1].as='lanes';
+ if(phases&&phases!==first)criteria[1].as='lanes';
  setOption({groupingPriority:criteria.length===1&&!criteria[0].consider?[]:criteria},label);
 }
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
@@ -1770,12 +1771,12 @@ async function runQuery(){
 }
 $('query-run').onclick=runQuery;
 $('query-text').onkeydown=e=>{if(e.key==='Enter')runQuery();};
-// A link to the view (the view controller's bookmark): the decisions, the highlight and the selection in the address
-// (#view=…); opening the page with it opens that view again (one undo step).
+// A link to the view (the view controller's compact bookmark): the decisions, the highlight and the selection in the
+// address (#view=…); opening the page with it opens that view again (one undo step). Links in the long form open too.
 $('view-link').onclick=async()=>{
- const r=await viewController.bookmark();
+ const r=await viewController.compactBookmark();
  if(!r.ok){status(`No link: ${r.error}`);return;}
- const hash=`#view=${encodeBookmark(r.bookmark)}`;
+ const hash=`#view=${r.text}`;
  if(typeof history!=='undefined'&&typeof location!=='undefined')history.replaceState(null,'',`${location.pathname}${location.search}${hash}`);
  try{await navigator.clipboard.writeText(typeof location!=='undefined'?location.href:hash);status('Link to this view copied (and kept in the address).');}
  catch{status('Link to this view kept in the address.');}
@@ -1783,11 +1784,14 @@ $('view-link').onclick=async()=>{
 async function openViewLink(){
  const hash=typeof location!=='undefined'?location.hash:'';
  if(!hash.startsWith('#view='))return;
- let bookmark;
- try{bookmark=decodeBookmark(hash.slice(6));}catch(e){status(`Link not opened: ${e.message}`);return;}
- const r=await edit({op:'restore'},{busy:'Opening the linked view …',fit:true,via:()=>viewController.openBookmark(bookmark)});
+ let missing=0,other=false;
+ const r=await edit({op:'restore'},{busy:'Opening the linked view …',fit:true,
+  via:()=>viewController.openBookmark(hash.slice(6)).then(opened=>{missing=opened.missing?.length??0;other=opened.sameSource===false;return opened;})});
  if(!r.ok){status(`Link not opened: ${r.error}`);return;}
- if(bookmark.selection?.nodeId&&snapshot.graph.nodes.some(n=>n.id===bookmark.selection.nodeId))selectNode(bookmark.selection.nodeId);
- status('Linked view opened.');
+ const chosen=viewController.getState().selection?.nodeId;
+ if(chosen&&snapshot.graph.nodes.some(n=>n.id===chosen))selectNode(chosen);
+ // A link names no example: the page may hold another graph than the one it was made on, which must be said.
+ const gone=missing?`; ${missing} id${missing===1?'':'s'} of the link ${missing===1?'is':'are'} not in it`:'';
+ status(other?`The link was made on another graph or another version of it: what fits is shown${gone}.`:`Linked view opened${gone}.`);
 }
 
