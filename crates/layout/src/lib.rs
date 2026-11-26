@@ -385,8 +385,33 @@ fn compute_counted_for(
     options: &LayoutOptions,
     compared: bool,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    compute_finished(options, |options| {
+        compute_counted_unclocked(graph, previous, dirty, options, compared)
+    })
+}
+
+/// One layout of a graph that is already the one the layout sees, as `region_ports` composes it from two: without the
+/// steps that turn a view into that graph (held groups, hub references, bus lines). Those ran once on the way in, and
+/// the caller gives their results back. Run again, they took the bus nodes out of the graph a second time (#204), and
+/// took the edges of a region's box for those of a hub. The two drawings are compared, so no step is left out.
+fn compute_counted_composed(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<(Snapshot, SearchCounters), String> {
+    compute_finished(options, |options| {
+        compute_counted_forced(graph, previous, dirty, options, false)
+    })
+}
+
+/// A layout by `lay` with what every complete layout adds: the second run without shared tracks, and the timings.
+fn compute_finished(
+    options: &LayoutOptions,
+    lay: impl Fn(&LayoutOptions) -> Result<(Snapshot, SearchCounters), String>,
+) -> Result<(Snapshot, SearchCounters), String> {
     let started = stage_timer_start();
-    let mut result = compute_counted_unclocked(graph, previous, dirty, options, compared);
+    let mut result = lay(options);
     // The completion found the lane orders cyclic and stopped at once (#152): the same as the fallback below.
     let cyclic = matches!(&result, Err(message) if message == SHARED_TRACKS_CYCLIC);
     // Provisional (`sharedTracks`): shared tracks made the lane orders cyclic for many edges; the placement had already made
@@ -404,13 +429,11 @@ fn compute_counted_for(
             shared_tracks: None,
             ..options.clone()
         };
-        result = compute_counted_unclocked(graph, previous, dirty, &plain, compared).map(
-            |(mut s, stages)| {
-                s.options.shared_tracks = options.shared_tracks;
-                s.layout_diagnostics.push(SHARED_TRACKS_FALLBACK.into());
-                (s, stages)
-            },
-        );
+        result = lay(&plain).map(|(mut s, stages)| {
+            s.options.shared_tracks = options.shared_tracks;
+            s.layout_diagnostics.push(SHARED_TRACKS_FALLBACK.into());
+            (s, stages)
+        });
     }
     // Provisional (phase timings): the time of this layout and its phases, for a host that installed a clock.
     if let Ok((_, stages)) = &result {
@@ -680,6 +703,34 @@ pub fn expand_bus_lines(snapshot: &mut Snapshot) -> bool {
     bus_line::expand_snapshot(snapshot)
 }
 
+/// Whether this drawing is one with backbone buses placed by the layout that single pass did not take and that asks for it
+/// again at its next layout (`fell_back`). The runtime and the layout treat such a view as one single pass is asked for,
+/// as they did while its options still said so (#205).
+pub fn retries_single_pass(snapshot: &Snapshot) -> bool {
+    fell_back(&snapshot.options)
+        && snapshot
+            .bus_boxes
+            .keys()
+            .any(|id| id.starts_with(bus_layout::BUS_NODE_PREFIX))
+}
+
+/// The options a single pass that fell back leaves: `singlePassAuto` on, `singlePass` and `abstractRouting` off.
+fn fell_back(options: &LayoutOptions) -> bool {
+    options.single_pass_auto && !options.single_pass && !options.abstract_routing
+}
+
+/// A view's snapshot as the layout saw it: every bus line (`Bus::taps`) as a node with its taps again, and every backbone
+/// bus as its node, with the boxes and the node sizes they had.
+pub(crate) fn seen_by_layout(snapshot: &Snapshot) -> Snapshot {
+    let mut seen = snapshot.clone();
+    bus_line::expand_snapshot(&mut seen);
+    if let Some((graph, options, _)) = bus_layout::expand(&seen.graph, &seen.options) {
+        seen = bus_layout::expand_previous(&seen, &graph);
+        seen.options = options;
+    }
+    seen
+}
+
 fn compute_counted_forced(
     graph: &Graph,
     previous: Option<&Snapshot>,
@@ -782,10 +833,10 @@ fn compute_counted_body(
             // is kept: ports in the order of the nodes keep the inner legs straight and apart, ports in the order outside
             // cross less there.
             let (mut first, first_stages) =
-                compute_counted_for(&split, earlier.as_ref(), dirty, &inner, true)?;
+                compute_counted_composed(&split, earlier.as_ref(), dirty, &inner)?;
             let placed = region_ports::with_ports(&split, &moved, &first);
             let (mut second, stages) =
-                compute_counted_for(&placed, earlier.as_ref(), dirty, &inner, true)?;
+                compute_counted_composed(&placed, earlier.as_ref(), dirty, &inner)?;
             // Each keeps the options its layout wrote (a layout that fell back to the other pipeline says so), so a later
             // edit or refinement goes on with the pipeline that drew it.
             for snapshot in [&mut first, &mut second] {
@@ -1057,7 +1108,7 @@ fn compute_counted_inner(
         if whole_reroute
             && engine_choice_fits
             && !snapshot.route_conflicts.is_empty()
-            && !snapshot.options.single_pass
+            && !keeps_routes(&snapshot)
         {
             if let Some(better) = engine_choice::improve(graph, previous, &snapshot, &finish)? {
                 return Ok((better, stages));
@@ -1077,6 +1128,13 @@ fn compute_counted_inner(
     })
 }
 
+/// Whether the routes in conflict are reported rather than answered by routing the whole drawing again with both engines:
+/// under single pass, and on a view with backbone buses that fell back from it. Such a view never had that second choice
+/// (its options kept `singlePass` through a fallback, #205).
+fn keeps_routes(snapshot: &Snapshot) -> bool {
+    snapshot.options.single_pass || retries_single_pass(snapshot)
+}
+
 /// Provisional (#150): whether routing the conflicting routes of `snapshot` again could change nothing but those routes,
 /// in a view whose buses all become lines (`compute_counted_buses`). Every condition names a way the routes would reach the
 /// result.
@@ -1085,7 +1143,7 @@ fn undrawn_routes(snapshot: &Snapshot, engine_choice_fits: bool) -> bool {
     // Every route is the tap of a bus node: the lines are drawn from the boxes (`bus_line::bars_to_lines`), not from it.
     bus_line::only_taps(&snapshot.graph)
         // The engine choice behind the second routing judges the drawings with these routes and may replace the drawing.
-        && (options.single_pass || !engine_choice_fits)
+        && (keeps_routes(snapshot) || !engine_choice_fits)
         // Edge and port labels are placed beside the routes, clear of all of them.
         && options.port_labels.is_empty()
         && !snapshot
@@ -1199,7 +1257,14 @@ fn compute_mode_buses(
     run: &mut Run,
 ) -> Result<Snapshot, Abort> {
     // Backbone buses take part in the layout as virtual nodes (`bus_layout`); the result is given back in the canonical graph.
-    if let Some((expanded, expanded_options, expansion)) = bus_layout::expand(graph, options) {
+    if let Some((expanded, mut expanded_options, expansion)) = bus_layout::expand(graph, options) {
+        // Such a view asks for single pass at every layout while `singlePassAuto` is on, also where the drawing it continues
+        // fell back, whose options say so: an edit that removes the reason gets single pass again. Other views stay on the
+        // pipeline that drew them until the next import or `configure`; these never did (#205).
+        if fell_back(options) {
+            expanded_options.abstract_routing = true;
+            expanded_options.single_pass = true;
+        }
         let earlier = previous.map(|p| bus_layout::expand_previous(p, &expanded));
         let snapshot = compute_mode_plain(
             &expanded,
