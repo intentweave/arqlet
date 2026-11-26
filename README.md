@@ -414,7 +414,7 @@ macOS arm64, Windows x64) and WASM give identical responses (checked in CI by
 | `packages/arqlet` | npm entry point: re-exports engine client and viewer |
 | `packages/engine-client` | the WASM engine with loader, worker protocol, presets, ELK-style API |
 | `packages/viewer` | SVG rendering, navigation, React Flow adapter |
-| `packages/query` | `@arqlet/query`: the query layer as WASM, without the layout engine (not published yet) |
+| `packages/query` | `@arqlet/query`: the query layer as WASM, without the layout engine (provisional) |
 | `packages/containment-tree` | interactive containment tree of a scene |
 | `packages/contracts` | generated TypeScript types for snapshot, scene and config sets |
 | `apps/playground` | demo UI, comparison view and loopback backend |
