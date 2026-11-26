@@ -235,6 +235,40 @@ pub fn validate(priority: &[GroupingCriterion], memberships: &Memberships) -> Re
     Ok(())
 }
 
+/// Provisional (ADR 0022 M4b): the phase of every top-level node of `graph` that the dimension `by` places: the earliest of its
+/// groups, by their declared order, that names the node or a node below it as a member. A nested group is a phase of its own.
+/// Top-level nodes of no group are not in the result.
+pub fn top_level_phases(graph: &Graph, by: &str) -> BTreeMap<String, usize> {
+    let Some(dimension) = graph.memberships.dimension(by) else {
+        return BTreeMap::new();
+    };
+    let parent: BTreeMap<&str, Option<&str>> = graph
+        .nodes
+        .iter()
+        .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
+        .collect();
+    let top = |id: &str| -> String {
+        let mut at = id;
+        for _ in 0..=parent.len() {
+            match parent.get(at).copied().flatten() {
+                Some(p) => at = p,
+                None => break,
+            }
+        }
+        at.to_string()
+    };
+    let mut phase: BTreeMap<String, usize> = BTreeMap::new();
+    for (i, g) in dimension.groups.iter().enumerate() {
+        for m in &g.members {
+            if parent.contains_key(m.as_str()) {
+                let entry = phase.entry(top(m)).or_insert(i);
+                *entry = (*entry).min(i);
+            }
+        }
+    }
+    phase
+}
+
 /// Whether a criterion considers a group: every group of its dimension when `consider` is empty, else the listed ones.
 pub fn considers(criterion: &GroupingCriterion, group: &str) -> bool {
     criterion.consider.is_empty() || criterion.consider.iter().any(|s| s == group)

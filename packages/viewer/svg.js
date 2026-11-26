@@ -124,7 +124,9 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  });
  for(const [i,lane] of lanes.entries()){
   if(i>0){const r=lane.rect;svg.append(element('line',{...(lane.vertical?{x1:r.x,y1:r.y,x2:r.x,y2:r.y+r.height}:{x1:r.x,y1:r.y,x2:r.x+r.width,y2:r.y}),stroke:T.frameStroke,'stroke-width':1,'stroke-dasharray':'4 4','pointer-events':'none',class:'lw-lane-border'}));}
-  const r=lane.rect;svg.append(element('text',{x:r.x+8,y:r.y+14,fill:T.title,'font-size':12,'font-weight':600,'pointer-events':'none',class:'lw-lane-label'},lane.label));
+  // A phase whose band runs across x (a flow from top to bottom) has its name in a narrow strip at the left: turned.
+  const r=lane.rect,turned=lane.phase&&!lane.vertical;
+  svg.append(element('text',{x:turned?r.x+16:r.x+8,y:turned?r.y+8:r.y+14,...(turned?{transform:`rotate(90 ${r.x+16} ${r.y+8})`}:{}),fill:T.title,'font-size':12,'font-weight':600,'pointer-events':'none',class:lane.phase?'lw-lane-label lw-phase-label':'lw-lane-label'},lane.label));
  }
  const rings=[],top=[];
  for(const n of [...nodes.values()].filter(n=>parents.has(n.id)).sort((a,b)=>depth(a)-depth(b))){const r=absolute.get(n.id);
