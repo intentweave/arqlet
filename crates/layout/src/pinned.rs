@@ -1,10 +1,11 @@
-//! Experimental (`pinsInSinglePass`, ADR 0016, amendment *Pins in single pass*, step P1): under single pass and in the
-//! hierarchical pipeline it falls back to, a pinned leaf of a layered area is a constraint of the arrangement instead of a
-//! box written over it. The pin gives the node its rank
+//! Experimental (`pinsInSinglePass`, ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass and in
+//! the hierarchical pipeline it falls back to, a pinned node of a layered area, a leaf or a container, is a constraint of
+//! the arrangement instead of a box written over it. The pin gives the node its rank
 //! (the rank whose band holds the pin's middle along the flow, or the nearest, in a drawing to start from), its order in
 //! that rank and its place across the flow, which the placement holds. Along the flow the node stands in its rank's band;
 //! the difference to the pin is reported. The layout itself runs without the pin, so every route is constructed and buses
-//! are drawn as buses. Containers (step P2), regions of other strategies and reversed flows keep what they did.
+//! are drawn as buses. A pinned container is one element of its parent's area, and its inside is laid out as without the pin.
+//! Pins in regions of other strategies and in reversed flows keep what they did.
 use arqlet_model::{Graph, LayoutOptions, Mode, Point, Rect, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -26,7 +27,7 @@ pub(crate) struct Place {
 pub(crate) type Places = BTreeMap<String, Place>;
 
 /// Whether the option applies to these pins: the layered areas are ordered hierarchically (single pass and the pipeline it
-/// falls back to), and every pin is a leaf of an area that flows left to right or top to bottom (or chooses its
+/// falls back to), and every pinned node stands in an area that flows left to right or top to bottom (or chooses its
 /// direction). Otherwise the pins are handled as without the option.
 pub(crate) fn applies(graph: &Graph, options: &LayoutOptions) -> bool {
     if !options.pins_in_single_pass
@@ -38,25 +39,19 @@ pub(crate) fn applies(graph: &Graph, options: &LayoutOptions) -> bool {
     {
         return false;
     }
-    let containers: BTreeSet<&str> = graph
-        .nodes
-        .iter()
-        .filter_map(|n| n.parent_id.as_deref())
-        .collect();
     let parents: BTreeMap<&str, Option<&str>> = graph
         .nodes
         .iter()
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
         .collect();
     options.pins.keys().all(|id| {
-        !containers.contains(id.as_str())
-            && parents
-                .get(id.as_str())
-                .is_some_and(|parent| match graph.area_mode(*parent) {
-                    Ok(Mode::Orientation(o)) => !o.reversed(),
-                    Ok(Mode::Chooser(_)) => true,
-                    _ => false,
-                })
+        parents
+            .get(id.as_str())
+            .is_some_and(|parent| match graph.area_mode(*parent) {
+                Ok(Mode::Orientation(o)) => !o.reversed(),
+                Ok(Mode::Chooser(_)) => true,
+                _ => false,
+            })
     })
 }
 
@@ -153,16 +148,17 @@ pub(crate) fn places(
         }) else {
             continue;
         };
-        // The siblings that hold an end of an edge of the node.
+        // The siblings joined to the node by an edge, between the nodes themselves or what they hold.
         let linked: BTreeSet<&str> = graph
             .edges
             .iter()
             .filter_map(|e| {
-                let target = e.target.as_deref()?;
-                if e.source == *id {
-                    sibling(&parents, area, target)
-                } else if target == id {
-                    sibling(&parents, area, &e.source)
+                let source = sibling(&parents, area, &e.source)?;
+                let target = sibling(&parents, area, e.target.as_deref()?)?;
+                if source == id && target != id {
+                    Some(target)
+                } else if target == id && source != id {
+                    Some(source)
                 } else {
                     None
                 }
