@@ -11,7 +11,7 @@ import {refinementFits} from './revisions.js';
 import {MoveGesture,releaseOnDrop} from './drag.js';
 import {trackGesture} from './gesture.js';
 import {createSession as createLayoutSession} from '@arqlet/engine-client/session.js';
-import {createViewController,encodeBookmark,decodeBookmark} from '@arqlet/engine-client/view-controller.js';
+import {createViewController} from '@arqlet/engine-client/view-controller.js';
 import {placementOnBorder,positionOnBorder} from './port-drag.js';
 import {nearResizeCorner,resizedLeaf} from './resize.js';
 import {GeometryReports,labelSize} from './geometry.js';
@@ -1758,12 +1758,12 @@ async function runQuery(){
 }
 $('query-run').onclick=runQuery;
 $('query-text').onkeydown=e=>{if(e.key==='Enter')runQuery();};
-// A link to the view (the view controller's bookmark): the decisions, the highlight and the selection in the address
-// (#view=…); opening the page with it opens that view again (one undo step).
+// A link to the view (the view controller's compact bookmark): the decisions, the highlight and the selection in the
+// address (#view=…); opening the page with it opens that view again (one undo step). Links in the long form open too.
 $('view-link').onclick=async()=>{
- const r=await viewController.bookmark();
+ const r=await viewController.compactBookmark();
  if(!r.ok){status(`No link: ${r.error}`);return;}
- const hash=`#view=${encodeBookmark(r.bookmark)}`;
+ const hash=`#view=${r.text}`;
  if(typeof history!=='undefined'&&typeof location!=='undefined')history.replaceState(null,'',`${location.pathname}${location.search}${hash}`);
  try{await navigator.clipboard.writeText(typeof location!=='undefined'?location.href:hash);status('Link to this view copied (and kept in the address).');}
  catch{status('Link to this view kept in the address.');}
@@ -1771,11 +1771,12 @@ $('view-link').onclick=async()=>{
 async function openViewLink(){
  const hash=typeof location!=='undefined'?location.hash:'';
  if(!hash.startsWith('#view='))return;
- let bookmark;
- try{bookmark=decodeBookmark(hash.slice(6));}catch(e){status(`Link not opened: ${e.message}`);return;}
- const r=await edit({op:'restore'},{busy:'Opening the linked view …',fit:true,via:()=>viewController.openBookmark(bookmark)});
+ let missing=0;
+ const r=await edit({op:'restore'},{busy:'Opening the linked view …',fit:true,
+  via:()=>viewController.openBookmark(hash.slice(6)).then(opened=>{missing=opened.missing?.length??0;return opened;})});
  if(!r.ok){status(`Link not opened: ${r.error}`);return;}
- if(bookmark.selection?.nodeId&&snapshot.graph.nodes.some(n=>n.id===bookmark.selection.nodeId))selectNode(bookmark.selection.nodeId);
- status('Linked view opened.');
+ const chosen=viewController.getState().selection?.nodeId;
+ if(chosen&&snapshot.graph.nodes.some(n=>n.id===chosen))selectNode(chosen);
+ status(missing?`Linked view opened; ${missing} id${missing===1?'':'s'} of the link no longer exist${missing===1?'s':''}.`:'Linked view opened.');
 }
 

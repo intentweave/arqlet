@@ -127,8 +127,12 @@ export function navigateScene(scene, from, direction) {
   }
 }
 
+// The engine's compact bookmark (`compactBookmark`): `b1.` and base64url; the JSON form's text holds no `.`.
+const compactText = /^b\d+\./;
+
 /**
  * A bookmark as text for a URL (base64url of its JSON, UTF-8), and back. `decodeBookmark` throws on text that is not one.
+ * This is the long form; `compactBookmark` of a view controller gives a short one, which `openBookmark` takes as text.
  */
 export function encodeBookmark(bookmark) {
   const bytes = new TextEncoder().encode(JSON.stringify(bookmark));
@@ -138,6 +142,7 @@ export function encodeBookmark(bookmark) {
 }
 
 export function decodeBookmark(text) {
+  if (compactText.test(text)) throw Error('A compact bookmark: open its text with openBookmark.');
   const base64 = text.replace(/-/g, '+').replace(/_/g, '/');
   const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
   const bookmark = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, c => c.charCodeAt(0))));
@@ -210,6 +215,31 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     return answer.ok ? answer.digest ?? null : null;
   };
 
+  // The view's decisions as it was imported, which a compact bookmark is compared with: undefined until they are read,
+  // null when unknown. They are read with the first change that reads the decisions anyway, or for a bookmark, so that no
+  // step costs an engine call for them; `pristine` says whether the view then came from an import.
+  let defaults;
+  let pristine = null;
+  const isPristine = snapshot => !!snapshot && (snapshot.layoutVersion ?? 0) === 0;
+  // Another view: its defaults are read from it, if it is as an import left it (a snapshot that went through changes holds
+  // decisions, which must stay in the bookmark).
+  const newView = () => {
+    defaults = undefined;
+    pristine = isPristine(session.snapshot);
+  };
+  // `now` is the current intent, if the caller has read it.
+  const readDefaults = async now => {
+    if (defaults !== undefined) return;
+    defaults = (pristine ?? isPristine(session.snapshot)) ? now ?? await intent() : null;
+  };
+  // Call before a change that may alter decisions, with the intent before it if the step has read it. Without it the
+  // defaults stay unknown: a compact bookmark then keeps every decision.
+  const beforeChange = async before => {
+    if (before) await readDefaults(before);
+    else if (defaults === undefined) defaults = null;
+  };
+  const withDefaults = request => (defaults ? {...request, defaults} : request);
+
   // The current snapshot kept by the session for `back` (#148): its mark, or null without it.
   const mark = async () => {
     if (!keepGeometry || typeof session.keep !== 'function') return null;
@@ -220,6 +250,14 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
     const answer = await session.apply({op: 'intent'});
     if (!answer.ok) throw Error(answer.error ?? 'No intent');
     return answer.intent;
+  };
+
+  // What a bookmark keeps beside the decisions: the highlight's question (not its answer) and the selection.
+  const marks = () => {
+    const h = state.highlight;
+    const highlight = h ? {kind: h.kind, ...(h.kind === 'trace' ? {from: h.from, to: h.to} : {nodeId: h.nodeId}),
+      ...(h.init ? {init: h.init} : {})} : null;
+    return {...(highlight ? {highlight} : {}), ...(state.selection ? {selection: state.selection} : {})};
   };
 
   // Asks the highlight's query again on the current view (its visible nodes and routes depend on what is open).
@@ -300,10 +338,12 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
 
   // A change the user makes: its decisions before and after are remembered (unless `remember` is false), so that `back`
   // undoes it. A refinement under way is stopped: its result would be for the view before the change.
-  const change = (label, run, extra = () => ({}), remember = true, merge = false) => enqueue(async current => {
+  // `settles`: the change moves nodes and alters no decision.
+  const change = (label, run, extra = () => ({}), remember = true, merge = false, settles = false) => enqueue(async current => {
     if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
     stopRefinement('cancelled');
     const before = remember ? await intent() : null;
+    if (!settles) await beforeChange(before);
     const beforeMark = remember ? await mark() : null;
     const result = await run();
     if (!current()) return {ok: false, cancelled: true};
@@ -387,6 +427,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           publish({error: result.error ?? 'The import failed.'});
           return result;
         }
+        newView();
         state = Object.freeze({...state, scene: null, highlight: null, selection: null, details: null, hover: null,
           search: null, focus: null, peek: null, hide: {}, steps: 0});
         await settle({}, current);
@@ -647,42 +688,78 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
 
     /**
      * The view as a value to keep or share: the decisions (the engine's intent: open groups, pages, filter, options), the
-     * highlight and the selection, and the digest of the graph it belongs to. `encodeBookmark` makes it text for a URL.
+     * highlight and the selection, and the digest of the graph it belongs to. `encodeBookmark` makes it text for a URL;
+     * `compactBookmark` gives a much shorter one.
      */
     bookmark() {
       return enqueue(async () => {
         if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
-        const h = state.highlight;
-        const highlight = h ? {kind: h.kind, ...(h.kind === 'trace' ? {from: h.from, to: h.to} : {nodeId: h.nodeId}),
-          ...(h.init ? {init: h.init} : {})} : null;
-        const bookmark = {version: 1, digest: await digest(), intent: await intent(),
-          ...(highlight ? {highlight} : {}), ...(state.selection ? {selection: state.selection} : {})};
-        return {ok: true, bookmark};
+        return {ok: true, bookmark: {version: 1, digest: await digest(), intent: await intent(), ...marks()}};
       });
     },
 
     /**
-     * Opens a bookmark on the current graph (a step for `back`): its decisions, highlight and selection. A bookmark of
-     * another graph (another digest) is refused unless `force`.
+     * Provisional: the view as a short text for a URL, `{ok, text}` (`b1.…`, base64url), made by the engine (operation
+     * `compactBookmark`): only what differs from the view as it was imported, every id once, with the highlight and the
+     * selection. `openBookmark(text)` opens it.
+     */
+    compactBookmark() {
+      return enqueue(async () => {
+        if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
+        await readDefaults();
+        const answer = await session.apply(withDefaults({op: 'compactBookmark', ...marks()}));
+        if (!answer.ok) publish({error: answer.error ?? 'No bookmark.'});
+        return answer;
+      });
+    },
+
+    /**
+     * Opens a bookmark on the current graph (a step for `back`): its decisions, highlight and selection. `bookmark` is the
+     * value of `bookmark()` or a text (of `compactBookmark` or `encodeBookmark`). A bookmark in the long form of another
+     * graph (another digest) is refused unless `force`. A compact one, and a forced one, is read against the graph (the
+     * engine's `readBookmark`): what names an id the graph no longer has is left out, and the result says so (`missing`,
+     * `ignored`, `sameSource`, `sameDefaults`).
      */
     openBookmark(bookmark, {force = false} = {}) {
       return enqueue(async current => {
         if (!session.snapshot) return {ok: false, error: 'Nothing imported yet.'};
-        if (bookmark?.version !== 1 || typeof bookmark.intent !== 'object') return {ok: false, error: 'Not a view bookmark.'};
-        const now = bookmark.digest && !force ? await digest() : null;
-        if (now && bookmark.digest !== now) {
+        const compact = typeof bookmark === 'string' && compactText.test(bookmark);
+        let opened = bookmark;
+        if (typeof bookmark === 'string' && !compact) {
+          try { opened = decodeBookmark(bookmark); } catch { opened = null; }
+        }
+        if (!compact && (opened?.version !== 1 || typeof opened.intent !== 'object')) {
+          return {ok: false, error: 'Not a view bookmark.'};
+        }
+        const now = !compact && opened.digest ? await digest() : null;
+        const other = !!now && opened.digest !== now;
+        if (other && !force) {
           const error = 'The bookmark belongs to another graph.';
           publish({error});
           return {ok: false, error};
         }
         stopRefinement('cancelled');
         const before = await intent();
+        await readDefaults(before);
+        let report = {};
+        if (compact || other) {
+          const read = await session.apply(compact ? withDefaults({op: 'readBookmark', text: bookmark})
+            : {op: 'readBookmark', bookmark: opened});
+          if (!current()) return {ok: false, cancelled: true};
+          if (!read.ok) {
+            publish({error: read.error ?? 'The engine refused the bookmark.'});
+            return read;
+          }
+          const {sameSource, sameDefaults, missing, ignored} = read;
+          report = {sameSource, sameDefaults, missing, ignored};
+          opened = read.bookmark;
+        }
         const beforeMark = await mark();
-        const result = await session.apply({op: 'restore', intent: bookmark.intent});
+        const result = await session.apply({op: 'restore', intent: opened.intent});
         if (!current()) return {ok: false, cancelled: true};
         if (!result.ok) {
           publish({error: result.error ?? 'The engine refused the bookmark.'});
-          return result;
+          return {...result, ...report};
         }
         const after = await intent();
         if (!same(before, after)) {
@@ -690,9 +767,9 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           if (back.length > historyLimit) back.shift();
           forward = [];
         }
-        state = Object.freeze({...state, highlight: bookmark.highlight ?? null, selection: bookmark.selection ?? null});
-        await settle({hide: bookmark.intent.hidden ?? {}}, current);
-        return result;
+        state = Object.freeze({...state, highlight: opened.highlight ?? null, selection: opened.selection ?? null});
+        await settle({hide: opened.intent.hidden ?? {}}, current);
+        return {...result, ...report};
       });
     },
 
@@ -717,7 +794,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
      * `remember: false`, for steps that change no decision, such as settling).
      */
     apply(request, label = request.op, {remember = true, merge = false} = {}) {
-      return change(label, () => session.apply(request), () => ({}), remember, merge);
+      return change(label, () => session.apply(request), () => ({}), remember, merge, request.op === 'settle');
     },
 
     /**
@@ -729,6 +806,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
         // With `remember` (a label) the change from the session's snapshot to this one is remembered for `back`.
         stopRefinement('cancelled');
         const before = remember && session.snapshot ? await intent() : null;
+        if (!forget && session.snapshot) await beforeChange(before);
         const beforeMark = before ? await mark() : null;
         const result = await session.load(snapshot, {reset: forget});
         if (!current()) return {ok: false, cancelled: true};
@@ -737,6 +815,7 @@ export function createViewController(session, {page = 12, historyLimit = 50, sce
           return result;
         }
         if (forget) {
+          newView();
           back = [];
           forward = [];
           state = Object.freeze({...state, highlight: null, selection: null, details: null, hover: null, search: null,
