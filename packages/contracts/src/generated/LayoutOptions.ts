@@ -258,14 +258,6 @@ organicIterations?: number | null,
  */
 organicGap?: number | null,
 /**
- * Provisional (#150): where every edge of a view is a tap of a bus drawn from a bar (also as the lines made from
- * one), a layout does not route the routes in conflict a second time. Those routes are never drawn (the bar and its
- * taps come from the boxes), but routing them again can take most of the layout's time. On the measured views an
- * import is drawn the same; the routes kept for later operations (`Snapshot::bus_taps`) and
- * `recomputed_containers` can differ, and a later move or refinement can draw differently. Off by default (omitted).
- */
-skipTapReroute?: boolean,
-/**
  * Experimental (ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass, and in the
  * hierarchical pipeline it falls back to, a pinned node (leaf or container) of an area that flows left to right or top
  * to bottom is a constraint of the arrangement: the pin chooses its rank and its order there and holds its place

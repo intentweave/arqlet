@@ -81,7 +81,7 @@ pub fn refine_hierarchical(
         .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
         .collect();
     let no_dirty = BTreeSet::new();
-    let base = arqlet_layout::compute(graph, None, &no_dirty, options)?;
+    let base = arqlet_layout::compute_compared(graph, None, &no_dirty, options)?;
 
     let mut shapes: BTreeMap<String, Orientation> = BTreeMap::new();
     let mut strategies: BTreeMap<String, LayoutStrategy> = BTreeMap::new();
@@ -416,7 +416,8 @@ fn layout_level(
     };
     let mut level_options = options.clone();
     level_options.node_sizes = level_sizes;
-    let laid = arqlet_layout::compute(&level_graph, None, &BTreeSet::new(), &level_options)?;
+    let laid =
+        arqlet_layout::compute_compared(&level_graph, None, &BTreeSet::new(), &level_options)?;
     // The level is refined by its own strategies, as the single container's interior is.
     let (refined, _, _) =
         refine_snapshot_logged(&laid, laid.revision, laid.layout_version, 1, None)?;

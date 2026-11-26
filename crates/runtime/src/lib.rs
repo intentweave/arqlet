@@ -1516,6 +1516,19 @@ pub(crate) fn fixed_size_conflicts(
 pub const MEASURE_TOLERANCE: f64 = 4.0;
 
 fn recompute_with(snapshot: &Snapshot, options: &LayoutOptions) -> Result<Snapshot, String> {
+    recompute_for(snapshot, options, false)
+}
+
+/// `recompute_with` for a drawing that is compared with another one (`arqlet_layout::compute_compared`).
+fn recompute_compared(snapshot: &Snapshot, options: &LayoutOptions) -> Result<Snapshot, String> {
+    recompute_for(snapshot, options, true)
+}
+
+fn recompute_for(
+    snapshot: &Snapshot,
+    options: &LayoutOptions,
+    compared: bool,
+) -> Result<Snapshot, String> {
     // The configId is a label, not a geometry input: it is compared like appearance.
     let mut geometry_options = options.clone();
     geometry_options.appearance = snapshot.options.appearance.clone();
@@ -1542,7 +1555,12 @@ fn recompute_with(snapshot: &Snapshot, options: &LayoutOptions) -> Result<Snapsh
         result.recomputed_containers.clear();
         return Ok(result);
     }
-    recompute_layout(snapshot, options, local_dirty(snapshot, options))
+    let dirty = local_dirty(snapshot, options);
+    if compared {
+        recompute_layout_with(snapshot, options, dirty, arqlet_layout::compute_compared)
+    } else {
+        recompute_layout(snapshot, options, dirty)
+    }
 }
 
 /// Whether an area of the graph is arranged organically: only there a continuation holds the unedited nodes in place.
@@ -1637,6 +1655,19 @@ fn recompute_layout(
     options: &LayoutOptions,
     dirty: Option<BTreeSet<String>>,
 ) -> Result<Snapshot, String> {
+    recompute_layout_with(snapshot, options, dirty, arqlet_layout::compute)
+}
+
+/// A layout function: `arqlet_layout::compute` or `compute_compared`.
+type Compute =
+    fn(&Graph, Option<&Snapshot>, &BTreeSet<String>, &LayoutOptions) -> Result<Snapshot, String>;
+
+fn recompute_layout_with(
+    snapshot: &Snapshot,
+    options: &LayoutOptions,
+    dirty: Option<BTreeSet<String>>,
+    compute: Compute,
+) -> Result<Snapshot, String> {
     let source = snapshot
         .source_graph
         .as_deref()
@@ -1659,7 +1690,7 @@ fn recompute_layout(
     // Warm start: children begin where the previous layout put them. Every node is placed again, so that a changed size or
     // a changed container reaches the drawing; only the start positions are taken from the previous layout.
     let dirty = dirty.unwrap_or_else(|| graph.nodes.iter().map(|n| n.id.clone()).collect());
-    let mut result = arqlet_layout::compute(&graph, Some(snapshot), &dirty, options)?;
+    let mut result = compute(&graph, Some(snapshot), &dirty, options)?;
     result.source_graph = Some(source.into());
     result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
@@ -3590,7 +3621,7 @@ fn evaluate_job(
             // The same pipeline with the row ports at the middle of their rows, then refined as the view is refined.
             let mut middle = snapshot.options.clone();
             middle.row_port_order = arqlet_model::RowPortOrder::Middle;
-            let computed = recompute_with(snapshot, &middle)?;
+            let computed = recompute_compared(snapshot, &middle)?;
             let refined = refine_snapshot_limited(
                 &computed,
                 computed.revision,
@@ -3606,7 +3637,7 @@ fn evaluate_job(
             // it exactly as a symmetric view is refined. A symmetric view has no alternative, so this does not recurse.
             let mut symmetric = snapshot.options.clone();
             symmetric.port_placement = PortPlacement::Symmetric;
-            let computed = recompute_with(snapshot, &symmetric)?;
+            let computed = recompute_compared(snapshot, &symmetric)?;
             // The nested refinement checks the same stop signal; an interrupted one is discarded by the caller.
             let refined = refine_snapshot_limited(
                 &computed,
@@ -3622,7 +3653,7 @@ fn evaluate_job(
             // The same view with component packing off, recomputed from the source graph and refined as usual.
             let mut unpacked = snapshot.options.clone();
             unpacked.component_packing = false;
-            let computed = recompute_with(snapshot, &unpacked)?;
+            let computed = recompute_compared(snapshot, &unpacked)?;
             let refined = refine_snapshot_limited(
                 &computed,
                 computed.revision,

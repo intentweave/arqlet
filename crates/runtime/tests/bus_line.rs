@@ -998,46 +998,58 @@ fn areas(containers: usize, units: usize, buses: usize, gateway: usize) -> Graph
     .unwrap()
 }
 
-/// #150: with `skipTapReroute` a view whose edges are all bus taps is drawn as without it, and the taps' routes in
-/// conflict are not routed a second time. Off and omitted by default.
+/// #150: where every bus becomes lines, nothing draws or reads the routes of the taps, and `compute` does not route the
+/// ones in conflict a second time. `compute_compared` leaves nothing out, so the two show what the step changes: the
+/// routes kept for the taps, and no part of the drawing. Wherever those routes could reach the result, the two are equal.
 #[test]
-fn skip_tap_reroute_draws_the_same_and_leaves_the_taps_as_first_routed() {
-    let import = |options: serde_json::Value| {
+fn taps_of_bus_lines_are_not_routed_twice_and_nothing_drawn_changes() {
+    let both = |graph: Graph, options: serde_json::Value| {
         let options: LayoutOptions = serde_json::from_value(options).unwrap();
-        import_graph_with(areas(16, 3, 3, 2), 10_000, &options).unwrap()
+        let view = import_graph_with(graph, 10_000, &options).unwrap();
+        let none = std::collections::BTreeSet::new();
+        let plain = arqlet_layout::compute(&view.graph, None, &none, &view.options).unwrap();
+        let complete =
+            arqlet_layout::compute_compared(&view.graph, None, &none, &view.options).unwrap();
+        (plain, complete)
     };
     let collapsed = json!({"busStyle": "lines", "levelOfDetail": {"kinds": ["single"]}});
-    let plain = import(collapsed.clone());
-    assert!(!serde_json::to_string(&plain.options)
-        .unwrap()
-        .contains("skipTapReroute"));
-    let mut with = collapsed;
-    with["skipTapReroute"] = json!(true);
-    let skipped = import(with);
-    // Everything the view draws or reports about its drawing.
-    let drawn = |s: &Snapshot| {
-        let v = serde_json::to_value(s).unwrap();
-        [
-            "graph",
-            "boxes",
-            "routes",
-            "busLines",
-            "routingIssues",
-            "routeConflicts",
-            "layoutDiagnostics",
-        ]
-        .map(|key| v[key].clone())
+    let large = || areas(24, 4, 3, 2);
+    let (plain, complete) = both(large(), collapsed.clone());
+    assert!(plain.bus_lines.is_empty(), "every bus is drawn as lines");
+    // This view has routes in conflict that routing again improves: the kept tap routes differ.
+    let routes = |s: &Snapshot| serde_json::to_value(&s.bus_taps.routes).unwrap();
+    assert_ne!(routes(&plain), routes(&complete));
+    assert_eq!(plain.bus_taps.routes.len(), complete.bus_taps.routes.len());
+    assert_eq!(plain.bus_taps.roots, complete.bus_taps.roots);
+    // Everything else is the same, but for the report of the containers routed again.
+    let rest = |s: &Snapshot| {
+        let mut v = serde_json::to_value(s).unwrap();
+        let map = v.as_object_mut().unwrap();
+        map.remove("busTaps");
+        map.remove("recomputedContainers");
+        v
     };
-    assert_eq!(drawn(&plain), drawn(&skipped));
-    // The view this generator draws has routes in conflict that the second pass improved: the kept tap routes differ,
-    // so the pass did not run with the option.
-    assert_ne!(
-        serde_json::to_value(&plain.bus_taps).unwrap(),
-        serde_json::to_value(&skipped.bus_taps).unwrap()
-    );
-    assert_eq!(
-        plain.bus_taps.routes.len(),
-        skipped.bus_taps.routes.len(),
-        "every tap keeps a route for later operations"
-    );
+    assert_eq!(rest(&plain), rest(&complete));
+
+    let same = |graph: Graph, options: serde_json::Value, why: &str| {
+        let (plain, complete) = both(graph, options);
+        assert_eq!(
+            serde_json::to_value(&plain).unwrap(),
+            serde_json::to_value(&complete).unwrap(),
+            "{why}"
+        );
+    };
+    // A bar's tap routes are restored for later operations.
+    let mut bar = collapsed.clone();
+    bar["busStyle"] = json!("bar");
+    same(large(), bar, "bars");
+    // Few boxes: the engine choice may run, and it judges the drawing with the tap routes.
+    same(areas(16, 3, 3, 2), collapsed.clone(), "engine choice");
+    // A label beside a tap's route is placed along it.
+    let mut labelled = collapsed;
+    let options: LayoutOptions = serde_json::from_value(labelled.clone()).unwrap();
+    let first = import_graph_with(large(), 10_000, &options).unwrap();
+    let tap = first.graph.edges[0].id.clone();
+    labelled["edgeLabels"] = json!({tap: {"text": "tap", "width": 20.0, "height": 10.0}});
+    same(large(), labelled, "an edge label");
 }

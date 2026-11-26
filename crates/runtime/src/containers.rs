@@ -114,7 +114,7 @@ pub fn refine_by_fixed_boundary(
         memberships: Default::default(),
     };
     let no_dirty = BTreeSet::new();
-    let laid = arqlet_layout::compute(&interior, None, &no_dirty, options)?;
+    let laid = arqlet_layout::compute_compared(&interior, None, &no_dirty, options)?;
     let (interior_snap, _, _) =
         refine_snapshot_logged(&laid, laid.revision, laid.layout_version, 1, None)?;
     let interior_strategy = strategy_of(&interior_snap);
@@ -193,7 +193,7 @@ pub fn refine_by_fixed_boundary(
     outer_options
         .node_sizes
         .insert(container.clone(), size.clone());
-    let laid_outer = arqlet_layout::compute(&outer, None, &no_dirty, &outer_options)?;
+    let laid_outer = arqlet_layout::compute_compared(&outer, None, &no_dirty, &outer_options)?;
     let (outer_snap, _, _) = refine_snapshot_logged(
         &laid_outer,
         laid_outer.revision,
@@ -209,7 +209,7 @@ pub fn refine_by_fixed_boundary(
         .clone();
 
     // The composition, in the coordinates of the whole graph: child boxes are relative to the container.
-    let mut composed = arqlet_layout::compute(graph, None, &no_dirty, options)?;
+    let mut composed = arqlet_layout::compute_compared(graph, None, &no_dirty, options)?;
     composed.boxes = outer_snap
         .boxes
         .iter()
@@ -253,7 +253,7 @@ pub fn refine_by_fixed_boundary(
         None
     };
     // The joint layout of the whole graph is the comparison.
-    let joint = arqlet_layout::compute(graph, None, &no_dirty, options)?;
+    let joint = arqlet_layout::compute_compared(graph, None, &no_dirty, options)?;
     let (joint, _, _) =
         refine_snapshot_logged(&joint, joint.revision, joint.layout_version, 1, None)?;
     let joint_key = arqlet_layout::published_key(&joint).ok();
@@ -302,7 +302,7 @@ pub fn refine_by_fixed_boundary(
 
 /// The joint layout again, for the report's `before`: the quality of the layout without the composition.
 fn joint_for_report(graph: &Graph, options: &LayoutOptions) -> Result<Snapshot, String> {
-    let laid = arqlet_layout::compute(graph, None, &BTreeSet::new(), options)?;
+    let laid = arqlet_layout::compute_compared(graph, None, &BTreeSet::new(), options)?;
     let (refined, _, _) =
         refine_snapshot_logged(&laid, laid.revision, laid.layout_version, 1, None)?;
     Ok(refined)

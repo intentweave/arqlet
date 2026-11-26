@@ -152,7 +152,7 @@ pub fn refine_structured(
         }
     }
 
-    let laid = arqlet_layout::compute(graph, None, &BTreeSet::new(), options)?;
+    let laid = arqlet_layout::compute_compared(graph, None, &BTreeSet::new(), options)?;
     let (joint, _, _) = refine_snapshot_logged(&laid, laid.revision, laid.layout_version, 1, None)?;
     let joint_key = arqlet_layout::published_key(&joint).ok();
     Ok((
@@ -296,9 +296,13 @@ mod tests {
             );
             assert_eq!(snapshot.boxes.len(), graph.nodes.len());
             assert_eq!(snapshot.routes.len(), graph.edges.len());
-            let joint =
-                arqlet_layout::compute(&graph, None, &BTreeSet::new(), &LayoutOptions::default())
-                    .unwrap();
+            let joint = arqlet_layout::compute_compared(
+                &graph,
+                None,
+                &BTreeSet::new(),
+                &LayoutOptions::default(),
+            )
+            .unwrap();
             let (joint, _, _) =
                 refine_snapshot_logged(&joint, joint.revision, joint.layout_version, 1, None)
                     .unwrap();
