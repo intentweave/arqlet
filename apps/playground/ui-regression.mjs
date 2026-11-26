@@ -172,6 +172,14 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
   const opened=await runInNewContext(`edit({op:'restore'},{via:()=>viewController.openBookmark(${JSON.stringify(bookmark)})})`,context);await settle();
   assert.equal(opened.ok,true,JSON.stringify(opened));
   assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'the bookmark restores the view');
+  // The compact form, as the view link keeps it: short text, opened by the controller as it is.
+  const compact=await runInNewContext('viewController.compactBookmark()',context);
+  assert.match(compact.text??'',/^b1\.[A-Za-z0-9_-]+$/,JSON.stringify(compact));
+  await get('undo').onclick();await settle();
+  assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),false);
+  const linked=await runInNewContext(`edit({op:'restore'},{via:()=>viewController.openBookmark(${JSON.stringify(compact.text)})})`,context);await settle();
+  assert.equal(linked.ok,true,JSON.stringify(linked));
+  assert.equal(runInNewContext(`snapshot.graph.nodes.some(n=>n.id===${JSON.stringify(leaf)})`,context),true,'the compact bookmark restores the view');
   console.log('Search, focus and bookmarks passed: a hidden node found, focused, and a kept view opened again.');
   // Query (provisional, the engine's `query`): a node found by id lists its row, "Select all" selects the box that shows
   // it, and a click on the row focuses it.
@@ -362,6 +370,33 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
   assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','back to the containment');
   assert.equal(latest.options?.groupingPriority,undefined);
+
+  // As lanes (ADR 0022 M4): the first structure as bands; the scene draws one band per group of the dimension shown.
+  get('grouping-first').value='team';get('grouping-first').onchange();await flush();
+  assert.equal(get('grouping-lanes').disabled,false);
+  get('grouping-lanes').checked=true;get('grouping-lanes').onchange();await flush();
+  assert.equal(latest.options.groupingPriority[0].as,'lanes');
+  assert.ok(!latest.graph.nodes.some(n=>n.id.startsWith('membership:')),'a lane is no container');
+  const banded=sceneOf(engine,latest);
+  assert.ok(banded.membershipLanes?.length>1,'the bands are drawn');
+  // Phases (M4b): a second dimension along the flow makes a grid with the lanes.
+  assert.equal(get('grouping-phases').disabled,false);
+  get('grouping-phases').value='zone';get('grouping-phases').onchange();await flush();
+  assert.deepEqual(latest.options.groupingPriority.slice(0,2),[{by:'team',as:'lanes'},{by:'zone',as:'lanes'}]);
+  const grid=sceneOf(engine,latest);
+  assert.ok(grid.membershipLanes.some(l=>l.phase)&&grid.membershipLanes.some(l=>!l.phase),'lanes and phases are drawn');
+  assert.equal(get('grouping-phases').value,'zone','the control shows the view it asked for');
+  get('grouping-phases').value='';get('grouping-phases').onchange();await flush();
+  get('grouping-lanes').checked=false;get('grouping-lanes').onchange();await flush();
+  assert.equal(latest.options.groupingPriority[0].as,undefined);
+  get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
+  assert.equal(get('grouping-lanes').disabled,true,'the containment is no lane');
+  // Lanes inside every container (M4d): the same control behind the containment.
+  get('grouping-phases').value='zone';get('grouping-phases').onchange();await flush();
+  assert.deepEqual(latest.options.groupingPriority.slice(0,2),[{by:'parent'},{by:'zone',as:'lanes'}]);
+  assert.ok(sceneOf(engine,latest).membershipLanes.some(l=>l.area),'bands inside the containers');
+  get('grouping-phases').value='';get('grouping-phases').onchange();await flush();
+  assert.equal(latest.options?.groupingPriority,undefined,'back to the default');
 
   // Hold groups together (ADR 0022 M3b): an option like any other, carried by the snapshot and shown again.
   get('membership-hold').checked=true;get('membership-hold').onchange();await flush();

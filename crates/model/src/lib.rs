@@ -2388,12 +2388,12 @@ pub struct LayoutOptions {
     /// than the default leaves a route room to leave a node that faces a neighbour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_gap: Option<f64>,
-    /// Experimental (ADR 0016, amendment *Pins in single pass*, step P1): under single pass, and in the hierarchical
-    /// pipeline it falls back to, a pinned leaf of an area that flows left to right or top to bottom is a constraint of the
-    /// arrangement: the pin chooses its rank and its order there and holds its place across the flow, and along the flow it
-    /// stands in its rank's band (the difference is reported in the layout diagnostics). Without it, and when a pin is
-    /// another one (a container, another strategy, a reversed flow), such a pin takes the view off that pipeline. Omitted
-    /// when off.
+    /// Experimental (ADR 0016, amendment *Pins in single pass*, steps P1 and P2): under single pass, and in the
+    /// hierarchical pipeline it falls back to, a pinned node (leaf or container) of an area that flows left to right or top
+    /// to bottom is a constraint of the arrangement: the pin chooses its rank and its order there and holds its place
+    /// across the flow, and along the flow it stands in its rank's band (the difference is reported in the layout
+    /// diagnostics). Without it, and when any pin of the view is another one (in an area of another strategy or of a
+    /// reversed flow), the pins are handled as before and take the view off that pipeline. Omitted when off.
     #[serde(default, skip_serializing_if = "is_false")]
     pub pins_in_single_pass: bool,
     /// Experimental minimum-displacement overlap constraints for organic placement and repair. Off by default.
@@ -2771,7 +2771,7 @@ pub struct GroupingCriterion {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
     pub values: Vec<String>,
-    /// How the criterion's groups are rendered where it owns nodes. `lanes` is accepted and reported as not yet applied
+    /// How the criterion's groups are rendered where it owns nodes. `lanes` of the first criterion are bands across the flow of the top level (M4a); elsewhere it is accepted and reported as not yet applied
     /// (ADR 0022, M4); its groups are drawn as containers until then.
     #[serde(
         default,

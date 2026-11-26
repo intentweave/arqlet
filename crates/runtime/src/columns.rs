@@ -706,6 +706,7 @@ mod tests {
             bus_lines: Vec::new(),
             hub_refs: Vec::new(),
             membership_hulls: Vec::new(),
+            membership_lanes: Vec::new(),
             membership_report: Vec::new(),
             membership_marks: Vec::new(),
             bounds: rect(-30., -30., 260., 160.),

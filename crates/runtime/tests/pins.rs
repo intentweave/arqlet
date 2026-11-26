@@ -353,18 +353,109 @@ fn a_drag_that_keeps_the_pin_stays_on_single_pass_and_a_release_removes_it() {
 }
 
 #[test]
+fn a_pinned_container_stays_on_single_pass_and_holds_its_place_across_the_flow() {
+    let snapshot = pinnable(json!({"pinsInSinglePass": true}));
+    let (p, q) = (&snapshot["boxes"]["p"], &snapshot["boxes"]["q"]);
+    let pin = json!({"x": number(&q["x"]), "y": number(&q["y"]) + 300.});
+    let response = configure(&snapshot, json!({"pins": {"q": pin}}));
+    assert_eq!(response["ok"], true, "{response}");
+    let pinned = &response["snapshot"];
+    assert_single_pass(pinned);
+    assert_eq!(pinned["boxes"]["q"]["y"], pin["y"]);
+    assert!(
+        diagnostics(pinned)
+            .iter()
+            .any(|d| d.starts_with("Pin q: held across the flow")),
+        "{:?}",
+        diagnostics(pinned)
+    );
+    // Its inside is laid out as without the pin, and the other container keeps its size.
+    for id in ["q1", "q2", "q3"] {
+        assert_eq!(pinned["boxes"][id], snapshot["boxes"][id], "{id}");
+    }
+    assert_eq!(pinned["boxes"]["p"]["width"], p["width"]);
+    // A pinned leaf inside a pinned container: both places hold, each in its parent's frame.
+    let inner = &pinned["boxes"]["q3"];
+    let leaf = json!({"x": number(&inner["x"]), "y": number(&inner["y"]) + 120.});
+    let both = configure(pinned, json!({"pins": {"q": pin, "q3": leaf}}));
+    assert_eq!(both["ok"], true, "{both}");
+    let both = &both["snapshot"];
+    assert_single_pass(both);
+    assert_eq!(both["boxes"]["q"]["y"], pin["y"]);
+    assert_eq!(both["boxes"]["q3"]["y"], leaf["y"]);
+    // An import with the pins, without a drawing to start from, holds them too.
+    let imported = pinnable(json!({"pinsInSinglePass": true, "pins": {"q": pin, "q3": leaf}}));
+    assert_single_pass(&imported);
+    assert_eq!(imported["boxes"]["q"]["y"], pin["y"]);
+    assert_eq!(imported["boxes"]["q3"]["y"], leaf["y"]);
+}
+
+#[test]
+fn a_container_pinned_before_the_one_that_feeds_it_takes_the_first_rank() {
+    let snapshot = pinnable(json!({"pinsInSinglePass": true}));
+    let (p, q) = (&snapshot["boxes"]["p"], &snapshot["boxes"]["q"]);
+    assert!(number(&p["x"]) < number(&q["x"]), "p stands before q");
+    // q pinned into p's band, below it.
+    let pin = json!({"x": number(&p["x"]), "y": number(&p["y"]) + number(&p["height"]) + 60.});
+    let response = configure(&snapshot, json!({"pins": {"q": pin}}));
+    assert_eq!(response["ok"], true, "{response}");
+    let pinned = &response["snapshot"];
+    assert_single_pass(pinned);
+    assert_eq!(pinned["boxes"]["q"]["y"], pin["y"]);
+    // The two are joined by edges, so they cannot share a rank: q holds the first, p moves on.
+    let ranks: Vec<Vec<String>> =
+        serde_json::from_value(pinned["layeredPlans"]["<root>"]["ranks"].clone()).unwrap();
+    let rank = |id: &str| ranks.iter().position(|r| r.iter().any(|x| x == id));
+    assert!(rank("q") < rank("p"), "{ranks:?}");
+}
+
+#[test]
+fn a_drag_of_a_container_that_keeps_the_pin_stays_on_single_pass() {
+    let snapshot = pinnable(json!({"pinsInSinglePass": true}));
+    let at = &snapshot["boxes"]["q"];
+    let to = json!({"x": number(&at["x"]), "y": number(&at["y"]) + 200.});
+    let step = |snapshot: &Value, seq: u64, phase: &str| {
+        let response = run(json!({
+            "op": "move",
+            "snapshot": snapshot,
+            "expectedRevision": snapshot["revision"],
+            "expectedLayoutVersion": snapshot["layoutVersion"].as_u64().unwrap_or(0),
+            "gestureId": "g", "seq": seq, "phase": phase, "node": "q",
+            "position": to, "release": false,
+        }));
+        assert_eq!(response["ok"], true, "{response}");
+        response["snapshot"].clone()
+    };
+    let begun = step(&snapshot, 1, "begin");
+    // The preview moves the container with what it holds.
+    assert_eq!(begun["boxes"]["q"]["y"], to["y"]);
+    assert_eq!(begun["boxes"]["q1"], snapshot["boxes"]["q1"]);
+    let pinned = step(&begun, 2, "finish");
+    assert_single_pass(&pinned);
+    assert_eq!(pinned["options"]["pins"]["q"], to);
+    assert_eq!(pinned["boxes"]["q"]["y"], to["y"]);
+}
+
+#[test]
 fn pins_the_option_does_not_take_are_handled_as_without_it() {
+    // A pin in an organic area, alone and beside one the option would take.
+    let mut graph = layered_graph();
+    graph["containerStrategies"] = json!({"q": "organic"});
     for pins in [
-        // A container (step P2).
-        json!({"p": {"x": 300.0, "y": 200.0}}),
-        // A leaf together with a container.
-        json!({"p": {"x": 300.0, "y": 200.0}, "q1": {"x": 30.0, "y": 260.0}}),
+        json!({"q1": {"x": 30.0, "y": 60.0}}),
+        json!({"p2": {"x": 30.0, "y": 260.0}, "q1": {"x": 30.0, "y": 60.0}}),
     ] {
+        let import = |options: Value| {
+            let response =
+                run(json!({"op": "import", "graph": graph, "limit": 40, "options": options}));
+            assert_eq!(response["ok"], true, "{response}");
+            response["snapshot"].clone()
+        };
         let with = configure(
-            &pinnable(json!({"pinsInSinglePass": true})),
+            &import(json!({"pinsInSinglePass": true})),
             json!({"pins": pins}),
         );
-        let without = configure(&pinnable(json!({})), json!({"pins": pins}));
+        let without = configure(&import(json!({})), json!({"pins": pins}));
         assert_eq!(with["ok"], true, "{with}");
         assert_eq!(with["snapshot"]["boxes"], without["snapshot"]["boxes"]);
         assert_eq!(with["snapshot"]["routes"], without["snapshot"]["routes"]);

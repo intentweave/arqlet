@@ -70,9 +70,6 @@ pub fn restore_intent(
         .keys()
         .chain(intent.container_sizing.keys())
         .chain(intent.node_sizes.keys())
-        .chain(collapsed.iter())
-        .chain(intent.partial.keys())
-        .chain(intent.partial.values().flatten())
         .chain(intent.shapes.keys())
         .chain(intent.container_directions.keys())
         .chain(intent.container_strategies.keys())
@@ -80,6 +77,23 @@ pub fn restore_intent(
         .find(|id| !known.contains(id.as_str()));
     if let Some(id) = unknown {
         return Err(format!("The remembered state names an unknown node: {id}"));
+    }
+    // The containers only the view has (communities, groups) can be collapsed or shown in part too.
+    let mut added = collapsed
+        .iter()
+        .chain(intent.partial.keys())
+        .chain(intent.partial.values().flatten())
+        .filter(|id| !known.contains(id.as_str()))
+        .peekable();
+    if added.peek().is_some() {
+        let mut shown = snapshot.options.clone();
+        shown.partial.clear();
+        shown.hidden = Default::default();
+        let view = super::structured(&source, &shown)?;
+        let in_view: BTreeSet<&str> = view.nodes.iter().map(|n| n.id.as_str()).collect();
+        if let Some(id) = added.find(|id| !in_view.contains(id.as_str())) {
+            return Err(format!("The remembered state names an unknown node: {id}"));
+        }
     }
     for node in &mut source.nodes {
         node.shape = intent.shapes.get(&node.id).copied().unwrap_or_default();

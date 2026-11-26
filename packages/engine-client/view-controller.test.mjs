@@ -194,6 +194,140 @@ for (const resident of [false, true]) {
   });
 }
 
+// A large view without randomness: packages of modules of functions with ids that are paths, calls along each module.
+function large(packages = 24, modules = 24, functions = 10) {
+  const two = n => String(n).padStart(2, '0');
+  const nodes = [];
+  const edges = [];
+  for (let p = 0; p < packages; p++) {
+    const pkg = `services/domain-${two(p)}`;
+    nodes.push({id: pkg, kind: 'package', label: `domain ${p}`});
+    for (let m = 0; m < modules; m++) {
+      const mod = `${pkg}/module-${two(m)}.ts`;
+      nodes.push({id: mod, kind: 'module', label: `module ${m}`, parentId: pkg});
+      for (let f = 0; f < functions; f++) {
+        const id = `${mod}#function-${two(f)}`;
+        nodes.push({id, kind: f % 4 === 3 ? 'test' : 'function', label: `function ${f}`, parentId: mod});
+        if (f > 0) edges.push({id: `call-${edges.length}`, kind: 'calls', source: `${mod}#function-${two(f - 1)}`, target: id});
+      }
+    }
+  }
+  return {nodes, edges};
+}
+
+const drawn = state => ({nodes: state.scene.nodes, routes: state.scene.routes});
+
+for (const resident of [false, true]) {
+  test(`a compact bookmark of a large view fits a URL and opens again (resident ${resident})`, {skip: !engine || (resident && !engine.openSession)}, async () => {
+    const init = {limit: 10000, options: {levelOfDetail: {depth: 1}}};
+    const view = createViewController(createSession(engine, {resident}));
+    await view.import(large(), init);
+    const mod = (p, m) => `services/domain-0${p}/module-0${m}.ts`;
+    const fn = (p, m, f) => `${mod(p, m)}#function-0${f}`;
+    for (const p of [0, 1, 2, 3]) assert.equal((await view.open(mod(p, 0))).ok, true);
+    await view.reveal([fn(5, 5, 5)]);
+    await view.filter({nodeKinds: ['test'], nodes: [fn(0, 0, 0)]});
+    await view.trace(fn(0, 0, 1), fn(0, 0, 6));
+    await view.select({nodeId: fn(1, 0, 2)});
+    const shown = view.getState();
+    const compact = await view.compactBookmark();
+    assert.equal(compact.ok, true, JSON.stringify(compact));
+    assert.match(compact.text, /^b1\.[A-Za-z0-9_-]+$/);
+    const {bookmark} = await view.bookmark();
+    assert.ok(encodeBookmark(bookmark).length > 20000, `${encodeBookmark(bookmark).length}`);
+    assert.ok(compact.text.length < 2000, `${compact.text.length}`);
+    assert.throws(() => decodeBookmark(compact.text), /openBookmark/);
+
+    // Another controller on a fresh import opens the same view, one step for `back`.
+    const other = createViewController(createSession(engine, {resident}));
+    await other.import(large(), init);
+    const start = drawn(other.getState());
+    const opened = await other.openBookmark(compact.text);
+    assert.equal(opened.ok, true, JSON.stringify(opened));
+    assert.deepEqual([opened.sameSource, opened.sameDefaults, opened.missing, opened.ignored], [true, true, [], []]);
+    let s = other.getState();
+    assert.deepEqual(drawn(s), drawn(shown));
+    assert.deepEqual(s.hide, shown.hide);
+    assert.equal(s.highlight.kind, 'trace');
+    assert.deepEqual(s.highlight.answer.nodes, shown.highlight.answer.nodes);
+    assert.deepEqual(s.selection, {nodeId: fn(1, 0, 2)});
+    assert.equal(s.backLabel, 'Open bookmark');
+    // The bookmark of the opened view is the same text: the defaults are those of the import, not of the opened view.
+    assert.equal((await other.compactBookmark()).text, compact.text);
+    await other.back();
+    assert.deepEqual(drawn(other.getState()), start);
+
+    // The next revision lacks an opened module and the selected node's module: reported, the rest restored.
+    const next = large();
+    const gone = id => id === mod(1, 0) || id.startsWith(`${mod(1, 0)}#`);
+    next.nodes = next.nodes.filter(n => !gone(n.id));
+    next.edges = next.edges.filter(e => !gone(e.source) && !gone(e.target));
+    await other.import(next, init);
+    const partial = await other.openBookmark(compact.text);
+    assert.equal(partial.ok, true, JSON.stringify(partial));
+    assert.equal(partial.sameSource, false);
+    assert.deepEqual(partial.missing, [mod(1, 0), fn(1, 0, 2)]);
+    s = other.getState();
+    assert.equal(s.selection, null);
+    assert.equal(s.highlight.kind, 'trace');
+    assert.ok(s.scene.nodes.some(n => n.id === fn(0, 0, 1)), 'the other modules are open');
+    // The long form of the old revision: refused, and restored as far as it goes when forced.
+    assert.equal((await other.openBookmark(bookmark)).ok, false);
+    const forced = await other.openBookmark(encodeBookmark({...bookmark, intent: {...bookmark.intent,
+      pins: {[fn(1, 0, 3)]: {x: 1, y: 2}}}}), {force: true});
+    assert.equal(forced.ok, true, JSON.stringify(forced));
+    assert.deepEqual(forced.missing, [fn(1, 0, 2), fn(1, 0, 3)]);
+    assert.equal((await other.openBookmark('b9.e30')).ok, false);
+    assert.equal((await other.openBookmark('nonsense')).ok, false);
+  });
+}
+
+test('a compact bookmark is compared with the view as imported, also when it was adopted', {skip: !engine}, async () => {
+  // A graph that declares a shape: the compact bookmark leaves it to the defaults, if the view's are known.
+  const shaped = () => {
+    const g = graph();
+    for (const n of g.nodes.slice(3)) n.shape = 'square';
+    return g;
+  };
+  const init = {limit: 100, options: {levelOfDetail: {depth: 0}}};
+  const imported = engine({op: 'import', graph: shaped(), ...init}).snapshot;
+  const session = createSession(engine, {resident: false});
+  const view = createViewController(session, {scenes: false});
+  await view.adopt(imported, {forget: true});
+  await view.open('box');
+  const relative = (await view.compactBookmark()).text;
+  assert.ok(relative.length < 300, `${relative.length}`);
+  // A snapshot that went through changes holds decisions: nothing is left to defaults then, and it opens anywhere.
+  const changed = session.snapshot;
+  await view.adopt(changed, {forget: true});
+  const whole = (await view.compactBookmark()).text;
+  assert.ok(whole.length > 2 * relative.length, `${whole.length}`);
+  for (const text of [relative, whole]) {
+    const fresh = createViewController(createSession(engine, {resident: false}), {scenes: false});
+    await fresh.import(shaped(), init);
+    const opened = await fresh.openBookmark(text);
+    assert.equal(opened.ok, true, JSON.stringify(opened));
+    assert.ok(!fresh.getState().snapshot.collapsedIds?.includes('box'));
+    assert.equal(fresh.getState().snapshot.graph.nodes.find(n => n.id === 'c04').shape, 'square');
+  }
+});
+
+test('the defaults of a compact bookmark cost a step no engine call of their own', {skip: !engine}, async () => {
+  const ops = [];
+  const counted = request => { ops.push(request.op); return engine(request); };
+  const view = createViewController(createSession(counted, {resident: false}), {scenes: false, keepGeometry: false});
+  await view.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  ops.length = 0;
+  await view.apply({op: 'toggle', nodeId: 'box'}, 'Open', {remember: false});
+  assert.deepEqual(ops, ['toggle']);
+  // The change was not remembered, so the defaults stay unknown: the bookmark keeps every decision, also this one.
+  const {text} = await view.compactBookmark();
+  const fresh = createViewController(createSession(engine, {resident: false}), {scenes: false});
+  await fresh.import(graph(), {limit: 100, options: {levelOfDetail: {depth: 0}}});
+  assert.equal((await fresh.openBookmark(text)).ok, true);
+  assert.ok(!fresh.getState().snapshot.collapsedIds?.includes('box'));
+});
+
 test('navigateScene moves by space, hierarchy, siblings and edges', () => {
   const box = (id, x, y, w, h, parentId) => ({id, bounds: {x, y, width: w, height: h}, ...(parentId ? {parentId} : {})});
   const scene = {

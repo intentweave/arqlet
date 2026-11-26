@@ -9,6 +9,7 @@
 //               for the layout only, so that the cycle break does not turn a helper edge instead
 //   sorted      `lanes`, with the nodes of a rank and band sorted by the mean place of their neighbours, eight rounds, the best
 //               round kept (violations, hits, crossings, bends): what ordering inside the bands is worth
+//   engine      `as: lanes` of the engine: lanes (M4a), and with a second dimension phases along the flow (M4b)
 //   best        `sorted` with the best order of the bands (all orders, at most four bands): an upper bound
 //
 // Bands: each as high as its fullest rank, nodes in the order of the flat drawing, GAP apart. `violations`: nodes outside their
@@ -80,7 +81,7 @@ function lanes(graph, laneOf, order, phaseOf, phases, rounds = 0) {
   }
 }
 
-const totals = {views: 0, laneViolations: 0, phaseViolations: 0, withoutViolation: 0, hard: 0, refused: 0, pins: 0, pinsOff: 0, notSingle: 0, sortedClean: 0, x: [], b: []};
+const totals = {views: 0, laneViolations: 0, phaseViolations: 0, withoutViolation: 0, hard: 0, refused: 0, pins: 0, pinsOff: 0, notSingle: 0, sortedClean: 0, engineBad: 0, engineIssues: 0, engine: [], x: [], b: []};
 function study(name, graph, laneOf, order, second) {
   totals.views++;
   const out = [];
@@ -89,6 +90,14 @@ function study(name, graph, laneOf, order, second) {
   const boxes = {...graph, nodes: [...order.map(o => ({id: `__c${o}`, kind: 'lane', label: String(o), parentId: null})), ...graph.nodes.map(n => ({...n, parentId: `__c${laneOf.get(n.id)}`}))]};
   try { out.push(`containers ${show(score(strip(imp(boxes))))}`); } catch (e) { out.push(`containers refused ${e.message.slice(0, 60)}`); }
   try {
+    const memberships = {dimensions: [{id: 'lane', groups: order.map(o => ({id: String(o), members: graph.nodes.filter(n => laneOf.get(n.id) === o).map(n => n.id)}))}, ...(second ? [{id: 'phase', groups: second.order.map(o => ({id: String(o), members: graph.nodes.filter(n => second.of.get(n.id) === o).map(n => n.id)}))}] : [])]};
+    const s = imp({...graph, memberships}, {groupingPriority: [{by: 'lane', as: 'lanes'}, ...(second ? [{by: 'phase', as: 'lanes'}] : [])]}), d = strip(s), q = score(d), v = s.layeredPlans?.['<root>']?.vertical;
+    const [axis, side] = v ? ['x', 'w'] : ['y', 'h'], e = order.map(o => { const of = d.nodes.filter(n => laneOf.get(n.id) === o); return [Math.min(...of.map(n => n[axis])), Math.max(...of.map(n => n[axis] + n[side]))]; });
+    let bad = 0; for (let i = 1; i < e.length; i++) if (e[i][0] < e[i - 1][1] - 1e-6) bad++;
+    totals.engineBad += bad; totals.engineIssues += s.geometryIssues.length; totals.engine.push([flat.x, q.x, flat.b, q.b, flat.hits, q.hits, flat.shared, q.shared]);
+    out.push(`engine ${show(q)} bands out of order ${bad} issues ${s.geometryIssues.length}${(s.layoutDiagnostics ?? []).some(x => x.startsWith('Single pass:')) ? '' : ' NOT single pass: ' + (s.layoutDiagnostics ?? [])[0]}`);
+  } catch (e) { out.push(`engine refused: ${e.message.slice(0, 100)}`); }
+  if (!process.argv.includes('--engine')) try {
     const q = lanes(graph, laneOf, order, second?.of, second?.order);
     totals.laneViolations += q.lanes; totals.phaseViolations += q.phases; totals.pins += q.n; totals.pinsOff += q.off; if (!q.single) totals.notSingle++;
     if (!q.lanes && !q.phases) totals.withoutViolation++;

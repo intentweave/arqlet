@@ -29,6 +29,16 @@ and undo stack. The undo of the direct view covered only container sizes. Gestur
 5. Every operation runs through `dispatch` and therefore in the split, the browser-only and the backend-only mode; the backend allowlist
    is checked against the dispatcher by a test.
 
+## Amendment (2026-11-26, #151): the compact bookmark
+
+An `Intent` as JSON is tens of kilobytes on a large view, too long for a link. `compactBookmark` and `readBookmark`
+(read only, provisional) give it a second form: `b1.` and base64url of the intent's difference from the defaults, with an
+id table and fingerprints of the source and the defaults. The ids are stored (front-coded), not indices into the source
+graph, because a reader with another revision has to name the ids that are gone; it restores the rest. The long form is
+unchanged. Details and limits: [integration guide](../integration-guide.md), section 7. In the same change `restore`
+accepts the containers that only the view has (communities, groups) as collapsed or shown in part; before, it refused
+them as unknown nodes.
+
 ## Consequences
 
 - Browser checks with real input: `gesture-robustness`, `history`, `selection-move`, `port-drag`, `label-drag`, `settle`, `rounded-routes`.

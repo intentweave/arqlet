@@ -62,7 +62,7 @@ below; a drag step and a drop with release stay on single pass since #169 and th
 
 ## Amendment: pins in single pass (2026-11-24)
 
-Status: proposed. Step P1 is built behind the option (`pinsInSinglePass`, off; see *Step P1* below); the behaviour is
+Status: proposed. Steps P1 and P2 are built behind the option (`pinsInSinglePass`, off; see *Step P1* and *Step P2* below); the behaviour is
 accepted by the quality gate as every algorithm change.
 
 ### Context
@@ -158,8 +158,24 @@ placement across the flow, the node is set to its pin there, the others of its r
 stands after those whose middle lies before its own, as far as they fit before it. A view with any pin the option does
 not take (a container, another strategy, a reversed flow) handles all its pins as before.
 
-Measured ([pins-single-pass-20261125.md](../../benchmarks/results/pins-single-pass-20261125.md)); the results file says
-what P2 and the default decision still need.
+Measured ([pins-single-pass-20261125.md](../../benchmarks/results/pins-single-pass-20261125.md)).
+
+### Step P2 (built 2026-11-26)
+
+A pinned container is taken like a pinned leaf, as one element of its parent's area; its inside is laid out as without
+the pin. The one addition: the siblings "with an edge to it" are those joined to anything it holds, so that the rank it
+takes is that of a sibling it has no edge to where there is one. A view with a pin in an area of another strategy or of
+a reversed flow still handles all its pins as before.
+
+Measured ([pins-containers-20261125.md](../../benchmarks/results/pins-containers-20261125.md)), 177 cases:
+
+- The view stays on its pipeline and every pin holds across the flow.
+- Along the flow a container stands much further from its pin than a leaf (237 units on average against 28, 2016 at
+  most). This is the case for step P3 that P1 did not give; it is open.
+- Against the same pin without the option the quality order is better on 11 datasets and worse on 4, two of them for
+  what the single-pass drawing or its re-layout does without any pin (`synthetic-2k`, `mixed-large`).
+- Open before a default decision: P3 or a rule for the band along the flow; the geometry issues a re-layout leaves on
+  `mixed-large`; the crossings the pins add on `can-bus`, `activity-order` and `arqlet-pipeline`.
 
 ### Open questions
 

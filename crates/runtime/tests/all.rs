@@ -4,6 +4,8 @@
 
 #[path = "abstract_pipeline.rs"]
 mod abstract_pipeline;
+#[path = "bookmark.rs"]
+mod bookmark;
 #[path = "bus_line.rs"]
 mod bus_line;
 #[path = "change_log.rs"]
@@ -62,6 +64,8 @@ mod import_limit;
 mod interactive_continuation;
 #[path = "isolated_grid_from.rs"]
 mod isolated_grid_from;
+#[path = "lanes.rs"]
+mod lanes;
 #[path = "layered_construction.rs"]
 mod layered_construction;
 #[path = "level_budget.rs"]
