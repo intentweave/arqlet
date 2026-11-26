@@ -44,8 +44,8 @@ Records: [`.jsonl`](router-sparse-grid-20261126.jsonl) (quality),
 
 ## The cause, reproduced
 
-The numbers of the report on #156 (`organic-corridor-plan-20261126.md`, branch `organic-corridor-plan`) reproduce on
-`231c010` with its script and its patches: of the routes through boxes on its 13 generated views and `mixed-large` with
+The numbers of the report on #156 ([`organic-corridor-plan-20261126.md`](organic-corridor-plan-20261126.md)) reproduce
+on `231c010` with its script (`organic_corridors.py` of branch `organic-corridor-plan`, `6f8277e`) and its patches: of the routes through boxes on its 13 generated views and `mixed-large` with
 orthogonal edges, the router's 461 are 437 with a way on the whole-view grid, 23 without and 1 changed later; the taps'
 247 are 33, 162 and 52; without the bound 461 become 24 and the 247 stay. CPU time of one run each, main to unbounded:
 mesh-100-0-240-1000 1.08 to 39.8 s, mesh-100-30-120-500-s11 1.32 to 21.7 s, mesh-100-0-120-500 5.51 to 0.94 s.
