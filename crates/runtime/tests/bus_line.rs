@@ -955,3 +955,58 @@ fn organic_gap_keeps_boxes_apart_and_is_omitted_by_default() {
         gap_of(&plain)
     );
 }
+
+/// A bus of an organic area becomes lines of its own, while a bus with one tap stays a bar. What the layout had kept for
+/// the taps of the first must not come back with the second's: the head's tap has no edge (`refine` panicked on it).
+#[test]
+fn expanding_a_view_restores_only_the_taps_of_its_bars() {
+    let tap = |bus: &str, node: &str| json!({"edge": format!("{bus}-{node}"), "node": node, "toBus": true, "kind": "on"});
+    let nodes: Vec<_> = ["a", "b", "c", "d"]
+        .iter()
+        .map(|id| json!({"id": id, "kind": "unit", "label": id}))
+        .collect();
+    let wide: Vec<_> = ["a", "b", "c"].iter().map(|n| tap("wide", n)).collect();
+    let lone = vec![tap("lone", "d")];
+    let graph: Graph = serde_json::from_value(json!({
+        "defaultStrategy": "organic",
+        "defaultDirection": "auto",
+        "nodes": nodes,
+        "edges": [],
+        "buses": [
+            {"id": "wide", "kind": "bus", "label": "Wide", "taps": wide},
+            {"id": "lone", "kind": "bus", "label": "Lone", "taps": lone},
+        ],
+    }))
+    .unwrap();
+    let options = LayoutOptions {
+        bus_style: arqlet_model::BusStyle::Lines,
+        ..Default::default()
+    };
+    let snapshot = import_graph_with(graph, 100, &options).unwrap();
+    // The case at hand: one bus drawn as lines (edges of the view), one as a bar.
+    assert!(!snapshot.graph.edges.is_empty());
+    assert!(snapshot.bus_lines.contains_key("lone") && !snapshot.bus_lines.contains_key("wide"));
+
+    let mut expanded = snapshot.clone();
+    assert!(arqlet_layout::expand_bus_lines(&mut expanded));
+    let edges: std::collections::BTreeSet<&str> =
+        expanded.graph.edges.iter().map(|e| e.id.as_str()).collect();
+    assert_eq!(edges.len(), expanded.graph.edges.len());
+    let mut routed = std::collections::BTreeSet::new();
+    for route in &expanded.routes {
+        assert!(
+            edges.contains(route.id.as_str()),
+            "no edge for {}",
+            route.id
+        );
+        assert!(routed.insert(route.id.as_str()), "twice: {}", route.id);
+    }
+    assert_eq!(routed, edges);
+    for port in &expanded.resolved_ports {
+        assert!(
+            edges.contains(port.edge_id.as_str()),
+            "port of {}",
+            port.edge_id
+        );
+    }
+}
