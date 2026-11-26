@@ -131,6 +131,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   the last backbone bus out of the view (collapsing its members' containers) now stays on the pipeline that drew it, as on
   other views; `configure` with `singlePassAuto` tries single pass again. For users of `arqlet-layout`:
   `retries_single_pass`.
+- A long-form bookmark (`bookmark`, `encodeBookmark`) of a view with a changed shape, direction, strategy, routing or
+  port was refused on a new import of the same source as "The bookmark belongs to another graph" (#195). `openBookmark`
+  and `readBookmark` (`sameSource`) now know it as the same source; bookmarks written by 0.8.0 and 0.9.0 included. As for
+  compact bookmarks, a revision that differs from the bookmarked source only in declared shapes, directions, strategies,
+  routing or ports is therefore no longer refused: the bookmark's values replace the new ones. `digest` is unchanged.
 
 ## 0.9.0 — 2026-11-24
 

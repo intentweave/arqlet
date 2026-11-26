@@ -3,7 +3,7 @@
 //! treats them as opaque. Restoring is checked like any other edit (the snapshot must be the current revision and layout
 //! version), so a stale undo is refused, never applied silently. Provisional.
 use super::{check_current, recompute_layout, validate_pins};
-use arqlet_model::{Intent, NodeShape, Snapshot};
+use arqlet_model::{Graph, Intent, NodeShape, Snapshot};
 use std::collections::BTreeSet;
 
 /// The decisions a snapshot carries. The source graph is the one the user edited; a collapsed view reads from it too.
@@ -34,6 +34,23 @@ pub fn intent_of(snapshot: &Snapshot) -> Intent {
         partial: options.partial.clone(),
         hidden: options.hidden.clone(),
     }
+}
+
+/// Writes into a source graph what the decisions of `intent` keep there: shapes, directions, strategies, routing and
+/// ports. Everything else in the graph is the source's own. A bookmark tells sources apart by that rest alone, so a field
+/// of the graph that a decision changes belongs here.
+pub(crate) fn write_decisions(source: &mut Graph, intent: &Intent) {
+    for node in &mut source.nodes {
+        node.shape = intent.shapes.get(&node.id).copied().unwrap_or_default();
+    }
+    source.default_direction = intent.default_direction.clone();
+    source.container_directions = intent.container_directions.clone();
+    source.default_strategy = intent.default_strategy.clone();
+    source.container_strategies = intent.container_strategies.clone();
+    source.default_routing = intent.default_routing.clone();
+    source.container_routing = intent.container_routing.clone();
+    source.ports = intent.ports.clone();
+    source.edge_ports = intent.edge_ports.clone();
 }
 
 /// Lays the snapshot out again with `intent`. Every name in it must belong to the graph; an unknown one refuses the whole
@@ -95,17 +112,7 @@ pub fn restore_intent(
             return Err(format!("The remembered state names an unknown node: {id}"));
         }
     }
-    for node in &mut source.nodes {
-        node.shape = intent.shapes.get(&node.id).copied().unwrap_or_default();
-    }
-    source.default_direction = intent.default_direction.clone();
-    source.container_directions = intent.container_directions.clone();
-    source.default_strategy = intent.default_strategy.clone();
-    source.container_strategies = intent.container_strategies.clone();
-    source.default_routing = intent.default_routing.clone();
-    source.container_routing = intent.container_routing.clone();
-    source.ports = intent.ports.clone();
-    source.edge_ports = intent.edge_ports.clone();
+    write_decisions(&mut source, intent);
 
     let mut options = snapshot.options.clone();
     options.pins = intent.pins.clone();

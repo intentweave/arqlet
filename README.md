@@ -269,7 +269,8 @@ the box that shows each match. The view controller's `focus` opens what hides a 
 (one undo step), selects it and hands the host the bounds to center the camera on.
 `bookmark` keeps the view (open groups, pages, filter, highlight, selection) as a value,
 `encodeBookmark` turns it into URL text, and `openBookmark` opens it again; a bookmark of
-another graph is refused (the engine's `digest`). For links, `compactBookmark` gives a short
+another graph is refused (the engine's `digest`; changed shapes, directions, strategies,
+routing and ports do not make it another one). For links, `compactBookmark` gives a short
 text (only what the user changed); opened on another revision of the graph it restores what
 still exists and reports the rest ([integration guide](docs/integration-guide.md), section 7).
 
