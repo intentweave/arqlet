@@ -29,9 +29,16 @@ fn lanes(name: &str) -> LayoutOptions {
     options
 }
 
-/// How far each lane reaches across the flow (`lr`: along y), in the declared order, from the boxes alone.
+/// How far each lane reaches across the flow (`lr`: along y), in the declared order, from the boxes alone: the members a
+/// group owns.
 fn bands(s: &Snapshot, source: &Graph, name: &str, vertical: bool) -> Vec<(String, f64, f64)> {
     let at = arqlet_layout::absolute_all(&s.graph, &s.boxes);
+    // A node in several groups stands in the lane of the one the value order chooses.
+    let owned = arqlet_model::grouping::owners(source, &lanes(name).grouping_priority);
+    let lane_of = |m: &str| match owned.owners.get(m) {
+        Some(arqlet_model::grouping::Owner::Group { group, .. }) => Some(group.clone()),
+        _ => None,
+    };
     source
         .memberships
         .dimension(name)
@@ -42,6 +49,7 @@ fn bands(s: &Snapshot, source: &Graph, name: &str, vertical: bool) -> Vec<(Strin
             let of: Vec<(f64, f64)> = g
                 .members
                 .iter()
+                .filter(|m| lane_of(m).as_deref() == Some(g.id.as_str()))
                 .filter_map(|m| at.get(m.as_str()))
                 .map(|r| {
                     if vertical {
@@ -223,4 +231,64 @@ fn lanes_hold_in_a_view_with_many_edges_between_them() {
         let order: Vec<usize> = rank.iter().filter_map(|id| lane(id)).collect();
         assert!(order.windows(2).all(|w| w[0] <= w[1]), "{order:?}");
     }
+}
+
+#[test]
+fn the_bands_cover_their_lanes_and_meet_without_overlapping() {
+    for (text, name, vertical) in [
+        (POOLS, "pool", false),
+        (THREE, "zone", false),
+        (ORG, "project", true),
+    ] {
+        let g = graph(text);
+        let s = import_graph_with(g.clone(), 500, &lanes(name)).unwrap();
+        let scene = build_scene(&s).unwrap();
+        let drawn = &scene.membership_lanes;
+        let expected = bands(&s, &g, name, vertical);
+        assert_eq!(drawn.len(), expected.len(), "{name}");
+        for (band, (group, lo, hi)) in drawn.iter().zip(&expected) {
+            assert_eq!(&band.group, group);
+            assert_eq!(band.vertical, vertical);
+            let (start, end) = if vertical {
+                (band.rect.x, band.rect.x + band.rect.width)
+            } else {
+                (band.rect.y, band.rect.y + band.rect.height)
+            };
+            assert!(
+                start < *lo && end > *hi,
+                "{name} {group}: band {start}..{end}, members {lo}..{hi}"
+            );
+        }
+        for pair in drawn.windows(2) {
+            let (a, b) = (&pair[0].rect, &pair[1].rect);
+            let (end, start) = if vertical {
+                (a.x + a.width, b.x)
+            } else {
+                (a.y + a.height, b.y)
+            };
+            assert!((end - start).abs() < 1e-6, "{name}: neighbours meet");
+        }
+        // Every band reaches over the whole drawing along the flow.
+        let b = &scene.bounds;
+        for band in drawn {
+            let r = &band.rect;
+            assert!(r.x >= b.x - 1e-6 && r.y >= b.y - 1e-6);
+            assert!(
+                r.x + r.width <= b.x + b.width + 1e-6 && r.y + r.height <= b.y + b.height + 1e-6
+            );
+        }
+    }
+}
+
+#[test]
+fn no_bands_without_lanes_or_where_they_are_not_applied() {
+    let g = graph(POOLS);
+    let plain = import_graph_with(g.clone(), 500, &LayoutOptions::default()).unwrap();
+    assert!(build_scene(&plain).unwrap().membership_lanes.is_empty());
+    assert!(!json(&build_scene(&plain).unwrap()).contains("membershipLanes"));
+    let mut value: serde_json::Value = serde_json::from_str(POOLS).unwrap();
+    value["defaultStrategy"] = "organic".into();
+    let organic: Graph = serde_json::from_value(value).unwrap();
+    let s = import_graph_with(organic, 500, &lanes("pool")).unwrap();
+    assert!(build_scene(&s).unwrap().membership_lanes.is_empty());
 }
