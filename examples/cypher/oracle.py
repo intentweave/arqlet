@@ -288,6 +288,57 @@ def cases():
     add("expr-14", "spike", "MATCH (a:Person)-[:KNOWS]->(b) RETURN a.name AS n, [a.name, count(*)] AS l", "supported", lambda g: [[k, [k, len(v)]] for k, v in knows_by_source(g).items()], ["n", "l"], payload=P, note="a grouping expression beside an aggregate keeps its value")
     add("expr-15", "spike", "MATCH (a:Person)-[:KNOWS]->(b) RETURN a.name AS n, a.name + ':' + toString(count(*)) AS s", "supported", lambda g: [[k, f"{k}:{len(v)}"] for k, v in knows_by_source(g).items()], ["n", "s"], payload=P)
     add("expr-16", "spike", "MATCH (a:Person)-[:KNOWS]->(b) RETURN a.name AS n, [x IN collect(b.name) WHERE x <> a.name | x + '<' + a.name] AS l", "supported", lambda g: [[k, [f"{x}<{k}" for x in v if x != k]] for k, v in knows_by_source(g).items()], ["n", "l"], payload=P, note="a comprehension over an aggregate that uses the grouping expression")
+
+    # The WHERE of a WITH applies after its ORDER BY, SKIP and LIMIT (#184).
+    def first_names(g, key, n, skip=0, reverse=False):
+        return [p["name"] for p in sorted(people(g), key=key, reverse=reverse)][skip : skip + n]
+
+    def by_name(p):
+        return p["name"]
+
+    def top_known(g, n):
+        counted = sorted(((k, len(v)) for k, v in knows_by_source(g).items()), key=lambda kv: (-kv[1], kv[0]))
+        return counted[:n]
+
+    add("where-01", "spike", "MATCH (a:Person) WITH a.name AS l ORDER BY l LIMIT 1 WHERE l <> 'Ann' RETURN l", "supported", lambda g: [[x] for x in first_names(g, by_name, 1) if x != "Ann"], ["l"], payload=P, note="the filter comes after the cut: nothing is left")
+    add("where-02", "spike", "MATCH (a:Person) WITH a.name AS l ORDER BY l SKIP 1 LIMIT 2 WHERE l <> 'Bob' RETURN l", "supported", lambda g: [[x] for x in first_names(g, by_name, 2, skip=1) if x != "Bob"], ["l"], payload=P)
+    add("where-03", "spike", "MATCH (a:Person) WITH a ORDER BY a.age DESC LIMIT 2 WHERE a.name <> 'Ann' RETURN a.name", "supported", lambda g: [[x] for x in first_names(g, lambda p: p["age"], 2, reverse=True) if x != "Ann"], ["a.name"], payload=P)
+    add("where-04", "spike", "MATCH (a:Person)-[:KNOWS]->(b) WITH a.name AS n, count(*) AS c ORDER BY c DESC, n LIMIT 2 WHERE n <> 'Ann' RETURN n, c", "supported", lambda g: [[k, c] for k, c in top_known(g, 2) if k != "Ann"], ["n", "c"], payload=P, note="the same after an aggregation")
+    add("where-05", "spike", "MATCH (a:Person) WITH DISTINCT a.name AS l ORDER BY l LIMIT 2 WHERE l <> 'Ann' RETURN l", "supported", lambda g: [[x] for x in first_names(g, by_name, 2) if x != "Ann"], ["l"], payload=P)
+
+    # A variable written again in the same pattern keeps its label and properties, wherever the pattern goes on (#185).
+    def pairs(g, first, second, joined):
+        """Rows of two relationships of one MATCH: two different edges of the graph for which `joined` holds."""
+        return [(a, b) for a in first for b in second if a["id"] != b["id"] and joined(a, b)]
+
+    def named(g, node):
+        return g.nodes[node]["name"]
+
+    def through_cid(g):
+        found = pairs(g, g.edges, g.edges, lambda a, b: a["target"] == b["source"] and named(g, b["source"]) == "Cid")
+        return [[named(g, a["source"]), named(g, b["target"])] for a, b in found]
+
+    def into_bob(g):
+        found = pairs(g, g.edges, g.edges, lambda a, b: b["target"] == a["source"] and named(g, a["source"]) == "Bob")
+        return [[named(g, a["target"]), named(g, b["source"])] for a, b in found]
+
+    def optional_through_bob(g):
+        rows = []
+        for f in g.of_kind("FOLLOWS"):
+            found = [
+                (x, y)
+                for x in g.of_kind("KNOWS")
+                for y in g.of_kind("KNOWS")
+                if x["source"] == f["target"] and y["source"] == x["target"] and named(g, x["target"]) == "Bob" and x["id"] != y["id"]
+            ]
+            rows += [[named(g, x["target"]), named(g, y["target"])] for x, y in found] or [[None, None]]
+        return rows
+
+    add("repeat-01", "spike", "MATCH (a)-->(b), (b:Nothing)-->(c) RETURN count(*)", "supported", lambda g: count(0), ["count(*)"], payload=P, note="no node has that label")
+    add("repeat-02", "spike", "MATCH (a)-->(b), (b {name: 'Cid'})-->(c) RETURN a.name, c.name", "supported", through_cid, ["a.name", "c.name"], payload=P, note="the repeated node starts the second relationship")
+    add("repeat-03", "spike", "MATCH (a)-->(b), (c)-->(a {name: 'Bob'}) RETURN b.name, c.name", "supported", into_bob, ["b.name", "c.name"], payload=P, note="the repeated node ends the second relationship")
+    add("repeat-04", "spike", "MATCH (f)-[:FOLLOWS]->(a) OPTIONAL MATCH (a)-[:KNOWS]->(c), (c {name: 'Bob'})-[:KNOWS]->(d) RETURN c.name, d.name", "supported", optional_through_bob, ["c.name", "d.name"], payload=P)
+    add("repeat-05", "spike", "MATCH (a)-[:FOLLOWS]->(b), (b {name: 'Nobody'})-[:KNOWS*1..2]->(c) RETURN count(*)", "supported", lambda g: count(0), ["count(*)"], payload=P, note="the same before a path of variable length")
     return C
 
 

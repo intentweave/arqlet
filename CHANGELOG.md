@@ -68,6 +68,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- **Query layer, wrong answers up to 0.9.0** (#184): the `WHERE` of a `WITH` applied before the `ORDER BY`, `SKIP` and
+  `LIMIT` of the same clause; it now filters what they leave.
+- **Query layer, wrong answers up to 0.9.0** (#185): a label or property map on a variable written again was dropped when
+  a later relationship of the same `MATCH` started at that node.
 - `restore` (undo, redo, bookmarks) refused a view with a collapsed or partly shown community or group container
   ("unknown node"): containers that only the view has are accepted.
 - `refine` panicked on a view with buses given as data where one bus is drawn as lines and another as a bar (organic,

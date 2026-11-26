@@ -45,7 +45,7 @@ test('every supported case gives the oracle\'s rows through the WASM module', {s
   const run = await module();
   const cases = read('examples/cypher/cases.jsonl').trim().split('\n').map(line => JSON.parse(line))
     .filter(c => c.status === 'supported');
-  assert.ok(cases.length >= 80, `the fixtures hold ${cases.length} supported cases`);
+  assert.ok(cases.length >= 90, `the fixtures hold ${cases.length} supported cases`);
   for (const c of cases) {
     const request = {op: 'load', graph: JSON.parse(read(`examples/cypher/graphs/${c.graph}.json`))};
     if (c.payload) request.payload = JSON.parse(read(`examples/cypher/payloads/${c.payload}.json`));

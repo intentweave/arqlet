@@ -11,7 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// How many of the supported cases pass today. Raised by every stage that makes more of them pass.
-const MIN_PASSING: usize = 80;
+const MIN_PASSING: usize = 90;
 
 fn fixture(path: &str) -> String {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -406,6 +406,29 @@ fn a_bound_relationship_variable_holds_a_later_match_to_its_edge() {
         ),
     ] {
         assert_eq!(spike(query), Ok(serde_json::json!([[count]])), "{query}");
+    }
+}
+
+/// Further forms of #184 beside the oracle's cases: a filter that reads a variable the projection left out, two `WITH`s
+/// in a row, and a `WHERE` with nothing to come after.
+#[test]
+fn the_where_of_a_with_filters_what_its_order_and_limit_leave() {
+    for (query, rows) in [
+        (
+            "MATCH (a:Person) WITH a.name AS l ORDER BY l LIMIT 2 WHERE a.age < 28 RETURN l",
+            serde_json::json!([["Bob"]]),
+        ),
+        (
+            "MATCH (a:Person) WITH a ORDER BY a.age DESC LIMIT 2 WHERE a.name <> 'Ann' \
+             WITH a.name AS n ORDER BY n LIMIT 1 RETURN n",
+            serde_json::json!([["Cid"]]),
+        ),
+        (
+            "MATCH (a:Person) WITH a.name AS l WHERE l <> 'Ann' RETURN l ORDER BY l LIMIT 1",
+            serde_json::json!([["Bob"]]),
+        ),
+    ] {
+        assert_eq!(spike(query), Ok(rows), "{query}");
     }
 }
 
