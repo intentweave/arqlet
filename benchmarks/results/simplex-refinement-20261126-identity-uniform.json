@@ -1,0 +1,194 @@
+{
+ "kind": "simplex-refinement",
+ "pose": "uniform",
+ "limit": 150,
+ "baseline": true,
+ "rows": [
+  {
+   "name": "activity-order",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "arqlet-pipeline",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "bpmn-pools",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "can-bus",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "cloud-architecture",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "deployment-cluster",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 21,
+    "kept": 21,
+    "better": 14,
+    "equal": 2,
+    "worse": 5,
+    "areaKept": 77518558.5,
+    "areaDefault": 77500689,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "er-diagram",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "layerweave-code",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "mixed-large",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "network-vlan",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "org-chart",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 24,
+    "kept": 24,
+    "better": 22,
+    "equal": 0,
+    "worse": 2,
+    "areaKept": 328247967.75,
+    "areaDefault": 430530475.5,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "petri-net",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 12,
+    "kept": 12,
+    "better": 12,
+    "equal": 0,
+    "worse": 0,
+    "areaKept": 18231744,
+    "areaDefault": 17725689,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "state-order",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "state-tcp",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  },
+  {
+   "name": "synthetic-2k",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 24,
+    "kept": 24,
+    "better": 24,
+    "equal": 0,
+    "worse": 0,
+    "areaKept": 2024392314.75,
+    "areaDefault": 2225226980.25,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "uml-class",
+   "baseline": true,
+   "threads": true,
+   "strategy": "simplex-ranks",
+   "simplexIsImport": true,
+   "edits": {
+    "made": 24,
+    "kept": 24,
+    "better": 21,
+    "equal": 1,
+    "worse": 2,
+    "areaKept": 61625658,
+    "areaDefault": 61372872,
+    "failed": 0
+   },
+   "singlePass": true
+  },
+  {
+   "name": "workflow-dag",
+   "baseline": true,
+   "threads": true,
+   "strategy": "keep-existing",
+   "defaultRanks": true,
+   "singlePass": true
+  }
+ ]
+}
