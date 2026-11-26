@@ -22,7 +22,8 @@ python3 benchmarks/experiments/router_grid.py --summarize FILE.jsonl --base base
 Records: [`.jsonl`](router-sparse-grid-20261126.jsonl) (quality),
 [`-timing.jsonl`](router-sparse-grid-20261126-timing.jsonl), [`-variants.jsonl`](router-sparse-grid-20261126-variants.jsonl),
 [`-searches.txt`](router-sparse-grid-20261126-searches.txt),
-[`-fingerprints.jsonl`](router-sparse-grid-20261126-fingerprints.jsonl).
+[`-fingerprints.jsonl`](router-sparse-grid-20261126-fingerprints.jsonl),
+[`-merged.jsonl`](router-sparse-grid-20261126-merged.jsonl) (digests after the merge of main).
 
 ## Result
 
@@ -267,6 +268,22 @@ The same pass spreads routes that share a track, which explains part of the shar
 has 12 694 pairs after the first routing and 3 970 after the second on main; with the option no pass runs and 12 560
 remain. Views without the pass on either side (mesh-200-60-120-500-s7) show the other part: longer routes through the
 same gaps.
+
+## Unchanged default output, and the branch with main merged
+
+Main moved during the work; the branch with `fe1e44f` merged (`7729428`) was checked against that main, built the same
+way:
+
+- Default fingerprints (the 15 views, `bench --limit 100 --reps 1 --threads 1,4`, release with `benchmark-timings`):
+  identical to main on all 15, and the same on 1 and 4 threads. Against the committed
+  `fingerprints-20261124-default-0.9.0.jsonl`: identical on 14; layerweave-code is generated from the source, so its input
+  differs.
+- Drawings: with the option off, all 66 views (the 65 above and the overview's generated graph) are as on main
+  `fe1e44f`. The drawings of main, option off and option on are those of the records above on 64 views; the other two
+  have other inputs (layerweave-code regenerated, the overview graph not measured above). The counts and metrics above
+  therefore hold for the merged branch.
+- `tools/platform-parity.mjs`: 20 of 20 requests identical between native and WASM, one of them with the option on a view
+  over the bound.
 
 ## Why 247 bus taps run through boxes
 
