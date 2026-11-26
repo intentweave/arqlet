@@ -1,5 +1,5 @@
 // ADR 0025 O2: the cluster overview on its three backends (WebGPU, WebGL 2, WebGL 1) draws the same picture in every
-// mode: plain, galaxy, orbit, lens, a path, a frame of breathing and a frame of a morph (the clock held still). Each is
+// mode: plain, galaxy (on a dark and on a light background, light and ink), orbit, lens, a path, a frame of breathing and a frame of a morph (the clock held still). Each is
 // compared with WebGL 1 pixel by pixel (or, when `packages/viewer/overview-gl-reference.js` exists, with that earlier
 // renderer kept beside it for the comparison: copy the previous `overview-gl.js` there, never commit it). Pictures go to
 // OUT (default: a temporary folder). Starts its own server and Chrome. Not part of CI.
@@ -57,6 +57,7 @@ try {
     const modes = {
       plain: r => {},
       galaxy: r => r.setGalaxy(true),
+      'galaxy, light': r => r.setGalaxy(true),
       orbit: r => r.setOrbit({yaw: 0.5, pitch: 0.35}),
       lens: r => r.setLens({x: W * 0.55, y: H * 0.45, radius: 160, magnification: 3}),
       path: r => r.setState({trace: pathOf(model, {nodes: leafIds, edges: []}), selected: model.children.findIndex(c => c.length)}),
@@ -66,12 +67,14 @@ try {
       'structured, scene look': r => structure(r, 'scene'),
     };
     // The earlier renderer has no scene look: that mode is compared with the WebGL 1 backend.
-    const own = mode => mode === 'structured, scene look' || !ref;
+    const own = mode => mode === 'structured, scene look' || mode === 'galaxy, light' || !ref;
+    // The clear colour per mode: the galaxy on a light background is drawn in ink.
+    const backgroundOf = mode => (mode === 'galaxy, light' ? [0.965, 0.973, 0.984, 1] : bg);
     const make = (kind, mode) => {
       const canvas = document.createElement('canvas');
       canvas.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px';
       document.body.append(canvas);
-      const options = {view, background: bg};
+      const options = {view, background: backgroundOf(mode)};
       const r = kind === 'reference' ? ref.createOverviewRenderer(canvas, model, options)
         : createOverviewRenderer(canvas, model, {...options, ...(kind === 'webgpu' ? {device: gpu.device} : kind === 'webgl1' ? {backend: 'webgl1'} : {})});
       r.setView(view);
@@ -80,7 +83,7 @@ try {
       r.draw({labels: false});
       const copy = document.createElement('canvas'); copy.width = W; copy.height = H;
       const c = copy.getContext('2d', {willReadFrequently: true});
-      c.fillStyle = 'rgb(12,16,24)'; c.fillRect(0, 0, W, H); c.drawImage(canvas, 0, 0);
+      c.fillStyle = 'rgb(' + backgroundOf(mode).slice(0, 3).map(v => Math.round(v * 255)).join(',') + ')'; c.fillRect(0, 0, W, H); c.drawImage(canvas, 0, 0);
       const backend = r.backend ?? 'webgl (reference)';
       r.destroy(); canvas.remove(); fixed = null;
       return {pixels: c.getImageData(0, 0, W, H).data, url: copy.toDataURL(), backend};

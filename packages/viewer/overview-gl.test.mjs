@@ -1,6 +1,6 @@
 import {test, mock} from 'node:test';
 import assert from 'node:assert/strict';
-import {bindOverviewNavigation} from './overview-gl.js';
+import {bindOverviewNavigation, edgeFadeMask} from './overview-gl.js';
 
 // A canvas and a renderer that only record what the navigation asks of them.
 function fakes() {
@@ -124,4 +124,16 @@ test('under the orbit a drag turns the drawing and Shift-drag pans', () => {
   fire('pointerdown');
   fire('pointermove', {clientX: 40, clientY: 10, shiftKey: true});
   assert.equal(views.length, 1);
+});
+
+test('the edge fade is a mask of two eased gradients, transparent at the edges and opaque inside; none for 0', () => {
+  assert.equal(edgeFadeMask(0), '');
+  assert.equal(edgeFadeMask(-5), '');
+  const mask = edgeFadeMask(80);
+  assert.equal(mask.match(/linear-gradient\(/g).length, 2);
+  assert.ok(mask.includes('linear-gradient(to right, rgba(0,0,0,0.000) 0.0px') && mask.includes('linear-gradient(to bottom, rgba(0,0,0,0.000) 0.0px'));
+  assert.ok(mask.includes('rgba(0,0,0,1.000) 80.0px') && mask.includes('rgba(0,0,0,1.000) calc(100% - 80.0px)'));
+  assert.ok(mask.includes('rgba(0,0,0,0.000) calc(100% - 0.0px))'));
+  // Eased: the step at a fifth of the width is fainter than a fifth.
+  assert.ok(mask.includes('rgba(0,0,0,0.104) 16.0px'));
 });
