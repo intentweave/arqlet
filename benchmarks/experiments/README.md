@@ -1,6 +1,7 @@
 # Experiments (not merged)
 
-Patches that were measured and not merged. Each applies to commit `1a514c8` (A2, first step).
+Patches that were measured and not merged. Each applies to commit `1a514c8` (A2, first step) unless its section names
+another.
 Apply with `git apply benchmarks/experiments/<name>.patch`.
 
 ## `local-channel-candidate.patch`
@@ -28,3 +29,17 @@ hugging 2 on state-tcp (`profiles-20261021T151732Z`).
 The key comparison alone is merged (`profiles-20261021T151732Z`: all inputs better or equal, run time unchanged).
 The local candidate is not merged. To reoptimize it, the local candidate needs a path to the same results as the
 full reroute on state-tcp, and the run time has to be measured against the full reroute on the same machine.
+
+## `router-grid-variants.patch`
+
+Applies to main `231c010`. The comparison of searches for the repair of a view over the router's grid bound (#203). With
+`ARQLET_GRID_DUMP=FILE`, `layout-command` appends every such repair problem (the route, the obstacles, the stubs, and
+whether today's windows find a way) to `FILE`; the example `grid_variants` of `arqlet-routing` runs variants on them:
+`cargo run --release -p arqlet-routing --example grid_variants -- FILE full,gap,gap-turn24,lazy,follow`. Results in
+`benchmarks/results/router-sparse-grid-20261126.md`. The variant that was chosen is in the router behind
+`sparseRepairGrid`; the patch is not meant to be merged.
+
+## `bus-tap-causes.patch`
+
+Applies to main `231c010`. With `ARQLET_TAP_LOG=1`, `layout-command` logs how every bus tap was drawn and the bars of the
+bus lines. `bus_tap_causes.py --bin BINARY --work DIR` classifies the taps through boxes (#203, same results file).

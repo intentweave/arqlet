@@ -1,0 +1,84 @@
+--- a/crates/layout/src/bus_line.rs
++++ b/crates/layout/src/bus_line.rs
+@@ -11,6 +11,8 @@
+ 
+ use arqlet_model::{Bus, BusLine, BusTap, Edge, Graph, Node, NodeShape, Point, Rect, Snapshot};
+ use std::collections::{BTreeMap, BTreeSet};
++
++std::thread_local!(static ROUTED_WHY: std::cell::RefCell<String> = Default::default());
+ 
+ /// How thick a bar is drawn.
+ pub(crate) const THICKNESS: f64 = 8.;
+@@ -316,19 +318,31 @@
+                     .all(|(id, b)| !tap_blocks(id) || !path_hits(points, b))
+             };
+             let mut points = tap(&absolute[member], &bar, plan.horizontal);
++            let mut method = "straight";
++            let mut routed_why = String::new();
+             if !clear(&points) {
+                 let obstacles: Vec<Rect> = absolute
+                     .iter()
+                     .filter(|(id, _)| tap_blocks(id))
+                     .map(|(_, r)| r.clone())
+                     .collect();
+-                if let Some(better) = tap_beside(&absolute[member], &bar, plan.horizontal, &clear)
+-                    .or_else(|| tap_around(&absolute[member], &bar, plan.horizontal, &clear))
+-                    .or_else(|| tap_routed(&absolute[member], &bar, plan.horizontal, &obstacles))
+-                {
++                method = "failed";
++                if let Some(better) = tap_beside(&absolute[member], &bar, plan.horizontal, &clear) {
+                     points = better;
++                    method = "beside";
++                } else if let Some(better) = tap_around(&absolute[member], &bar, plan.horizontal, &clear) {
++                    points = better;
++                    method = "around";
++                } else if let Some(better) = tap_routed(&absolute[member], &bar, plan.horizontal, &obstacles) {
++                    points = better;
++                    method = "routed";
++                } else {
++                    routed_why = ROUTED_WHY.with(|w| w.borrow().clone());
+                 }
+             }
++            if std::env::var_os("ARQLET_TAP_LOG").is_some() {
++                eprintln!("EXPTAP\t{}\t{}\t{}\t{}\t{}\t{}", plan.bus, edge, member, method, u8::from(clear(&points)), routed_why);
++            }
+             if !from_member {
+                 points.reverse();
+             }
+@@ -608,7 +622,10 @@
+     a_lines.dedup_by(|x, y| (*x - *y).abs() < 0.5);
+     c_lines.sort_by(f64::total_cmp);
+     c_lines.dedup_by(|x, y| (*x - *y).abs() < 0.5);
++    let why = |s: &str| ROUTED_WHY.with(|w| *w.borrow_mut() = format!("{s} cells={}", a_lines.len() * c_lines.len()));
++    why("noPath");
+     if a_lines.len() * c_lines.len() > 40_000 {
++        why("gridLimit");
+         return None;
+     }
+     // A segment is open when its inside meets no wall's inside (a point on a face, as the start and the goal, is open).
+@@ -1456,6 +1473,9 @@
+         };
+         let b = &line.bar;
+         let horizontal = b.width >= b.height;
++        if std::env::var_os("ARQLET_TAP_LOG").is_some() {
++            eprintln!("EXPBAR\t{}\t{}\t{},{},{},{}\t{}\t{}", bus.id, head, b.x, b.y, b.width, b.height, u8::from(horizontal), line.taps.iter().map(|(e, p)| format!("{e}:{}", p.iter().map(|p| format!("{},{}", p.x, p.y)).collect::<Vec<_>>().join(";"))).collect::<Vec<_>>().join("|"));
++        }
+         let middle = if horizontal {
+             b.y + b.height / 2.
+         } else {
+@@ -1594,6 +1614,15 @@
+             }
+         }
+     }
++    if std::env::var_os("ARQLET_TAP_LOG").is_some() {
++        for c in &found {
++            let route = snapshot.routes.iter().find(|r| r.id == c.edge_id).unwrap();
++            eprintln!("EXPHIT\t{}\t{}\t{}", c.edge_id, c.node_id, route.points.iter().map(|p| format!("{},{}", p.x, p.y)).collect::<Vec<_>>().join(";"));
++        }
++        for bus in &snapshot.graph.buses {
++            eprintln!("EXPBUS\t{}\t{}", bus.id, bus.taps.iter().map(|t| format!("{}={}", t.edge, t.node)).collect::<Vec<_>>().join(";"));
++        }
++    }
+     snapshot.route_conflicts.extend(found);
+ }
+ 

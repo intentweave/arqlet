@@ -12,7 +12,8 @@ explicit bus's edges may share lines), and a digest of the drawing without its o
 Usage: router_grid.py --arm NAME=BINARY[,on] ... --work DIR --out FILE.jsonl [--views SET|NAME,...] [--runs N]
        router_grid.py --summarize FILE.jsonl ... [--base ARM]
 
-With `--runs N` the arms are run in turn N times; every run is a record. SET is `report` (the views of the C1 report of
+With `--runs N` the arms are run in turn N times; every run is a record. `--times` records only the CPU and wall time
+and the digest of each run, and `--summarize` then prints the median and range of the CPU times. SET is `report` (the views of the C1 report of
 #156), `other` (generated views not used for the design), `corpus`, `large` or `all`.
 """
 import argparse
@@ -156,6 +157,12 @@ def on_border(p, b, slack=0.5):
         inside_y and (abs(p["x"] - b["x"]) <= slack or abs(p["x"] - b["x"] - b["width"]) <= slack))
 
 
+def digest(snapshot):
+    """A digest of the drawing: the snapshot without its options."""
+    rest = {k: v for k, v in snapshot.items() if k != "options"}
+    return hashlib.sha256(json.dumps(rest, sort_keys=True).encode()).hexdigest()[:16]
+
+
 def measure(binary, body, snapshot):
     parent, boxes = absolute(snapshot)
     containers = {p for p in parent.values() if p}
@@ -208,7 +215,6 @@ def measure(binary, body, snapshot):
     got = subprocess.run([binary], input=json.dumps({"op": "metrics", "drawing": drawing}), capture_output=True,
                          text=True, timeout=600, check=True)
     metrics = json.loads(got.stdout)["metrics"]
-    rest = {k: v for k, v in snapshot.items() if k != "options"}
     return {
         "edges": len(edges), "boxes": len(boxes), "missingRoutes": missing, "endsOffTheirBoxes": sorted(ends_off),
         "obliqueRoutes": oblique, "through": {**hits, "routes": hits["router"] + hits["tap"]},
@@ -218,7 +224,7 @@ def measure(binary, body, snapshot):
         "metrics": {k: metrics[k] for k in (
             "lineNodeHits", "containerTraversals", "crossings", "sharedEndpointCrossings", "bends", "length",
             "sharedLinePairs", "nearParallelPairs", "hugPairs", "siblingOverlaps", "area")},
-        "digest": hashlib.sha256(json.dumps(rest, sort_keys=True).encode()).hexdigest()[:16],
+        "digest": digest(snapshot),
     }
 
 
@@ -234,6 +240,9 @@ def summarize(files, base):
     by = {}
     for r in records:
         by.setdefault((r["view"], r["arm"]), []).append(r)
+    if all("through" not in r for r in records):
+        summarize_times(by, views, arms, base)
+        return
 
     def first(view, arm):
         rs = by.get((view, arm), [])
@@ -255,9 +264,9 @@ def summarize(files, base):
         if arm == base:
             continue
         print(f"\n## {arm} against {base}\n")
-        print("| View | Through boxes: router, taps | Crossings | Bends | Length | Shared line pairs | CPU s |"
-              " Drawing |")
-        print("| --- |" + " --- |" * 7)
+        print("| View | Through boxes: router, taps | Lines through nodes | Shared line pairs | Crossings | Bends |"
+              " Length | CPU s | In objective order |")
+        print("| --- |" + " --- |" * 8)
         totals = {a: {} for a in (base, arm)}
         compared = []
         for view in views:
@@ -297,10 +306,20 @@ def summarize(files, base):
                 x, y = values[key]
                 return fmt.format(x) if x == y else f"{fmt.format(x)} → {fmt.format(y)}"
 
-            print(f"| {view} | {pair('router')}, {pair('taps')} | {pair('crossings')} | {pair('bends')} | "
-                  f"{pair('length')} | {pair('sharedLinePairs')} | "
-                  f"{values['cpu'][0]:.2f} → {values['cpu'][1]:.2f} | "
-                  f"{'same' if a['digest'] == b['digest'] else 'changed'} |")
+            # The first criterion of the default objectives that differs decides (the metrics' counts; `crossings` are
+            # crossing points).
+            verdict = "same drawing"
+            if a["digest"] != b["digest"]:
+                verdict = "equal"
+                for key in ("siblingOverlaps", "lineNodeHits", "sharedLinePairs", "crossings", "hugPairs", "bends",
+                            "length"):
+                    x, y = values[key]
+                    if x != y:
+                        verdict = f"{'better' if y < x else 'worse'} ({key})"
+                        break
+            print(f"| {view} | {pair('router')}, {pair('taps')} | {pair('lineNodeHits')} | "
+                  f"{pair('sharedLinePairs')} | {pair('crossings')} | {pair('bends')} | {pair('length')} | "
+                  f"{values['cpu'][0]:.2f} → {values['cpu'][1]:.2f} | {verdict} |")
         same = sum(first(v, base)["digest"] == first(v, arm)["digest"] for v in compared)
         print(f"\n{len(compared)} views, {same} drawn the same.\n")
         print("| Sum over the views | " + base + " | " + arm + " |")
@@ -308,6 +327,39 @@ def summarize(files, base):
         for key in totals[base]:
             x, y = totals[base][key], totals[arm][key]
             print(f"| {key} | {x:.2f} | {y:.2f} |" if key == "cpu" else f"| {key} | {x:.0f} | {y:.0f} |")
+
+
+def summarize_times(by, views, arms, base):
+    """CPU seconds of the runs: the median and the range per view and arm, and the 1-minute loads seen."""
+    for (view, arm), records in by.items():
+        for r in records:
+            if "failed" in r:
+                print(f"FAILED {view} {arm}: {r['failed']}")
+        if len({r.get("digest") for r in records}) > 1:
+            print(f"NOT REPEATABLE {view} {arm}")
+    loads = [r["load"][0] for records in by.values() for r in records]
+    print(f"1-minute load: {min(loads):.1f} to {max(loads):.1f}, median {statistics.median(loads):.1f}\n")
+    print("| View | " + " | ".join(f"CPU s, {a}: median (range)" for a in arms) + " | Ratio of the medians | Runs |")
+    print("| --- |" + " --- |" * (len(arms) + 2))
+    totals = {a: 0.0 for a in arms}
+    for view in views:
+        cells, medians, runs = [], {}, 0
+        for arm in arms:
+            values = [r["cpu"] for r in by.get((view, arm), []) if "cpu" in r]
+            if not values:
+                cells.append("-")
+                continue
+            medians[arm] = statistics.median(values)
+            runs = len(values)
+            cells.append(f"{medians[arm]:.2f} ({min(values):.2f} to {max(values):.2f})")
+        if len(medians) == len(arms):
+            for arm in arms:
+                totals[arm] += medians[arm]
+        others = [a for a in arms if a != base and a in medians]
+        ratio = ", ".join(f"{medians[a] / medians[base]:.2f}" for a in others) if base in medians else "-"
+        print(f"| {view} | " + " | ".join(cells) + f" | {ratio} | {runs} |")
+    print("| sum of the medians | " + " | ".join(f"{totals[a]:.2f}" for a in arms) + " | "
+          + ", ".join(f"{totals[a] / totals[base]:.2f}" for a in arms if a != base) + " | |")
 
 
 def main():
@@ -319,6 +371,7 @@ def main():
     parser.add_argument("--out")
     parser.add_argument("--views", default="report")
     parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--times", action="store_true", help="only the times and the digests")
     parser.add_argument("--limit", type=int, default=900)
     args = parser.parse_args()
     if args.summarize:
@@ -343,7 +396,7 @@ def main():
         "revision": sh("git", "rev-parse", "HEAD"),
         "dirty": bool(sh("git", "status", "--porcelain", "--", "crates")),
         # No paths: the arms are named, and the results file says what each binary is.
-        "command": f"router_grid.py --views {args.views} --runs {args.runs} --arm "
+        "command": f"router_grid.py --views {args.views} --runs {args.runs}{' --times' if args.times else ''} --arm "
                    + " --arm ".join(f"{n}={Path(b).name}{',on' if on else ''}" for n, b, on in arms),
     }
     with open(args.out, "a") as out:
@@ -361,6 +414,11 @@ def main():
                     if "snapshot" not in got:
                         record["failed"] = got
                         print(name, arm, got, file=sys.stderr)
+                    elif args.times:
+                        record.update(digest=digest(got["snapshot"]), cpu=round(got["cpu"], 3),
+                                      wall=round(got["wall"], 3))
+                        print(name, arm, turn, "cpu", record["cpu"], "load", record["load"][0], file=sys.stderr,
+                              flush=True)
                     else:
                         record.update(measure(binary, body, got["snapshot"]))
                         record["cpu"] = round(got["cpu"], 3)

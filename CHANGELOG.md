@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `sparseRepairGrid` (provisional, off, #203): on views over the repair grid's bound the default router first searches a
+  sparse grid of the whole view (a line only in the gaps between boxes that matter, a cost per bend). On 24 generated
+  views with containers and bus meshes the routes the router draws through boxes fell from 1 091 to 52, with fewer
+  crossings, bends and shared lines in sum and 5 % longer routes; some views get more shared lines or import up to 13.7
+  times slower (a second routing pass they now get), and line-node hits are not 0, so it stays off
+  (`benchmarks/results/router-sparse-grid-20261126.md`). Views within the bound are unchanged. For users of
+  `arqlet-routing`: `Params` has the new field `sparse_grid`, `SearchCounters` the field `sparse_grids`.
 - Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
   criterion `as: lanes` cuts every layered area into bands, the top level included; drawn inside each container. Playground:
   *Second structure as bands* (phases with *As lanes*, lanes inside the containers without).
