@@ -1,10 +1,11 @@
 # ADR 0027: Area inside single pass: ranks by span where they cost no quality, then free sibling areas along the flow
 
 Date: 2026-11-23.
-Status: proposed. Nothing is implemented; the default output is unchanged. Step 0 done (2026-11-23): the plan-crossing
-Revised 2026-11-23 after step 0: the per-area guard (former step 1) is dropped; `simplexRanks` becomes a refinement
-candidate (step 1 below), and the composition of the areas (step 2) is the main lever.
-guard **fails**; the fallback for step 1 is open (see "Outcome of step 0").
+Status: proposed. Step 0 done (2026-11-23): the plan-crossing guard **fails** (see "Outcome of step 0"). Revised
+2026-11-23 after step 0: the per-area guard (former step 1) is dropped; `simplexRanks` becomes a refinement candidate
+(step 1 below), and the composition of the areas (step 2) is the main lever. Step 1 implemented and measured
+(2026-11-26) behind `simplexRanksCandidate`, off by default: no view worse than the default in objective order, but the
+expected gain does **not** hold (see "Outcome of step 1"). Step 1 is not accepted; the default output is unchanged.
 
 Related: [ADR 0016](0016-single-pass-default-gate.md) (single pass is the default), [ADR 0017](0017-area-border-legs.md)
 (edges between areas in legs, border nodes), [ADR 0020](0020-single-pass-for-every-area.md) (single pass for every area);
@@ -134,6 +135,43 @@ layout per view does not matter: `rankChoice: "best"`, behind the same acceptanc
 
 Cost: a second layout per refinement of a single-pass view, measured on an idle machine before acceptance.
 
+#### Outcome of step 1 (2026-11-26)
+
+Implemented as decided, behind the option `simplexRanksCandidate` (off, omitted): the candidate `simplex-ranks` is
+planned on a single-pass drawing without `simplexRanks`, is the view laid out again from the start (as a view change
+lays it out), counts as one job of the work budget, and replaces the drawing only when it is better by the published
+key, also where the input reports geometry issues. The ranking is kept as `simplexRanks: true` in the result's options.
+Measured on both poses, limit 150, against the current corpus
+([results](../../benchmarks/results/simplex-refinement-20261126.md)):
+
+| pose | views with simplex ranks | crossings | bends | area, sum | area / elk-rs (median) | expected above |
+|---|---:|---|---|---:|---|---|
+| uniform (17 views) | 5 | 4245 → 4181 | 4239 → 4287 | −5.5 % | 1.70 → 1.60 | 7 views, −9.4 % |
+| configured (16 views, `can-bus` fails to refine with and without the option) | 3 | 6491 → 6483 | 4869 → 4847 | **+0.2 %** | not measured | 6 views, −3.2 % |
+
+- **Acceptance 1 holds:** no view is worse than the default in objective order; three uniform views trade bends for
+  fewer crossings.
+- **Acceptance 2 recorded:** single pass and delegated routes are unchanged.
+- **Acceptance 3 holds for identity:** with the option off, import and refinement answer byte for byte as the build
+  without the change on all views of both poses, and the 15 reference fingerprints equal it; where the default ranks are
+  kept, the snapshot differs only in the option and the count of evaluated candidates. Times: see the results.
+- **The area is not a reason to expect:** the published key has no area (its last criterion is the route length), so
+  all three chosen views of the configured pose, and three of the five uniform ones, get larger (by 0.5 to 11.6 %). The
+  uniform sum comes from `org-chart` (−32.8 %) and `synthetic-2k` (−8.4 %).
+- **Why fewer views than step 0 predicted:** step 0 counted a choice by overlaps, hits, crossings, bends and then area,
+  on a corpus whose `layerweave-code` has since grown (1105/2461 then, 1474/3254 now; simplex is worse on it now). The
+  same rule on today's drawings would take 6 uniform views (−7.5 %) and 5 configured ones (−1.8 %). The candidate takes
+  8 of those 11: the published key ranks shared route pairs above bends (`synthetic-2k` configured: 9 → 13);
+  the geometry rules refuse the candidate of the uniform `mixed-large`, whose default drawing reports the same kind of
+  container-bounds issues; and the configured `mixed-large` does not run single pass.
+- **Kept ranks after edits:** on the views that took them, 158 edits (containers collapsed, nodes added) all kept
+  `simplexRanks`; against the same edit of the default drawing 135 were better in objective order, 6 equal and 17 worse.
+  A later refinement does not try the default ranks again.
+
+Open for the decision: whether this gain is worth the second layout; whether the choice should weigh area (a different
+key for this candidate, not tried: it would not be "better by the published key"); and whether a refinement of a drawing
+with kept ranks should compare the default ranks too.
+
 ### Step 2: unlinked sibling areas spread along the flow
 
 The main lever (step 0: rank changes act mostly on other areas). For the stacking of unlinked sibling areas
@@ -149,6 +187,16 @@ away from the border lengthens its chain again, and dummies also cost room acros
 measured, not assumed. A cheap upper bound comes first: ELK's own `MIN_WIDTH` and `STRETCH_WIDTH` layerers, run through
 the pinned elk-rs (`benchmarks/eval`) on the same views and poses, against elk-rs's default layering; if they buy little
 area there, step 2 is not built.
+
+#### Upper bound of step 2 (2026-11-26)
+
+ELK's `MIN_WIDTH` and `STRETCH_WIDTH` layerers through the pinned elk-rs, default parameters, against its default
+layering ([results](../../benchmarks/results/simplex-refinement-20261126.md)): on the uniform task `MIN_WIDTH` costs
+60.6 % area in sum (smaller on 2 of 17 views; the smaller of both per view saves 0.2 %), `STRETCH_WIDTH` costs 39.8 % on
+the 10 views it finishes within 90 s and is smaller on none; as configured elk-rs refuses 13 of the 17 views, and both
+are larger on the other 4. By the rule above this speaks against building step 2. The bound is not tight: ELK layers the
+whole hierarchy at once and counts leaves, step 2 would spread sibling areas inside one area and count an area by its
+box; no width parameter was tuned. Whether to drop step 2 is the owner's decision.
 
 ### Acceptance, for each step
 
@@ -178,8 +226,8 @@ changes.
 
 - Answered by step 0: the plan-crossing guard does not predict the drawn regressions, and most of them lie outside the
   area whose ranks changed; no per-area guard can see them.
-- Step 1: the time of the second layout per refinement on an idle machine, and how the chosen ranking is kept across
-  edits (stored with the snapshot) without changing the default output.
+- Step 1: the time of the second layout per refinement on an idle machine (the times of 2026-11-26 were taken on a
+  loaded one). The ranking is kept in the options (`simplexRanks`), which are omitted when default.
 - Which views lose under step 2, and by how much length?
 - `layerweave-code` is generated from the repository's source and drifts (measured copy: 1105 nodes / 2461 edges);
   record its size and hash with every figure.

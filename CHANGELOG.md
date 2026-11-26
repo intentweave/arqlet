@@ -7,6 +7,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `simplexRanksCandidate` (experimental, off, ADR 0027 step 1, #119): the refinement of a single-pass drawing also lays
+  the view out with network-simplex ranks and takes that drawing when its published key is better (strategy
+  `simplex-ranks`); the options of the result then carry `simplexRanks`, so later edits keep the ranking. It costs a second
+  layout per refinement. With the option off nothing changes.
 - Phases (provisional, ADR 0022 M4b): with lanes first, a second criterion `as: lanes` lays its groups out one after the other
   along the flow, so that lanes and phases make a grid; drawn as bands with their names. Playground: *Phases along the flow*.
 - Compact bookmarks that fit into a URL (provisional, #151): `controller.compactBookmark()` gives a view as `b1.…`

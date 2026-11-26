@@ -1,0 +1,557 @@
+{
+ "kind": "option-gates",
+ "pose": "native",
+ "limit": 150,
+ "refine": true,
+ "arms": [
+  [
+   "default",
+   {}
+  ],
+  [
+   "simplexRanksCandidate",
+   {
+    "simplexRanksCandidate": true
+   }
+  ]
+ ],
+ "rows": [
+  {
+   "name": "activity-order",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 92,
+    "bends": 79,
+    "length": 21858,
+    "width": 1056,
+    "height": 1833,
+    "area": 1935190,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.3,
+    "refineMs": 3.5,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 92,
+    "bends": 79,
+    "length": 21858,
+    "width": 1056,
+    "height": 1833,
+    "area": 1935190,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.2,
+    "refineMs": 7.4,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "arqlet-pipeline",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 25,
+    "bends": 78,
+    "length": 18242,
+    "width": 1690,
+    "height": 2006,
+    "area": 3389746,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 5.9,
+    "refineMs": 3.5,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 25,
+    "bends": 78,
+    "length": 18242,
+    "width": 1690,
+    "height": 2006,
+    "area": 3389746,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6,
+    "refineMs": 7.3,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "bpmn-pools",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 12,
+    "bends": 59,
+    "length": 14449,
+    "width": 1976,
+    "height": 982,
+    "area": 1939941,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 5,
+    "refineMs": 2.9,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 10,
+    "bends": 51,
+    "length": 13034,
+    "width": 2034,
+    "height": 1065,
+    "area": 2165464,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 5,
+    "refineMs": 6,
+    "strategy": "simplex-ranks"
+   }
+  },
+  {
+   "name": "can-bus",
+   "default": {
+    "failed": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+   },
+   "simplexRanksCandidate": {
+    "failed": "Routing completion requires the legacy router and unbundled default orthogonal routing"
+   }
+  },
+  {
+   "name": "cloud-architecture",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 31,
+    "bends": 108,
+    "length": 33958,
+    "width": 2893,
+    "height": 1489,
+    "area": 4307945,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 8.2,
+    "refineMs": 3.9,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 30,
+    "bends": 106,
+    "length": 34010,
+    "width": 2899,
+    "height": 1574,
+    "area": 4561080,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 7.9,
+    "refineMs": 9.8,
+    "strategy": "simplex-ranks"
+   }
+  },
+  {
+   "name": "deployment-cluster",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 109,
+    "bends": 227,
+    "length": 68598,
+    "width": 3064,
+    "height": 1538,
+    "area": 4710900,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 11.5,
+    "refineMs": 4.7,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 109,
+    "bends": 227,
+    "length": 68598,
+    "width": 3064,
+    "height": 1538,
+    "area": 4710900,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 10.9,
+    "refineMs": 13.2,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "er-diagram",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 23,
+    "length": 3084,
+    "width": 1104,
+    "height": 1508,
+    "area": 1664280,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3.7,
+    "refineMs": 2.6,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 23,
+    "length": 3084,
+    "width": 1104,
+    "height": 1508,
+    "area": 1664280,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3.7,
+    "refineMs": 4.5,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "layerweave-code",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1473,
+    "bends": 1171,
+    "length": 1401725,
+    "width": 7712,
+    "height": 11206,
+    "area": 86418744,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 72.2,
+    "refineMs": 24.5,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1473,
+    "bends": 1171,
+    "length": 1401725,
+    "width": 7712,
+    "height": 11206,
+    "area": 86418744,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 70.7,
+    "refineMs": 89.8,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "mixed-large",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1030,
+    "bends": 150,
+    "length": 218409,
+    "width": 5760,
+    "height": 3724,
+    "area": 21452464,
+    "singlePass": false,
+    "delegated": null,
+    "ms": 867.9,
+    "refineMs": 3648.4,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 1030,
+    "bends": 150,
+    "length": 218409,
+    "width": 5760,
+    "height": 3724,
+    "area": 21452464,
+    "singlePass": false,
+    "delegated": null,
+    "ms": 874.3,
+    "refineMs": 3741.5,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "network-vlan",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 43,
+    "bends": 106,
+    "length": 31751,
+    "width": 1712,
+    "height": 1778,
+    "area": 3043047,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.7,
+    "refineMs": 3.6,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 43,
+    "bends": 106,
+    "length": 31751,
+    "width": 1712,
+    "height": 1778,
+    "area": 3043047,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.3,
+    "refineMs": 8,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "org-chart",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 48,
+    "bends": 335,
+    "length": 88170,
+    "width": 2758,
+    "height": 6484,
+    "area": 17883992,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 14.7,
+    "refineMs": 7.1,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 48,
+    "bends": 335,
+    "length": 88170,
+    "width": 2758,
+    "height": 6484,
+    "area": 17883992,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 14.8,
+    "refineMs": 21.9,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "petri-net",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 32,
+    "bends": 84,
+    "length": 24174,
+    "width": 1734,
+    "height": 801,
+    "area": 1388934,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.3,
+    "refineMs": 3.3,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 27,
+    "bends": 72,
+    "length": 14695,
+    "width": 1756,
+    "height": 795,
+    "area": 1396020,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6,
+    "refineMs": 6.4,
+    "strategy": "simplex-ranks"
+   }
+  },
+  {
+   "name": "state-order",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 19,
+    "length": 2374,
+    "width": 1752,
+    "height": 244,
+    "area": 427488,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3,
+    "refineMs": 2.4,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 19,
+    "length": 2374,
+    "width": 1752,
+    "height": 244,
+    "area": 427488,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3.1,
+    "refineMs": 3.3,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "state-tcp",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 26,
+    "length": 5286,
+    "width": 1698,
+    "height": 210,
+    "area": 356580,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3.3,
+    "refineMs": 2.4,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 0,
+    "bends": 26,
+    "length": 5286,
+    "width": 1698,
+    "height": 210,
+    "area": 356580,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 3.5,
+    "refineMs": 4,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "synthetic-2k",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 3037,
+    "bends": 1570,
+    "length": 806684,
+    "width": 7434,
+    "height": 8366,
+    "area": 62192844,
+    "singlePass": true,
+    "delegated": 29,
+    "ms": 137.5,
+    "refineMs": 32.1,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 3037,
+    "bends": 1570,
+    "length": 806684,
+    "width": 7434,
+    "height": 8366,
+    "area": 62192844,
+    "singlePass": true,
+    "delegated": 29,
+    "ms": 134.1,
+    "refineMs": 179.9,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "uml-class",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 6,
+    "bends": 49,
+    "length": 13873,
+    "width": 3030,
+    "height": 1197,
+    "area": 3626910,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 7.3,
+    "refineMs": 3.4,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 6,
+    "bends": 49,
+    "length": 13873,
+    "width": 3030,
+    "height": 1197,
+    "area": 3626910,
+    "singlePass": true,
+    "delegated": 0,
+    "ms": 6.5,
+    "refineMs": 8.9,
+    "strategy": "keep-existing"
+   }
+  },
+  {
+   "name": "workflow-dag",
+   "default": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 553,
+    "bends": 785,
+    "length": 305473,
+    "width": 15168,
+    "height": 780,
+    "area": 11826879,
+    "singlePass": true,
+    "delegated": 3,
+    "ms": 22.2,
+    "refineMs": 8.9,
+    "strategy": "keep-existing"
+   },
+   "simplexRanksCandidate": {
+    "overlaps": 0,
+    "hits": 0,
+    "crossings": 553,
+    "bends": 785,
+    "length": 305473,
+    "width": 15168,
+    "height": 780,
+    "area": 11826879,
+    "singlePass": true,
+    "delegated": 3,
+    "ms": 21.8,
+    "refineMs": 29.9,
+    "strategy": "keep-existing"
+   }
+  }
+ ]
+}
