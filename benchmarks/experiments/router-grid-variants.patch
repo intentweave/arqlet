@@ -1,0 +1,415 @@
+--- a/crates/routing/src/lib.rs
++++ b/crates/routing/src/lib.rs
+@@ -2113,6 +2113,29 @@
+     let (xs, ys) = lines(None);
+     if xs.len().checked_mul(ys.len())? <= GRID_LIMIT {
+         return search_grid(route, obstacles, start, end, (&a, &b), xs, ys, counters);
++    }
++    if let Ok(path) = std::env::var("ARQLET_GRID_DUMP") {
++        let around = route_bounds(route);
++        let mut found = false;
++        let started = std::time::Instant::now();
++        for reach in WINDOW_REACH {
++            let window = [around[0] - reach, around[1] - reach, around[2] + reach, around[3] + reach];
++            let (wx, wy) = lines(Some(&window));
++            if wx.len() * wy.len() > GRID_LIMIT { break; }
++            if search_grid(route, obstacles, start, end, (&a, &b), wx, wy, &mut channel::SearchCounters::default()).is_some() { found = true; break; }
++        }
++        let window_ns = started.elapsed().as_nanos();
++        let mut out = format!("R {} {} {} {} {} {}\n", route.id, u8::from(found), own_clearance, window_ns, xs.len(), ys.len());
++        out.push_str("P");
++        for p in &route.points { out.push_str(&format!(" {} {}", p.x, p.y)); }
++        out.push_str(&format!("\nS {} {} {} {}\n", a.x, a.y, b.x, b.y));
++        for (o, own) in obstacles.iter().zip(own) {
++            let r = o.bounds();
++            out.push_str(&format!("O {} {} {} {} {} {}\n", u8::from(matches!(o, Outline::Disc { .. })), u8::from(*own), r.x, r.y, r.width, r.height));
++        }
++        out.push_str("E\n");
++        use std::io::Write;
++        std::fs::OpenOptions::new().create(true).append(true).open(path).unwrap().write_all(out.as_bytes()).unwrap();
+     }
+     // The whole view gives more grid lines than the search can hold. Before the route is given up, the lines are taken only from
+     // the obstacles near it, in windows that grow (the freedom of a step is still tested against every obstacle, so a route found
+@@ -3697,5 +3720,324 @@
+             length(&circle),
+             length(&rectangle)
+         );
++    }
++}
++
++/// Experiment (#203, not merged): variants of the repair search on dumped repair problems.
++pub mod proto {
++    use super::*;
++
++    pub struct Problem {
++        pub id: String,
++        pub window_found: bool,
++        pub own_c: f64,
++        pub window_ns: u128,
++        pub route: Route,
++        pub a: Point,
++        pub b: Point,
++        pub obstacles: Vec<Outline>,
++        pub own: Vec<bool>,
++    }
++
++    pub fn parse(text: &str) -> Vec<Problem> {
++        let mut out = Vec::new();
++        let mut current: Option<Problem> = None;
++        for line in text.lines() {
++            let mut it = line.split(' ');
++            let tag = it.next().unwrap();
++            let rest: Vec<&str> = it.collect();
++            let n = |i: usize| rest[i].parse::<f64>().unwrap();
++            match tag {
++                "R" => {
++                    current = Some(Problem {
++                        id: rest[0].into(),
++                        window_found: rest[1] == "1",
++                        own_c: n(2),
++                        window_ns: rest[3].parse().unwrap(),
++                        route: Route::new(rest[0], vec![]),
++                        a: Point { x: 0., y: 0. },
++                        b: Point { x: 0., y: 0. },
++                        obstacles: vec![],
++                        own: vec![],
++                    })
++                }
++                "P" => {
++                    let c = current.as_mut().unwrap();
++                    c.route.points = (0..rest.len() / 2)
++                        .map(|i| Point { x: n(2 * i), y: n(2 * i + 1) })
++                        .collect();
++                }
++                "S" => {
++                    let c = current.as_mut().unwrap();
++                    c.a = Point { x: n(0), y: n(1) };
++                    c.b = Point { x: n(2), y: n(3) };
++                }
++                "O" => {
++                    let c = current.as_mut().unwrap();
++                    let r = Rect { x: n(2), y: n(3), width: n(4), height: n(5) };
++                    c.obstacles.push(Outline::of(
++                        if rest[0] == "1" { NodeShape::Circle } else { NodeShape::default() },
++                        &r,
++                    ));
++                    c.own.push(rest[1] == "1");
++                }
++                "E" => out.push(current.take().unwrap()),
++                _ => {}
++            }
++        }
++        out
++    }
++
++    fn sorted(mut v: Vec<f64>) -> Vec<f64> {
++        v.sort_by(f64::total_cmp);
++        v.dedup();
++        v
++    }
++
++    fn line_bounds(p: &Problem, i: usize) -> Rect {
++        let mut r = p.obstacles[i].bounds();
++        if p.own[i] && p.own_c > 0. {
++            r = Rect { x: r.x - p.own_c, y: r.y - p.own_c, width: r.width + 2. * p.own_c, height: r.height + 2. * p.own_c };
++        }
++        r
++    }
++
++    pub fn full_lines(p: &Problem, keep: &dyn Fn(usize) -> bool) -> (Vec<f64>, Vec<f64>) {
++        let mut xs = vec![p.a.x, p.b.x];
++        let mut ys = vec![p.a.y, p.b.y];
++        for i in 0..p.obstacles.len() {
++            if !keep(i) { continue; }
++            let r = line_bounds(p, i);
++            xs.extend([r.x - 6., r.x + r.width + 6.]);
++            ys.extend([r.y - 6., r.y + r.height + 6.]);
++            if matches!(p.obstacles[i], Outline::Disc { .. }) {
++                xs.extend([r.x + 6., r.x + r.width - 6.]);
++                ys.extend([r.y + 6., r.y + r.height - 6.]);
++            }
++        }
++        (sorted(xs), sorted(ys))
++    }
++
++    /// Lines only in the slabs between box edges that are not dominated by a neighbour: after an edge where a box ends and
++    /// before one where a box begins.
++    fn minimal_slabs(p: &Problem, vertical: bool, margin: f64, mode: u8) -> Vec<f64> {
++        let mut events: Vec<(f64, bool, bool)> = Vec::new();
++        let mut out = if vertical { vec![p.a.x, p.b.x] } else { vec![p.a.y, p.b.y] };
++        for i in 0..p.obstacles.len() {
++            let r = p.obstacles[i].bounds();
++            let (lo, hi) = if vertical { (r.x, r.x + r.width) } else { (r.y, r.y + r.height) };
++            let own = if p.own[i] { p.own_c } else { 0. };
++            events.push((lo, true, own > 0.));
++            events.push((hi, false, own > 0.));
++            let lr = line_bounds(p, i);
++            let (llo, lhi) = if vertical { (lr.x, lr.x + lr.width) } else { (lr.y, lr.y + lr.height) };
++            if matches!(p.obstacles[i], Outline::Disc { .. }) {
++                out.extend([llo - 6., lhi + 6., llo + 6., lhi - 6.]);
++            }
++            if own > 0. {
++                out.extend([llo - 6., lhi + 6.]);
++            }
++        }
++        events.sort_by(|a, b| a.0.total_cmp(&b.0));
++        let mut groups: Vec<(f64, bool, bool)> = Vec::new(); // coordinate, has start, has end
++        for (c, start, _) in events {
++            match groups.last_mut() {
++                Some(g) if c - g.0 < EPS => { g.1 |= start; g.2 |= !start; }
++                _ => groups.push((c, start, !start)),
++            }
++        }
++        if groups.is_empty() { return sorted(out); }
++        out.push(groups[0].0 - margin);
++        out.push(groups[groups.len() - 1].0 + margin);
++        for w in groups.windows(2) {
++            let (lo, hi) = (w[0], w[1]);
++            if !(lo.2 && hi.1) { continue; }
++            let gap = hi.0 - lo.0;
++            if mode == 0 {
++                // one line
++                out.push((lo.0 + hi.0) / 2.);
++            } else if gap > 2. * margin {
++                out.extend([lo.0 + margin, hi.0 - margin]);
++            } else if gap >= 1. {
++                out.push((lo.0 + hi.0) / 2.);
++            }
++        }
++        sorted(out)
++    }
++
++    pub struct Found {
++        pub points: Vec<Point>,
++        pub pops: usize,
++        pub cells: usize,
+     }
++
++    /// A* over the grid with a turn penalty (in layout units); `turn == 0` means no direction states.
++    pub fn astar(
++        p: &Problem,
++        xs: &[f64],
++        ys: &[f64],
++        turn: f64,
++        blockers: Option<&mut std::collections::BTreeSet<usize>>,
++    ) -> (Option<Vec<Point>>, usize, usize) {
++        use std::cmp::Reverse;
++        use std::collections::BinaryHeap;
++        let width = xs.len();
++        let count = width * ys.len();
++        let at = |q: &Point| {
++            Some(ys.binary_search_by(|v| v.total_cmp(&q.y)).ok()? * width + xs.binary_search_by(|v| v.total_cmp(&q.x)).ok()?)
++        };
++        let (Some(source), Some(target)) = (at(&p.a), at(&p.b)) else { return (None, 0, count) };
++        let point = |i: usize| Point { x: xs[i % width], y: ys[i / width] };
++        let boxes: Vec<Bounds> = p.obstacles.iter().map(|o| rect_bounds(&o.bounds())).collect();
++        let grid = BoxIndex::new(&boxes);
++        let mut blockers = blockers;
++        let mut free = |u: &Point, v: &Point| {
++            let reach = [u.x.min(v.x), u.y.min(v.y), u.x.max(v.x), u.y.max(v.y)];
++            let segment = [u.clone(), v.clone()];
++            match blockers.as_deref_mut() {
++                None => !grid.any_near(&boxes, &reach, |i| hits_outline_points(&reach, &segment, &p.obstacles[i])),
++                Some(set) => {
++                    let mut any = false;
++                    grid.any_near(&boxes, &reach, |i| {
++                        if hits_outline_points(&reach, &segment, &p.obstacles[i]) {
++                            any = true;
++                            set.insert(i);
++                        }
++                        false
++                    });
++                    !any
++                }
++            }
++        };
++        let start = p.route.points.first().unwrap();
++        let end = p.route.points.last().unwrap();
++        if !free(start, &p.a) || !free(&p.b, end) {
++            return (None, 0, count);
++        }
++        let dirs = if turn > 0. { 2 } else { 1 };
++        let mut costs = vec![u64::MAX; count * dirs];
++        let mut parent = vec![u32::MAX; count * dirs];
++        let mut queue = BinaryHeap::new();
++        let tp = point(target);
++        let h = |i: usize| (((xs[i % width] - tp.x).abs() + (ys[i / width] - tp.y).abs()) * 1000.) as u64;
++        // The direction of the stub from the port: leaving it any other way is a turn.
++        let first_dir = if (start.y - p.a.y).abs() < EPS { 0 } else { 1 };
++        let s = source * dirs + if dirs == 2 { first_dir } else { 0 };
++        costs[s] = 0;
++        queue.push(Reverse((h(source), Reverse(0u64), s)));
++        let mut pops = 0;
++        let last_dir = if (end.y - p.b.y).abs() < EPS { 0 } else { 1 };
++        let mut done: Option<(u64, usize)> = None;
++        while let Some(Reverse((est, Reverse(cost), state))) = queue.pop() {
++            if done.is_some_and(|(best, _)| est >= best) { break; }
++            pops += 1;
++            if cost != costs[state] { continue; }
++            let (i, d) = (state / dirs, state % dirs);
++            if i == target {
++                let total = cost + if dirs == 2 && d != last_dir { (turn * 1000.) as u64 } else { 0 };
++                if done.is_none_or(|(best, _)| total < best) { done = Some((total, state)); }
++                continue;
++            }
++            let u = point(i);
++            let neighbors = [
++                ((i % width > 0).then(|| i.wrapping_sub(1)), 0usize),
++                ((i % width + 1 < width).then(|| i + 1), 0),
++                ((i >= width).then(|| i.wrapping_sub(width)), 1),
++                ((i + width < count).then(|| i + width), 1),
++            ];
++            for (j, nd) in neighbors {
++                let Some(j) = j else { continue };
++                let v = point(j);
++                let step = (((u.x - v.x).abs() + (u.y - v.y).abs()) * 1000.) as u64 + 1;
++                let t = if dirs == 2 && nd != d { (turn * 1000.) as u64 } else { 0 };
++                let next = cost + step + t;
++                let ns = j * dirs + if dirs == 2 { nd } else { 0 };
++                if next < costs[ns] && free(&u, &v) {
++                    costs[ns] = next;
++                    parent[ns] = state as u32;
++                    queue.push(Reverse((next + h(j), Reverse(next), ns)));
++                }
++            }
++        }
++        let Some((_, mut cur)) = done else { return (None, pops, count) };
++        let mut path = vec![end.clone()];
++        loop {
++            path.push(point(cur / dirs));
++            if cur == s { break; }
++            cur = parent[cur] as usize;
++        }
++        path.push(start.clone());
++        path.reverse();
++        let r = clean(Route::new("", path));
++        (Some(r.points), pops, count)
++    }
++
++    pub fn run(p: &Problem, variant: &str) -> Found {
++        let all = |_: usize| true;
++        let from = |r: (Option<Vec<Point>>, usize, usize)| Found { points: r.0.unwrap_or_default(), pops: r.1, cells: r.2 };
++        match variant {
++            "full" => {
++                let (xs, ys) = full_lines(p, &all);
++                let mut c = channel::SearchCounters::default();
++                let found = search_grid(&p.route, &p.obstacles.iter().collect::<Vec<_>>(), p.route.points.first().unwrap(), p.route.points.last().unwrap(), (&p.a, &p.b), xs.clone(), ys.clone(), &mut c);
++                Found { points: found.map(|r| r.points).unwrap_or_default(), pops: c.legacy_grid_pops, cells: xs.len() * ys.len() }
++            }
++            "gap" | "gap-turn4" | "gap-turn12" | "gap-turn24" | "gap-turn48" | "gap2" | "gap2-turn12" => {
++                let mode = u8::from(variant.starts_with("gap2"));
++                let xs = minimal_slabs(p, true, 6., mode);
++                let ys = minimal_slabs(p, false, 6., mode);
++                let turn = variant.split_once("turn").map_or(0., |(_, t)| t.parse().unwrap());
++                from(astar(p, &xs, &ys, turn, None))
++            }
++            "full-turn12" => {
++                let (xs, ys) = full_lines(p, &all);
++                from(astar(p, &xs, &ys, 12., None))
++            }
++            "lazy" => {
++                // Lines of the ends and of the boxes in the way; the boxes that blocked a step are added and it searches again.
++                let mut set: std::collections::BTreeSet<usize> = (0..p.obstacles.len())
++                    .filter(|&i| p.own[i] || hits_outline(&p.route, &p.obstacles[i]))
++                    .collect();
++                let mut pops = 0;
++                let mut cells = 0;
++                loop {
++                    let (xs, ys) = full_lines(p, &|i| set.contains(&i));
++                    let mut seen = std::collections::BTreeSet::new();
++                    let r = astar(p, &xs, &ys, 12., Some(&mut seen));
++                    pops += r.1;
++                    cells += r.2;
++                    if r.0.is_some() { return Found { points: r.0.unwrap(), pops, cells }; }
++                    let before = set.len();
++                    set.extend(seen);
++                    if set.len() == before { return Found { points: vec![], pops, cells }; }
++                }
++            }
++            "follow" => {
++                // Windows around the route and the boxes it runs through.
++                let hit: Vec<Bounds> = (0..p.obstacles.len())
++                    .filter(|&i| p.own[i] || hits_outline(&p.route, &p.obstacles[i]))
++                    .map(|i| rect_bounds(&p.obstacles[i].bounds()))
++                    .collect();
++                let base = hit.iter().fold(route_bounds(&p.route), |a, b| [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])]);
++                let mut pops = 0;
++                let mut cells = 0;
++                for reach in [24., 120., 480., 1920.] {
++                    let w = [base[0] - reach, base[1] - reach, base[2] + reach, base[3] + reach];
++                    let (xs, ys) = full_lines(p, &|i| !apart(&w, &rect_bounds(&line_bounds(p, i))));
++                    if xs.len() * ys.len() > 480_000 { break; }
++                    let r = astar(p, &xs, &ys, 12., None);
++                    pops += r.1;
++                    cells += r.2;
++                    if r.0.is_some() { return Found { points: r.0.unwrap(), pops, cells }; }
++                }
++                Found { points: vec![], pops, cells }
++            }
++            _ => panic!("unknown variant"),
++        }
++    }
++
++    pub fn is_free(p: &Problem, points: &[Point]) -> bool {
++        let r = Route::new("", points.to_vec());
++        p.obstacles.iter().all(|o| !hits_outline(&r, o))
++    }
+ }
+--- /dev/null
++++ b/crates/routing/examples/grid_variants.rs
+@@ -0,0 +1,55 @@
++use arqlet_routing::proto::*;
++fn main() {
++    let args: Vec<String> = std::env::args().collect();
++    let text = std::fs::read_to_string(&args[1]).unwrap();
++    let all = parse(&text);
++    // A problem repeated with the same geometry (repeated repair passes) is counted once.
++    let mut seen = std::collections::BTreeSet::new();
++    let problems: Vec<&Problem> = all
++        .iter()
++        .filter(|p| seen.insert(format!("{} {:?} {:?} {}", p.id, p.route.points, p.obstacles.iter().map(|o| o.bounds().x).collect::<Vec<_>>(), p.obstacles.len())))
++        .collect();
++    let window_ok = problems.iter().filter(|p| p.window_found).count();
++    let window_ms: u128 = problems.iter().map(|p| p.window_ns).sum::<u128>() / 1_000_000;
++    println!("problems {} (all {}) windowFound {} windowMs {}", problems.len(), all.len(), window_ok, window_ms);
++    let variants: Vec<String> = args[2].split(',').map(String::from).collect();
++    let mut full_found: Vec<bool> = vec![];
++    for v in &variants {
++        let mut found = 0;
++        let mut gave = 0; // problems the windows gave up on
++        let (mut pops, mut cells, mut len, mut bends, mut ms_fail) = (0usize, 0usize, 0f64, 0usize, 0f64);
++        let started = std::time::Instant::now();
++        let mut ok = vec![];
++        for p in &problems {
++            let t = std::time::Instant::now();
++            let f = run(p, v);
++            pops += f.pops;
++            cells += f.cells;
++            let good = !f.points.is_empty();
++            ok.push(good);
++            if good {
++                assert!(is_free(p, &f.points[..]), "{v} {}: not free", p.id);
++                assert!(f.points.windows(2).all(|w| (w[0].x - w[1].x).abs() < 1e-6 || (w[0].y - w[1].y).abs() < 1e-6), "{v} {}: oblique", p.id);
++                found += 1;
++                if !p.window_found { gave += 1; }
++                len += f.points.windows(2).map(|w| (w[0].x - w[1].x).abs() + (w[0].y - w[1].y).abs()).sum::<f64>();
++                bends += f.points.len() - 2;
++            } else {
++                ms_fail += t.elapsed().as_secs_f64() * 1000.;
++            }
++        }
++        if v == "full" { full_found = ok.clone(); }
++        let (mut missed, mut extra) = (0, 0);
++        if !full_found.is_empty() {
++            missed = ok.iter().zip(&full_found).filter(|(a, b)| !**a && **b).count();
++            extra = ok.iter().zip(&full_found).filter(|(a, b)| **a && !**b).count();
++        }
++        println!(
++            "{v:12} found {found:5} (beyondWindows {gave:5}) missedVsFull {missed} extraVsFull {extra} ms {:8.1} failMs {ms_fail:8.1} pops {pops} meanCells {} len {:.0} bends {:.2}",
++            started.elapsed().as_secs_f64() * 1000.,
++            cells / problems.len().max(1),
++            len / found.max(1) as f64,
++            bends as f64 / found.max(1) as f64
++        );
++    }
++}
