@@ -44,3 +44,13 @@ test('a scene without lanes draws none', () => {
   renderSvg(svg, {schemaVersion: 1, bounds: {x: 0, y: 0, width: 10, height: 10}, nodes: [], routes: [], ports: [], crossings: [], labels: [], showPorts: false}, {document});
   assert.equal(svg.children.filter(c => String(c.attrs.class).startsWith('lw-lane')).length, 0);
 });
+
+test('a phase that runs across x has its name turned in its strip', () => {
+  const svg = new Element('svg');
+  const phase = (group, y) => ({dimension: 'phase', dimensionLabel: 'Phase', group, label: group, rect: {x: -44, y, width: 400, height: 100}, vertical: false, phase: true});
+  renderSvg(svg, {schemaVersion: 1, bounds: {x: -60, y: -30, width: 460, height: 260}, nodes: [], routes: [], ports: [], crossings: [], labels: [], showPorts: false,
+    membershipLanes: [phase('request', 0), phase('approval', 100)]}, {document});
+  const names = svg.find('text').filter(t => String(t.attrs.class).includes('lw-phase-label'));
+  assert.equal(names.length, 2);
+  assert.match(names[0].attrs.transform, /^rotate\(90 /);
+});

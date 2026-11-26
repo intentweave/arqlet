@@ -445,6 +445,13 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   meeting in the middle of the gap between them; the SVG viewer draws them behind everything, alternating, with a dashed line between
   two and the lane's name at its start; the playground has *As lanes*. No band where the lanes are not applied. Not drawn by the GPU
   layer yet.
+  **M4b, phases along the flow, done** (2026-11-26; [results](../../benchmarks/results/memberships-20261126-phases.md)):
+  the second criterion `as: lanes`, behind lanes of the first, is a sequence of phases. The ranking takes them one after the other
+  (an edge from a later phase to an earlier one is turned for it and keeps its direction), and a phase starts in the rank after
+  the last of the one before. A top-level node is in the earliest group, in the declared order, that names it or a node below it;
+  a nested group is a phase of its own. The scene draws phases as bands with a header strip for their names, not as hulls, and
+  the report counts phases out of place. `pools-and-lanes` with its own priority is the 2×3 grid. Not built: lanes below the
+  parent hierarchy (inside each owner).
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.
