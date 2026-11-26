@@ -574,8 +574,9 @@ const plain = request => {
   return {...request, start: fixed};
 };
 
-// An overview's places by node id, as `start.nodes` takes them.
-const placesOf = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id, {x: o.x[i], y: o.y[i], r: o.r[i]}]));
+// An overview's places by node id, as `start.nodes` takes them, each with its parent's id.
+const placesOf = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id,
+  {x: o.x[i], y: o.y[i], r: o.r[i], ...(o.parent[i] >= 0 ? {parent: o.ids[o.parent[i]]} : {})}]));
 
 // The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
 // Defaults as the engine's (`communities` 120, `satellites` 0); `groups` and `hubs` compared as given.

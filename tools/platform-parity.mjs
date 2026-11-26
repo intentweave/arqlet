@@ -86,6 +86,12 @@ requests.push(['overview with edge data', {op: 'overview', graph: changed, edgeD
 for (const settle of [false, true]) {
   requests.push([`overview continued by id${settle ? ', settling' : ''}`, {op: 'overview', graph: changed, edgeData: true, start: {nodes: places, settle}}]);
 }
+// With each entry's parent, from an answer whose first containers are set far smaller than what they hold.
+const radii = Object.fromEntries(before.overview.ids.filter((id, i) => i % 211 === 0 && containers.has(id)).map(id => [id, 5]));
+const small = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overview', graph: large, radii,
+  start: {x: before.overview.x, y: before.overview.y, r: before.overview.r}}), maxBuffer: 1 << 30}).toString()).overview;
+const parented = Object.fromEntries(small.ids.map((id, i) => [id, {x: small.x[i], y: small.y[i], r: small.r[i], parent: small.ids[small.parent[i]]}]));
+requests.push(['overview continued by id with parents', {op: 'overview', graph: changed, start: {nodes: parented}}]);
 const digest = process.argv.includes('--digest');
 let differ = 0;
 for (const [name, request] of requests) {

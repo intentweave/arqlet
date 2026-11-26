@@ -345,6 +345,12 @@ test('an overview continued by id keeps its clusters over later layouts, in both
   assert.deepEqual(later.parent, continued.parent);
   const again = await both(s => s.layOut({options, start: {settle: true}}));
   assert.deepEqual(again.parent, continued.parent);
+  // A cluster set smaller than its content keeps its members, in both kinds: the parents go with the places.
+  const community = again.ids[again.parent[0]];
+  const radii = {[community]: again.r[again.parent[0]] / 3};
+  await both(s => s.layOut({options, radii, start: {}}));
+  const clipped = await both(s => s.layOut({options, radii, start: {}}));
+  assert.deepEqual(clipped.parent, continued.parent);
   const anew = await both(s => s.layOut({options}));
   assert.notDeepEqual(anew.parent, continued.parent);
   await kept.close();

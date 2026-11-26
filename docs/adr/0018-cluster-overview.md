@@ -156,13 +156,16 @@ change no answer that does not ask for them. Usage: [integration guide](../integ
    the alternative and was rejected: a client without the graph cannot resolve it, the taps of buses given as data have
    no input edge, and a host with the graph already has the order (`resolvedEdgeIds`). On request, because it makes every
    answer larger and most hosts have the graph.
-2. **Continuation by node id** (`start.nodes`, `id → {x, y, r}`; excluding `x`, `y`, `r`): read onto the graph as it
+2. **Continuation by node id** (`start.nodes`, `id → {x, y, r, parent?}`; excluding `x`, `y`, `r`): read onto the graph as it
    is now (`arqlet_layout::overview::continue_by_id`), then laid out as any continuation. A node without a usable place
    (none, a new container, or an entry outside its container's earlier disc) is put next to the nodes it is linked to,
    and its container makes room or settles. A container that lost a node counts as changed, as does one whose children
    no longer fit together at their places (a node that moved up out of a container). The earlier disc of a container
    judges its members only when it holds at least half of them or they gather elsewhere, so that a disc the host set
-   smaller than its content (`radii`) does not send them all anew.
+   smaller than its content (`radii`) does not send them all anew. An entry's `parent` (added 2026-11-26), where given,
+   says what held the node instead of the discs, for the container and the cluster alike: discs cannot tell the members
+   of a cluster set smaller than its content. A parent that names nothing, and cluster parents that are not of the same
+   container or go round in a circle, count as left out ([table](../integration-guide.md)).
 3. **The added clusters continue; the changed graph is not clustered anew** (`clusters_by_id`). Discs of one container
    do not overlap, so the earlier cluster discs say which nodes each cluster held, whatever the graph would be clustered
    into now. Each keeps its id; a new node joins the cluster of the nodes it is linked to most; a cluster with fewer
@@ -178,9 +181,8 @@ change no answer that does not ask for them. Usage: [integration guide](../integ
    The price: the clusters of a continuation drift from those of a fresh layout as changes add up (a node whose links
    moved to another community stays where it was). The host decides when to lay out without `start`.
 
-Open: the drill-down from an `OverviewModel` without the input graph (part 2 of #209) builds on 1; it may want edge ids,
-which would be another request field. Not kept from the places: which nodes a cluster held whose disc the host set
-smaller than its content; an entry could name its parent for that.
+Open, both later: the drill-down from an `OverviewModel` without the input graph (part 2 of #209) builds on 1 and may
+want edge ids, which would be another request field; a session continuing a new graph from its own places on `start: {}`.
 
 ## Real data (2026-11-11)
 

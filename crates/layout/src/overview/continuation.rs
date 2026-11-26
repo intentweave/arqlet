@@ -2,12 +2,13 @@
 //! as it is now, so that the overview of a changed graph continues without a session.
 //!
 //! - The clusters the overview added continue: their ids are positions in a clustering, and a changed graph clustered
-//!   anew would group much of it differently. Discs of one container do not overlap, so the earlier discs tell which
-//!   nodes each cluster held (`clusters_by_id`). A node without such a place joins the cluster of the nodes it is linked
-//!   to most. Only a container without earlier clusters is clustered as a new graph is.
-//! - A node continues from its entry when that lies in the earlier disc of its container (the nearest container from
-//!   the graph; every disc of the top level). Without an entry, in a container without one, outside its container's disc
-//!   (it changed its container) or in a cluster made now, it is placed anew (`continue_by_id`).
+//!   anew would group much of it differently. An entry that names its parent says which cluster held it; otherwise the
+//!   discs tell, since those of one container do not overlap (`clusters_by_id`). A node without such a place joins the
+//!   cluster of the nodes it is linked to most. Only a container without earlier clusters is clustered as a new graph is.
+//! - A node continues from its entry when it was in its container: the parent it names says so, or else its place lies
+//!   in the earlier disc of its container (the nearest container from the graph; every disc of the top level). Without
+//!   an entry, in a container without one, from another container, or in a cluster made now, it is placed anew
+//!   (`continue_by_id`).
 //!
 //! Everything runs in index or id order, so the result is the same on every platform.
 use super::{
@@ -118,23 +119,97 @@ fn owner_of(h: &Hierarchy, i: usize) -> Option<usize> {
     at
 }
 
+/// The container from the graph an added cluster's id names (`#`: the top level), through the clusters around it;
+/// `None` when the id is not that of an added cluster.
+fn container_of<'a>(nodes: &BTreeMap<&str, usize>, id: &'a str) -> Option<&'a str> {
+    let (mut container, _) = parse(id)?;
+    while !nodes.contains_key(container) {
+        match parse(container) {
+            Some((outer, _)) => container = outer,
+            None => break,
+        }
+    }
+    Some(container)
+}
+
+/// What the parent a node's entry names says about where it was, seen from the container it is in now.
+enum Was<'a> {
+    /// No parent, or one that names nothing (no node of the graph and no entry): the discs tell.
+    Unsaid,
+    /// In this container, in no cluster.
+    Direct,
+    /// In this cluster of this container.
+    In(&'a str),
+    /// In another container.
+    Elsewhere,
+}
+
+/// `Was` for the node `id`, now in `container` (`None`: the top level). `nodes` are the nodes of the graph.
+fn was<'a>(
+    nodes: &BTreeMap<&str, usize>,
+    places: &'a BTreeMap<String, OverviewPlace>,
+    id: &str,
+    container: Option<&str>,
+) -> Was<'a> {
+    let Some(parent) = places.get(id).and_then(|p| p.parent.as_deref()) else {
+        return Was::Unsaid;
+    };
+    if container == Some(parent) {
+        return Was::Direct;
+    }
+    if nodes.contains_key(parent) {
+        return Was::Elsewhere;
+    }
+    if !places.contains_key(parent) {
+        return Was::Unsaid;
+    }
+    match container_of(nodes, parent) {
+        Some(of) if of == container.unwrap_or("#") => Was::In(parent),
+        // A cluster of another container, or a node the graph no longer has.
+        _ => Was::Elsewhere,
+    }
+}
+
+/// The index of every node of the graph by id.
+fn nodes_of(h: &Hierarchy) -> BTreeMap<&str, usize> {
+    h.ids[..h.real]
+        .iter()
+        .enumerate()
+        .map(|(i, id)| (id.as_str(), i))
+        .collect()
+}
+
 /// Which nodes of the graph have no place to continue from in their container: those without an entry, those in a
-/// container without one, and those whose entry lies outside their container's disc.
-fn without_place(h: &Hierarchy, frame: &[Option<Disc>]) -> Vec<bool> {
+/// container without one, and those that were in another: as the parent their entry names says, or else when the entry
+/// lies outside their container's disc.
+fn without_place(
+    h: &Hierarchy,
+    places: &BTreeMap<String, OverviewPlace>,
+    frame: &[Option<Disc>],
+) -> Vec<bool> {
+    let nodes = nodes_of(h);
     let mut anew: Vec<bool> = frame[..h.real].iter().map(Option::is_none).collect();
-    // Nodes with an entry, by their container.
+    // Nodes the discs have to tell about, by their container.
     let mut owned: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for i in (0..h.real).filter(|&i| frame[i].is_some()) {
-        if let Some(owner) = owner_of(h, i) {
-            owned.entry(owner).or_default().push(i);
+        let owner = owner_of(h, i);
+        // A new container: what it holds is placed anew.
+        if owner.is_some_and(|o| frame[o].is_none()) {
+            anew[i] = true;
+            continue;
+        }
+        match was(&nodes, places, &h.ids[i], owner.map(|o| h.ids[o].as_str())) {
+            Was::Elsewhere => anew[i] = true,
+            Was::Unsaid => {
+                if let Some(owner) = owner {
+                    owned.entry(owner).or_default().push(i);
+                }
+            }
+            Was::Direct | Was::In(_) => {}
         }
     }
     for (owner, members) in owned {
         let Some(disc) = frame[owner] else {
-            // A new container: what it holds is placed anew.
-            for m in members {
-                anew[m] = true;
-            }
             continue;
         };
         let centre = |m: usize| frame[m].map_or((0., 0.), |d| (d.x, d.y));
@@ -185,8 +260,34 @@ fn parse(id: &str) -> Option<(&str, Label)> {
     Some((container, label))
 }
 
+/// The clusters that lie on a circle of `outer` links.
+fn circles(outer: &[Option<usize>]) -> Vec<usize> {
+    // 0: not visited, 1: on the path walked now, 2: done.
+    let mut state = vec![0u8; outer.len()];
+    let mut on_circle = Vec::new();
+    for start in 0..outer.len() {
+        let mut path = Vec::new();
+        let mut at = Some(start);
+        while let Some(c) = at.filter(|&c| state[c] == 0) {
+            state[c] = 1;
+            path.push(c);
+            at = outer[c];
+        }
+        // The walk ended on its own path: from there on it went round.
+        if let Some(back) = at.filter(|&c| state[c] == 1) {
+            let first = path.iter().position(|&c| c == back).unwrap_or(0);
+            on_circle.extend_from_slice(&path[first..]);
+        }
+        for c in path {
+            state[c] = 2;
+        }
+    }
+    on_circle
+}
+
 /// The hierarchy of a graph whose earlier places are given by id: the clusters of those places with the nodes they
-/// held, new nodes joined to the cluster of the nodes they are linked to most (of its container), and in containers
+/// held (as the parents the entries name say, else the discs), new nodes joined to the cluster of the nodes they are
+/// linked to most (of its container), and in containers
 /// without earlier clusters new ones as `with_communities_except` and `with_satellites` make them. An earlier cluster
 /// with fewer than two children is dissolved. `communities` or `satellites` 0 keeps no cluster of that sort. Returns
 /// the hierarchy and the indices of the clusters kept. For an unchanged graph and options it is the hierarchy those
@@ -210,7 +311,7 @@ pub fn clusters_by_id(
         .iter()
         .map(|id| places.get(id).map(Disc::of))
         .collect();
-    let anew = without_place(&base, &frame);
+    let anew = without_place(&base, places, &frame);
 
     // The earlier clusters of containers the graph still has, in id order: (id, disc, container).
     let mut old: Vec<(&str, Disc, Option<usize>)> = Vec::new();
@@ -218,20 +319,13 @@ pub fn clusters_by_id(
         if index.contains_key(id.as_str()) {
             continue;
         }
-        let Some((mut container, label)) = parse(id) else {
+        let (Some((_, label)), Some(container)) = (parse(id), container_of(&index, id)) else {
             continue;
         };
         let wanted = match label {
             Label::Satellites(_) => satellites > 0.,
             _ => communities > 0,
         };
-        // A cluster inside a cluster names it; the container from the graph is at the end of that chain.
-        while !index.contains_key(container) {
-            match parse(container) {
-                Some((outer, _)) => container = outer,
-                None => break,
-            }
-        }
         let owner = index.get(container).copied();
         let known = match owner {
             Some(o) => frame[o].is_some() && !base.children[o].is_empty(),
@@ -248,20 +342,61 @@ pub fn clusters_by_id(
         list.push(c);
     }
     // The smallest cluster of the container whose disc holds this one whole and passes `also`.
-    let around = |owner: Option<usize>, disc: &Disc, also: &dyn Fn(&Disc) -> bool| {
+    let around = |owner: Option<usize>, disc: &Disc, also: &dyn Fn(usize, &Disc) -> bool| {
         let (grid, list) = grids.get(&owner)?;
-        grid.smallest((disc.x, disc.y), |_, d| d.holds_disc(disc) && also(d))
-            .map(|k| list[k])
+        grid.smallest((disc.x, disc.y), |k, d| {
+            d.holds_disc(disc) && also(list[k], d)
+        })
+        .map(|k| list[k])
     };
-    // The cluster around each cluster, and the cluster of each node that stayed.
-    let mut outer: Vec<Option<usize>> = old
+    // The kept clusters by id.
+    let position: BTreeMap<&str, usize> = old
         .iter()
-        .map(|(_, disc, owner)| around(*owner, disc, &|d| d.r > disc.r))
+        .enumerate()
+        .map(|(c, (id, ..))| (*id, c))
         .collect();
+    // The cluster around each cluster: first as its entry names it (its container, or another cluster of it).
+    let mut outer: Vec<Option<usize>> = vec![None; old.len()];
+    let mut told = vec![false; old.len()];
+    for (c, (id, _, owner)) in old.iter().enumerate() {
+        let Some(parent) = places.get(*id).and_then(|p| p.parent.as_deref()) else {
+            continue;
+        };
+        if owner.is_some_and(|o| base.ids[o] == parent) {
+            told[c] = true;
+        } else if let Some(&k) = position.get(parent).filter(|&&k| old[k].2 == *owner) {
+            outer[c] = Some(k);
+            told[c] = true;
+        }
+    }
+    // Parents that go round in a circle count as left out.
+    for c in circles(&outer) {
+        outer[c] = None;
+        told[c] = false;
+    }
+    // Then by the discs, never a cluster that this one holds.
+    for c in (0..old.len()).filter(|&c| !told[c]) {
+        let (_, disc, owner) = old[c];
+        outer[c] = around(owner, &disc, &|k, d| {
+            d.r > disc.r && !std::iter::successors(Some(k), |&at| outer[at]).any(|at| at == c)
+        });
+    }
+    // The cluster of each node that stayed.
     let mut cluster: Vec<Option<usize>> = (0..n)
         .map(|i| {
             let disc = frame[i].filter(|_| !anew[i])?;
-            around(base.parent[i], &disc, &|_| true)
+            let owner = base.parent[i];
+            match was(
+                &index,
+                places,
+                &base.ids[i],
+                owner.map(|o| base.ids[o].as_str()),
+            ) {
+                Was::Direct => None,
+                // A cluster of a sort that is switched off is not kept: the discs tell.
+                Was::In(id) if position.contains_key(id) => position.get(id).copied(),
+                _ => around(owner, &disc, &|_, _| true),
+            }
         })
         .collect();
 
@@ -323,13 +458,16 @@ pub fn clusters_by_id(
         }
     }
 
-    // Dissolve, from the smallest up, every cluster left with fewer than two children.
+    // Dissolve, from the innermost out, every cluster left with fewer than two children.
     let mut children = vec![0usize; old.len()];
     for c in cluster.iter().flatten().chain(outer.iter().flatten()) {
         children[*c] += 1;
     }
+    let depth: Vec<usize> = (0..old.len())
+        .map(|c| std::iter::successors(outer[c], |&at| outer[at]).count())
+        .collect();
     let mut order: Vec<usize> = (0..old.len()).collect();
-    order.sort_by(|&a, &b| old[a].1.r.total_cmp(&old[b].1.r).then(a.cmp(&b)));
+    order.sort_by(|&a, &b| depth[b].cmp(&depth[a]).then(a.cmp(&b)));
     let mut alive = vec![true; old.len()];
     for c in order {
         if children[c] < 2 {
@@ -495,7 +633,7 @@ pub fn continue_by_id(
                 .flatten()
         })
         .collect();
-    let mut anew = without_place(h, &frame);
+    let mut anew = without_place(h, places, &frame);
     anew.extend((h.real..n).map(|c| frame[c].is_none()));
     // What a cluster made now holds has no place in it.
     for i in 0..h.real {

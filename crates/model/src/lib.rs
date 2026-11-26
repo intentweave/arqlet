@@ -4212,16 +4212,27 @@ pub struct OverviewStart {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub settle: Option<bool>,
+    /// Provisional: nodes the user moved, by id, to their new centres: each one's container settles around it. Needs
+    /// earlier places (`x`, `y`, `r`, `nodes`, or a session's), and with `nodes` an earlier place of that node.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub moved: Option<BTreeMap<String, Point>>,
 }
 
-/// Provisional: the disc of a node in an earlier overview (its `x`, `y` and `r`).
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq)]
+/// Provisional: the disc of a node in an earlier overview (its `x`, `y` and `r`), and what held it.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OverviewPlace {
     pub x: f64,
     pub y: f64,
     pub r: f64,
+    /// The id of its parent in that overview (`ids[parent[i]]`), a node of the graph or an added cluster; left out at
+    /// the top level. Where given, it says what held the node instead of the discs, which cannot tell it for a cluster
+    /// the host set smaller than its content (`radii`). A parent that names nothing counts as left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub parent: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

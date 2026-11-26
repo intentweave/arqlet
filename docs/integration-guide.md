@@ -126,30 +126,33 @@ as in its last overview, and a whole overview when it changed.
 **Continuing a changed graph, without a session.** Keep the places of an answer by id and send them with the next graph:
 
 ```js
-const places = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id, {x: o.x[i], y: o.y[i], r: o.r[i]}]));
+const places = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id,
+  {x: o.x[i], y: o.y[i], r: o.r[i], parent: o.ids[o.parent[i]]}]));   // no parent at the top level
 const next = run({op: 'overview', graph: changed, start: {nodes: places(previous)}});
 next.overview.continuation;   // {continued, anew, ignored}
 ```
 
-Give every node of the previous answer, **the added clusters included**. `start.nodes` excludes `start.x`, `y` and `r`
-(the same graph, by node index); a request with both is refused. `settle` and `moved` work as before; a moved node needs
-an earlier place in its cluster. A session takes `start.nodes` too, also together with a new graph.
+Give every node of the previous answer, **the added clusters included**, each with its `parent`. `start.nodes` excludes
+`start.x`, `y` and `r` (the same graph, by node index); a request with both is refused. `settle` and `moved` (node id →
+new centre `{x, y}`) work as before; a moved node needs an earlier place in its cluster. A session takes `start.nodes`
+too, also together with a new graph.
 
 What continues:
 
 - **The added clusters stay** (`community:…`, communities and satellite groups), with their ids. Their ids are positions
   in a clustering: a changed graph clustered anew (a request without `start`) would group much of it differently and may
-  give the same id to other members. With `start.nodes`, each node stays in the cluster whose earlier disc held it, so
-  `intent` and `radii` by cluster id still name the same cluster. A cluster left with fewer than two children is
+  give the same id to other members. With `start.nodes`, each node stays in its earlier cluster (its entry's `parent`,
+  else the cluster whose earlier disc held it), so `intent` and `radii` by cluster id still name the same cluster. A cluster left with fewer than two children is
   dissolved. Only a container without earlier clusters (a new one, or one that now has more than `communities` children)
   is clustered, and what its new clusters hold is laid out anew. `communities: 0` or `satellites: 0` keeps no cluster of
   that sort.
 - A node continues from its entry. It is **placed anew** when it has none, when its container has none (a new container
-  and what it holds), or when its entry lies outside its container's earlier disc (it changed its container). A
-  container that changed its parent keeps its inner arrangement.
+  and what it holds), or when it changed its container: its `parent` names another one, or, without a `parent`, its
+  entry lies outside its container's earlier disc. A container that changed its parent keeps its inner arrangement.
 - A node placed anew joins the cluster of the nodes it is linked to most and starts next to them (else outside what is
-  there). Overlaps are then removed, which can push others; with `settle` the changed containers settle by forces. The
-  same holds for a node that moved to a container around its old one: it starts where it was and the two part.
+  there). Overlaps are then removed, which can push others; with `settle` the changed containers settle by forces.
+  Without a `parent`, a node that moved to a container around its old one is not seen to have moved: it starts where it
+  was and the two part.
 - Entries for ids the graph no longer has are **ignored** and listed in `continuation.ignored`. Entries of clusters that
   are gone are not listed.
 - Unchanged graph and options: the same answer as `start` by node index.
@@ -164,8 +167,23 @@ On two generated graphs with 0.1 to 5 % of the nodes changed, nodes moved less w
 `start`; with `settle` not in every case ([movements](../benchmarks/results/overview-continuation-20261126.md)). This is
 no general guarantee.
 
-Limits: other cluster options do not regroup a container that keeps its clusters. A cluster the host set smaller than
-its content (`radii`) does not hold all its members in the places, so those it does not hold leave it.
+**`parent`.** Optional, the id of the node's parent in the earlier answer (`ids[parent[i]]`). Without it the earlier
+discs tell what held what, and they cannot for a cluster or container the host set smaller than its content (`radii`):
+members outside the small disc leave it. With it they stay, and such an overview continues as by node index. How a named
+parent is read, for a node now in container C (the top level included):
+
+| `parent` names | The node |
+|---|---|
+| nothing: left out, `null`, or an id that is no node of the graph and has no entry | judged by the discs, as without it |
+| C | stays, in no cluster |
+| a cluster with an entry whose id belongs to C | stays, in that cluster, wherever its disc is (the cluster grows to hold it) |
+| anything else: another node of the graph (itself included), a cluster of another container, a node that is gone but has an entry | changed its container: placed anew |
+
+A cluster entry's `parent` may name its container or another cluster of that container. Anything else, and parents that
+go round in a circle, count as left out. A named cluster that is not kept (its sort switched off) leaves its members to
+the discs. A `parent` that is not a string is refused. Parents are taken at their word: no check against the discs.
+
+Limits: other cluster options do not regroup a container that keeps its clusters.
 
 ## 5. Offers from another engine: refinement
 

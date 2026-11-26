@@ -177,7 +177,7 @@ fn hints_of(
     Ok((hints, continuation))
 }
 
-/// `start.nodes` of a request, when it has them: node id → `{x, y, r}`.
+/// `start.nodes` of a request, when it has them: node id → `{x, y, r, parent?}`.
 fn places_of(v: &Value) -> Result<Option<BTreeMap<String, OverviewPlace>>, String> {
     let Some(start) = v.get("start") else {
         return Ok(None);
@@ -193,12 +193,17 @@ fn places_of(v: &Value) -> Result<Option<BTreeMap<String, OverviewPlace>>, Strin
     }
     nodes
         .as_object()
-        .ok_or("Overview start nodes must be an object: node id -> {x, y, r}")?
+        .ok_or("Overview start nodes must be an object: node id -> {x, y, r, parent?}")?
         .iter()
         .map(|(id, p)| {
             let at = |k: &str| p[k].as_f64().filter(|v| v.is_finite());
+            let parent = match p.get("parent") {
+                None | Some(Value::Null) => None,
+                Some(Value::String(parent)) => Some(parent.clone()),
+                Some(_) => return Err(format!("Overview start nodes {id} parent must be an id")),
+            };
             match (at("x"), at("y"), at("r").filter(|r| *r >= 0.)) {
-                (Some(x), Some(y), Some(r)) => Ok((id.clone(), OverviewPlace { x, y, r })),
+                (Some(x), Some(y), Some(r)) => Ok((id.clone(), OverviewPlace { x, y, r, parent })),
                 _ => Err(format!(
                     "Overview start nodes {id} needs finite x, y and r >= 0"
                 )),

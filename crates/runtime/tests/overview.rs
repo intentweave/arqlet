@@ -1271,6 +1271,17 @@ fn moved_by(before: &Value, after: &Value, id: &str) -> f64 {
     d("x").hypot(d("y"))
 }
 
+/// The places with each node's parent, as a host takes them from an answer.
+fn places_with_parents(o: &Value) -> Value {
+    let mut map = places(o);
+    for (i, id) in o["ids"].as_array().unwrap().iter().enumerate() {
+        if let Some(p) = o["parent"][i].as_i64().filter(|p| *p >= 0) {
+            map[id.as_str().unwrap()]["parent"] = o["ids"][p as usize].clone();
+        }
+    }
+    map
+}
+
 /// Every node lies in its parent's disc, and no two discs of one container overlap.
 fn assert_nested(o: &Value) {
     let n = o["ids"].as_array().unwrap().len();
@@ -1339,6 +1350,8 @@ fn places_by_id_continue_an_unchanged_graph_as_places_by_index_do() {
                     )
                 };
                 let (index, id) = (request(by_index.clone()), request(by_id.clone()));
+                let told = request(json!({"nodes": places_with_parents(&first)}));
+                assert_eq!(told, id, "{options} {settle} {radii}");
                 let report = id["continuation"].clone();
                 assert_eq!(report["anew"], 0, "{options}");
                 assert_eq!(report["ignored"], json!([]), "{options}");
@@ -1758,6 +1771,10 @@ fn places_by_id_are_checked_and_work_in_a_session() {
         ),
         (json!({"nodes": {}, "r": []}), "not both"),
         (json!({"nodes": [1]}), "must be an object"),
+        (
+            json!({"nodes": {"g0": {"x": 1, "y": 2, "r": 3, "parent": 4}}}),
+            "parent must be an id",
+        ),
         (json!({"nodes": {"g0": {"x": 1, "y": 2}}}), "g0 needs"),
         (
             json!({"nodes": {"g0": {"x": 1, "y": 2, "r": -1}}}),
@@ -1848,16 +1865,29 @@ fn places_by_id_are_checked_and_work_in_a_session() {
         graph: Some(serde_json::from_value(graph).unwrap()),
         start: Some(arqlet_model::OverviewStart {
             nodes: Some(
-                [(
-                    "g0".to_string(),
-                    arqlet_model::OverviewPlace {
-                        x: 0.,
-                        y: 0.,
-                        r: 50.,
-                    },
-                )]
+                [
+                    (
+                        "g0".to_string(),
+                        arqlet_model::OverviewPlace {
+                            x: 0.,
+                            y: 0.,
+                            r: 50.,
+                            parent: None,
+                        },
+                    ),
+                    (
+                        "g0/f0".to_string(),
+                        arqlet_model::OverviewPlace {
+                            x: 5.,
+                            y: 0.,
+                            r: 20.,
+                            parent: Some("g0".into()),
+                        },
+                    ),
+                ]
                 .into(),
             ),
+            moved: Some([("g0".to_string(), arqlet_model::Point { x: 1., y: 2. })].into()),
             ..Default::default()
         }),
         edge_data: Some(true),
@@ -1950,8 +1980,24 @@ fn a_graph_changed_at_random_continues_without_overlaps() {
         let mut last = answer(&json!({"op": "overview", "graph": graph, "options": options}));
         for step in 0..8 {
             graph = changed_at_random(&graph, &mut next, step);
+            // Without parents, with them, and with some of them wrong.
+            let mut from = if step % 3 == 0 {
+                places(&last)
+            } else {
+                places_with_parents(&last)
+            };
+            if step % 3 == 2 {
+                let mut names: Vec<Value> =
+                    from.as_object().unwrap().keys().map(|k| json!(k)).collect();
+                names.extend([json!("nowhere"), json!("community:#:9.9"), Value::Null]);
+                for (k, (_, place)) in from.as_object_mut().unwrap().iter_mut().enumerate() {
+                    if k % 5 == 0 || next(7) == 0 {
+                        place["parent"] = names[next(names.len())].clone();
+                    }
+                }
+            }
             let request = json!({"op": "overview", "graph": graph, "options": options,
-                "start": {"nodes": places(&last), "settle": step % 2 == 1}, "threads": 1});
+                "start": {"nodes": from, "settle": step % 2 == 1}, "threads": 1});
             let o = answer(&request);
             let mut parallel = request.clone();
             parallel["threads"] = json!(4);
@@ -1966,4 +2012,200 @@ fn a_graph_changed_at_random_continues_without_overlaps() {
             last = o;
         }
     }
+}
+
+/// The ring graph laid out, then once more with the cluster of `r1n0` set to a third of its radius (`radii`): that
+/// cluster's name, and the first and the clipped answer.
+fn clipped() -> (Value, String, Value, Value) {
+    let graph = rings();
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    let cluster = cluster_of(&first, "r1n0");
+    let r = first["r"][at(&first, &cluster)].as_f64().unwrap();
+    let small = answer(&json!({"op": "overview", "graph": graph,
+        "radii": {cluster.clone(): r / 3.},
+        "start": {"x": first["x"], "y": first["y"], "r": first["r"]}}));
+    (graph, cluster, first, small)
+}
+
+/// How many of the nodes of ring 1 are not in `cluster`.
+fn left(o: &Value, cluster: &str) -> usize {
+    (0..40)
+        .filter(|i| {
+            o["ids"]
+                .as_array()
+                .unwrap()
+                .contains(&json!(format!("r1n{i}")))
+                && cluster_of(o, &format!("r1n{i}")) != cluster
+        })
+        .count()
+}
+
+#[test]
+fn a_cluster_set_smaller_than_its_content_keeps_its_members_by_their_parents() {
+    let (graph, cluster, first, small) = clipped();
+    assert_eq!(small["parent"], first["parent"]);
+    // The discs alone cannot tell: members outside the small disc leave the cluster.
+    let o = answer(&json!({"op": "overview", "graph": graph,
+        "start": {"nodes": places(&small)}}));
+    assert!(left(&o, &cluster) > 10, "{} left", left(&o, &cluster));
+    assert_nested(&o);
+    // With their parents they stay, and the answer is that of the places by index, with or without the radius again.
+    let r = small["r"][at(&small, &cluster)].as_f64().unwrap();
+    for radii in [json!({}), json!({cluster.clone(): r})] {
+        let request = |start: Value| {
+            answer(&json!({"op": "overview", "graph": graph, "radii": radii, "start": start}))
+        };
+        let told = request(json!({"nodes": places_with_parents(&small)}));
+        assert_eq!(left(&told, &cluster), 0);
+        assert_eq!(told["continuation"]["anew"], 0);
+        assert_eq!(
+            without_continuation(told),
+            request(json!({"x": small["x"], "y": small["y"], "r": small["r"]}))
+        );
+    }
+    // On a changed graph too: one member gone, one new beside the others.
+    let mut changed = graph.clone();
+    changed["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|n| n["id"] != "r1n5");
+    changed["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id": "new", "kind": "fn", "label": "new", "parentId": null}));
+    let edges = changed["edges"].as_array_mut().unwrap();
+    edges.retain(|e| e["source"] != "r1n5" && e["target"] != "r1n5");
+    edges.push(json!({"id": "n", "kind": "call", "source": "new", "target": "r1n0"}));
+    let o = answer(&json!({"op": "overview", "graph": changed,
+        "start": {"nodes": places_with_parents(&small)}}));
+    assert_eq!((left(&o, &cluster), cluster_of(&o, "new")), (0, cluster));
+    assert_eq!(
+        o["continuation"],
+        json!({"continued": 159, "anew": 1, "ignored": ["r1n5"]})
+    );
+    assert_nested(&o);
+}
+
+#[test]
+fn containers_and_the_clusters_in_them_clipped_by_a_radius_continue_by_their_parents() {
+    // Clusters inside files, and a file and a group set far smaller than what they hold.
+    let graph = hierarchical(3, 3, 12);
+    let options = json!({"communities": 4, "satellites": 0.5});
+    let first = answer(&json!({"op": "overview", "graph": graph, "options": options}));
+    assert!(first["stats"]["communities"].as_u64().unwrap() > 0);
+    let inner = cluster_of(&first, "g0/f0/n3");
+    for radii in [
+        json!({"g1/f1": 6.0}),
+        json!({"g2": 8.0}),
+        json!({inner.clone(): 3.0}),
+    ] {
+        let small = answer(
+            &json!({"op": "overview", "graph": graph, "options": options,
+            "radii": radii, "start": {"x": first["x"], "y": first["y"], "r": first["r"]}}),
+        );
+        let request = |start: Value| {
+            answer(&json!({"op": "overview", "graph": graph, "options": options, "start": start}))
+        };
+        let told = request(json!({"nodes": places_with_parents(&small)}));
+        assert_eq!(told["continuation"]["anew"], 0, "{radii}");
+        assert_eq!(
+            without_continuation(told),
+            request(json!({"x": small["x"], "y": small["y"], "r": small["r"]})),
+            "{radii}"
+        );
+    }
+}
+
+#[test]
+fn a_node_that_moved_up_is_placed_anew_when_its_parent_is_named() {
+    let graph = hierarchical(4, 3, 8);
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    for parent in [json!("g0"), Value::Null] {
+        let mut changed = graph.clone();
+        for node in changed["nodes"].as_array_mut().unwrap() {
+            if node["id"] == "g0/f0/n5" {
+                node["parentId"] = parent.clone();
+            }
+        }
+        let o = answer(&json!({"op": "overview", "graph": changed,
+            "start": {"nodes": places_with_parents(&first)}}));
+        assert_eq!(o["continuation"]["anew"], 1, "{parent}");
+        assert_nested(&o);
+    }
+}
+
+#[test]
+fn parents_that_say_nothing_or_something_wrong_are_handled() {
+    let graph = rings();
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    let ring = |r: usize| cluster_of(&first, &format!("r{r}n0"));
+    let run = |from: &Value| {
+        let o = answer(&json!({"op": "overview", "graph": graph, "start": {"nodes": from}}));
+        assert_nested(&o);
+        assert_eq!(
+            answer(
+                &json!({"op": "overview", "graph": graph, "start": {"nodes": from},
+                "threads": 4})
+            ),
+            o
+        );
+        o
+    };
+    let plain = run(&places(&first));
+    let with = |changes: &[(&str, Value)]| {
+        let mut from = places_with_parents(&first);
+        for (id, parent) in changes {
+            from[*id]["parent"] = parent.clone();
+        }
+        from
+    };
+    // Naming nothing (no node, no entry), or null: as left out.
+    for parent in [
+        json!("nowhere"),
+        json!("community:#:7.7"),
+        json!("community:"),
+        json!(""),
+        Value::Null,
+    ] {
+        let o = run(&with(&[
+            ("r0n3", parent.clone()),
+            (ring(1).as_str(), parent.clone()),
+        ]));
+        assert_eq!(o, plain, "{parent}");
+    }
+    // Clusters that name each other, or themselves: as left out.
+    let (a, b, c) = (ring(0), ring(1), ring(2));
+    let o = run(&with(&[(a.as_str(), json!(b)), (b.as_str(), json!(a))]));
+    assert_eq!(o, plain);
+    let o = run(&with(&[
+        (a.as_str(), json!(b)),
+        (b.as_str(), json!(c)),
+        (c.as_str(), json!(a)),
+        (ring(3).as_str(), json!(ring(3))),
+    ]));
+    assert_eq!(o, plain);
+    // A node of the graph that is no container of the cluster: as left out.
+    assert_eq!(run(&with(&[(a.as_str(), json!("r2n2"))])), plain);
+    // Another cluster of the same container is taken at its word, for a node and for a cluster.
+    let o = run(&with(&[("r0n3", json!(c))]));
+    assert_eq!(cluster_of(&o, "r0n3"), c);
+    assert_eq!(o["continuation"]["anew"], 0);
+    let o = run(&with(&[(a.as_str(), json!(b))]));
+    assert_eq!(cluster_of(&o, &a), b);
+    assert_eq!(cluster_of(&o, "r0n0"), a);
+    // No cluster at all, said by naming nothing, cannot be told apart from silence; the node's own id, or another node
+    // of the graph, is another container: placed anew.
+    for parent in ["r0n3", "r2n2"] {
+        let o = run(&with(&[("r0n3", json!(parent))]));
+        assert_eq!(o["continuation"]["anew"], 1, "{parent}");
+        assert_eq!(cluster_of(&o, "r0n3"), a, "it joins by its links");
+    }
+    // A container the graph no longer has, with an entry, is another container too.
+    let mut from = with(&[("r0n3", json!("gone"))]);
+    from["gone"] = json!({"x": 0.0, "y": 0.0, "r": 10.0});
+    let o = run(&from);
+    assert_eq!(
+        o["continuation"],
+        json!({"continued": 159, "anew": 1, "ignored": ["gone"]})
+    );
 }

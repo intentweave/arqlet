@@ -9,12 +9,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 - The cluster overview as a server result (provisional, #209): with `edgeData: true` the `overview` answer gives every
   edge's kind and weight (`edgeKinds`, `edgeKind`, `edgeWeight`; with `columns`, two more `u32` columns), for a host
-  without the graph. `start.nodes` (`id → {x, y, r}`) continues the overview of a changed graph without a session: the
+  without the graph. `start.nodes` (`id → {x, y, r, parent?}`) continues the overview of a changed graph without a session: the
   clusters the overview added continue with their ids instead of the graph being clustered anew, new and moved nodes are
-  placed anew among the others, and removed ids are reported (`continuation`). Existing requests are answered as
-  before. In a session, `positionsOnly` answers a whole overview when `edgeData` differs from the last request's. For
-  Rust users: `Overview`, `OverviewPositions`, `OverviewRequest` and `OverviewStart` have new fields,
-  `layout::overview::Previous` has `anew` and `changed` (and implements `Default`).
+  placed anew among the others, and removed ids are reported (`continuation`). An entry's optional `parent` says what
+  held the node, so that a cluster the host set smaller than its content keeps its members. Existing requests are
+  answered as before. The typed `OverviewStart` now has `moved`, which the engine already took. In a session,
+  `positionsOnly` answers a whole overview when `edgeData` differs from the last request's. For Rust users: `Overview`,
+  `OverviewPositions`, `OverviewRequest` and `OverviewStart` have new fields, `layout::overview::Previous` has `anew`
+  and `changed` (and implements `Default`).
 - **Galaxy style on a light background** (overview, provisional): a light clear colour (`background`, new
   `setBackground` for a host that switches themes, `tone`) draws the galaxy in ink instead of light — colours subtracted
   from the background, so clouds deepen where they overlap, darker stars, a dark selection ring, light name tags and dark
