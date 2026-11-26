@@ -8,7 +8,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 ### Added
 
 - `as: lanes` on the first criterion of `groupingPriority` (provisional, ADR 0022 M4a) lays its groups out as bands across the flow of
-  the top level, in their declared order, instead of as containers. The bands are not drawn yet. The report counts lanes out of place.
+  the top level, in their declared order, instead of as containers. The scene draws them as bands
+  (`membershipLanes`), the SVG viewer behind everything with the lane's name; playground *As lanes*. The report counts lanes out of
+  place.
 - `holdMemberships` (provisional, ADR 0022 M3b, off by default): the layout keeps a soft membership group whose shown members
   share a container together there, where that stays within a budget of crossings and bends. Snapshot `heldGroups`, report
   `held`; `holding` says why each other group is not held and what holding costs, edges against the flow included. An edit

@@ -440,7 +440,11 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   how many lanes are out of place, and that they are not applied where the top level has no flow. On twelve views no lane is out of place;
   crossings are far below the probe with pins and at or above containers (`layerweave-code` 422 flat, 469 containers, 2559 pins, 726
   lanes). The gate of §6 (comparison with elk-rs, recorded timing) is not met, so this stays an option. Open: lanes below a higher rank,
-  along the flow (M4b), and drawing the bands (M4c): until then a lane is seen by its place only.
+  along the flow (M4b), and drawing the bands (M4c).
+  **M4c, the bands drawn, done** (2026-11-26): scene `membershipLanes`, one band per lane over the whole drawing along the flow, neighbours
+  meeting in the middle of the gap between them; the SVG viewer draws them behind everything, alternating, with a dashed line between
+  two and the lane's name at its start; the playground has *As lanes*. No band where the lanes are not applied. Not drawn by the GPU
+  layer yet.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.

@@ -1187,6 +1187,9 @@ function syncDetails(){
  }
  first.disabled=dimensions.length===0;
  first.value=priority[0]?.by??'parent';
+ // Provisional (ADR 0022 M4): the first structure as lanes; only a dimension can be one.
+ $('grouping-lanes').disabled=first.value==='parent';
+ $('grouping-lanes').checked=priority[0]?.as==='lanes';
  // Hulls are on when a dimension after the first is listed for its own sake; one listed only to show a single group
  // (`consider`, the control below) does not turn them on.
  $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent'&&!c.consider?.length);
@@ -1316,10 +1319,12 @@ function applyGrouping(label){
  for(const [by,group] of chosen){if(!consider.has(by))consider.set(by,[]);consider.get(by).push(group);}
  for(const by of consider.keys())if(!order.includes(by))order.push(by);
  const criteria=order.map(by=>consider.has(by)?{by,consider:consider.get(by)}:{by});
+ if(first!=='parent'&&$('grouping-lanes').checked)criteria[0].as='lanes';
  setOption({groupingPriority:criteria.length===1&&!criteria[0].consider?[]:criteria},label);
 }
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
 $('grouping-first').onchange=()=>applyGrouping('Structure first');
+$('grouping-lanes').onchange=()=>applyGrouping('As lanes');
 $('grouping-consider').onchange=()=>applyGrouping('Only groups');
 // Provisional (ADR 0022 M3b): the layout keeps soft groups together where that stays cheap. It moves nodes.
 $('membership-hold').onchange=()=>setOption({holdMemberships:$('membership-hold').checked},'Hold groups');
