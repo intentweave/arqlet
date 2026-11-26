@@ -1,9 +1,10 @@
 # ADR 0028: Edge bundling: hierarchical bundles, drawn by the scene
 
 Date: 2026-11-26.
-Status: proposed (#133, milestone 0.10). Nothing is built into the engine. The owner accepted the recommendations on
-2026-11-26 (decisions below). The probe B0 ran the same day: **no-go** for all three kinds of control points
-([B0 result](#b0-result-2026-11-26)).
+Status: not taken (#133). Nothing is built into the engine. The owner accepted the recommendations on 2026-11-26
+(decisions below). The probe B0 ran the same day: **no-go** for all three kinds of control points
+([B0 result](#b0-result-2026-11-26)). **Decided the same day: B1 is not built**; this document is the record. #133 stays
+open, outside the 0.10 milestone.
 
 Related: [ADR 0004](0004-organic-placement-and-straight-routing.md) (organic placement, straight edges),
 [ADR 0005](0005-routing-constraints.md) (routing requirements, buses, shared segments),
@@ -361,9 +362,9 @@ The recommendations of the proposal are accepted; the ADR stays proposed.
 ## Recommendation
 
 Before the probe: build hierarchical bundling as an optional step of the scene, and probe it first. After the probe:
-**do not build B1.** The strict guard (decision 3) and containment as the only hierarchy (decisions 1 and 2) leave the
+**do not build B1** (accepted 2026-11-26). The strict guard (decision 3) and containment as the only hierarchy (decisions 1 and 2) leave the
 method too little to bundle on the gate views, and better control points (B4) were part of the probe. Take #133 out of
-0.10 and keep this ADR proposed, with the probe as its record. Should bundling still be wanted, each of these needs its
+0.10 and keep this ADR with the probe as its record. Should bundling still be wanted, each of these needs its
 own design and decision, and none was probed: bundles routed through the free space around nodes (ordered bundles, on
 ADR 0020's corridors), which would keep the strict guard's promise by construction; an arrangement of the hierarchy on
 a circle, the case the method was made for (decision 1 left it out of 0.10); or a bundled drawing that is allowed to
