@@ -2190,8 +2190,8 @@ struct Edges {
 /// a line: any other gap meets all the boxes of a neighbouring gap and more, so a way along it can be moved there. With
 /// the two lines beyond the outermost edges and the lines through the route's `ends`, a grid of these lines holds an
 /// orthogonal way between the ends whenever the rectangles leave one through gaps of positive width. A line runs in the
-/// middle of its gap, farther from an own node than its clearance where the gap allows it. Discs and own nodes keep the
-/// lines the full grid has beside them.
+/// middle of its gap, farther from an own node than its clearance where the gap allows it. A disc, and an own node with a
+/// clearance, also keep lines beside them as the full grid has them.
 fn sparse_lines(
     obstacles: &[&Outline],
     own: &[bool],
