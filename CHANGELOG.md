@@ -65,6 +65,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 - `restore` (undo, redo, bookmarks) refused a view with a collapsed or partly shown community or group container
   ("unknown node"): containers that only the view has are accepted.
+- `refine` panicked on a view with buses given as data where one bus is drawn as lines and another as a bar (organic,
+  `busStyle: "lines"`; #197). An operation now takes back only what the layout had kept for the taps of the bars.
 - **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that
