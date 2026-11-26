@@ -349,6 +349,18 @@ pub fn compute(
     compute_counted(graph, previous, dirty, options).map(|(snapshot, _)| snapshot)
 }
 
+/// Provisional (#150): `compute` for a drawing that is compared with another one, as a candidate of a refinement or a
+/// composition is. Such a layout leaves out none of its steps: the routes that `compute` may leave unrouted a second time,
+/// because nothing draws or reads them, are routed like all others, so the comparison sees complete layouts.
+pub fn compute_compared(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+) -> Result<Snapshot, String> {
+    compute_counted_for(graph, previous, dirty, options, true).map(|(snapshot, _)| snapshot)
+}
+
 /// `compute` that also returns the stage work of the first layout (placement, routing, and so on), so that a caller can
 /// report where the time of an import goes. The snapshot is the same as `compute` returns.
 /// Provisional (`LayoutOptions::shared_tracks`): the diagnostic of a layout computed without shared tracks because they
@@ -362,15 +374,26 @@ pub fn compute_counted(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    compute_counted_for(graph, previous, dirty, options, false)
+}
+
+/// `compute_counted`; `compared` says that the drawing is compared with another one (`compute_compared`).
+fn compute_counted_for(
+    graph: &Graph,
+    previous: Option<&Snapshot>,
+    dirty: &BTreeSet<String>,
+    options: &LayoutOptions,
+    compared: bool,
+) -> Result<(Snapshot, SearchCounters), String> {
     compute_finished(options, |options| {
-        compute_counted_unclocked(graph, previous, dirty, options)
+        compute_counted_unclocked(graph, previous, dirty, options, compared)
     })
 }
 
 /// One layout of a graph that is already the one the layout sees, as `region_ports` composes it from two: without the
 /// steps that turn a view into that graph (held groups, hub references, bus lines). Those ran once on the way in, and
 /// the caller gives their results back. Run again, they took the bus nodes out of the graph a second time (#204), and
-/// took the edges of a region's box for those of a hub.
+/// took the edges of a region's box for those of a hub. The two drawings are compared, so no step is left out.
 fn compute_counted_composed(
     graph: &Graph,
     previous: Option<&Snapshot>,
@@ -378,7 +401,7 @@ fn compute_counted_composed(
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
     compute_finished(options, |options| {
-        compute_counted_forced(graph, previous, dirty, options)
+        compute_counted_forced(graph, previous, dirty, options, false)
     })
 }
 
@@ -439,6 +462,7 @@ fn compute_counted_unclocked(
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
+    compared: bool,
 ) -> Result<(Snapshot, SearchCounters), String> {
     // Provisional (ADR 0022 M3b, `holdMemberships`): a complete layout tries to hold the soft groups; one that continues
     // an earlier drawing starts from the held places.
@@ -477,7 +501,8 @@ fn compute_counted_unclocked(
         };
         let mut spaced = options.clone();
         spaced.hub_ref_room = room(true) + room(false);
-        let (mut snapshot, stages) = compute_counted_buses(&view, previous, dirty, &spaced)?;
+        let (mut snapshot, stages) =
+            compute_counted_buses(&view, previous, dirty, &spaced, compared)?;
         snapshot.hub_refs = refs;
         return Ok((snapshot, stages));
     }
@@ -485,9 +510,9 @@ fn compute_counted_unclocked(
     if options.hub_ref_room != 0. {
         let mut plain = options.clone();
         plain.hub_ref_room = 0.;
-        return compute_counted_buses(graph, previous, dirty, &plain);
+        return compute_counted_buses(graph, previous, dirty, &plain, compared);
     }
-    compute_counted_buses(graph, previous, dirty, options)
+    compute_counted_buses(graph, previous, dirty, options, compared)
 }
 
 /// Provisional (`hubRefs`): the view without the edges of its hubs (nodes with at least `min` edges between two distinct
@@ -550,6 +575,7 @@ fn compute_counted_buses(
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
+    compared: bool,
 ) -> Result<(Snapshot, SearchCounters), String> {
     // Provisional (ADR 0019 view model): a node of shape `busLine` is a bus line in the view (`Bus::taps`), without its node
     // and edges; the layout sees it as a node again, and its bar and taps come back in `Snapshot::bus_lines`.
@@ -607,17 +633,26 @@ fn compute_counted_buses(
         bus_line::expand_snapshot(&mut p);
         p
     });
+    // Provisional (#150): where every bus of this view becomes lines of its own (`bars_to_lines`, below), no later
+    // operation reads the routes the layout keeps for the taps: `bus_line::expand_snapshot` restores those of bars. Then
+    // the layout need not route them a second time (`undrawn_routes`), unless its drawing is compared with another.
+    let lines_only = !compared
+        && view
+            .buses
+            .iter()
+            .filter(|b| !b.taps.is_empty() && b.edges.is_empty())
+            .all(|b| organic_heads.contains_key(&b.id));
     let (mut snapshot, stages) = match bus_line::expand(view) {
         Some(expanded) => {
             let (mut snapshot, stages) =
-                compute_counted_forced(&expanded, earlier.as_ref(), dirty, options)?;
+                compute_counted_forced(&expanded, earlier.as_ref(), dirty, options, lines_only)?;
             bus_line::collapse(&mut snapshot, view);
             (snapshot, stages)
         }
         None if trunk_roots.is_some() => {
-            compute_counted_forced(view, earlier.as_ref(), dirty, options)?
+            compute_counted_forced(view, earlier.as_ref(), dirty, options, false)?
         }
-        None => return compute_counted_forced(graph, previous, dirty, options),
+        None => return compute_counted_forced(graph, previous, dirty, options, false),
     };
     if let Some(roots) = trunk_roots {
         if let Some(view) = trunked.as_ref().filter(|_| !joining.is_empty()) {
@@ -631,6 +666,10 @@ fn compute_counted_buses(
         if let Some(roots) = organic_roots {
             snapshot.bus_taps.roots = roots;
         }
+    }
+    // A bar that stayed after all would hand its tap routes to a later operation: laid out again with nothing left out.
+    if lines_only && bus_line::expand(&snapshot.graph).is_some() {
+        return compute_counted_buses(graph, previous, dirty, options, true);
     }
     Ok((snapshot, stages))
 }
@@ -669,8 +708,9 @@ fn compute_counted_forced(
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
+    lines_only: bool,
 ) -> Result<(Snapshot, SearchCounters), String> {
-    let forced = compute_counted_body(graph, previous, dirty, options)?;
+    let forced = compute_counted_body(graph, previous, dirty, options, lines_only)?;
     // Experimental (`organicForces`): the forces are chosen per area before the repair, which cannot be foreseen there. A
     // drawing that keeps a geometry issue is laid out again without them, and the one with fewer issues is kept (mixed-large:
     // one straight edge through a node in a deeply nested container). Only then does the layout run twice.
@@ -683,7 +723,7 @@ fn compute_counted_forced(
         organic_forces: false,
         ..options.clone()
     };
-    let (mut plain, stages) = compute_counted_body(graph, previous, dirty, &without)?;
+    let (mut plain, stages) = compute_counted_body(graph, previous, dirty, &without, lines_only)?;
     if plain.geometry_issues.len() < forced.0.geometry_issues.len() {
         // The option stays in the snapshot: a later layout of it goes on as configured.
         plain.options.organic_forces = true;
@@ -697,6 +737,7 @@ fn compute_counted_body(
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
+    lines_only: bool,
 ) -> Result<(Snapshot, SearchCounters), String> {
     // Experimental (`directionsFirst`): the free directions are chosen by a first layout, and the drawing is laid out
     // again with those orientations fixed (single pass builds edges between fixed axes; it delegates them under a free
@@ -732,7 +773,8 @@ fn compute_counted_body(
                 directions_first: false,
                 ..options.clone()
             };
-            let (mut snapshot, stages) = compute_counted_body(&fixed, previous, dirty, &inner)?;
+            let (mut snapshot, stages) =
+                compute_counted_body(&fixed, previous, dirty, &inner, false)?;
             snapshot.options.directions_first = true;
             let key = published_key(&snapshot)?;
             if best.as_ref().is_none_or(|(b, ..)| key < *b) {
@@ -792,7 +834,7 @@ fn compute_counted_body(
                 back
             });
             let (mut snapshot, stages) =
-                compute_counted_inner(&positive, earlier.as_ref(), dirty, options)?;
+                compute_counted_inner(&positive, earlier.as_ref(), dirty, options, lines_only)?;
             mirror::mirror(&mut snapshot, vertical);
             snapshot.graph = graph.clone();
             for o in snapshot.area_orientations.values_mut() {
@@ -812,7 +854,7 @@ fn compute_counted_body(
                 ..options.clone()
             };
             let (mut snapshot, stages) =
-                compute_counted_inner(graph, previous, dirty, &with_sides)?;
+                compute_counted_inner(graph, previous, dirty, &with_sides, lines_only)?;
             // The options the layout wrote, without the sides it was given (internal, derived for each layout).
             snapshot.options.region_child_sides.clear();
             region_ports::child_legs(&mut snapshot);
@@ -820,7 +862,8 @@ fn compute_counted_body(
             return Ok((snapshot, stages));
         }
     }
-    let (mut snapshot, stages) = compute_counted_inner(graph, previous, dirty, options)?;
+    let (mut snapshot, stages) =
+        compute_counted_inner(graph, previous, dirty, options, lines_only)?;
     if options.region_child_ports {
         region_ports::child_legs(&mut snapshot);
     }
@@ -898,6 +941,7 @@ fn compute_counted_inner(
     previous: Option<&Snapshot>,
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
+    lines_only: bool,
 ) -> Result<(Snapshot, SearchCounters), String> {
     check_rows(graph, options)?;
     tree::check_tree_areas(graph)?;
@@ -1013,7 +1057,10 @@ fn compute_counted_inner(
     // a route through a node is a hard violation.
     // Not for more conflicts than `MAX_REROUTED_ROUTES`: in a dense view nearly every route is in conflict, and routing them
     // again around all others did not end (a view of 349 nodes and 8778 edges); they are reported.
+    // Provisional (#150): not where the routes are the taps of buses that become lines, which nothing draws or reads
+    // (`undrawn_routes`): a bus view with few routes through boxes spent most of its time here.
     if whole_reroute
+        && !(lines_only && undrawn_routes(&snapshot, engine_choice_fits))
         && !dragging
         && !snapshot.route_conflicts.is_empty()
         && snapshot.route_conflicts.len() <= engine_choice::MAX_REROUTED_ROUTES
@@ -1051,6 +1098,31 @@ fn compute_counted_inner(
         }
         (snapshot, stages)
     })
+}
+
+/// Provisional (#150): whether routing the conflicting routes of `snapshot` again could change nothing but those routes,
+/// in a view whose buses all become lines (`compute_counted_buses`). Every condition names a way the routes would reach the
+/// result.
+fn undrawn_routes(snapshot: &Snapshot, engine_choice_fits: bool) -> bool {
+    let options = &snapshot.options;
+    // Every route is the tap of a bus node: the lines are drawn from the boxes (`bus_line::bars_to_lines`), not from it.
+    bus_line::only_taps(&snapshot.graph)
+        // The engine choice behind the second routing judges the drawings with these routes and may replace the drawing.
+        && (options.single_pass || !engine_choice_fits)
+        // Edge and port labels are placed beside the routes, clear of all of them.
+        && options.port_labels.is_empty()
+        && !snapshot
+            .graph
+            .edges
+            .iter()
+            .any(|e| options.edge_labels.contains_key(&e.id))
+        // A port spacing that cannot be reached is reported with the routes' issues, which routing again derives anew.
+        && options.min_port_spacing <= 0.
+        // Another routing style changes how the routes are finished (straight segments, fans drawn as buses).
+        && snapshot.straight_edges.is_empty()
+        && styles::only_orthogonal(&snapshot.graph, options)
+        // Shared tracks may end in a fallback that lays the view out again.
+        && options.shared_tracks.is_none()
 }
 
 /// The steps that give a complete layout its drawn routes, labels and diagnostics. The port search uses the same steps for
