@@ -107,8 +107,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   apart when that removes conflicts.
 - Snapshot of a view with backbone buses that single pass did not take: `options.singlePass` and
   `options.abstractRouting` are `false`, as on every other view that falls back (the `options` object is then written in
-  full). The drawing is unchanged, and such a view still tries single pass again at every edit while `singlePassAuto` is
-  on, and a released drag still keeps the drop's order. For users of `arqlet-layout`: `places_buses`.
+  full). The drawing of an import is unchanged. Such a view still tries single pass again at every edit that keeps a
+  backbone bus in it (while `singlePassAuto` is on), and a released drag still keeps the drop's order. An edit that takes
+  the last backbone bus out of the view (collapsing its members' containers) now stays on the pipeline that drew it, as on
+  other views; `configure` with `singlePassAuto` tries single pass again. For users of `arqlet-layout`:
+  `retries_single_pass`.
 
 ## 0.9.0 — 2026-11-24
 

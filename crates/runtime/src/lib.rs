@@ -1887,9 +1887,8 @@ pub fn configure_snapshot(
     recompute_with(snapshot, &options)
 }
 
-/// A drag of one node on a drawing that single pass made (`single_pass_auto`), or on one whose backbone buses the layout
-/// placed (`arqlet_layout::places_buses`), also after a fallback: the pipeline that drew it keeps a drop's order too
-/// (#205). Its steps move the node and route again only what the move touches (its edges, and the routes into its old or
+/// A drag of one node on a drawing that single pass made (`single_pass_auto`), or on one with backbone buses that fell
+/// back from it (`arqlet_layout::retries_single_pass`): the pipeline that drew that one keeps a drop's order too (#205). Its steps move the node and route again only what the move touches (its edges, and the routes into its old or
 /// new box), as a preview, so that the edges follow the node and the drawing stays as it was made
 /// (`arqlet_layout::preview_move`). A release turns the drop into an order hint: the node stands after the sibling whose
 /// place across the flow is before the drop's, in its rank, and the layout is made again. A finish without release pins
@@ -1914,8 +1913,9 @@ fn move_on_single_pass(snapshot: &Snapshot, step: &MoveStep) -> Option<Result<Sn
     };
     match step.phase {
         MovePhase::Begin => {
-            let takes = options.single_pass || arqlet_layout::places_buses(snapshot);
-            if !(options.single_pass_auto && takes) || !step.others.is_empty() || active.is_some() {
+            let takes = (options.single_pass && options.single_pass_auto)
+                || arqlet_layout::retries_single_pass(snapshot);
+            if !takes || !step.others.is_empty() || active.is_some() {
                 return None;
             }
             Some((|| {

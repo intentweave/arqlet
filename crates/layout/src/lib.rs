@@ -680,12 +680,20 @@ pub fn expand_bus_lines(snapshot: &mut Snapshot) -> bool {
     bus_line::expand_snapshot(snapshot)
 }
 
-/// Whether the layout gave a backbone bus of this drawing a place of its own (`Snapshot::bus_boxes` holds its node).
-pub fn places_buses(snapshot: &Snapshot) -> bool {
-    snapshot
-        .bus_boxes
-        .keys()
-        .any(|id| id.starts_with(bus_layout::BUS_NODE_PREFIX))
+/// Whether this drawing is one with backbone buses placed by the layout that single pass did not take and that asks for it
+/// again at its next layout (`fell_back`). The runtime and the layout treat such a view as one single pass is asked for,
+/// as they did while its options still said so (#205).
+pub fn retries_single_pass(snapshot: &Snapshot) -> bool {
+    fell_back(&snapshot.options)
+        && snapshot
+            .bus_boxes
+            .keys()
+            .any(|id| id.starts_with(bus_layout::BUS_NODE_PREFIX))
+}
+
+/// The options a single pass that fell back leaves: `singlePassAuto` on, `singlePass` and `abstractRouting` off.
+fn fell_back(options: &LayoutOptions) -> bool {
+    options.single_pass_auto && !options.single_pass && !options.abstract_routing
 }
 
 /// A view's snapshot as the layout saw it: every bus line (`Bus::taps`) as a node with its taps again, and every backbone
@@ -1098,10 +1106,10 @@ fn compute_counted_inner(
 }
 
 /// Whether the routes in conflict are reported rather than answered by routing the whole drawing again with both engines:
-/// under single pass, and on a view with backbone buses unless `singlePassAuto` is off, also after a fallback. Such views
-/// never had that second choice (their options kept `singlePass` through a fallback, #205).
+/// under single pass, and on a view with backbone buses that fell back from it. Such a view never had that second choice
+/// (its options kept `singlePass` through a fallback, #205).
 fn keeps_routes(snapshot: &Snapshot) -> bool {
-    snapshot.options.single_pass || (snapshot.options.single_pass_auto && places_buses(snapshot))
+    snapshot.options.single_pass || retries_single_pass(snapshot)
 }
 
 /// Provisional (#150): whether routing the conflicting routes of `snapshot` again could change nothing but those routes,
@@ -1230,7 +1238,7 @@ fn compute_mode_buses(
         // Such a view asks for single pass at every layout while `singlePassAuto` is on, also where the drawing it continues
         // fell back, whose options say so: an edit that removes the reason gets single pass again. Other views stay on the
         // pipeline that drew them until the next import or `configure`; these never did (#205).
-        if options.single_pass_auto && !options.single_pass && !options.abstract_routing {
+        if fell_back(options) {
             expanded_options.abstract_routing = true;
             expanded_options.single_pass = true;
         }
