@@ -486,6 +486,20 @@ const DARK_BACKGROUND = [0.047, 0.063, 0.094, 1];
 const toneOf = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5 ? 'light' : 'dark');
 
 /**
+ * Provisional: a CSS mask that fades an element out over `width` CSS pixels at each of its four edges (eased, so the
+ * transition has no visible band), for `mask-image` with `mask-composite: intersect`; '' for a width of 0 or less.
+ */
+export function edgeFadeMask(width) {
+  if (!(width > 0)) return '';
+  const steps = [0, 0.2, 0.4, 0.6, 0.8, 1].map(t => [t * t * (3 - 2 * t), t * width]);
+  const one = direction => `linear-gradient(${direction}, ${[
+    ...steps.map(([a, at]) => `rgba(0,0,0,${a.toFixed(3)}) ${at.toFixed(1)}px`),
+    ...[...steps].reverse().map(([a, at]) => `rgba(0,0,0,${a.toFixed(3)}) calc(100% - ${at.toFixed(1)}px)`),
+  ].join(', ')})`;
+  return `${one('to right')}, ${one('to bottom')}`;
+}
+
+/**
  * Draws `model` (from `overviewModel`) into `canvas`. Returns a renderer: `view` is `{centreX, centreY, scale}` with
  * `scale` in CSS pixels per unit; `setState({expanded, collapsed, selected, trace}, {fade})` draws clusters structured in
  * their discs (index → {scene}), collapsed into one disc (indices), marks one and a path (`pathOf`), blending the change in over `fade`
@@ -493,7 +507,8 @@ const toneOf = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5 ? 'lig
  * `view`). `options.labels` is a 2D canvas laid over `canvas` for texts; `options.onView(view)` is called after every
  * view change; `options.edgeAlpha` (default 1) scales the opacity of the overview's edges; `options.background` is the
  * clear colour (RGBA in 0..1, `setBackground`). A light background (relative luminance above one half) sets the tone
- * to light: texts are dark, and the galaxy style draws in ink instead of light.
+ * to light: texts are dark, and the galaxy style draws in ink instead of light. `options.edgeFade` (CSS pixels,
+ * `setEdgeFade`) fades the drawing out at the canvas edges into the page behind it.
  */
 export function createOverviewRenderer(canvas, initialModel, options = {}) {
   // WebGPU with a device (`options.device`, from `sceneBackend`), else WebGL 2, else WebGL 1; `options.backend: 'webgl'`
@@ -520,6 +535,18 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   let galaxy = !!options.galaxy;
   // The clear colour and the tone it gives (`setBackground`): on a light background the galaxy style is ink.
   let background = options.background ?? DARK_BACKGROUND, tone = toneOf(background);
+  // Provisional: the fade at the edges (`setEdgeFade`), in CSS pixels; a CSS mask on the canvas and the texts' canvas, so
+  // the page shows through at the edges (a dark galaxy in a light host, for example). 0: none.
+  let edgeFade = 0;
+  const applyEdgeFade = () => {
+    const mask = edgeFadeMask(edgeFade);
+    for (const element of [canvas, options.labels]) {
+      if (!element?.style) continue;
+      for (const [name, value] of [['mask-image', mask], ['-webkit-mask-image', mask], ['mask-composite', mask && 'intersect'], ['-webkit-mask-composite', mask && 'source-in']]) {
+        if (value) element.style.setProperty(name, value); else element.style.removeProperty(name);
+      }
+    }
+  };
   // The appearance (style.js): the theme's trace, route, line and bus colours and a palette for the clusters.
   let style = options.style ?? null;
   // How structured clusters are drawn (ADR 0025 O3): 'cluster' (boxes in the cluster's colour) or 'scene' (as the scene view).
@@ -686,6 +713,9 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     /** Provisional: draws in the galaxy style (glows, stars, faint lines, added light) or back in discs and rings. */
     get galaxy() { return galaxy; },
     setGalaxy(on) { if (galaxy !== !!on) { galaxy = !!on; renderer.setState({}); } },
+    /** Provisional: the width in CSS pixels over which the drawing fades out at the canvas edges (0: none). */
+    get edgeFade() { return edgeFade; },
+    setEdgeFade(width) { edgeFade = Math.max(0, Number(width) || 0); applyEdgeFade(); },
     /** Provisional: 'light' when the background is light (texts dark, the galaxy style in ink), else 'dark'. */
     get tone() { return tone; },
     /** Provisional: the clear colour (RGBA in 0..1), for a host that switches between a dark and a light theme; its
@@ -814,11 +844,13 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     pickScene(clientX, clientY) { return pickExpanded(model, expanded, ...renderer.world(clientX, clientY)); },
     destroy() {
       if (frame) cancelAnimationFrame(frame);
+      if (edgeFade) { edgeFade = 0; applyEdgeFade(); }
       drop(current); drop(previous);
       backend.destroy();
       options.labels?.getContext('2d').clearRect(0, 0, options.labels.width, options.labels.height);
     },
   };
+  if (options.edgeFade) renderer.setEdgeFade(options.edgeFade);
   return renderer;
 }
 

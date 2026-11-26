@@ -16,6 +16,8 @@ export interface OverviewRendererOptions {
   background?: [number, number, number, number];
   /** The outline per node kind; kinds not named are circles. */
   shapes?: Record<string, import('./overview.js').Outline>;
+  /** Provisional: fade the drawing out at the canvas edges over this many CSS pixels (`setEdgeFade`). */
+  edgeFade?: number;
   /** Provisional: start in the galaxy style (`setGalaxy`). */
   galaxy?: boolean;
   /** Provisional: the names of nodes (`setNames`) and their details. */
@@ -41,6 +43,10 @@ export interface OverviewRenderer {
   /** Provisional: whether the galaxy style is on (glows and stars instead of discs and rings, faint lines, added light). */
   readonly galaxy: boolean;
   setGalaxy(on: boolean): void;
+  /** Provisional: the width in CSS pixels over which the drawing fades out at the canvas edges into the page (0: none);
+   * a CSS mask on the canvas and the labels canvas, so a dark galaxy can sit in a light host. */
+  readonly edgeFade: number;
+  setEdgeFade(width: number): void;
   /** Provisional: 'light' on a light background (dark texts, the galaxy style in ink), else 'dark'. */
   readonly tone: 'dark' | 'light';
   /** Provisional: the clear colour (RGBA in 0..1; default the dark one), for a host that switches themes. */
@@ -128,3 +134,7 @@ export interface BreathSettings {
   wavelength?: number;
   fadeIn?: number;
 }
+
+/** Provisional: a CSS mask (`mask-image`, used with `mask-composite: intersect`) fading an element out over `width` CSS
+ * pixels at its four edges; '' for none. */
+export function edgeFadeMask(width: number): string;
