@@ -102,6 +102,89 @@ digest before use.
 finished scene first and the layout state as a lean snapshot; the browser renders the scene before it has loaded the
 engine, and starts the engine at the first local change, taking the structure from its replica.
 
+### The cluster overview as a server result (provisional)
+
+A backend may compute the cluster overview ([ADR 0018](adr/0018-cluster-overview.md)) and give the browser only the
+answer.
+
+**Edge kinds and weights.** The browser has no graph, so ask for them with `edgeData: true`. The answer then also holds,
+per edge `k` (the pair `edges[2k]`, `edges[2k + 1]`):
+
+| Field | Meaning |
+|---|---|
+| `edgeKinds` | the edge kinds, in order of first use |
+| `edgeKind[k]` | the edge's kind, an index into `edgeKinds` |
+| `edgeWeight[k]` | how many edges it stands for (`Edge.weight`); the field is left out when every edge counts 1 |
+
+Without `edgeData` the answer is as before. With it, the gzipped answer grew by 3 to 4 % for six kinds and 8 to 9 %
+with weights too, on generated code graphs of 10 000 and 100 000 nodes
+([sizes](../benchmarks/results/overview-edge-data-20261126.md)). The taps of buses given as data are edges of the overview and carry their
+kinds. With `columns: true`, `edgeKind` and `edgeWeight` are two more `u32` columns after `links`; `edgeKinds` stays in
+the JSON. A positions-only answer leaves them out with the edges: a session answers one only while `edgeData` is the same
+as in its last overview, and a whole overview when it changed.
+
+**Continuing a changed graph, without a session.** Keep the places of an answer by id and send them with the next graph:
+
+```js
+const places = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id,
+  {x: o.x[i], y: o.y[i], r: o.r[i], parent: o.ids[o.parent[i]]}]));   // no parent at the top level
+const next = run({op: 'overview', graph: changed, start: {nodes: places(previous)}});
+next.overview.continuation;   // {continued, anew, ignored}
+```
+
+Give every node of the previous answer, **the added clusters included**, each with its `parent`. `start.nodes` excludes
+`start.x`, `y` and `r` (the same graph, by node index); a request with both is refused. `settle` and `moved` (node id →
+new centre `{x, y}`) work as before; a moved node needs an earlier place in its cluster. A session takes `start.nodes`
+too, also together with a new graph.
+
+What continues:
+
+- **The added clusters stay** (`community:…`, communities and satellite groups), with their ids. Their ids are positions
+  in a clustering: a changed graph clustered anew (a request without `start`) would group much of it differently and may
+  give the same id to other members. With `start.nodes`, each node stays in its earlier cluster (its entry's `parent`,
+  else the cluster whose earlier disc held it), so `intent` and `radii` by cluster id still name the same cluster. A cluster left with fewer than two children is
+  dissolved. Only a container without earlier clusters (a new one, or one that now has more than `communities` children)
+  is clustered, and what its new clusters hold is laid out anew. `communities: 0` or `satellites: 0` keeps no cluster of
+  that sort.
+- A node continues from its entry. It is **placed anew** when it has none, when its container has none (a new container
+  and what it holds), or when it changed its container: its `parent` names another one, or, without a `parent`, its
+  entry lies outside its container's earlier disc. A container that changed its parent keeps its inner arrangement.
+- A node placed anew joins the cluster of the nodes it is linked to most and starts next to them (else outside what is
+  there). Overlaps are then removed, which can push others; with `settle` the changed containers settle by forces.
+  Without a `parent`, a node that moved to a container around its old one is not seen to have moved: it starts where it
+  was and the two part.
+- Entries for ids the graph no longer has are **ignored** and listed in `continuation.ignored`. Entries of clusters that
+  are gone are not listed.
+- Unchanged graph and options: the same answer as `start` by node index.
+
+**Keep continuing by id.** The clusters of such an answer are not those the graph alone gives, so a later request without
+a session must send `start.nodes` again; `start` by node index belongs to a request without them. A session (and
+`createOverviewSession`, resident or not) does this itself for a `start` without positions.
+
+Without `settle` the nodes move least, and gaps stay open, so the drawing grows slowly over many changes; with it the
+changed containers close up and move more. Lay out without `start` when the old places and clusters no longer help.
+On two generated graphs with 0.1 to 5 % of the nodes changed, nodes moved less without `settle` than in a layout without
+`start`; with `settle` not in every case ([movements](../benchmarks/results/overview-continuation-20261126.md)). This is
+no general guarantee.
+
+**`parent`.** Optional, the id of the node's parent in the earlier answer (`ids[parent[i]]`). Without it the earlier
+discs tell what held what, and they cannot for a cluster or container the host set smaller than its content (`radii`):
+members outside the small disc leave it. With it they stay, and such an overview continues as by node index. How a named
+parent is read, for a node now in container C (the top level included):
+
+| `parent` names | The node |
+|---|---|
+| nothing: left out, `null`, or an id that is no node of the graph and has no entry | judged by the discs, as without it |
+| C | stays, in no cluster |
+| a cluster with an entry whose id belongs to C | stays, in that cluster, wherever its disc is (the cluster grows to hold it) |
+| anything else: another node of the graph (itself included), a cluster of another container, a node that is gone but has an entry | changed its container: placed anew |
+
+A cluster entry's `parent` may name its container or another cluster of that container. Anything else, and parents that
+go round in a circle, count as left out. A named cluster that is not kept (its sort switched off) leaves its members to
+the discs. A `parent` that is not a string is refused. Parents are taken at their word: no check against the discs.
+
+Limits: other cluster options do not regroup a container that keeps its clusters.
+
 ## 5. Offers from another engine: refinement
 
 A refinement improves a layout without changing the view's decisions. It can run anywhere and is applied only if the

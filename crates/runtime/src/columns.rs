@@ -462,6 +462,9 @@ pub struct OverviewColumns {
     kind: Vec<u32>,
     edges: Vec<u32>,
     links: Vec<f64>,
+    /// With `edgeData`; the weights only when the answer has them.
+    edge_kind: Option<Vec<u32>>,
+    edge_weight: Option<Vec<u32>>,
     positions_only: bool,
     meta: serde_json::Value,
 }
@@ -480,11 +483,24 @@ impl OverviewColumns {
             if !overview.bus_lines.is_empty() {
                 meta["busLines"] = serde_json::to_value(&overview.bus_lines).unwrap_or_default();
             }
+            if let Some(continuation) = &overview.continuation {
+                meta["continuation"] = serde_json::to_value(continuation).unwrap_or_default();
+            }
             meta
         } else {
             let mut whole = serde_json::to_value(&overview).unwrap_or_default();
             if let Some(o) = whole.as_object_mut() {
-                for key in ["x", "y", "r", "parent", "kind", "edges", "links"] {
+                for key in [
+                    "x",
+                    "y",
+                    "r",
+                    "parent",
+                    "kind",
+                    "edges",
+                    "links",
+                    "edgeKind",
+                    "edgeWeight",
+                ] {
                     o.remove(key);
                 }
             }
@@ -502,6 +518,8 @@ impl OverviewColumns {
             c.kind = overview.kind;
             c.edges = overview.edges;
             c.links = overview.links;
+            c.edge_kind = overview.edge_kind;
+            c.edge_weight = overview.edge_weight;
         }
         let listed: Vec<_> = c
             .columns()
@@ -513,7 +531,8 @@ impl OverviewColumns {
         c
     }
 
-    /// The columns in a fixed order; a positions-only set has the first three.
+    /// The columns in a fixed order; a positions-only set has the first three, and `edgeKind` and `edgeWeight` come last,
+    /// when the answer has them.
     pub fn columns(&self) -> Vec<(&'static str, Column<'_>)> {
         let mut all = vec![
             ("x", Column::F64(&self.x)),
@@ -525,6 +544,12 @@ impl OverviewColumns {
             all.push(("kind", Column::U32(&self.kind)));
             all.push(("edges", Column::U32(&self.edges)));
             all.push(("links", Column::F64(&self.links)));
+            if let Some(c) = &self.edge_kind {
+                all.push(("edgeKind", Column::U32(c)));
+            }
+            if let Some(c) = &self.edge_weight {
+                all.push(("edgeWeight", Column::U32(c)));
+            }
         }
         all
     }

@@ -323,7 +323,8 @@ export function httpRun(
 
 /**
  * An overview request without `op` and `graph` (`OverviewRequest` in `@arqlet/contracts`): `start` without positions
- * continues from the last overview.
+ * continues from the last overview, `start.nodes` (places by node id) from the places given, also on a new graph, and
+ * keeps their clusters.
  */
 export type OverviewSessionRequest = Omit<OverviewRequest, 'graph'>;
 
@@ -340,7 +341,8 @@ export interface OverviewAnswer {
 export interface OverviewSession {
   /** Lays out `graph`; replaces the graph the session had. */
   open(graph: Graph, request?: OverviewSessionRequest): Promise<OverviewAnswer>;
-  /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options). */
+  /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options).
+   * With `edgeData: true` the answer has each edge's kind and weight (ask each time). */
   layOut(request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Provisional: the paths between two nodes of the overview's graph, read only (`GraphTrace`). */
   trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<ReadAnswer<GraphTrace>>;
@@ -365,8 +367,8 @@ export function createOverviewSession(
   init?: {
     resident?: boolean | 'auto';
     /**
-     * Provisional (ADR 0019, step 4): the overview's numbers (`parent`, `x`, `y`, `r`, `kind`, `edges`, `links`) as typed
-     * arrays instead of JSON arrays, moved without JSON (copied once out of the engine's memory, transferred from a
+     * Provisional (ADR 0019, step 4): the overview's numbers (`parent`, `x`, `y`, `r`, `kind`, `edges`, `links`, and
+     * with `edgeData` `edgeKind` and `edgeWeight`) as typed arrays instead of JSON arrays, moved without JSON (copied once out of the engine's memory, transferred from a
      * worker). Needs a resident session in an engine that offers `overview` (WASM, a worker); an answer says so
      * otherwise. Default false: the arrays are plain, as before. Typed arrays index like arrays; a `start` built from
      * them is sent as plain arrays.

@@ -146,6 +146,44 @@ simulation runs in the browser), the browser only interpolates:
   transforms, about 0.4 s) and fades in routes and labels; off when the user asks for reduced motion, and never in the
   way of the change (a minimal DOM, as in the regression test, just skips it).
 
+## Addendum (2026-11-26): the overview as a server result (#209)
+
+A host may compute the overview on a server and give the browser only the answer. Both additions are provisional and
+change no answer that does not ask for them. Usage: [integration guide](../integration-guide.md).
+
+1. **Edge data on request** (`edgeData`): per resolved edge its kind (index into `edgeKinds`, as nodes have
+   `kinds`/`kind`) and its weight, the latter only when an edge counts more than once. The index of the input edge was
+   the alternative and was rejected: a client without the graph cannot resolve it, the taps of buses given as data have
+   no input edge, and a host with the graph already has the order (`resolvedEdgeIds`). On request, because it makes every
+   answer larger and most hosts have the graph.
+2. **Continuation by node id** (`start.nodes`, `id → {x, y, r, parent?}`; excluding `x`, `y`, `r`): read onto the graph as it
+   is now (`arqlet_layout::overview::continue_by_id`), then laid out as any continuation. A node without a usable place
+   (none, a new container, or an entry outside its container's earlier disc) is put next to the nodes it is linked to,
+   and its container makes room or settles. A container that lost a node counts as changed, as does one whose children
+   no longer fit together at their places (a node that moved up out of a container). The earlier disc of a container
+   judges its members only when it holds at least half of them or they gather elsewhere, so that a disc the host set
+   smaller than its content (`radii`) does not send them all anew. An entry's `parent` (added 2026-11-26), where given,
+   says what held the node instead of the discs, for the container and the cluster alike: discs cannot tell the members
+   of a cluster set smaller than its content. A parent that names nothing, and cluster parents that are not of the same
+   container or go round in a circle, count as left out ([table](../integration-guide.md)).
+3. **The added clusters continue; the changed graph is not clustered anew** (`clusters_by_id`). Discs of one container
+   do not overlap, so the earlier cluster discs say which nodes each cluster held, whatever the graph would be clustered
+   into now. Each keeps its id; a new node joins the cluster of the nodes it is linked to most; a cluster with fewer
+   than two children is dissolved; containers without earlier clusters are clustered as a new graph's. An unchanged
+   graph therefore continues exactly as by node index.
+
+   Rejected: clustering the changed graph anew and matching its clusters to the earlier discs by their members (built
+   first, commit `78a5bbd`). Louvain regroups far more than what changed, so many nodes were placed anew and the new
+   clusters' discs overlapped; removing the overlaps without forces grew the root disc up to 31 times on a flat generated
+   graph with 5 % of the nodes changed, and 1.6 times on a hierarchical one with 0.1 %. Kept clusters grow it by at most
+   1.2 times on the same changes ([movements](../../benchmarks/results/overview-continuation-20261126.md)).
+
+   The price: the clusters of a continuation drift from those of a fresh layout as changes add up (a node whose links
+   moved to another community stays where it was). The host decides when to lay out without `start`.
+
+Open, both later: the drill-down from an `OverviewModel` without the input graph (part 2 of #209) builds on 1 and may
+want edge ids, which would be another request field; a session continuing a new graph from its own places on `start: {}`.
+
 ## Real data (2026-11-11)
 
 On two real exports (Intentweave, 8 874 nodes; Backstage, 31 758 nodes; `benchmarks/results/overview-real-20261111.md`)

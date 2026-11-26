@@ -7,6 +7,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- The cluster overview as a server result (provisional, #209): with `edgeData: true` the `overview` answer gives every
+  edge's kind and weight (`edgeKinds`, `edgeKind`, `edgeWeight`; with `columns`, two more `u32` columns), for a host
+  without the graph. `start.nodes` (`id → {x, y, r, parent?}`) continues the overview of a changed graph without a
+  session: the clusters the overview added continue with their ids instead of the graph being clustered anew, new and
+  moved nodes are placed anew among the others, and removed ids are reported (`continuation`). An entry's optional
+  `parent` says what held the node, so that a cluster the host set smaller than its content keeps its members.
+  Existing requests are answered as before. The typed `OverviewStart` now has `moved`, which the engine already took. In a session,
+  `positionsOnly` answers a whole overview when `edgeData` differs from the last request's. For Rust users: `Overview`,
+  `OverviewPositions`, `OverviewRequest` and `OverviewStart` have new fields, `layout::overview::Previous` has `anew`
+  and `changed` (and implements `Default`).
 - `sparseRepairGrid` (provisional, off, #203): on views over the repair grid's bound the default router first searches a
   sparse grid of the whole view (a line only in the gaps between boxes that matter, a cost per bend). On 24 generated
   views with containers and bus meshes the routes the router draws through boxes fell from 1 091 to 52, with fewer
