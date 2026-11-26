@@ -28,3 +28,8 @@ hugging 2 on state-tcp (`profiles-20261021T151732Z`).
 The key comparison alone is merged (`profiles-20261021T151732Z`: all inputs better or equal, run time unchanged).
 The local candidate is not merged. To reoptimize it, the local candidate needs a path to the same results as the
 full reroute on state-tcp, and the run time has to be measured against the full reroute on the same machine.
+
+## `bus-collapse-phases.patch`
+
+Not a candidate: temporary timing prints for the phase table of `benchmarks/results/bus-collapse-20261126.md` (#150).
+It applies to the commit that added that file. `bus-collapse.mjs` records the printed lines.

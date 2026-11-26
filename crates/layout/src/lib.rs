@@ -964,6 +964,9 @@ fn compute_counted_inner(
     // of a dense drawing) or the whole drawing with both engines is not bounded by their size (2000 children did not finish
     // in 30 minutes); the conflicts that remain are reported.
     let whole_reroute = !snapshot.options.scalable_stress;
+    // Provisional (`skipTapReroute`, #150): where every edge is a tap of a bus node, no route is drawn
+    // (`bus_line::collapse`), so routing the conflicting ones again changes nothing that is seen.
+    let undrawn = snapshot.options.skip_tap_reroute && bus_line::only_taps(&snapshot.graph);
     // The engine choice routes the whole drawing again with both engines: not above `MAX_REROUTED_ROUTES` routes, nor above
     // `MAX_REROUTE_WORK` estimated work (#149: a bus view of 189 routes took 20 s in the channel router).
     let engine_choice_fits = engine_choice::fits(&snapshot);
@@ -973,6 +976,7 @@ fn compute_counted_inner(
         && !dragging
         && !snapshot.route_conflicts.is_empty();
     if whole_reroute
+        && !undrawn
         && engine_choice_fits
         && !dragging
         && !snapshot.route_conflicts.is_empty()
@@ -989,6 +993,7 @@ fn compute_counted_inner(
     // Not for more conflicts than `MAX_REROUTED_ROUTES`: in a dense view nearly every route is in conflict, and routing them
     // again around all others did not end (a view of 349 nodes and 8778 edges); they are reported.
     if whole_reroute
+        && !undrawn
         && !dragging
         && !snapshot.route_conflicts.is_empty()
         && snapshot.route_conflicts.len() <= engine_choice::MAX_REROUTED_ROUTES

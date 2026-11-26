@@ -2388,6 +2388,13 @@ pub struct LayoutOptions {
     /// than the default leaves a route room to leave a node that faces a neighbour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organic_gap: Option<f64>,
+    /// Provisional (#150): where every edge of a view is a tap of a bus drawn from a bar (also as the lines made from
+    /// one), a layout does not route the routes in conflict a second time. Those routes are never drawn (the bar and its
+    /// taps come from the boxes), but routing them again can take most of the layout's time. An imported view is drawn
+    /// the same; the routes kept for later operations (`Snapshot::bus_taps`) and `recomputed_containers` can differ, so
+    /// a later move or refinement can place boxes differently. Off by default (omitted).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub skip_tap_reroute: bool,
     /// Experimental (ADR 0016, amendment *Pins in single pass*, step P1): under single pass, and in the hierarchical
     /// pipeline it falls back to, a pinned leaf of an area that flows left to right or top to bottom is a constraint of the
     /// arrangement: the pin chooses its rank and its order there and holds its place across the flow, and along the flow it
@@ -2972,6 +2979,7 @@ impl Default for LayoutOptions {
             edge_routing: None,
             organic_iterations: None,
             organic_gap: None,
+            skip_tap_reroute: false,
             pins_in_single_pass: false,
             vpsc_overlap_removal: false,
             directed_repair: false,

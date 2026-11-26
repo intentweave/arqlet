@@ -955,3 +955,89 @@ fn organic_gap_keeps_boxes_apart_and_is_omitted_by_default() {
         gap_of(&plain)
     );
 }
+
+/// Areas of `units` units on buses given as data, each area on one bus and every `gateway`-th on two (the generator of
+/// `benchmarks/experiments/bus-collapse.mjs`), organic.
+fn areas(containers: usize, units: usize, buses: usize, gateway: usize) -> Graph {
+    // In floating point, as the script's numbers are.
+    let mut seed = 7_f64;
+    let mut rnd = |n: usize| {
+        seed = (seed * 1_103_515_245. + 12_345.) % 2_147_483_648.;
+        (seed / 2_147_483_648. * n as f64) as usize
+    };
+    let mut nodes = Vec::new();
+    let mut taps = vec![Vec::new(); buses];
+    let tap = |b: usize, node: String| json!({"edge": format!("t{b}-{node}"), "node": node, "toBus": true, "kind": "on"});
+    for c in 0..containers {
+        let home = rnd(buses);
+        let two = c % gateway == 0;
+        nodes.push(
+            json!({"id": format!("c{c}"), "kind": if two { "gateway" } else { "single" },
+            "label": format!("Area {c}")}),
+        );
+        for u in 0..units {
+            nodes.push(
+                json!({"id": format!("c{c}u{u}"), "kind": "unit", "label": format!("U{c}.{u}"),
+                "parentId": format!("c{c}")}),
+            );
+            taps[home].push(tap(home, format!("c{c}u{u}")));
+        }
+        if two {
+            let other = (home + 1 + rnd(buses - 1)) % buses;
+            taps[other].push(tap(other, format!("c{c}u0")));
+        }
+    }
+    let buses: Vec<serde_json::Value> = taps
+        .into_iter()
+        .enumerate()
+        .filter(|(_, t)| !t.is_empty())
+        .map(|(b, t)| json!({"id": format!("bus{b}"), "kind": "bus", "label": format!("Bus {b}"), "taps": t}))
+        .collect();
+    serde_json::from_value(json!({"nodes": nodes, "edges": [], "buses": buses,
+        "defaultStrategy": "organic", "defaultDirection": "auto"}))
+    .unwrap()
+}
+
+/// #150: with `skipTapReroute` a view whose edges are all bus taps is drawn as without it, and the taps' routes in
+/// conflict are not routed a second time. Off and omitted by default.
+#[test]
+fn skip_tap_reroute_draws_the_same_and_leaves_the_taps_as_first_routed() {
+    let import = |options: serde_json::Value| {
+        let options: LayoutOptions = serde_json::from_value(options).unwrap();
+        import_graph_with(areas(16, 3, 3, 2), 10_000, &options).unwrap()
+    };
+    let collapsed = json!({"busStyle": "lines", "levelOfDetail": {"kinds": ["single"]}});
+    let plain = import(collapsed.clone());
+    assert!(!serde_json::to_string(&plain.options)
+        .unwrap()
+        .contains("skipTapReroute"));
+    let mut with = collapsed;
+    with["skipTapReroute"] = json!(true);
+    let skipped = import(with);
+    // Everything the view draws or reports about its drawing.
+    let drawn = |s: &Snapshot| {
+        let v = serde_json::to_value(s).unwrap();
+        [
+            "graph",
+            "boxes",
+            "routes",
+            "busLines",
+            "routingIssues",
+            "routeConflicts",
+            "layoutDiagnostics",
+        ]
+        .map(|key| v[key].clone())
+    };
+    assert_eq!(drawn(&plain), drawn(&skipped));
+    // The view this generator draws has routes in conflict that the second pass improved: the kept tap routes differ,
+    // so the pass did not run with the option.
+    assert_ne!(
+        serde_json::to_value(&plain.bus_taps).unwrap(),
+        serde_json::to_value(&skipped.bus_taps).unwrap()
+    );
+    assert_eq!(
+        plain.bus_taps.routes.len(),
+        skipped.bus_taps.routes.len(),
+        "every tap keeps a route for later operations"
+    );
+}
