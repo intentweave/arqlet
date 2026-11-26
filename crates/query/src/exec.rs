@@ -9,10 +9,14 @@
 //! order; `collect` keeps input order; a result that would be `NaN` is an error until its rules are decided in the
 //! fixtures. Mixed-type ordering and the comparison of an integer with a float beyond 2^53 are provisional.
 
-use crate::plan::{AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Op, Plan, SortKey};
+use crate::functions::{self, weight};
+use crate::plan::{
+    AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Function, Op, Plan, SortKey,
+};
 use crate::store::GraphStore;
 use crate::value::{EdgeId, NodeId, Value};
 use crate::QueryError;
+use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -58,8 +62,9 @@ pub fn execute(
         store,
         params,
         limits,
-        steps: 0,
+        steps: Cell::new(0),
         slots: plan.slots,
+        locals: RefCell::new(Vec::new()),
     };
     run.run(plan)
 }
@@ -68,22 +73,16 @@ struct Run<'a> {
     store: &'a dyn GraphStore,
     params: &'a BTreeMap<String, Value>,
     limits: Limits,
-    steps: u64,
+    /// Counted in a cell: an expression that goes through a list counts too.
+    steps: Cell<u64>,
     slots: usize,
+    /// The variables of the comprehensions being evaluated, innermost last: each with its slot and its current item.
+    locals: RefCell<Vec<(usize, Value)>>,
 }
 
 impl Run<'_> {
     fn run(&mut self, plan: &Plan) -> Result<ResultSet, QueryError> {
-        let mut rows: Vec<Row> = vec![vec![Value::Null; self.slots]];
-        for op in &plan.ops {
-            rows = self.apply(op, rows)?;
-            if rows.len() > self.limits.max_rows {
-                return Err(QueryError::limit(format!(
-                    "stopped: more than {} rows (the row limit) after {} steps",
-                    self.limits.max_rows, self.steps
-                )));
-            }
-        }
+        let rows = self.rows(plan)?;
         Ok(ResultSet {
             columns: plan.columns.iter().map(|c| c.name.clone()).collect(),
             rows: rows
@@ -98,12 +97,59 @@ impl Run<'_> {
         })
     }
 
-    fn tick(&mut self, n: usize) -> Result<(), QueryError> {
-        self.steps = self.steps.saturating_add(n as u64);
-        if self.steps > self.limits.max_steps {
+    /// The rows after the last operation of `plan`.
+    fn rows(&mut self, plan: &Plan) -> Result<Vec<Row>, QueryError> {
+        let mut rows: Vec<Row> = vec![vec![Value::Null; self.slots]];
+        for op in &plan.ops {
+            rows = self.apply(op, rows)?;
+            self.within_row_limit(rows.len())?;
+        }
+        Ok(rows)
+    }
+
+    fn within_row_limit(&self, rows: usize) -> Result<(), QueryError> {
+        if rows > self.limits.max_rows {
             return Err(QueryError::limit(format!(
-                "stopped after {} steps (the work budget is {})",
-                self.steps, self.limits.max_steps
+                "stopped: more than {} rows (the row limit) after {} steps",
+                self.limits.max_rows,
+                self.steps.get()
+            )));
+        }
+        Ok(())
+    }
+
+    /// `UNION`: every branch under the same budget, one after the other.
+    fn union(&mut self, branches: &[Plan], distinct: bool) -> Result<Vec<Row>, QueryError> {
+        let slots = self.slots;
+        let mut seen = HashSet::new(); // only to find a row seen before; never iterated
+        let mut out: Vec<Row> = Vec::new();
+        for branch in branches {
+            self.slots = branch.slots;
+            let rows = self.rows(branch);
+            self.slots = slots;
+            for row in rows? {
+                self.tick(1)?;
+                let mut next = vec![Value::Null; slots];
+                for (to, column) in next.iter_mut().zip(&branch.columns) {
+                    *to = row[column.slot].clone();
+                }
+                if distinct && !seen.insert(group_key(next.iter())) {
+                    continue;
+                }
+                out.push(next);
+                self.within_row_limit(out.len())?;
+            }
+        }
+        Ok(out)
+    }
+
+    fn tick(&self, n: usize) -> Result<(), QueryError> {
+        let steps = self.steps.get().saturating_add(n as u64);
+        self.steps.set(steps);
+        if steps > self.limits.max_steps {
+            return Err(QueryError::limit(format!(
+                "stopped after {steps} steps (the work budget is {})",
+                self.limits.max_steps
             )));
         }
         Ok(())
@@ -262,6 +308,7 @@ impl Run<'_> {
                 let n = self.count(expr, "LIMIT")?;
                 Ok(rows.into_iter().take(n).collect())
             }
+            Op::Union { branches, distinct } => self.union(branches, *distinct),
         }
     }
 
@@ -336,11 +383,15 @@ impl Run<'_> {
             return Ok(());
         }
         let mut next = row.clone();
-        next[x.rel] = if as_list {
+        let taken = if as_list {
             Value::List(path.iter().map(|e| Value::Edge(*e)).collect())
         } else {
             Value::Edge(path[0])
         };
+        if x.rel_bound && row[x.rel] != taken {
+            return Ok(());
+        }
+        next[x.rel] = taken;
         if !x.to_bound {
             next[x.to] = Value::Node(node);
         }
@@ -498,24 +549,48 @@ impl Run<'_> {
             Expr::Param(name) => self.params.get(name).cloned().ok_or_else(|| {
                 QueryError::runtime(format!("the parameter ${name} was not supplied"))
             })?,
-            Expr::Slot(slot) => row[*slot].clone(),
-            Expr::Property(base, key) => match self.eval(base, row)? {
-                Value::Null => Value::Null,
-                Value::Node(node) => self.store.node_property(node, key),
-                Value::Edge(edge) => self.store.edge_property(edge, key),
-                other => {
-                    return Err(QueryError::runtime(format!(
-                        "cannot read the property `{key}` of a {}",
-                        other.kind()
-                    )))
-                }
+            Expr::Slot(slot) => match self.local(*slot) {
+                Some(item) => item,
+                None => row[*slot].clone(),
             },
-            Expr::List(items) => Value::List(
-                items
-                    .iter()
-                    .map(|e| self.eval(e, row))
-                    .collect::<Result<_, _>>()?,
-            ),
+            Expr::Property(base, key) => {
+                self.with_value(base, row, |base| self.property(base, key))?
+            }
+            Expr::Map(entries) => {
+                let mut map = BTreeMap::new();
+                let mut bytes = 16u64;
+                for (key, expr) in entries {
+                    let value = self.eval(expr, row)?;
+                    bytes = bytes.saturating_add(key.len() as u64 + weight(&value) as u64);
+                    functions::fits(bytes)?;
+                    map.insert(key.clone(), value);
+                }
+                Value::Map(map)
+            }
+            Expr::Index(base, index) => {
+                let index = self.eval(index, row)?;
+                self.with_value(base, row, |base| self.index(base, &index))?
+            }
+            Expr::Slice(list, from, to) => self.slice(list, from.as_deref(), to.as_deref(), row)?,
+            Expr::Comprehension {
+                slot,
+                list,
+                filter,
+                map,
+            } => self.comprehension(*slot, list, filter.as_deref(), map.as_deref(), row)?,
+            Expr::List(items) => {
+                // Weighed item by item: the list is refused before it holds much more than the limit.
+                let mut values = Vec::with_capacity(items.len());
+                let mut bytes = 16u64;
+                for item in items {
+                    let value = self.eval(item, row)?;
+                    bytes = bytes.saturating_add(weight(&value) as u64);
+                    functions::fits(bytes)?;
+                    values.push(value);
+                }
+                Value::List(values)
+            }
+            Expr::Call(function, args) => self.call(*function, args, row)?,
             Expr::Not(x) => match truth(&self.eval(x, row)?, "NOT")? {
                 None => Value::Null,
                 Some(b) => Value::Bool(!b),
@@ -607,6 +682,220 @@ impl Run<'_> {
                 }
             }
         })
+    }
+
+    /// The current item of the comprehension variable in `slot`, if `slot` is one.
+    fn local(&self, slot: usize) -> Option<Value> {
+        let locals = self.locals.borrow();
+        locals
+            .iter()
+            .rev()
+            .find(|(s, _)| *s == slot)
+            .map(|(_, item)| item.clone())
+    }
+
+    /// Calls `read` on the value of an expression. A variable, of the row or of a comprehension, is read in place: a list
+    /// or a map that is only looked into is not copied. `read` evaluates nothing (the comprehension variables are borrowed
+    /// while it runs).
+    fn with_value<T>(
+        &self,
+        expr: &Expr,
+        row: &Row,
+        read: impl FnOnce(&Value) -> Result<T, QueryError>,
+    ) -> Result<T, QueryError> {
+        if let Expr::Slot(slot) = expr {
+            let locals = self.locals.borrow();
+            return match locals.iter().rev().find(|(s, _)| s == slot) {
+                Some((_, item)) => read(item),
+                None => read(&row[*slot]),
+            };
+        }
+        read(&self.eval(expr, row)?)
+    }
+
+    /// `base.key`.
+    fn property(&self, base: &Value, key: &str) -> Result<Value, QueryError> {
+        Ok(match base {
+            Value::Null => Value::Null,
+            Value::Node(node) => self.store.node_property(*node, key),
+            Value::Edge(edge) => self.store.edge_property(*edge, key),
+            Value::Map(map) => map.get(key).cloned().unwrap_or(Value::Null),
+            other => {
+                return Err(QueryError::runtime(format!(
+                    "cannot read the property `{key}` of a {}",
+                    other.kind()
+                )))
+            }
+        })
+    }
+
+    /// `base[index]`.
+    fn index(&self, base: &Value, index: &Value) -> Result<Value, QueryError> {
+        match (base, index) {
+            (Value::Null, _) | (_, Value::Null) => Ok(Value::Null),
+            (Value::List(items), Value::Int(i)) => {
+                let at = if *i < 0 {
+                    (items.len() as i64).saturating_add(*i)
+                } else {
+                    *i
+                };
+                Ok(usize::try_from(at)
+                    .ok()
+                    .and_then(|at| items.get(at))
+                    .cloned()
+                    .unwrap_or(Value::Null))
+            }
+            (Value::Map(_) | Value::Node(_) | Value::Edge(_), Value::String(key)) => {
+                self.property(base, key)
+            }
+            _ => Err(QueryError::runtime(format!(
+                "cannot index a {} with a value of type {}",
+                base.kind(),
+                index.kind()
+            ))),
+        }
+    }
+
+    /// `list[from..to]`; null when the list or a bound is null.
+    fn slice(
+        &self,
+        list: &Expr,
+        from: Option<&Expr>,
+        to: Option<&Expr>,
+        row: &Row,
+    ) -> Result<Value, QueryError> {
+        // A bound as written: `Some(None)` when it is null.
+        let bound = |expr: Option<&Expr>| -> Result<Option<Option<i64>>, QueryError> {
+            let Some(expr) = expr else { return Ok(None) };
+            match self.eval(expr, row)? {
+                Value::Null => Ok(Some(None)),
+                Value::Int(i) => Ok(Some(Some(i))),
+                other => Err(QueryError::runtime(format!(
+                    "a slice takes integers, not a {}",
+                    other.kind()
+                ))),
+            }
+        };
+        let (from, to) = (bound(from)?, bound(to)?);
+        self.with_value(list, row, |list| {
+            let items = match list {
+                Value::Null => return Ok(Value::Null),
+                Value::List(items) => items,
+                other => {
+                    return Err(QueryError::runtime(format!(
+                        "cannot slice a {}",
+                        other.kind()
+                    )))
+                }
+            };
+            let length = items.len() as i64;
+            // A position within the list: from the end when negative, never outside it.
+            let at = |bound: Option<Option<i64>>, missing: i64| -> Option<usize> {
+                let i = match bound {
+                    None => missing,
+                    Some(None) => return None,
+                    Some(Some(i)) if i < 0 => length.saturating_add(i),
+                    Some(Some(i)) => i,
+                };
+                Some(i.clamp(0, length) as usize)
+            };
+            Ok(match (at(from, 0), at(to, length)) {
+                (Some(from), Some(to)) => Value::List(items[from..to.max(from)].to_vec()),
+                _ => Value::Null,
+            })
+        })
+    }
+
+    /// `[x IN list WHERE filter | map]`. Every item visited is a step of the work budget.
+    fn comprehension(
+        &self,
+        slot: usize,
+        list: &Expr,
+        filter: Option<&Expr>,
+        map: Option<&Expr>,
+        row: &Row,
+    ) -> Result<Value, QueryError> {
+        let items = match self.eval(list, row)? {
+            Value::Null => return Ok(Value::Null),
+            Value::List(items) => items,
+            other => {
+                return Err(QueryError::runtime(format!(
+                    "a list comprehension goes through a list, not a {}",
+                    other.kind()
+                )))
+            }
+        };
+        let mut out = Vec::new();
+        let mut bytes = 16u64;
+        for item in items {
+            self.tick(1)?;
+            self.locals.borrow_mut().push((slot, item));
+            let found = self.comprehended(slot, filter, map, row);
+            self.locals.borrow_mut().pop();
+            if let Some(value) = found? {
+                bytes = bytes.saturating_add(weight(&value) as u64);
+                functions::fits(bytes)?;
+                out.push(value);
+            }
+        }
+        Ok(Value::List(out))
+    }
+
+    /// What one item of a comprehension gives, if it passes the filter.
+    fn comprehended(
+        &self,
+        slot: usize,
+        filter: Option<&Expr>,
+        map: Option<&Expr>,
+        row: &Row,
+    ) -> Result<Option<Value>, QueryError> {
+        if let Some(filter) = filter {
+            if truth(&self.eval(filter, row)?, "WHERE")? != Some(true) {
+                return Ok(None);
+            }
+        }
+        Ok(match map {
+            Some(map) => Some(self.eval(map, row)?),
+            None => self.local(slot),
+        })
+    }
+
+    fn call(&self, function: Function, args: &[Expr], row: &Row) -> Result<Value, QueryError> {
+        if function == Function::Coalesce {
+            for arg in args {
+                let value = self.eval(arg, row)?;
+                if !value.is_null() {
+                    return Ok(value);
+                }
+            }
+            return Ok(Value::Null);
+        }
+        let values = args
+            .iter()
+            .map(|a| self.eval(a, row))
+            .collect::<Result<Vec<_>, _>>()?;
+        let wrong = |wanted: &str, got: &Value| {
+            QueryError::runtime(format!(
+                "`{}` expects {wanted}, not a {}",
+                function.name(),
+                got.kind()
+            ))
+        };
+        match (function, values.as_slice()) {
+            (Function::Id | Function::Type | Function::Labels, [Value::Null]) => Ok(Value::Null),
+            (Function::Id, [Value::Node(n)]) => Ok(self.store.node_property(*n, "id")),
+            (Function::Id, [Value::Edge(e)]) => Ok(self.store.edge_property(*e, "id")),
+            (Function::Id, [other]) => Err(wrong("a node or a relationship", other)),
+            (Function::Type, [Value::Edge(e)]) => {
+                Ok(Value::String(self.store.edge_type(*e).to_string()))
+            }
+            (Function::Type, [other]) => Err(wrong("a relationship", other)),
+            (Function::Labels, [Value::Node(n)]) => Ok(Value::List(vec![Value::String(
+                self.store.node_label(*n).to_string(),
+            )])),
+            (Function::Labels, [other]) => Err(wrong("a node", other)),
+            _ => functions::call(function, values),
+        }
     }
 
     fn binary(&self, op: BinOp, a: &Expr, b: &Expr, row: &Row) -> Result<Value, QueryError> {
@@ -728,6 +1017,20 @@ fn equals(a: &Value, b: &Value) -> Option<bool> {
             }
             result
         }
+        (Value::Map(x), Value::Map(y)) => {
+            if !x.keys().eq(y.keys()) {
+                return Some(false);
+            }
+            let mut result = Some(true);
+            for (p, q) in x.values().zip(y.values()) {
+                match equals(p, q) {
+                    Some(false) => return Some(false),
+                    None => result = None,
+                    Some(true) => {}
+                }
+            }
+            result
+        }
         _ => Some(false),
     }
 }
@@ -763,6 +1066,7 @@ fn compare_op(op: CmpOp, a: &Value, b: &Value) -> Option<bool> {
 fn total_order(a: &Value, b: &Value) -> Ordering {
     fn rank(v: &Value) -> u8 {
         match v {
+            Value::Map(_) => 0,
             Value::List(_) => 1,
             Value::String(_) => 2,
             Value::Bool(_) => 3,
@@ -786,6 +1090,14 @@ fn total_order(a: &Value, b: &Value) -> Ordering {
             }
             x.len().cmp(&y.len())
         }
+        // Maps: by their keys, then by the values of those keys (provisional).
+        (Value::Map(x), Value::Map(y)) => x.keys().cmp(y.keys()).then_with(|| {
+            x.values()
+                .zip(y.values())
+                .map(|(p, q)| null_last(p, q))
+                .find(|o| *o != Ordering::Equal)
+                .unwrap_or(Ordering::Equal)
+        }),
         (Value::Node(x), Value::Node(y)) => x.cmp(y),
         (Value::Edge(x), Value::Edge(y)) => x.cmp(y),
         _ => order(a, b).unwrap_or(Ordering::Equal),
@@ -821,6 +1133,14 @@ fn group_key<'a>(values: impl Iterator<Item = &'a Value>) -> String {
                 }
                 out.push_str("];");
             }
+            Value::Map(entries) => {
+                out.push('{');
+                for (key, value) in entries {
+                    out.push_str(&format!("{}:{key}", key.len()));
+                    push(value, out);
+                }
+                out.push_str("};");
+            }
             Value::Node(n) => out.push_str(&format!("N{};", n.0)),
             Value::Edge(e) => out.push_str(&format!("E{};", e.0)),
         }
@@ -853,6 +1173,25 @@ fn arithmetic(op: BinOp, l: Value, r: Value) -> Result<Value, QueryError> {
     if l.is_null() || r.is_null() {
         return Ok(Value::Null);
     }
+    // `+` with a list on either side: two lists joined, or a value put at the end or the start.
+    if op == BinOp::Add && (matches!(l, Value::List(_)) || matches!(r, Value::List(_))) {
+        // The result's weight: two lists joined have one list around their items, not two.
+        let joined = matches!(l, Value::List(_)) && matches!(r, Value::List(_));
+        let bytes = weight(&l) as u64 + weight(&r) as u64 - if joined { 16 } else { 0 };
+        functions::fits(bytes)?;
+        return Ok(Value::List(match (l, r) {
+            (Value::List(mut x), Value::List(y)) => {
+                x.extend(y);
+                x
+            }
+            (Value::List(mut x), y) => {
+                x.push(y);
+                x
+            }
+            (x, Value::List(y)) => std::iter::once(x).chain(y).collect(),
+            (x, y) => vec![x, y], // unreachable: one side is a list
+        }));
+    }
     match (&l, &r) {
         (Value::Int(x), Value::Int(y)) => {
             let (x, y) = (*x, *y);
@@ -879,6 +1218,7 @@ fn arithmetic(op: BinOp, l: Value, r: Value) -> Result<Value, QueryError> {
             })
         }
         (Value::String(x), Value::String(y)) if op == BinOp::Add => {
+            functions::fits(x.len() as u64 + y.len() as u64 + 16)?;
             Ok(Value::String(format!("{x}{y}")))
         }
         _ => Err(QueryError::runtime(format!(
@@ -903,7 +1243,8 @@ enum State {
         sum: f64,
         n: u64,
     },
-    Collect(Vec<Value>),
+    /// The values and their weight with the list around them.
+    Collect(Vec<Value>, u64),
 }
 
 struct Acc {
@@ -925,7 +1266,7 @@ impl Acc {
                 },
                 AggFunc::Min | AggFunc::Max => State::Extreme(None),
                 AggFunc::Avg => State::Avg { sum: 0.0, n: 0 },
-                AggFunc::Collect => State::Collect(Vec::new()),
+                AggFunc::Collect => State::Collect(Vec::new(), 16),
             },
             seen: distinct.then(HashSet::new),
         }
@@ -998,7 +1339,11 @@ impl Acc {
                     *best = Some(value);
                 }
             }
-            State::Collect(items) => items.push(value),
+            State::Collect(items, bytes) => {
+                *bytes = bytes.saturating_add(weight(&value) as u64);
+                functions::fits(*bytes)?;
+                items.push(value);
+            }
         }
         Ok(())
     }
@@ -1025,7 +1370,7 @@ impl Acc {
                 }
             }
             State::Extreme(best) => best.unwrap_or(Value::Null),
-            State::Collect(items) => Value::List(items),
+            State::Collect(items, _) => Value::List(items),
         }
     }
 }
@@ -1495,6 +1840,7 @@ mod tests {
             types: types.iter().map(|t| t.to_string()).collect(),
             props: vec![],
             to_bound: false,
+            rel_bound: false,
             to_label: None,
             to_props: vec![],
             distinct_from: vec![],

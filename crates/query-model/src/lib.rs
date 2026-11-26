@@ -12,13 +12,18 @@
 //! - An edge whose target is missing or names no node is not in the store: unresolved edges are excluded before a query
 //!   runs, and the graph itself is not changed.
 //! - The buses of a graph are not nodes of the source graph and are not seen.
-//! - A payload entry for an id the graph does not have is ignored and counted ([`ModelStore::ignored_payload`]); a payload
-//!   value that is a map is refused, because maps are not values of the query layer yet.
+//! - A payload entry for an id the graph does not have is ignored and counted ([`ModelStore::ignored_payload`]); an
+//!   integer beyond `i64` is refused.
+//! - A payload key named like a virtual property ([`VIRTUAL_KEYS`]) is refused by [`Payload::from_json`], on nodes and on
+//!   edges, as the engine's content refuses it.
 #![forbid(unsafe_code)]
 
 use arqlet_model::Graph;
 use arqlet_query::{Direction, EdgeId, EdgeRef, GraphStore, NodeId, Value};
 use std::collections::{BTreeMap, HashMap};
+
+/// The keys a query reads from the model itself; a payload may not use them.
+pub const VIRTUAL_KEYS: [&str; 5] = ["id", "kind", "label", "parentId", "weight"];
 
 /// The properties a host supplies beside the graph, by node id and by edge id (ADR 0021, M0; the table of ADR 0022).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -54,6 +59,11 @@ fn table(
             .ok_or_else(|| format!("payload {part} `{id}` must be an object of properties"))?;
         let mut map = BTreeMap::new();
         for (key, value) in props {
+            if VIRTUAL_KEYS.contains(&key.as_str()) {
+                return Err(format!(
+                    "payload {part} `{id}`: the key `{key}` is a property of the model itself; use another name"
+                ));
+            }
             map.insert(
                 key.clone(),
                 value_of(value)
@@ -97,7 +107,7 @@ impl PayloadSource for Payload {
     }
 }
 
-/// A JSON value as a query value. A map, and an integer beyond `i64`, are refused instead of being changed.
+/// A JSON value as a query value; an object is a map. An integer beyond `i64` is refused instead of being changed.
 pub fn value_of(json: &serde_json::Value) -> Result<Value, String> {
     use serde_json::Value as J;
     Ok(match json {
@@ -110,7 +120,12 @@ pub fn value_of(json: &serde_json::Value) -> Result<Value, String> {
         },
         J::String(s) => Value::String(s.clone()),
         J::Array(items) => Value::List(items.iter().map(value_of).collect::<Result<_, _>>()?),
-        J::Object(_) => return Err("a map is not a value of the query layer yet".into()),
+        J::Object(entries) => Value::Map(
+            entries
+                .iter()
+                .map(|(key, value)| Ok((key.clone(), value_of(value)?)))
+                .collect::<Result<_, String>>()?,
+        ),
     })
 }
 
@@ -263,5 +278,24 @@ impl GraphStore for ModelStore<'_> {
                 merged
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_payload_key_named_like_a_virtual_property_is_refused() {
+        for part in ["nodes", "edges"] {
+            for key in VIRTUAL_KEYS {
+                let json = serde_json::json!({part: {"x": {"loc": 1, key: "other"}}});
+                let error = Payload::from_json(&json).unwrap_err();
+                assert!(error.contains(&format!("`{key}`")), "{error}");
+            }
+        }
+        // Only these names: others, also in another case, are the host's.
+        let json = serde_json::json!({"nodes": {"x": {"Label": 1, "parent": 2}}});
+        assert!(Payload::from_json(&json).is_ok());
     }
 }

@@ -29,6 +29,16 @@ test('the notices name each crate with its license and carry the license texts',
   assert.match(text, /Permission is hereby granted/);
 });
 
+test('the query module (@arqlet/query) has its own list, with the parser, and no license file is missing', () => {
+  const query = collect('arqlet-query-wasm', 'wasm32-unknown-unknown');
+  const linked = query.map(c => c.name);
+  for (const expected of ['decypher', 'rowan', 'unicode-ident', 'serde_json']) {
+    assert.ok(linked.includes(expected), `${expected} is linked and must be listed`);
+  }
+  assert.ok(!linked.some(n => n.startsWith('arqlet')));
+  assert.deepEqual(query.filter(c => c.files.length === 0).map(c => `${c.name} ${c.version}`), []);
+});
+
 test('the notices are the same on every run', () => {
   assert.equal(notices('arqlet-wasm', 'wasm32-unknown-unknown'), notices('arqlet-wasm', 'wasm32-unknown-unknown'));
 });

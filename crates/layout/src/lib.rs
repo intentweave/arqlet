@@ -11,8 +11,10 @@ pub mod constructive;
 mod engine_choice;
 mod global;
 pub mod hierarchy_order;
+pub mod holding;
 mod id;
 mod labels;
+mod lanes;
 pub mod layered_plan;
 mod ports;
 mod range_tree;
@@ -414,6 +416,20 @@ fn compute_counted_unclocked(
     dirty: &BTreeSet<String>,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, SearchCounters), String> {
+    // Provisional (ADR 0022 M3b, `holdMemberships`): a complete layout tries to hold the soft groups; one that continues
+    // an earlier drawing starts from the held places.
+    if holding::applies(graph, options) {
+        if previous.is_none() || graph.nodes.iter().all(|n| dirty.contains(&n.id)) {
+            return holding::hold(graph, options);
+        }
+        let plain = LayoutOptions {
+            hold_memberships: false,
+            ..options.clone()
+        };
+        if let Some(previous) = previous {
+            return holding::resume(graph, previous, dirty, options, &plain);
+        }
+    }
     // Provisional (`hubRefs`): the edges of hubs are taken out of the layout and kept as references to draw as stubs.
     if let Some((view, refs)) = hub_refs(graph, options.hub_refs) {
         // Room between the ranks for the stubs and their names: out of a node on its right, into one on its left (as the
@@ -2618,6 +2634,7 @@ fn align_lanes(
     stacked: &BTreeMap<(id::Id, id::Id), f64>,
     // `pinsInSinglePass`: the places across the flow that pinned elements hold.
     held: &BTreeMap<id::Id, f64>,
+    header: f64,
 ) -> (f64, BTreeMap<usize, Vec<id::Id>>) {
     let across = |r: &Rect| {
         if vertical {
@@ -2692,7 +2709,7 @@ fn align_lanes(
             }
         }
     }
-    let low = if vertical { 24. } else { 48. };
+    let low = if vertical { 24. } else { header };
     // The sweeps work on indices: every element of the ranks and the chains, with its place across the flow (when it is
     // placed) and its size; the places go back to `placed` after the sweeps.
     let mut slot: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
@@ -3042,6 +3059,112 @@ fn straighten_chains(
         .fold(0., f64::max)
 }
 
+/// `align_lanes`, or with bands (ADR 0022 M4a) each band aligned on its own and stacked behind the one before: an alignment
+/// across bands would pull a band's ranks apart along its edges into the others, and the separation would add that up.
+#[allow(clippy::too_many_arguments)]
+fn align_banded(
+    placed: &mut BTreeMap<String, Rect>,
+    levels: &BTreeMap<usize, Vec<id::Id>>,
+    (chains, link_edges, lanes): (
+        &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+        &BTreeMap<(id::Id, id::Id), Vec<id::Id>>,
+        &BTreeMap<(id::Id, id::Id), f64>,
+    ),
+    vertical: bool,
+    spacing: (f64, f64),
+    blocks: bool,
+    room: &BTreeMap<id::Id, (f64, f64)>,
+    shared: bool,
+    stacked: &BTreeMap<(id::Id, id::Id), f64>,
+    held: &BTreeMap<id::Id, f64>,
+    header: f64,
+    bands: Option<&BTreeMap<String, usize>>,
+) -> (f64, BTreeMap<usize, Vec<id::Id>>) {
+    let Some(bands) = bands else {
+        return align_lanes(
+            placed,
+            levels,
+            (chains, link_edges, lanes),
+            vertical,
+            spacing,
+            blocks,
+            room,
+            shared,
+            stacked,
+            held,
+            header,
+        );
+    };
+    let order: BTreeSet<usize> = bands.values().copied().collect();
+    for band in order {
+        let inside = |id: &id::Id| bands.get(id.as_str()) == Some(&band);
+        let part: BTreeMap<usize, Vec<id::Id>> = levels
+            .iter()
+            .map(|(r, ids)| (*r, ids.iter().filter(|id| inside(id)).cloned().collect()))
+            .collect();
+        let own: BTreeMap<(id::Id, id::Id), Vec<id::Id>> = chains
+            .iter()
+            .filter(|((a, b), dummies)| inside(a) && inside(b) && dummies.iter().all(inside))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        // The band starts where a rank starts, not where the bands before it would push it.
+        let first = part
+            .values()
+            .flatten()
+            .filter_map(|id| placed.get(id.as_str()))
+            .map(|r| if vertical { r.x } else { r.y })
+            .fold(f64::MAX, f64::min);
+        for ids in part.values() {
+            let start = ids.first().and_then(|id| placed.get(id.as_str())).map(|r| {
+                if vertical {
+                    r.x
+                } else {
+                    r.y
+                }
+            });
+            let Some(by) = start.map(|s| s - first) else {
+                continue;
+            };
+            for id in ids {
+                if let Some(r) = placed.get_mut(id.as_str()) {
+                    if vertical {
+                        r.x -= by;
+                    } else {
+                        r.y -= by;
+                    }
+                }
+            }
+        }
+        align_lanes(
+            placed,
+            &part,
+            (&own, link_edges, lanes),
+            vertical,
+            spacing,
+            blocks,
+            room,
+            shared,
+            stacked,
+            held,
+            header,
+        );
+    }
+    (
+        crate::lanes::separate(placed, bands, vertical),
+        BTreeMap::new(),
+    )
+}
+
+/// Where the children of an area start below its upper border: below the title row, which a container that only holds a
+/// membership group during the layout does not have (ADR 0022 M3b).
+fn header_of(area: Option<&str>) -> f64 {
+    if area.is_some_and(holding::is_holding) {
+        24.
+    } else {
+        48.
+    }
+}
+
 fn slide_free(
     placed: &mut BTreeMap<String, Rect>,
     levels: &BTreeMap<usize, Vec<String>>,
@@ -3049,6 +3172,7 @@ fn slide_free(
     vertical: bool,
     gap: f64,
     extent: f64,
+    header: f64,
 ) {
     let cross = |r: &Rect| {
         if vertical {
@@ -3057,7 +3181,7 @@ fn slide_free(
             (r.y, r.height)
         }
     };
-    let low = if vertical { 24. } else { 48. };
+    let low = if vertical { 24. } else { header };
     for _ in 0..3 {
         for ids in levels.values() {
             for (index, id) in ids.iter().enumerate() {
@@ -5771,6 +5895,8 @@ fn placed_snapshot(
             .iter()
             .map(|(area, plan)| (area.clone(), plan.to_stored()))
             .collect(),
+        held_groups: Vec::new(),
+        holding: None,
         options: options.clone(),
         source_graph: None,
         collapsed_ids: vec![],
@@ -6929,9 +7055,17 @@ fn place(
                 }
             }
         }
+        // Provisional (ADR 0022 M4a): the lanes of the top level are blocks of every rank, dummies included.
+        let in_lanes =
+            parent.is_none() && layered && flattening.is_empty() && crate::lanes::applies(options);
+        if in_lanes {
+            component_of = crate::lanes::of_nodes(graph, options);
+            crate::lanes::extend(&mut component_of, &chains);
+        }
         if options.component_packing
             || options.isolated_grid_in(parent)
             || (options.pack_components.is_some() && layered)
+            || in_lanes
         {
             for ids in levels.values_mut() {
                 ids.sort_by_key(|id| component_of.get(id).copied().unwrap_or(0));
@@ -7220,6 +7354,11 @@ fn place(
                     reversed: o.reversed(),
                     ranks: id::rank_strings(levels.values()),
                     chains: id::chain_strings(&chains),
+                    lanes: if parent.is_none() && crate::lanes::applies(options) {
+                        component_of.clone()
+                    } else {
+                        BTreeMap::new()
+                    },
                     reversed_links: id::pair_strings(&reversed_links),
                     borders,
                     sides: sides.clone(),
@@ -7433,7 +7572,8 @@ fn place(
                     .sum::<f64>()
         };
         let max_cross = levels.values().map(cross_total).fold(0., f64::max);
-        let mut primary = snap(if vertical { 48. } else { 24. }, grid);
+        let header = header_of(parent);
+        let mut primary = snap(if vertical { header } else { 24. }, grid);
         let mut cross_extent: f64 = snap(if vertical { 48. } else { 90. }, grid);
         let mut placed = BTreeMap::new();
         let level_list: Vec<&Vec<id::Id>> = levels.values().collect();
@@ -7448,7 +7588,7 @@ fn place(
                     }
                 })
                 .fold(0., f64::max);
-            let mut cross = snap(if vertical { 24. } else { 48. }, grid);
+            let mut cross = snap(if vertical { 24. } else { header }, grid);
             if optimize >= 3 {
                 cross = snap(cross + (max_cross - cross_total(ids)) / 2., grid);
             }
@@ -7572,6 +7712,7 @@ fn place(
                 vertical,
                 cross_gap,
                 cross_extent,
+                header,
             );
         }
         let mut physical_track_counts = Vec::new();
@@ -7808,6 +7949,8 @@ fn place(
                     Some((id::Id::from(&c.id), if vertical { at.x } else { at.y }))
                 })
                 .collect();
+            let bands = (parent.is_none() && crate::lanes::applies(options) && !global)
+                .then(|| component_of.clone());
             let planned_tracks = if reuse_cross {
                 let lanes = lanes.as_ref().expect("hierarchical lane planning");
                 let input = placement_geometry::Input {
@@ -7836,6 +7979,7 @@ fn place(
                                 vertical,
                                 cross_gap,
                                 cross_extent,
+                                header,
                             );
                         }
                         let slots = chain_slots(
@@ -7847,7 +7991,7 @@ fn place(
                         );
                         let mut lanes = lanes.clone();
                         lanes.extend(slots.clone());
-                        let (reach, reordered) = align_lanes(
+                        let (reach, reordered) = align_banded(
                             &mut placed,
                             &levels,
                             (&chains, &link_edges, &lanes),
@@ -7858,6 +8002,8 @@ fn place(
                             options.shared_border_ranks,
                             &stacked,
                             &held,
+                            header,
+                            bands.as_ref(),
                         );
                         placement_geometry::CrossPlan {
                             tracks: channel_tracks_by_edges(
@@ -7901,7 +8047,7 @@ fn place(
             if !global && !reuse_cross {
                 match &lanes {
                     Some(lanes) => {
-                        let (reach, reordered) = align_lanes(
+                        let (reach, reordered) = align_banded(
                             &mut placed,
                             &levels,
                             (&chains, &link_edges, lanes),
@@ -7912,6 +8058,8 @@ fn place(
                             options.shared_border_ranks,
                             &stacked,
                             &held,
+                            header,
+                            bands.as_ref(),
                         );
                         *border_orders.borrow_mut() = reordered;
                         cross_extent = cross_extent.max(reach + cross_gap);
@@ -7924,6 +8072,7 @@ fn place(
                             vertical,
                             cross_gap,
                             cross_extent,
+                            header,
                         );
                         // The dummies of every long edge on one line: a bend costs more than the room it saves (the
                         // objectives rank bends before length).
@@ -8411,6 +8560,11 @@ fn place(
                     reversed: o.reversed(),
                     ranks: id::rank_strings(levels.values()),
                     chains: id::chain_strings(&chains),
+                    lanes: if parent.is_none() && crate::lanes::applies(options) {
+                        component_of.clone()
+                    } else {
+                        BTreeMap::new()
+                    },
                     reversed_links: id::pair_strings(&reversed_links),
                     borders,
                     sides: sides.clone(),

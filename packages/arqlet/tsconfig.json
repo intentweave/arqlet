@@ -12,6 +12,7 @@
   "include": [
     "index.d.ts",
     "../engine-client/*.d.ts",
-    "../viewer/*.d.ts"
+    "../viewer/*.d.ts",
+    "../query/index.d.ts"
   ]
 }

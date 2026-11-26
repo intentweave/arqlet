@@ -186,6 +186,12 @@ console.log('Split mode passed: initial auto, collapse/expand, LR/TB/hybrid and 
   assert.ok(row&&!row.disabled,`the row names the node: ${answer.children.map(c=>c.textContent).join(' | ')}`);
   await row.onclick();await settle();
   assert.equal(runInNewContext('selected',context),leaf,'a click on the row focuses the node');
+  // A map in a row is shown by its entries, with the node's label, and the row still focuses the node it holds.
+  get('query-text').value=`MATCH (n) WHERE n.id = ${JSON.stringify(leaf).replace(/"/g,"'")} RETURN {who: n, all: [n]} AS m`;
+  await get('query-run').onclick();await settle();
+  const mapped=get('query-results').children.find(b=>b.textContent.startsWith('{'));
+  assert.ok(mapped&&!mapped.disabled,`the map row: ${get('query-results').children.map(c=>c.textContent).join(' | ')}`);
+  assert.equal(mapped.textContent,`{all: [${label}], who: ${label}}`);
   get('query-text').value='MATCH (n RETURN n';await get('query-run').onclick();await settle();
   assert.match(get('query-results').textContent,/^Not run: query syntax/,get('query-results').textContent);
   console.log('Query passed: a node found by id, its box selected and focused; a syntax error reported.');
@@ -356,6 +362,26 @@ if(exampleIndex.some(e=>e.name==='memberships')){
   get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
   assert.equal(latest.graph.nodes.find(n=>n.id==='gateway').parentId,'front','back to the containment');
   assert.equal(latest.options?.groupingPriority,undefined);
+
+  // As lanes (ADR 0022 M4): the first structure as bands; the scene draws one band per group of the dimension shown.
+  get('grouping-first').value='team';get('grouping-first').onchange();await flush();
+  assert.equal(get('grouping-lanes').disabled,false);
+  get('grouping-lanes').checked=true;get('grouping-lanes').onchange();await flush();
+  assert.equal(latest.options.groupingPriority[0].as,'lanes');
+  assert.ok(!latest.graph.nodes.some(n=>n.id.startsWith('membership:')),'a lane is no container');
+  const banded=sceneOf(engine,latest);
+  assert.ok(banded.membershipLanes?.length>1,'the bands are drawn');
+  get('grouping-lanes').checked=false;get('grouping-lanes').onchange();await flush();
+  assert.equal(latest.options.groupingPriority[0].as,undefined);
+  get('grouping-first').value='parent';get('grouping-first').onchange();await flush();
+  assert.equal(get('grouping-lanes').disabled,true,'the containment is no lane');
+
+  // Hold groups together (ADR 0022 M3b): an option like any other, carried by the snapshot and shown again.
+  get('membership-hold').checked=true;get('membership-hold').onchange();await flush();
+  assert.equal(latest.options.holdMemberships,true);
+  assert.equal(get('membership-hold').checked,true,'the control shows the option');
+  get('membership-hold').checked=false;get('membership-hold').onchange();await flush();
+  assert.equal(latest.options?.holdMemberships,undefined,'off is omitted');
 
   // Only some groups (ADR 0022 §2, consider; a multiple select): held softly they are the only hulls; first, the only
   // boxes of their dimension.

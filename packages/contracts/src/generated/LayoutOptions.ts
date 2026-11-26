@@ -168,6 +168,12 @@ groupingPriority?: Array<GroupingCriterion>,
  */
 membershipHull?: HullShape,
 /**
+ * Provisional (ADR 0022 M3b): hold the soft membership groups whose shown members have one container in the view
+ * together there, each where the cost in crossings and bends stays in a budget that halves with the rank. The held
+ * group is drawn as its hull; its members keep their container. Off by default (omitted).
+ */
+holdMemberships?: boolean,
+/**
  * Provisional, computed by the layout with `hubRefs`: the room the references' stubs and names take between two ranks
  * (added to the layer spacing), kept with the snapshot so that every later operation spaces alike. 0 (omitted): none.
  */

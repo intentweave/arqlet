@@ -120,9 +120,16 @@ pub fn validate_geometry(
         ancestors.insert(n.id.as_str(), chain);
         if let Some(parent) = &n.parent_id {
             let container = &boxes[parent];
+            // A container that holds a membership group during the layout (ADR 0022 M3b) has no title row, and never
+            // leaves the layout.
+            let header = if parent.starts_with(arqlet_model::HOLDING_PREFIX) {
+                rules.padding
+            } else {
+                rules.header
+            };
             // A circle container holds its children inside its disc (less the padding), below the header.
             let outside = if nodes[parent.as_str()].shape == arqlet_model::NodeShape::Circle {
-                r.y < rules.header - 1e-6
+                r.y < header - 1e-6
                     || arqlet_model::outline::Outline::of(n.shape, r).overshoot_beyond_disc(
                         container.width / 2.,
                         container.height / 2.,
@@ -130,7 +137,7 @@ pub fn validate_geometry(
                     ) > 1e-6
             } else {
                 r.x < rules.padding - 1e-6
-                    || r.y < rules.header - 1e-6
+                    || r.y < header - 1e-6
                     || r.x + r.width > container.width - rules.padding + 1e-6
                     || r.y + r.height > container.height - rules.padding + 1e-6
             };

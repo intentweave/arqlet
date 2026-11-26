@@ -206,7 +206,7 @@ mod tests {
         );
         // A payload that is refused is refused the same way, and keeps what was loaded.
         let bad =
-            json!({"op": "load", "graph": graph(), "payload": {"nodes": {"a": {"m": {"k": 1}}}}});
+            json!({"op": "load", "graph": graph(), "payload": {"nodes": {"a": {"label": "x"}}}});
         let (x, y) = (ask(&mut one_pass, bad.clone()), ask(&mut general, bad));
         assert_eq!(x["ok"], false);
         assert_eq!(x, y);

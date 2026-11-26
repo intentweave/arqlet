@@ -54,12 +54,16 @@ mod geometry_update;
 mod graph_patch;
 #[path = "graph_roundtrip.rs"]
 mod graph_roundtrip;
+#[path = "holding.rs"]
+mod holding;
 #[path = "import_limit.rs"]
 mod import_limit;
 #[path = "interactive_continuation.rs"]
 mod interactive_continuation;
 #[path = "isolated_grid_from.rs"]
 mod isolated_grid_from;
+#[path = "lanes.rs"]
+mod lanes;
 #[path = "layered_construction.rs"]
 mod layered_construction;
 #[path = "level_budget.rs"]

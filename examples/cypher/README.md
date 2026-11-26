@@ -50,14 +50,16 @@ issues #132 to #134); the syntax-tree guard must reject them.
 `corpus.tsv` columns: `parse` is what a parser must do (`ok` or `err`); `verdict` is what the layer must do under ADR
 0021, item 5 (`supported`, `later`, `rejected`, `open`, `invalid`, as above). The verdict is this fixture's reading of the
 ADR; where the ADR does not say, it is `open`: path variables, pattern comprehensions and predicates, quantifier
-predicates, map projections, multi-label patterns, label expressions and the function table. Change a verdict in review if
+predicates, map projections, multi-label patterns and label expressions (the first function table is in the ADR,
+section *The function table and UNION*). Change a verdict in review if
 the ADR is clarified.
 
 ## How the expected values were checked
 
 The oracle was cross-checked on 2026-11-21 (and again after `spike-11` moved to `later` and `spike-20` was added) against
 Grafeo 0.6.2 running the same queries on a store built from the same graph and payload files (a throw-away checker, not
-part of this repository): all 40 `supported` cases and the four `later` or `open` cases with rows agreed. Changing two
+part of this repository): all 40 `supported` cases there were then and the four `later` or `open` cases with rows agreed. The cases `fn-*`,
+`union-*` and `expr-*` (2026-11-25) have not been compared with Grafeo: their expectations are the oracle's alone. Changing two
 expected values by hand made the checker fail, so the comparison is not vacuous. This is evidence that the oracle and an independent engine read these queries alike. It is not the openCypher
 TCK, and it covers only these queries on these graphs.
 

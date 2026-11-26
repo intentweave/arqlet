@@ -2510,7 +2510,8 @@ fn refine_logged(
     }
     validate_requirements(snapshot)?;
     validate(&snapshot.graph)?;
-    if snapshot.options.abstract_routing {
+    // The owner of a held membership group has no plan (ADR 0022 M3b); such a drawing is kept as it is below.
+    if snapshot.options.abstract_routing && snapshot.held_groups.is_empty() {
         arqlet_layout::constructive::abstract_realization::completion::check_capability(snapshot)?;
     }
     if snapshot
@@ -2542,6 +2543,13 @@ fn refine_logged(
     candidate.geometry_issues = current_issues;
     candidate.recomputed_containers.clear();
     let mut strategy = "keep-existing".to_string();
+    // A drawing that holds membership groups (ADR 0022 M3b) keeps them: a candidate is laid out without holding, and the
+    // quality criteria would prefer it. Until candidates hold too, such a drawing is not refined.
+    let work = if snapshot.held_groups.is_empty() {
+        work
+    } else {
+        Some(0)
+    };
     // Ordering strategies plus routing-only; each job depends only on the input snapshot.
     let (planned, excluded) = plan_first_stage(snapshot);
     let (jobs, mut work_limited) = allocate_first_stage(planned, work);
@@ -4696,6 +4704,8 @@ mod tests {
             hub_refs: Vec::new(),
             gesture: None,
             layered_plans: Default::default(),
+            held_groups: Vec::new(),
+            holding: None,
         }
     }
 

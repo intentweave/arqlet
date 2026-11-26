@@ -9,17 +9,18 @@
 //! refusal.
 
 use arqlet_query::plan::{
-    AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Op, Plan, SortKey,
+    AggFunc, Aggregate, BinOp, CmpOp, Column, Expand, Expr, Function, Op, Plan, SortKey,
 };
 use arqlet_query::Direction;
 use arqlet_query::{QueryError, Value};
 use decypher::hir::arena::ExprId;
-use decypher::hir::arena::HirArenas;
+use decypher::hir::arena::{BindingId, HirArenas};
 use decypher::hir::expr::{BinaryOp, ComparisonOperator, ExprKind, Literal, UnaryOp};
-use decypher::hir::ops::{AggregateItem, Operation, SortDirection};
+use decypher::hir::ops::{AggregateItem, Operation, SortDirection, UnionOp};
 use decypher::hir::pattern::{
     GraphPattern, LabelExpr, NodePattern, RelationshipDirection, RelationshipLength,
 };
+use decypher::hir::HirQuery;
 use decypher::syntax::{SyntaxKind as K, SyntaxNode};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -28,6 +29,59 @@ pub fn lower(query: &str) -> Result<Plan, QueryError> {
     crate::check(query)?;
     let hir = decypher::analyze(query).map_err(|e| QueryError::syntax(e.to_string()))?;
     let tree = decypher::parse_cst(query).tree;
+    // The `RETURN` clauses in the order written: one for each part of a `UNION`, the last one for any other query.
+    let returns: Vec<SyntaxNode> = tree
+        .descendants()
+        .filter(|n| n.kind() == K::RETURN_CLAUSE)
+        .collect();
+    if let [part] = hir.parts.as_slice() {
+        if let [Operation::Union(u)] = part.operations.as_slice() {
+            return union(u, &returns);
+        }
+    }
+    single(&hir, returns.last())
+}
+
+/// `UNION [ALL]`: every branch is a query of its own, with its own variables.
+fn union(u: &UnionOp, returns: &[SyntaxNode]) -> Result<Plan, QueryError> {
+    if u.branches.len() != returns.len() {
+        return Err(QueryError::unsupported(
+            "cannot match the parts of this UNION to their RETURN clauses",
+        ));
+    }
+    let branches = u
+        .branches
+        .iter()
+        .zip(returns)
+        .map(|(query, clause)| single(query, Some(clause)))
+        .collect::<Result<Vec<Plan>, _>>()?;
+    let names = |p: &Plan| p.columns.iter().map(|c| c.name.clone()).collect::<Vec<_>>();
+    let Some(first) = branches.first().map(names) else {
+        return Err(QueryError::unsupported("a UNION without parts"));
+    };
+    // decypher refuses different names; the same names in another order it accepts, and rows are matched by position.
+    if branches.iter().any(|b| names(b) != first) {
+        return Err(QueryError::unsupported(
+            "the parts of a UNION must return the same columns in the same order",
+        ));
+    }
+    let columns: Vec<Column> = first
+        .into_iter()
+        .enumerate()
+        .map(|(slot, name)| Column { name, slot })
+        .collect();
+    Ok(Plan {
+        slots: columns.len(),
+        ops: vec![Op::Union {
+            branches,
+            distinct: u.distinct,
+        }],
+        columns,
+    })
+}
+
+/// A query without `UNION`, with the `RETURN` clause that names its columns.
+fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryError> {
     let slots = hir.arenas.bindings.iter().count();
     let mut lowering = Lowering {
         arenas: &hir.arenas,
@@ -35,6 +89,7 @@ pub fn lower(query: &str) -> Result<Plan, QueryError> {
         bound: BTreeSet::new(),
         ops: Vec::new(),
         aliases: BTreeMap::new(),
+        grouped: Vec::new(),
         distinct_return: false,
     };
     for part in &hir.parts {
@@ -43,16 +98,162 @@ pub fn lower(query: &str) -> Result<Plan, QueryError> {
             lowering.op(op)?;
         }
     }
-    let columns = lowering.columns(&tree)?;
+    let columns = lowering.columns(returning)?;
     if lowering.distinct_return {
         let slots = columns.iter().map(|c| c.slot).collect();
         lowering.ops.push(Op::Distinct(slots));
     }
-    Ok(Plan {
+    let plan = Plan {
         slots: lowering.next_slot,
         ops: lowering.ops,
         columns,
-    })
+    };
+    available(&plan, &hir.arenas)?;
+    Ok(plan)
+}
+
+/// Refuses a plan in which an expression reads a variable that holds nothing at that point: it would read null and answer
+/// something the query does not say. After an aggregation only the grouping keys and the aggregates are there.
+fn available(plan: &Plan, arenas: &HirArenas) -> Result<(), QueryError> {
+    let mut there = BTreeSet::new();
+    check_ops(&plan.ops, &mut there, arenas)?;
+    for column in &plan.columns {
+        read(column.slot, &there, arenas)?;
+    }
+    Ok(())
+}
+
+fn read(slot: usize, there: &BTreeSet<usize>, arenas: &HirArenas) -> Result<(), QueryError> {
+    if there.contains(&slot) {
+        return Ok(());
+    }
+    let name = arenas
+        .bindings
+        .iter()
+        .find(|(id, _)| id.0 == slot)
+        .map_or("?", |(_, b)| b.name.as_str());
+    Err(QueryError::unsupported(format!(
+        "the variable `{name}` has no value here: a pattern cannot read a variable it binds itself, and after an \
+         aggregation only the grouping keys and the aggregates are there (name what is needed in a WITH first)"
+    )))
+}
+
+fn check_expr(expr: &Expr, there: &BTreeSet<usize>, arenas: &HirArenas) -> Result<(), QueryError> {
+    if let Expr::Slot(slot) = expr {
+        return read(*slot, there, arenas);
+    }
+    // The variable of a comprehension is there inside its filter and its map, not in its list.
+    if let Expr::Comprehension {
+        slot,
+        list,
+        filter,
+        map,
+    } = expr
+    {
+        check_expr(list, there, arenas)?;
+        let mut inside = there.clone();
+        inside.insert(*slot);
+        for e in [filter, map].into_iter().flatten() {
+            check_expr(e, &inside, arenas)?;
+        }
+        return Ok(());
+    }
+    let mut result = Ok(());
+    expr.clone().for_each_child_mut(&mut |child| {
+        if result.is_ok() {
+            result = check_expr(child, there, arenas);
+        }
+    });
+    result
+}
+
+fn check_ops(
+    ops: &[Op],
+    there: &mut BTreeSet<usize>,
+    arenas: &HirArenas,
+) -> Result<(), QueryError> {
+    for op in ops {
+        match op {
+            Op::ScanNodes { slot, props, .. } => {
+                for (_, e) in props {
+                    check_expr(e, there, arenas)?;
+                }
+                there.insert(*slot);
+            }
+            Op::CheckNode { slot, props, .. } => {
+                read(*slot, there, arenas)?;
+                for (_, e) in props {
+                    check_expr(e, there, arenas)?;
+                }
+            }
+            Op::Expand(x) => {
+                read(x.from, there, arenas)?;
+                if x.to_bound {
+                    read(x.to, there, arenas)?;
+                }
+                if x.rel_bound {
+                    read(x.rel, there, arenas)?;
+                }
+                for (_, e) in x.props.iter().chain(&x.to_props) {
+                    check_expr(e, there, arenas)?;
+                }
+                there.insert(x.rel);
+                there.insert(x.to);
+            }
+            Op::Optional(inner) => check_ops(inner, there, arenas)?,
+            Op::Filter(e) => check_expr(e, there, arenas)?,
+            Op::Unwind { expr, slot } => {
+                check_expr(expr, there, arenas)?;
+                there.insert(*slot);
+            }
+            Op::Project { items, .. } => {
+                for (e, _) in items {
+                    check_expr(e, there, arenas)?;
+                }
+                there.extend(items.iter().map(|(_, slot)| *slot));
+            }
+            Op::Aggregate { keys, aggregates } => {
+                for (e, _) in keys {
+                    check_expr(e, there, arenas)?;
+                }
+                for e in aggregates.iter().filter_map(|a| a.arg.as_ref()) {
+                    check_expr(e, there, arenas)?;
+                }
+                *there = keys
+                    .iter()
+                    .map(|(_, slot)| *slot)
+                    .chain(aggregates.iter().map(|a| a.slot))
+                    .collect();
+            }
+            Op::Distinct(slots) => {
+                for slot in slots {
+                    read(*slot, there, arenas)?;
+                }
+            }
+            Op::Sort(keys) => {
+                for key in keys {
+                    check_expr(&key.expr, there, arenas)?;
+                }
+            }
+            Op::Skip(e) | Op::Limit(e) => check_expr(e, &BTreeSet::new(), arenas)?,
+            // Each branch is a plan of its own, checked when it was lowered.
+            Op::Union { .. } => {}
+        }
+    }
+    Ok(())
+}
+
+/// Replaces every part of `expr` that is a grouping expression by the slot that holds its value after the aggregation.
+/// The HIR does this in some places only (not inside a list or a function call).
+fn regroup(mut expr: Expr, grouped: &[(Expr, usize)]) -> Expr {
+    if let Some((_, slot)) = grouped.iter().find(|(key, _)| *key == expr) {
+        return Expr::Slot(*slot);
+    }
+    expr.for_each_child_mut(&mut |child| {
+        let taken = std::mem::replace(child, Expr::Literal(Value::Null));
+        *child = regroup(taken, grouped);
+    });
+    expr
 }
 
 struct Lowering<'a> {
@@ -64,16 +265,14 @@ struct Lowering<'a> {
     ops: Vec<Op>,
     /// The aliases of the current part's projections: name to slot, for the columns.
     aliases: BTreeMap<String, usize>,
+    /// The grouping expressions of the last aggregation, as they read before it, with the slot of each.
+    grouped: Vec<(Expr, usize)>,
     /// `RETURN DISTINCT`: the HIR keeps the flag on the Return operation, not on the projection.
     distinct_return: bool,
 }
 
 /// The label and the `{key: value}` constraints of a node pattern.
 type Constraints = (Option<String>, Vec<(String, Expr)>);
-
-fn not_yet(what: &str, stage: &str) -> QueryError {
-    QueryError::unsupported(format!("{what} is not built yet ({stage} of ADR 0021)"))
-}
 
 impl Lowering<'_> {
     fn op(&mut self, op: &Operation) -> Result<(), QueryError> {
@@ -112,7 +311,7 @@ impl Lowering<'_> {
                 Ok(())
             }
             Operation::Filter(f) => {
-                let e = self.expr(f.predicate)?;
+                let e = self.after(f.predicate)?;
                 self.ops.push(Op::Filter(e));
                 Ok(())
             }
@@ -127,7 +326,7 @@ impl Lowering<'_> {
                 let mut items = Vec::new();
                 for item in &p.items {
                     let slot = item.alias.0;
-                    items.push((self.expr(item.expression)?, slot));
+                    items.push((self.after(item.expression)?, slot));
                     self.bound.insert(slot);
                     self.aliases
                         .insert(self.arenas.bindings.get(item.alias).name.clone(), slot);
@@ -168,6 +367,7 @@ impl Lowering<'_> {
                         item.alias.0,
                     );
                 }
+                self.grouped = keys.clone();
                 self.ops.push(Op::Aggregate { keys, aggregates });
                 Ok(())
             }
@@ -175,7 +375,7 @@ impl Lowering<'_> {
                 let mut keys = Vec::new();
                 for item in &s.items {
                     keys.push(SortKey {
-                        expr: self.expr(item.expression)?,
+                        expr: self.after(item.expression)?,
                         descending: matches!(item.direction, SortDirection::Descending),
                     });
                 }
@@ -196,7 +396,9 @@ impl Lowering<'_> {
                 self.distinct_return = r.distinct;
                 Ok(())
             }
-            Operation::Union(_) => Err(not_yet("UNION", "stage M4")),
+            Operation::Union(_) => Err(QueryError::unsupported(
+                "a UNION inside a query is not supported",
+            )),
             other => Err(QueryError::unsupported(format!(
                 "the operation {} is not supported",
                 format!("{other:?}")
@@ -205,6 +407,43 @@ impl Lowering<'_> {
                     .unwrap_or("?")
             ))),
         }
+    }
+
+    /// An expression of a clause that may follow an aggregation.
+    fn after(&self, id: ExprId) -> Result<Expr, QueryError> {
+        Ok(regroup(self.expr(id)?, &self.grouped))
+    }
+
+    /// Refuses a comprehension variable that is named like a variable outside it. After a projection the HIR replaces
+    /// text that reads like a projected item by that item's column, also inside a comprehension whose own variable the
+    /// text means, and the query would answer from the column. Comprehensions may share a name among themselves.
+    fn own_name(&self, variable: BindingId) -> Result<(), QueryError> {
+        let name = &self.arenas.bindings.get(variable).name;
+        let comprehensions: BTreeSet<usize> = self
+            .arenas
+            .expressions
+            .iter()
+            .filter_map(|(_, e)| match &e.kind {
+                ExprKind::ListComprehension(c) => Some(c.variable.0),
+                _ => None,
+            })
+            .collect();
+        let taken = self
+            .arenas
+            .bindings
+            .iter()
+            .any(|(id, b)| b.name == *name && !comprehensions.contains(&id.0));
+        if taken {
+            return Err(QueryError::unsupported(format!(
+                "the comprehension variable `{name}` has the name of a variable outside it, which the parser can \
+                 mistake for it; give it another name"
+            )));
+        }
+        Ok(())
+    }
+
+    fn optional(&self, id: Option<ExprId>) -> Result<Option<Box<Expr>>, QueryError> {
+        id.map(|id| self.expr(id).map(Box::new)).transpose()
     }
 
     fn fresh(&mut self) -> usize {
@@ -272,8 +511,21 @@ impl Lowering<'_> {
         let was_bound: Vec<bool> = node_slots.iter().map(|s| self.bound.contains(s)).collect();
         let mut touched = vec![false; pattern.nodes.len()];
         let mut rel_slots: Vec<usize> = Vec::new();
+        // A node no relationship reaches is taken where it is written, before the relationships written after it, so
+        // that their properties can read it.
+        let mut alone = vec![true; pattern.nodes.len()];
+        for rel in &pattern.relationships {
+            alone[rel.left] = false;
+            alone[rel.right] = false;
+        }
 
         for rel in &pattern.relationships {
+            for i in 0..rel.left.min(rel.right) {
+                if alone[i] && !touched[i] {
+                    self.node(&pattern.nodes[i], node_slots[i])?;
+                    touched[i] = true;
+                }
+            }
             if rel.type_expression.is_some() {
                 return Err(QueryError::unsupported(
                     "a relationship type expression is undecided (ADR 0021, open)",
@@ -326,6 +578,7 @@ impl Lowering<'_> {
                 None => self.fresh(),
             };
             let to_bound = self.bound.contains(&node_slots[to]);
+            let rel_bound = self.bound.contains(&rel_slot);
             self.ops.push(Op::Expand(Expand {
                 from: node_slots[from],
                 rel: rel_slot,
@@ -334,6 +587,7 @@ impl Lowering<'_> {
                 types,
                 props: self.props(rel.properties)?,
                 to_bound,
+                rel_bound,
                 to_label,
                 to_props,
                 distinct_from: rel_slots.clone(),
@@ -346,16 +600,20 @@ impl Lowering<'_> {
         }
 
         for (i, node) in pattern.nodes.iter().enumerate() {
-            if touched[i] {
-                continue;
-            }
-            if self.bound.contains(&node_slots[i]) {
-                self.check(node, node_slots[i])?;
-            } else {
-                self.start(node, node_slots[i])?;
+            if !touched[i] {
+                self.node(node, node_slots[i])?;
             }
         }
         Ok(())
+    }
+
+    /// A node of a pattern on its own: checked when its variable is bound, else scanned.
+    fn node(&mut self, node: &NodePattern, slot: usize) -> Result<(), QueryError> {
+        if self.bound.contains(&slot) {
+            self.check(node, slot)
+        } else {
+            self.start(node, slot)
+        }
     }
 
     fn start(&mut self, node: &NodePattern, slot: usize) -> Result<(), QueryError> {
@@ -469,6 +727,45 @@ impl Lowering<'_> {
                 }
                 Expr::Compare(Box::new(self.expr(*left)?), chain)
             }
+            ExprKind::FunctionCall {
+                function,
+                args,
+                distinct,
+            } => self.call(
+                self.arenas.functions.name_of(*function).unwrap_or(""),
+                args,
+                *distinct,
+            )?,
+            ExprKind::Map(entries) => {
+                let mut out: Vec<(String, Expr)> = Vec::new();
+                for (key, value) in entries {
+                    let key = self.arenas.property_keys.name_of(*key).unwrap_or("");
+                    if out.iter().any(|(k, _)| k == key) {
+                        return Err(QueryError::unsupported(format!(
+                            "a map with the key `{key}` twice is not decided (ADR 0021)"
+                        )));
+                    }
+                    out.push((key.to_string(), self.expr(*value)?));
+                }
+                Expr::Map(out)
+            }
+            ExprKind::ListIndex { list, index } => {
+                Expr::Index(Box::new(self.expr(*list)?), Box::new(self.expr(*index)?))
+            }
+            ExprKind::ListSlice { list, start, end } => Expr::Slice(
+                Box::new(self.expr(*list)?),
+                self.optional(*start)?,
+                self.optional(*end)?,
+            ),
+            ExprKind::ListComprehension(c) => {
+                self.own_name(c.variable)?;
+                Expr::Comprehension {
+                    slot: c.variable.0,
+                    list: Box::new(self.expr(c.collection)?),
+                    filter: self.optional(c.filter)?,
+                    map: self.optional(c.map)?,
+                }
+            }
             ExprKind::IsNull { operand, negated } => {
                 Expr::IsNull(Box::new(self.expr(*operand)?), *negated)
             }
@@ -560,9 +857,47 @@ impl Lowering<'_> {
         })
     }
 
-    /// The columns of the answer, in the order the last `RETURN` writes them, matched to the aliases of the last part.
-    fn columns(&self, tree: &SyntaxNode) -> Result<Vec<Column>, QueryError> {
-        let names = return_names(tree)?;
+    /// A scalar function call. Aggregates are not expressions here: the HIR takes them out of a projection, so one that
+    /// is left stands where none may stand.
+    fn call(&self, name: &str, args: &[ExprId], distinct: bool) -> Result<Expr, QueryError> {
+        let lower = name.to_ascii_lowercase();
+        if matches!(
+            lower.as_str(),
+            "avg" | "collect" | "count" | "max" | "min" | "sum"
+        ) {
+            return Err(QueryError::syntax(format!(
+                "the aggregate `{name}` is only allowed in RETURN and WITH"
+            )));
+        }
+        let function = scalar(&lower).ok_or_else(|| {
+            QueryError::unsupported(format!(
+                "the function `{name}` is not in the function table"
+            ))
+        })?;
+        if distinct {
+            return Err(QueryError::syntax(format!(
+                "DISTINCT is for aggregates, not for `{name}`"
+            )));
+        }
+        let (fewest, most) = function.arity();
+        if args.len() < fewest || args.len() > most {
+            return Err(QueryError::syntax(format!(
+                "`{}` does not take {} arguments",
+                function.name(),
+                args.len()
+            )));
+        }
+        Ok(Expr::Call(
+            function,
+            args.iter()
+                .map(|a| self.expr(*a))
+                .collect::<Result<_, _>>()?,
+        ))
+    }
+
+    /// The columns of the answer, in the order the `RETURN` writes them, matched to the aliases of the last part.
+    fn columns(&self, returning: Option<&SyntaxNode>) -> Result<Vec<Column>, QueryError> {
+        let names = return_names(returning)?;
         names
             .into_iter()
             .map(|name| match self.aliases.get(&name) {
@@ -591,12 +926,33 @@ fn cmp(op: ComparisonOperator) -> Result<CmpOp, QueryError> {
     })
 }
 
-/// The names of the columns of the last `RETURN`, in the order written: the alias after `AS`, else the text of the item.
-fn return_names(tree: &SyntaxNode) -> Result<Vec<String>, QueryError> {
-    let clause = tree
-        .descendants()
-        .filter(|n| n.kind() == K::RETURN_CLAUSE)
-        .last()
+/// The scalar function of a name in lower case.
+fn scalar(name: &str) -> Option<Function> {
+    Some(match name {
+        "id" | "elementid" => Function::Id,
+        "type" => Function::Type,
+        "labels" => Function::Labels,
+        "size" => Function::Size,
+        "coalesce" => Function::Coalesce,
+        "tostring" => Function::ToString,
+        "toupper" => Function::ToUpper,
+        "tolower" => Function::ToLower,
+        "trim" => Function::Trim,
+        "ltrim" => Function::LTrim,
+        "rtrim" => Function::RTrim,
+        "replace" => Function::Replace,
+        "substring" => Function::Substring,
+        "left" => Function::Left,
+        "right" => Function::Right,
+        "split" => Function::Split,
+        "reverse" => Function::Reverse,
+        _ => return None,
+    })
+}
+
+/// The names of the columns of a `RETURN`, in the order written: the alias after `AS`, else the text of the item.
+fn return_names(returning: Option<&SyntaxNode>) -> Result<Vec<String>, QueryError> {
+    let clause = returning
         .ok_or_else(|| QueryError::unsupported("a query without RETURN has no columns"))?;
     let items = clause
         .descendants()
@@ -627,5 +983,21 @@ fn unquote(text: &str) -> String {
     match text.strip_prefix('`').and_then(|t| t.strip_suffix('`')) {
         Some(inner) => inner.replace("``", "`"),
         None => text.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_function_of_the_table_is_an_aggregate_or_has_a_lowering() {
+        for name in crate::FUNCTIONS {
+            let aggregate = matches!(*name, "avg" | "collect" | "count" | "max" | "min" | "sum");
+            assert_ne!(aggregate, scalar(name).is_some(), "{name}");
+        }
+        for name in ["id", "elementid", "type", "labels", "size", "coalesce"] {
+            assert!(crate::FUNCTIONS.contains(&name), "{name}");
+        }
     }
 }

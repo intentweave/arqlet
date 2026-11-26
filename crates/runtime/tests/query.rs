@@ -50,6 +50,39 @@ fn a_query_reads_structure_and_the_sessions_content() {
     assert_eq!(a["ignoredContent"], 1);
 }
 
+/// The session's content and the payload of the standalone adapter refuse the same keys (ADR 0021, M0 item 1).
+#[test]
+fn content_and_the_adapters_payload_refuse_the_same_keys() {
+    assert_eq!(
+        arqlet_runtime::content::VIRTUAL_KEYS,
+        arqlet_query_model::VIRTUAL_KEYS
+    );
+}
+
+#[test]
+fn stateless_content_may_not_use_the_models_own_keys() {
+    let mut s = session();
+    let snapshot = ok(s.run_value(&json!({"op": "export"})))["snapshot"].clone();
+    for content in [
+        json!({"nodes": {"a": {"label": "other"}}}),
+        json!({"edges": {"xa": {"weight": 9}}}),
+    ] {
+        let answer: Value = serde_json::from_str(&arqlet_runtime::dispatch(
+            &json!({"op": "query", "query": "MATCH (n) RETURN n", "snapshot": snapshot, "content": content})
+                .to_string(),
+        ))
+        .unwrap();
+        assert_eq!(answer["ok"], false, "{answer}");
+        assert!(
+            answer["error"]
+                .as_str()
+                .unwrap()
+                .contains("property of the model itself"),
+            "{answer}"
+        );
+    }
+}
+
 #[test]
 fn unresolved_edges_are_excluded_and_nodes_and_edges_come_back_as_ids() {
     let mut s = session();
@@ -129,16 +162,36 @@ fn errors_name_their_class_and_a_limit_stops_the_query() {
     );
     // No query text, a bad parameter: refused with a reason.
     assert_eq!(s.run_value(&json!({"op": "query"}))["ok"], false);
-    let bad = s.run_value(&json!({"op": "query", "query": "RETURN $p", "params": {"p": {"k": 1}}}));
+    let bad = s.run_value(&json!({"op": "query", "query": "RETURN $p", "params": {"p": u64::MAX}}));
     assert!(bad["error"].as_str().unwrap().contains("$p"), "{bad}");
 }
 
 #[test]
-fn a_map_valued_property_reads_as_null_and_is_counted() {
+fn a_map_valued_property_and_a_map_parameter_are_maps() {
     let mut s = session();
-    ok(s.run_value(&json!({"op": "payload", "set": {"nodes": {"a": {"meta": {"k": 1}, "n": 3}}}})));
+    ok(s.run_value(
+        &json!({"op": "payload", "set": {"nodes": {"a": {"meta": {"node": "x", "k": [1]}}}}}),
+    ));
     let a = ok(s.run_value(&json!({
-        "op": "query", "query": "MATCH (a) WHERE a.id = 'a' RETURN a.meta, a.n",
+        "op": "query",
+        "query": "MATCH (a) WHERE a.id = 'a' AND a.meta.k[0] = $p.one RETURN a.meta, a",
+        "params": {"p": {"one": 1}},
+    })));
+    // A map is tagged, so its key `node` is not taken for a node; the ids of the answer name nodes only.
+    assert_eq!(
+        a["rows"],
+        json!([[{"map": {"k": [1], "node": "x"}}, {"node": "a"}]])
+    );
+    assert_eq!(a["nodes"], json!(["a"]));
+    assert!(a.get("skippedValues").is_none(), "{a}");
+}
+
+#[test]
+fn a_property_the_query_layer_has_no_type_for_reads_as_null_and_is_counted() {
+    let mut s = session();
+    ok(s.run_value(&json!({"op": "payload", "set": {"nodes": {"a": {"big": u64::MAX, "n": 3}}}})));
+    let a = ok(s.run_value(&json!({
+        "op": "query", "query": "MATCH (a) WHERE a.id = 'a' RETURN a.big, a.n",
     })));
     assert_eq!(a["rows"], json!([[null, 3]]));
     assert_eq!(a["skippedValues"], 1);

@@ -1187,6 +1187,9 @@ function syncDetails(){
  }
  first.disabled=dimensions.length===0;
  first.value=priority[0]?.by??'parent';
+ // Provisional (ADR 0022 M4): the first structure as lanes; only a dimension can be one.
+ $('grouping-lanes').disabled=first.value==='parent';
+ $('grouping-lanes').checked=priority[0]?.as==='lanes';
  // Hulls are on when a dimension after the first is listed for its own sake; one listed only to show a single group
  // (`consider`, the control below) does not turn them on.
  $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent'&&!c.consider?.length);
@@ -1207,6 +1210,19 @@ function syncDetails(){
  for(const option of considerSelect.children??[])option.selected=option.value?considered.has(option.value):considered.size===0;
  $('membership-hull').disabled=dimensions.length===0;
  $('membership-hull').value=o.membershipHull??'rectangle';
+ // Provisional (ADR 0022 M3b): holding needs a soft dimension to hold.
+ $('membership-hold').disabled=dimensions.length===0;
+ $('membership-hold').checked=!!o.holdMemberships;
+ $('membership-hold-info').textContent=o.holdMemberships?holdingText(snapshot):'';
+}
+/** What holding did (ADR 0022 M3b): how many groups are held, why the others are not, and what it costs. */
+function holdingText(s){
+ const held=s?.heldGroups?.length??0,count=new Map();
+ const why={acrossContainers:'across containers',fixedPlace:'pinned or ordered',overlapsHeld:'shares nodes with a held group',refused:'no layout possible',notWhole:'not whole even then',breaksOther:'would break another group',violation:'would break a hard rule',budget:'over the budget',trials:'not tried',edit:'released by an edit',buses:'graph with buses'};
+ for(const r of s?.holding?.released??[])count.set(r.reason,(count.get(r.reason)??0)+1);
+ const parts=[`${held} held`,...[...count].map(([r,n])=>`${n} ${why[r]??r}`)],c=s?.holding?.cost;
+ const cost=c?` Crossings ${c.crossingsBefore} → ${c.crossings}, bends ${c.bendsBefore} → ${c.bends}, edges against the flow ${c.againstFlowBefore} → ${c.againstFlow}.`:'';
+ return `${parts.join(', ')}.${cost}`;
 }
 /** The ids of the membership dimensions the current graph declares, in their declared order. */
 function membershipDimensions(){
@@ -1303,11 +1319,15 @@ function applyGrouping(label){
  for(const [by,group] of chosen){if(!consider.has(by))consider.set(by,[]);consider.get(by).push(group);}
  for(const by of consider.keys())if(!order.includes(by))order.push(by);
  const criteria=order.map(by=>consider.has(by)?{by,consider:consider.get(by)}:{by});
+ if(first!=='parent'&&$('grouping-lanes').checked)criteria[0].as='lanes';
  setOption({groupingPriority:criteria.length===1&&!criteria[0].consider?[]:criteria},label);
 }
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');
 $('grouping-first').onchange=()=>applyGrouping('Structure first');
+$('grouping-lanes').onchange=()=>applyGrouping('As lanes');
 $('grouping-consider').onchange=()=>applyGrouping('Only groups');
+// Provisional (ADR 0022 M3b): the layout keeps soft groups together where that stays cheap. It moves nodes.
+$('membership-hold').onchange=()=>setOption({holdMemberships:$('membership-hold').checked},'Hold groups');
 // Provisional (ADR 0022 §3): the hull's outline. Sent as it is; the engine omits the default (rectangle) when it writes
 // the options back, so a snapshot that never chose a shape stays unchanged.
 $('membership-hull').onchange=()=>setOption({membershipHull:$('membership-hull').value},'Hull shape');
@@ -1707,7 +1727,21 @@ async function runQuery(){
  if(!r.ok){box.textContent=`Not run: ${r.error}`;return;}
  if(!r.rowCount){box.textContent=`No rows (${r.graph.nodes} nodes, ${r.graph.edges} edges searched).`;return;}
  const label=id=>(snapshot.sourceGraph??snapshot.graph).nodes.find(n=>n.id===id)?.label??id;
- const show=v=>v&&typeof v==='object'?(v.node!==undefined?label(v.node):v.edge!==undefined?`edge ${v.edge}`:Array.isArray(v)?`[${v.map(show).join(', ')}]`:JSON.stringify(v)):String(v);
+ // A row value: every object is a node, an edge or a map (`{map: {…}}`).
+ const show=v=>{
+  if(v===null||typeof v!=='object')return String(v);
+  if(Array.isArray(v))return `[${v.map(show).join(', ')}]`;
+  if(v.node!==undefined)return label(v.node);
+  if(v.edge!==undefined)return `edge ${v.edge}`;
+  return `{${Object.entries(v.map).map(([key,x])=>`${key}: ${show(x)}`).join(', ')}}`;
+ };
+ // The first node in a value, also inside a list or a map.
+ const firstNode=v=>{
+  if(v===null||typeof v!=='object')return undefined;
+  if(!Array.isArray(v)&&v.node!==undefined)return v.node;
+  for(const x of Object.values(Array.isArray(v)?v:v.map??{})){const id=firstNode(x);if(id!==undefined)return id;}
+  return undefined;
+ };
  const head=document.createElement('span');head.textContent=`${r.rowCount} row${r.rowCount===1?'':'s'}: ${r.columns.join(' · ')}`;box.append(head);
  const shownBoxes=[...new Set(Object.values(r.shown?.nodes??{}).filter(Boolean))];
  if(shownBoxes.length){
@@ -1716,7 +1750,7 @@ async function runQuery(){
  }
  for(const row of r.rows.slice(0,20)){
   const b=document.createElement('button');b.setAttribute('role','listitem');b.textContent=row.map(show).join(' · ');
-  const node=row.find(v=>v&&typeof v==='object'&&v.node!==undefined)?.node;
+  const node=firstNode(row);
   if(node!==undefined)b.onclick=()=>focusNode(node);else b.disabled=true;
   box.append(b);
  }

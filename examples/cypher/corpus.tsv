@@ -34,7 +34,7 @@ c32	expr	ok	supported	RETURN {a: [1, 2, {b: 'c'}], d: null}
 c33	basic	ok	supported	MATCH (`my node`:`My Label`) RETURN `my node`.`a b`
 c34	cypher25	ok	open	MATCH (n:A|B) RETURN n
 c35	cypher25	ok	open	MATCH (n:!A&(B|C)) RETURN n
-c36	expr	ok	open	MATCH (n) RETURN toString(n.x) + 'a' AS s, coalesce(n.y, 0) AS y, n.z[0] AS z0, n.l[1..3] AS sl
+c36	expr	ok	supported	MATCH (n) RETURN toString(n.x) + 'a' AS s, coalesce(n.y, 0) AS y, n.z[0] AS z0, n.l[1..3] AS sl
 e01	neg	err	invalid	MATCH (n RETURN n
 e02	neg	err	invalid	MATCH (n) RETRUN n
 e03	neg	err	invalid	RETURN

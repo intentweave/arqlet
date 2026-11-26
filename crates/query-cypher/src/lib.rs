@@ -30,9 +30,34 @@ pub fn run(
 /// The longest query accepted, in bytes (provisional). decypher itself refuses expressions nested deeper than 128 levels.
 pub const MAX_QUERY_BYTES: usize = 64 * 1024;
 
-/// The functions the first release knows (provisional; the function table is still to be decided, ADR 0021 item 4). A
-/// function that is not listed is rejected, not passed on: decypher accepts any name.
-pub const FUNCTIONS: &[&str] = &["avg", "collect", "count", "max", "min", "sum"];
+/// The functions the layer knows (provisional, ADR 0021, "The function table"): the aggregates and the scalar functions.
+/// A function that is not listed is rejected, not passed on: decypher accepts any name.
+pub const FUNCTIONS: &[&str] = &[
+    "avg",
+    "coalesce",
+    "collect",
+    "count",
+    "elementid",
+    "id",
+    "labels",
+    "left",
+    "ltrim",
+    "max",
+    "min",
+    "replace",
+    "reverse",
+    "right",
+    "rtrim",
+    "size",
+    "split",
+    "substring",
+    "sum",
+    "tolower",
+    "tostring",
+    "toupper",
+    "trim",
+    "type",
+];
 
 /// Checks a query: `Ok` when it is valid openCypher and uses nothing the guard rejects.
 ///

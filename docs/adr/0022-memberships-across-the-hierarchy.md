@@ -405,9 +405,46 @@ Each step is behind an option and measured before the next. Nothing becomes a de
   [results](../../benchmarks/results/memberships-20261125-baseline.md)): with the parent first and groups planted along the
   edges, 11 of 24 groups inside one container are drawn whole and none of 30 across containers. Holding within an owner
   (M3b) can improve at most 13 of these groups, regions across owners (M3c) at most 30. Planted groups, not real ones.
+  **M3b, holding inside an owner, done behind `holdMemberships`** (2026-11-25, off by default;
+  `crates/layout/src/holding.rs`, [results](../../benchmarks/results/memberships-20261125-hold.md)). Order alone does not hold a
+  group: 2 of 19 become whole, against 19 of 19 as a nested container
+  ([feasibility](../../benchmarks/results/memberships-20261125-hold-inside.md)). So a group whose shown members share a container is
+  laid out as a container nested there, which is taken out of the result again: the view, its owners and its ports have no
+  trace of it, and only the hull is drawn. Groups are tried one by one in the order of the priority, each with a layout of its
+  own (at most 64), and kept when they are then whole, break no group that was whole, add no hard violation and stay in a
+  budget: crossings the larger of 2 and 5 percent, bends the larger of 4 and 5 percent, halved per further rank. On the
+  baseline inputs 5 of 19 groups are held. Not held: a moved-down parent hierarchy, groups across containers (M3c), members
+  with a pin or an order hint, graphs with buses. A complete layout searches; an edit of a part holds the groups that were held
+  again in the areas it lays out, and searches for no others. A drawing that holds something is not refined
+  until candidates hold as well. A group that is not held says why, and the cost of all held groups together is reported with the edges that run
+  against the flow (`Snapshot::holding`): they are counted and not limited, because a group held around a node between its
+  members turns an edge back, and holding is what the user chose. Open for M3d: the budget, per group and in total, and the
+  number of trials; and the title row a held group still has in tree and organic areas.
+  **M3c, across containers, probed and not built** (2026-11-25;
+  [levers](../../benchmarks/results/memberships-20261125-hold-across.md),
+  [alignment](../../benchmarks/results/memberships-20261125-hold-aligned.md)): nested pieces, pieces at the facing borders and
+  owners pulled together make 10 of 35 groups whole, 5 of them in the M3b budget. Aligning the pieces across the flow brings the
+  groups with two owners from 9 to 12 of 19, and none of the added ones is in the budget. Pieces and marks stay the answer for
+  groups across containers until real groupings say otherwise.
 - **M4 — lanes** (`as: lanes`): at rank 1 across the drawing, below a higher rank inside each owner, two of them as a grid.
   *Exit:* the gate; `pools-and-lanes.json` with its `groupingPriority` draws as the 2×3 grid with no lane violation;
   `three-dimensions.json` reports what it cannot satisfy.
+  **Probed** (2026-11-25; [results](../../benchmarks/results/memberships-20261125-lanes.md)): with pins across the flow and helper
+  edges along it, 20 of 20 views have every node in its lane and phase, the 2×3 grid included, without a new hard violation; edges
+  that run back between phases have to be turned for the layout. The crossings are the open part (`layerweave-code` 422 to 2559
+  against the flat drawing, 469 with containers): the order has to know the bands, dummies included, which pins cannot say.
+  **M4a, lanes of the first criterion across the flow, done** (2026-11-25; `crates/layout/src/lanes.rs`,
+  [results](../../benchmarks/results/memberships-20261125-lanes-engine.md)). The projection makes no containers of them; in every order
+  of the top level the lanes are consecutive blocks in their declared order, dummies of long edges included, and each band is aligned
+  on its own and stacked behind the one before. A node of no lane, and a container that keeps one, come after the lanes. The report says
+  how many lanes are out of place, and that they are not applied where the top level has no flow. On twelve views no lane is out of place;
+  crossings are far below the probe with pins and at or above containers (`layerweave-code` 422 flat, 469 containers, 2559 pins, 726
+  lanes). The gate of §6 (comparison with elk-rs, recorded timing) is not met, so this stays an option. Open: lanes below a higher rank,
+  along the flow (M4b), and drawing the bands (M4c).
+  **M4c, the bands drawn, done** (2026-11-26): scene `membershipLanes`, one band per lane over the whole drawing along the flow, neighbours
+  meeting in the middle of the gap between them; the SVG viewer draws them behind everything, alternating, with a dashed line between
+  two and the lane's name at its start; the playground has *As lanes*. No band where the lanes are not applied. Not drawn by the GPU
+  layer yet.
 - **M5 — the later display options of §4:** explicit groups "unassigned" and "several", proxies.
 
 M2b and M1 change no layout and need no quality gate; M3 and M4 change the layout and need it. That is the order.

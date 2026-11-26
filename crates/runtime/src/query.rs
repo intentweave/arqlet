@@ -14,7 +14,7 @@
 //! Request: `query` (text), optional `params` (object of `$name` values), optional `maxSteps`, `maxRows`, `maxHops`
 //! (the execution limits of ADR 0021 item 11), optional `view`. A stateless `dispatch` request also carries the `snapshot`
 //! and may carry `content` (`{"nodes": {id: {key: value}}, "edges": {…}}`); a session uses its own.
-use crate::content::Content;
+use crate::content::{Content, VIRTUAL_KEYS};
 use arqlet_model::Snapshot;
 use serde_json::{json, Value};
 
@@ -32,13 +32,26 @@ pub fn query_response(v: &Value) -> Value {
     result.unwrap_or_else(|error| json!({"ok": false, "error": error}))
 }
 
-/// The content a stateless request brings.
+/// The content a stateless request brings; it may not use the model's own keys, as a session's content may not.
 fn content_of(v: &Value) -> Result<Content, String> {
     let table = |part: &str| -> Result<crate::content::Properties, String> {
         match v.get(part) {
             None | Some(Value::Null) => Ok(Default::default()),
             Some(t) => serde_json::from_value(t.clone())
-                .map_err(|e| format!("content.{part} must map ids to properties: {e}")),
+                .map_err(|e| format!("content.{part} must map ids to properties: {e}"))
+                .and_then(|table: crate::content::Properties| {
+                    for (id, properties) in &table {
+                        if let Some(key) = VIRTUAL_KEYS
+                            .iter()
+                            .find(|key| properties.contains_key(**key))
+                        {
+                            return Err(format!(
+                                "content key {key} is a property of the model itself (on {id}); use another name"
+                            ));
+                        }
+                    }
+                    Ok(table)
+                }),
         }
     };
     Ok(Content {
@@ -66,8 +79,8 @@ pub fn query_on(
     use std::cell::Cell as Counter;
     use std::collections::BTreeMap;
 
-    /// The session's JSON content as a payload; a value the query layer has no type for (a map) reads as null and is
-    /// counted, so the answer says that something was left out instead of changing it silently.
+    /// The session's JSON content as a payload; a value the query layer has no type for (an integer beyond `i64`) reads
+    /// as null and is counted, so the answer says that something was left out instead of changing it silently.
     struct ContentSource<'a> {
         content: Option<&'a Content>,
         skipped: Counter<usize>,
