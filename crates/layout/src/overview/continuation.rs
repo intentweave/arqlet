@@ -289,7 +289,7 @@ pub fn clusters_by_id(
                 continue;
             }
             // The weight per cluster among the linked nodes that have their place (no cluster counts as one choice);
-            // ties go to the earlier cluster.
+            // a tie goes to no cluster, else to the earlier one.
             let mut weight: BTreeMap<Option<usize>, f64> = BTreeMap::new();
             for &(o, w) in linked_to(m) {
                 if done.contains(&o) {
