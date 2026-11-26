@@ -44,6 +44,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- **Query layer, wrong answers up to 0.9.0** (#184): the `WHERE` of a `WITH` applied before the `ORDER BY`, `SKIP` and
+  `LIMIT` of the same clause; it now filters what they leave.
+- **Query layer, wrong answers up to 0.9.0** (#185): a label or property map on a variable written again was dropped when
+  a later relationship of the same `MATCH` started at that node.
 - **Query layer, wrong answers in 0.8.0 and 0.9.0:** a grouping expression used beside an aggregate could read
   null: `RETURN n.name AS who, [n.name, count(*)]` answered `[null, …]`. Grouping expressions now keep their value
   wherever they stand, and an expression that would read a variable without a value (also a property of a pattern that

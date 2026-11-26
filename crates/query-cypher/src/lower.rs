@@ -94,7 +94,7 @@ fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryE
     };
     for part in &hir.parts {
         lowering.aliases.clear();
-        for op in &part.operations {
+        for op in in_clause_order(&part.operations) {
             lowering.op(op)?;
         }
     }
@@ -110,6 +110,31 @@ fn single(hir: &HirQuery, returning: Option<&SyntaxNode>) -> Result<Plan, QueryE
     };
     available(&plan, &hir.arenas)?;
     Ok(plan)
+}
+
+/// The operations of a part of the query in the order they apply. The HIR puts the `WHERE` of a `WITH` ahead of the
+/// `ORDER BY`, `SKIP` and `LIMIT` of the same clause, but it filters what they leave.
+fn in_clause_order(operations: &[Operation]) -> Vec<&Operation> {
+    let cuts = |op: &Operation| {
+        matches!(
+            op,
+            Operation::Sort(_) | Operation::Skip(_) | Operation::Limit(_)
+        )
+    };
+    let mut ordered = Vec::with_capacity(operations.len());
+    let mut filters = Vec::new();
+    for (i, op) in operations.iter().enumerate() {
+        if matches!(op, Operation::Filter(_)) && operations[i + 1..].iter().any(cuts) {
+            filters.push(op);
+            continue;
+        }
+        if !cuts(op) {
+            ordered.append(&mut filters);
+        }
+        ordered.push(op);
+    }
+    ordered.append(&mut filters);
+    ordered
 }
 
 /// Refuses a plan in which an expression reads a variable that holds nothing at that point: it would read null and answer
@@ -508,7 +533,6 @@ impl Lowering<'_> {
                 None => self.fresh(),
             })
             .collect();
-        let was_bound: Vec<bool> = node_slots.iter().map(|s| self.bound.contains(s)).collect();
         let mut touched = vec![false; pattern.nodes.len()];
         let mut rel_slots: Vec<usize> = Vec::new();
         // A node no relationship reaches is taken where it is written, before the relationships written after it, so
@@ -548,10 +572,10 @@ impl Lowering<'_> {
                 true
             };
             let (from, to) = if from_left { (l, r) } else { (r, l) };
+            // A start that was bound already, by an earlier clause or by an earlier part of this pattern, keeps the
+            // label and the properties written here.
             if !touched[from] {
-                if was_bound[from] {
-                    self.check(&pattern.nodes[from], node_slots[from])?;
-                }
+                self.check(&pattern.nodes[from], node_slots[from])?;
                 touched[from] = true;
             }
             let direction = match (rel.direction, from_left) {
