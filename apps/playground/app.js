@@ -1195,11 +1195,12 @@ function syncDetails(){
  if([...(phaseSelect.children??[])].map(c=>c.value).join('|')!==phaseChoices.join('|')){
   phaseSelect.replaceChildren(...phaseChoices.map(id=>{const option=document.createElement('option');option.value=id;option.textContent=id||'None';return option;}));
  }
- phaseSelect.disabled=!$('grouping-lanes').checked;
- phaseSelect.value=priority[0]?.as==='lanes'&&priority[1]?.as==='lanes'?priority[1].by:'';
+ // With lanes first a second dimension is phases along the flow; otherwise lanes inside every container (M4d).
+ phaseSelect.disabled=dimensions.length===0;
+ phaseSelect.value=priority[1]?.as==='lanes'?priority[1].by:'';
  // Hulls are on when a dimension after the first is listed for its own sake; one listed only to show a single group
  // (`consider`, the control below) does not turn them on.
- $('membership-hulls').checked=priority.slice(1).some((c,i)=>c.by!=='parent'&&!c.consider?.length&&!(i===0&&c.as==='lanes'&&priority[0].as==='lanes'));
+ $('membership-hulls').checked=priority.slice(1).some(c=>c.by!=='parent'&&!c.consider?.length&&c.as!=='lanes');
  // Provisional (ADR 0022 §2, consider): some groups, or all. A value is the JSON pair [dimension, group], since
  // group ids may hold any character (documents are paths).
  const graphDims=(snapshot?.sourceGraph??snapshot?.graph)?.memberships?.dimensions??[];
@@ -1317,8 +1318,8 @@ function applyGrouping(label){
  const first=$('grouping-first').value||'parent';
  // Phases (ADR 0022 M4b): a second dimension along the flow, right after the lanes, so that the two make a grid.
  const lanes=first!=='parent'&&$('grouping-lanes').checked;
- const phases=lanes?$('grouping-phases').value:'';
- const order=[first,...(phases?[phases]:[])];
+ const phases=$('grouping-phases').value;
+ const order=[first,...(phases&&phases!==first?[phases]:[])];
  if(first!=='parent')order.push('parent');
  if($('membership-hulls').checked)order.push(...dimensions.filter(d=>!order.includes(d)));
  // Only some groups: each chosen group's dimension keeps its rank, or joins as a soft criterion when it is not listed
@@ -1330,7 +1331,7 @@ function applyGrouping(label){
  for(const by of consider.keys())if(!order.includes(by))order.push(by);
  const criteria=order.map(by=>consider.has(by)?{by,consider:consider.get(by)}:{by});
  if(lanes)criteria[0].as='lanes';
- if(phases)criteria[1].as='lanes';
+ if(phases&&phases!==first)criteria[1].as='lanes';
  setOption({groupingPriority:criteria.length===1&&!criteria[0].consider?[]:criteria},label);
 }
 $('membership-hulls').onchange=()=>applyGrouping('Membership hulls');

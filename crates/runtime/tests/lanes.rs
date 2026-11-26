@@ -5,6 +5,8 @@ use arqlet_scene::build_scene;
 
 const POOLS: &str = include_str!("../../../examples/fixtures/memberships/pools-and-lanes.json");
 const THREE: &str = include_str!("../../../examples/fixtures/memberships/three-dimensions.json");
+const CROSSES: &str =
+    include_str!("../../../examples/fixtures/memberships/crosses-containers.json");
 const ORG: &str = include_str!("../../../examples/fixtures/memberships/org-chart-projects.json");
 
 fn graph(text: &str) -> Graph {
@@ -429,5 +431,130 @@ fn the_grid_of_pools_and_phases_is_the_target_of_the_fixture() {
                 );
             }
         }
+    }
+}
+
+/// The parent hierarchy first and `name` as lanes inside every container.
+fn inside(name: &str) -> LayoutOptions {
+    let mut options = LayoutOptions::default();
+    options.grouping_priority = vec![
+        GroupingCriterion {
+            by: "parent".into(),
+            ..Default::default()
+        },
+        GroupingCriterion {
+            by: name.into(),
+            render: GroupingRendering::Lanes,
+            ..Default::default()
+        },
+    ];
+    options
+}
+
+#[test]
+fn lanes_inside_every_container_keep_the_containment_and_lie_behind_one_another() {
+    for (text, name) in [
+        (THREE, "zone"),
+        (THREE, "team"),
+        (THREE, "layer"),
+        (ORG, "site"),
+        (CROSSES, "focus"),
+    ] {
+        for legacy in [false, true] {
+            let g = graph(text);
+            let mut options = inside(name);
+            if legacy {
+                options.single_pass_auto = false;
+                options.single_pass = false;
+            }
+            let s = import_graph_with(g.clone(), 500, &options).unwrap();
+            assert!(
+                s.geometry_issues.is_empty(),
+                "{name}: {:?}",
+                s.geometry_issues
+            );
+            // The containment is the view's, untouched by the lanes.
+            let plain = import_graph_with(g.clone(), 500, &LayoutOptions::default()).unwrap();
+            let parents = |s: &Snapshot| {
+                s.graph
+                    .nodes
+                    .iter()
+                    .map(|n| (n.id.clone(), n.parent_id.clone()))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(parents(&s), parents(&plain));
+            // In every area the lanes lie behind one another across its flow.
+            let at = arqlet_layout::absolute_all(&s.graph, &s.boxes);
+            let mut areas: Vec<Option<String>> = vec![None];
+            areas.extend(
+                s.graph
+                    .nodes
+                    .iter()
+                    .filter_map(|n| n.parent_id.clone())
+                    .map(Some),
+            );
+            areas.sort();
+            areas.dedup();
+            let mut banded = 0;
+            for area in &areas {
+                let groups = arqlet_model::grouping::area_groups(&s.graph, name, area.as_deref());
+                let Some(plan) = s.layered_plans.get(area.as_deref().unwrap_or("<root>")) else {
+                    continue;
+                };
+                let mut extent: std::collections::BTreeMap<usize, (f64, f64)> = Default::default();
+                for (id, i) in &groups {
+                    let r = &at[id.as_str()];
+                    let (lo, hi) = if plan.vertical {
+                        (r.x, r.x + r.width)
+                    } else {
+                        (r.y, r.y + r.height)
+                    };
+                    let e = extent.entry(*i).or_insert((lo, hi));
+                    *e = (e.0.min(lo), e.1.max(hi));
+                }
+                let list: Vec<_> = extent.values().collect();
+                banded += usize::from(list.len() > 1);
+                for w in list.windows(2) {
+                    assert!(w[0].1 < w[1].0, "{name} in {area:?}: {list:?}");
+                }
+            }
+            assert!(banded > 0, "{name}: the test is about something");
+            let scene = build_scene(&s).unwrap();
+            let report = &scene.membership_report[1];
+            assert!(report.applied, "{}", report.summary);
+            // Each drawn band lies inside its container and covers its lane's children.
+            // Each drawn band lies inside its container, or inside the drawing at the top level.
+            for band in &scene.membership_lanes {
+                let c = match band.area.as_deref() {
+                    Some(area) => at[area].clone(),
+                    None => scene.bounds.clone(),
+                };
+                let r = &band.rect;
+                assert!(r.x >= c.x - 1e-6 && r.y >= c.y - 1e-6, "{name}: {band:?}");
+                assert!(
+                    r.x + r.width <= c.x + c.width + 1e-6
+                        && r.y + r.height <= c.y + c.height + 1e-6,
+                    "{name}: {band:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn lanes_inside_containers_stay_through_an_edit_and_a_refinement() {
+    let g = graph(THREE);
+    let s = import_graph_with(g.clone(), 500, &inside("zone")).unwrap();
+    let refined = refine_snapshot(&s, s.revision, s.layout_version).unwrap();
+    assert!(build_scene(&refined).unwrap().membership_report[1].applied);
+    for n in g.nodes.iter().filter(|n| n.parent_id.is_some()) {
+        let added = arqlet_runtime::add_node(&s, s.revision, &n.id, "new").unwrap();
+        assert!(added.geometry_issues.is_empty());
+        let report = &build_scene(&added).unwrap().membership_report[1];
+        assert!(
+            report.summary.contains("lanes inside each container"),
+            "{}",
+            report.summary
+        );
     }
 }
