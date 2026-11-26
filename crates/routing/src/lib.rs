@@ -406,6 +406,10 @@ pub struct Params {
     /// rails at the prototype's distances. With a value, the stub leaves the port at least this far and the rails
     /// beside an own node lie beyond it.
     pub own_clearance: f64,
+    /// Provisional (#203): when the grid of the whole view is over the limit of the repair search, the sparse grid of
+    /// the whole view (`sparse_lines`) is searched, with a cost per bend. Off by default: it changes the routes of views
+    /// over the limit.
+    pub sparse_grid: bool,
 }
 impl Default for Params {
     fn default() -> Self {
@@ -416,6 +420,7 @@ impl Default for Params {
             spread: false,
             rail_offset: 12.,
             own_clearance: 0.,
+            sparse_grid: false,
         }
     }
 }
@@ -1867,7 +1872,7 @@ fn repair_raw(
             let obstacles: Vec<&Outline> = owned.iter().collect();
             let own: Vec<bool> = kept().map(|(i, _)| ends.contains(&i)).collect();
             if obstacles.iter().any(|o| hits_outline(route, o)) {
-                grid_route(route, &obstacles, &own, params.own_clearance, counters)
+                grid_route(route, &obstacles, &own, params, counters)
                     .unwrap_or_else(|| route.clone())
             } else {
                 route.clone()
@@ -1971,11 +1976,11 @@ fn grid_route(
     route: &Route,
     obstacles: &[&Outline],
     own: &[bool],
-    own_clearance: f64,
+    params: Params,
     counters: &mut channel::SearchCounters,
 ) -> Option<Route> {
     let before = counters.legacy_grid_pops;
-    let found = grid_route_search(route, obstacles, own, own_clearance, counters);
+    let found = grid_route_search(route, obstacles, own, params, counters);
     *counters
         .legacy_grid_pops_by_route
         .entry(route.id.clone())
@@ -1987,9 +1992,10 @@ fn grid_route_search(
     route: &Route,
     obstacles: &[&Outline],
     own: &[bool],
-    own_clearance: f64,
+    params: Params,
     counters: &mut channel::SearchCounters,
 ) -> Option<Route> {
+    let own_clearance = params.own_clearance;
     if route.points.len() < 2 {
         return None;
     }
@@ -2114,9 +2120,28 @@ fn grid_route_search(
     if xs.len().checked_mul(ys.len())? <= GRID_LIMIT {
         return search_grid(route, obstacles, start, end, (&a, &b), xs, ys, counters);
     }
+    // #203: with `sparse_grid`, the sparse grid of the whole view (`sparse_lines`) is searched first: it has a fraction of
+    // the lines and holds a way between the stubs whenever the rectangles leave one. Where it finds none (a disc's free
+    // corner may need a line it does not have) or is over its own limit, the windows are searched as without it.
+    if params.sparse_grid {
+        let sparse_x = sparse_lines(obstacles, own, own_clearance, true, [a.x, b.x]);
+        let sparse_y = sparse_lines(obstacles, own, own_clearance, false, [a.y, b.y]);
+        if sparse_x
+            .len()
+            .checked_mul(sparse_y.len())
+            .is_some_and(|cells| cells <= SPARSE_LIMIT)
+        {
+            let found = search_turns(route, obstacles, (&a, &b), &sparse_x, &sparse_y, counters);
+            if found.is_some() {
+                counters.sparse_grids += 1;
+                return found;
+            }
+        }
+    }
     // The whole view gives more grid lines than the search can hold. Before the route is given up, the lines are taken only from
     // the obstacles near it, in windows that grow (the freedom of a step is still tested against every obstacle, so a route found
-    // in a window is as valid as one found on the whole grid). Views within the limit never get here, so their output is unchanged.
+    // in a window is as valid as one found on the whole grid). Views within the limit never get here or to the sparse grid, so
+    // their output is unchanged.
     let around = route_bounds(route);
     for reach in WINDOW_REACH {
         let window = [
@@ -2141,6 +2166,258 @@ fn grid_route_search(
 const GRID_LIMIT: usize = 120_000;
 /// How far around a route's box (layout units) the windows reach, when the whole view gives too many grid lines.
 const WINDOW_REACH: [f64; 3] = [120., 480., 1920.];
+
+/// The most cells of the sparse grid (`Params::sparse_grid`).
+const SPARSE_LIMIT: usize = 480_000;
+/// The cost of a bend on the sparse grid (layout units), as the bus taps' search takes it.
+const SPARSE_TURN: f64 = 24.;
+/// The distance of a line beyond the outermost box edge, and beside an own node or a disc, as on the full grid.
+const SPARSE_MARGIN: f64 = 6.;
+
+/// One coordinate where boxes start or end along an axis; edges closer than `EPS` are one.
+struct Edges {
+    first: f64,
+    last: f64,
+    starts: bool,
+    ends: bool,
+    /// The largest own clearance of an own box that starts here, and of one that ends here.
+    start_clearance: f64,
+    end_clearance: f64,
+}
+
+/// The lines of the sparse grid across the x axis (`vertical`: lines x = const) or the y axis. Between two box edges
+/// every position meets the same boxes. Only the gaps from an edge where a box ends to the next edge where one begins get
+/// a line: any other gap meets all the boxes of a neighbouring gap and more, so a way along it can be moved there. With
+/// the two lines beyond the outermost edges and the lines through the route's `ends`, a grid of these lines holds an
+/// orthogonal way between the ends whenever the rectangles leave one through gaps of positive width. A line runs in the
+/// middle of its gap, farther from an own node than its clearance where the gap allows it. Discs and own nodes keep the
+/// lines the full grid has beside them.
+fn sparse_lines(
+    obstacles: &[&Outline],
+    own: &[bool],
+    own_clearance: f64,
+    vertical: bool,
+    ends: [f64; 2],
+) -> Vec<f64> {
+    let mut lines = ends.to_vec();
+    // (coordinate, whether a box starts there, own clearance).
+    let mut sides: Vec<(f64, bool, f64)> = Vec::with_capacity(2 * obstacles.len());
+    for (index, o) in obstacles.iter().enumerate() {
+        let r = o.bounds();
+        let (low, high) = if vertical {
+            (r.x, r.x + r.width)
+        } else {
+            (r.y, r.y + r.height)
+        };
+        let clearance = if own.get(index) == Some(&true) {
+            own_clearance.max(0.)
+        } else {
+            0.
+        };
+        sides.push((low, true, clearance));
+        sides.push((high, false, clearance));
+        let (outer_low, outer_high) = (low - clearance, high + clearance);
+        if clearance > 0. {
+            lines.extend([outer_low - SPARSE_MARGIN, outer_high + SPARSE_MARGIN]);
+        }
+        if matches!(o, Outline::Disc { .. }) {
+            lines.extend([
+                outer_low - SPARSE_MARGIN,
+                outer_low + SPARSE_MARGIN,
+                outer_high - SPARSE_MARGIN,
+                outer_high + SPARSE_MARGIN,
+            ]);
+        }
+    }
+    sides.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut edges: Vec<Edges> = Vec::new();
+    for (at, starts, clearance) in sides {
+        if edges.last().is_none_or(|e| at - e.first >= EPS) {
+            edges.push(Edges {
+                first: at,
+                last: at,
+                starts: false,
+                ends: false,
+                start_clearance: 0.,
+                end_clearance: 0.,
+            });
+        }
+        let e = edges.last_mut().expect("pushed above");
+        e.last = at;
+        if starts {
+            e.starts = true;
+            e.start_clearance = e.start_clearance.max(clearance);
+        } else {
+            e.ends = true;
+            e.end_clearance = e.end_clearance.max(clearance);
+        }
+    }
+    if let (Some(first), Some(last)) = (edges.first(), edges.last()) {
+        lines.push(first.first - first.start_clearance - SPARSE_MARGIN);
+        lines.push(last.last + last.end_clearance + SPARSE_MARGIN);
+    }
+    for pair in edges.windows(2) {
+        let (low, high) = (&pair[0], &pair[1]);
+        if !(low.ends && high.starts) {
+            continue;
+        }
+        let middle = (low.last + high.first) / 2.;
+        let from = low.last + low.end_clearance;
+        let to = high.first - high.start_clearance;
+        lines.push(if from <= to {
+            middle.clamp(from, to)
+        } else {
+            middle
+        });
+    }
+    lines.sort_by(f64::total_cmp);
+    lines.dedup();
+    lines
+}
+
+/// A* over the grid `xs` x `ys` from `a` to `b` that charges `SPARSE_TURN` for every bend, the bends at the two stubs
+/// included. A state is a grid point and the axis it is reached along. Equal estimates are taken farthest first, then by
+/// state, so the way found depends on the input only.
+fn search_turns(
+    route: &Route,
+    obstacles: &[&Outline],
+    (a, b): (&Point, &Point),
+    xs: &[f64],
+    ys: &[f64],
+    counters: &mut channel::SearchCounters,
+) -> Option<Route> {
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
+    let start = route.points.first()?;
+    let end = route.points.last()?;
+    let width = xs.len();
+    let count = width.checked_mul(ys.len())?;
+    let at = |p: &Point| {
+        Some(
+            ys.binary_search_by(|v| v.total_cmp(&p.y)).ok()? * width
+                + xs.binary_search_by(|v| v.total_cmp(&p.x)).ok()?,
+        )
+    };
+    let source = at(a)?;
+    let target = at(b)?;
+    let point = |i: usize| Point {
+        x: xs[i % width],
+        y: ys[i / width],
+    };
+    let steps = FreeSteps::new(obstacles);
+    if !steps.free(start, a) || !steps.free(b, end) {
+        return None;
+    }
+    // Axis 0 is horizontal, 1 vertical.
+    let axis = |p: &Point, q: &Point| usize::from((p.y - q.y).abs() >= EPS);
+    let (leaving, arriving) = (axis(start, a), axis(b, end));
+    let turn = (SPARSE_TURN * 1000.) as u64;
+    let states = count.checked_mul(2)?;
+    let mut costs = vec![u64::MAX; states];
+    let mut parents = vec![u32::MAX; states];
+    let mut queue = BinaryHeap::new();
+    let goal = point(target);
+    let remaining = |i: usize| {
+        let p = point(i);
+        (((p.x - goal.x).abs() + (p.y - goal.y).abs()) * 1000.)
+            .floor()
+            .min(u64::MAX as f64) as u64
+    };
+    let first = 2 * source + leaving;
+    costs[first] = 0;
+    queue.push(Reverse((remaining(source), Reverse(0u64), first)));
+    // The cheapest arrival at the target so far, with the bend into the last stub, and its state.
+    let mut best: Option<(u64, usize)> = None;
+    while let Some(Reverse((estimate, Reverse(cost), state))) = queue.pop() {
+        if best.is_some_and(|(total, _)| estimate >= total) {
+            break;
+        }
+        counters.legacy_grid_pops += 1;
+        if cost != costs[state] {
+            continue;
+        }
+        let (i, along) = (state / 2, state % 2);
+        if i == target {
+            let total = cost.saturating_add(if along == arriving { 0 } else { turn });
+            if best.is_none_or(|(known, _)| total < known) {
+                best = Some((total, state));
+            }
+            continue;
+        }
+        let p = point(i);
+        let neighbors = [
+            ((i % width > 0).then(|| i - 1), 0),
+            ((i % width + 1 < width).then(|| i + 1), 0),
+            ((i >= width).then(|| i - width), 1),
+            ((i + width < count).then(|| i + width), 1),
+        ];
+        for (j, direction) in neighbors {
+            let Some(j) = j else { continue };
+            let q = point(j);
+            let length = (((p.x - q.x).abs() + (p.y - q.y).abs()) * 1000.)
+                .ceil()
+                .min(u64::MAX as f64) as u64;
+            let next = cost
+                .saturating_add(length)
+                .saturating_add(1)
+                .saturating_add(if direction == along { 0 } else { turn });
+            let reached = 2 * j + direction;
+            if next < costs[reached] && steps.free(&p, &q) {
+                costs[reached] = next;
+                parents[reached] = state as u32;
+                queue.push(Reverse((
+                    next.saturating_add(remaining(j)),
+                    Reverse(next),
+                    reached,
+                )));
+            }
+        }
+    }
+    let (_, mut state) = best?;
+    let mut path = vec![end.clone()];
+    loop {
+        path.push(point(state / 2));
+        if state == first {
+            break;
+        }
+        state = parents[state] as usize;
+    }
+    path.push(start.clone());
+    path.reverse();
+    let mut repaired = route.clone();
+    repaired.points = path;
+    Some(clean(repaired))
+}
+
+/// Whether a step of a grid search is free of the obstacles.
+struct FreeSteps<'a> {
+    obstacles: &'a [&'a Outline],
+    boxes: Vec<Bounds>,
+    grid: BoxIndex,
+}
+
+impl<'a> FreeSteps<'a> {
+    fn new(obstacles: &'a [&'a Outline]) -> Self {
+        let boxes: Vec<Bounds> = obstacles.iter().map(|o| rect_bounds(&o.bounds())).collect();
+        let grid = BoxIndex::new(&boxes);
+        FreeSteps {
+            obstacles,
+            boxes,
+            grid,
+        }
+    }
+
+    /// The same prefilter `hits_outline` applies first, here without building a route for every grid step: only the
+    /// obstacles whose box meets the segment's box are tested, so the result is the one a test against all obstacles
+    /// gives.
+    fn free(&self, p: &Point, q: &Point) -> bool {
+        let reach = [p.x.min(q.x), p.y.min(q.y), p.x.max(q.x), p.y.max(q.y)];
+        let segment = [p.clone(), q.clone()];
+        !self.grid.any_near(&self.boxes, &reach, |i| {
+            hits_outline_points(&reach, &segment, self.obstacles[i])
+        })
+    }
+}
 
 /// A* over the grid `xs` x `ys` from `a` to `b`, using the Dijkstra tie order for equal-cost paths.
 #[allow(clippy::too_many_arguments)]
@@ -2170,17 +2447,8 @@ fn search_grid(
         x: xs[i % width],
         y: ys[i / width],
     };
-    // The same prefilter `hits_outline` applies first, here without building a route for every grid step: only the obstacles
-    // whose box meets the segment's box are tested, so the result is the one a test against all obstacles gives.
-    let boxes: Vec<Bounds> = obstacles.iter().map(|o| rect_bounds(&o.bounds())).collect();
-    let grid = BoxIndex::new(&boxes);
-    let free = |p: &Point, q: &Point| {
-        let reach = [p.x.min(q.x), p.y.min(q.y), p.x.max(q.x), p.y.max(q.y)];
-        let segment = [p.clone(), q.clone()];
-        !grid.any_near(&boxes, &reach, |i| {
-            hits_outline_points(&reach, &segment, obstacles[i])
-        })
-    };
+    let steps = FreeSteps::new(obstacles);
+    let free = |p: &Point, q: &Point| steps.free(p, q);
     if !free(start, a) || !free(b, end) {
         return None;
     }
@@ -2318,7 +2586,7 @@ mod tests {
             &original,
             &obstacles,
             &[],
-            0.,
+            Params::default(),
             &mut channel::SearchCounters::default(),
         )
         .unwrap();
@@ -2363,7 +2631,8 @@ mod tests {
         let obstacles: Vec<&Outline> = outlines.iter().collect();
         let original = r(&[(10., 5.), (16., 5.), (94., 5.), (100., 5.)]);
         let mut counters = channel::SearchCounters::default();
-        let repaired = grid_route(&original, &obstacles, &[], 0., &mut counters)
+        let params = Params::default();
+        let repaired = grid_route(&original, &obstacles, &[], params, &mut counters)
             .expect("the route is found on a window of the grid");
         assert_eq!(counters.windowed_grids, 1);
         assert!(obstacles.iter().all(|o| !hits_outline(&repaired, o)));
@@ -2374,9 +2643,205 @@ mod tests {
         // Without the far boxes the whole grid is within the limit and no window is used.
         let near: Vec<&Outline> = outlines[..4].iter().collect();
         let mut counters = channel::SearchCounters::default();
-        assert!(grid_route(&original, &near, &[], 0., &mut counters).is_some());
+        assert!(grid_route(&original, &near, &[], params, &mut counters).is_some());
         assert_eq!(counters.windowed_grids, 0);
     }
+    fn boxes(list: &[(f64, f64, f64, f64)]) -> Vec<Outline> {
+        list.iter()
+            .map(|&(x, y, width, height)| {
+                Outline::Rect(Rect {
+                    x,
+                    y,
+                    width,
+                    height,
+                })
+            })
+            .collect()
+    }
+
+    /// `count` small boxes far from the origin at coordinates of their own, so that the grid of the whole view is over
+    /// the limit of the search.
+    fn far_boxes(count: usize) -> Vec<Outline> {
+        let list: Vec<_> = (0..count)
+            .map(|i| {
+                let t = i as f64;
+                (20_000. + t * 7.31, 20_000. + t * 5.17, 3., 3.)
+            })
+            .collect();
+        boxes(&list)
+    }
+
+    fn orthogonal_and_free(route: &Route, obstacles: &[&Outline]) {
+        assert!(obstacles.iter().all(|o| !hits_outline(route, o)));
+        assert!(route
+            .points
+            .windows(2)
+            .all(|w| horizontal(&w[0], &w[1]) || vertical(&w[0], &w[1])));
+    }
+
+    /// #203: over the limit, a way that leaves the windows around the route is found only with the sparse grid.
+    #[test]
+    fn the_sparse_grid_finds_a_way_the_windows_do_not_reach() {
+        // A wall between the two ends that reaches 4,000 units to both sides, farther than the widest window, built of
+        // overlapping pieces: a window only has the lines of the pieces it meets.
+        let mut outlines = boxes(&[(0., 0., 10., 10.), (100., 0., 10., 10.)]);
+        let pieces: Vec<_> = (-40..40)
+            .map(|i| (50., f64::from(i) * 100., 10., 101.))
+            .collect();
+        outlines.extend(boxes(&pieces));
+        outlines.extend(far_boxes(400));
+        let obstacles: Vec<&Outline> = outlines.iter().collect();
+        let original = r(&[(10., 5.), (16., 5.), (94., 5.), (100., 5.)]);
+        let mut counters = channel::SearchCounters::default();
+        let without = grid_route(&original, &obstacles, &[], Params::default(), &mut counters);
+        assert!(without.is_none());
+        let params = Params {
+            sparse_grid: true,
+            ..Params::default()
+        };
+        let found = grid_route(&original, &obstacles, &[], params, &mut counters)
+            .expect("a way round the wall");
+        assert_eq!((counters.sparse_grids, counters.windowed_grids), (1, 0));
+        orthogonal_and_free(&found, &obstacles);
+        assert_eq!(found.points.first(), original.points.first());
+        assert_eq!(found.points.last(), original.points.last());
+        // Round one end of the wall, with the four bends that takes.
+        assert_eq!(found.points.len(), 6, "{:?}", found.points);
+    }
+
+    /// #203: a gap narrower than the 6 units the full grid keeps its lines from a box holds a line of the sparse grid.
+    #[test]
+    fn the_sparse_grid_passes_a_gap_the_full_grid_has_no_line_in() {
+        let mut outlines = boxes(&[
+            (0., 0., 10., 10.),
+            (100., 0., 10., 10.),
+            // Two walls with a gap of 4 units between y = 40 and y = 44.
+            (50., -4_000., 10., 4_040.),
+            (50., 44., 10., 4_000.),
+        ]);
+        outlines.extend(far_boxes(400));
+        let obstacles: Vec<&Outline> = outlines.iter().collect();
+        let original = r(&[(10., 5.), (16., 5.), (94., 5.), (100., 5.)]);
+        let params = Params {
+            sparse_grid: true,
+            ..Params::default()
+        };
+        let mut counters = channel::SearchCounters::default();
+        let found = grid_route(&original, &obstacles, &[], params, &mut counters)
+            .expect("a way through the gap");
+        orthogonal_and_free(&found, &obstacles);
+        assert!(
+            found.points.windows(2).any(|w| horizontal(&w[0], &w[1])
+                && w[0].y > 40.
+                && w[0].y < 44.
+                && w[0].x.min(w[1].x) < 50.
+                && w[0].x.max(w[1].x) > 60.),
+            "{:?}",
+            found.points
+        );
+    }
+
+    /// #203: within the limit of the full grid the option changes nothing.
+    #[test]
+    fn the_sparse_grid_option_does_nothing_within_the_limit() {
+        let outlines = boxes(&[
+            (0., 0., 10., 10.),
+            (100., 0., 10., 10.),
+            (25., -20., 15., 50.),
+            (60., -40., 15., 50.),
+        ]);
+        let obstacles: Vec<&Outline> = outlines.iter().collect();
+        let original = r(&[(10., 5.), (16., 5.), (94., 5.), (100., 5.)]);
+        let search = |sparse_grid| {
+            let mut counters = channel::SearchCounters::default();
+            let params = Params {
+                sparse_grid,
+                ..Params::default()
+            };
+            let found = grid_route(&original, &obstacles, &[], params, &mut counters);
+            (found.map(|r| r.points), counters)
+        };
+        assert_eq!(search(false), search(true));
+    }
+
+    /// #203: the sparse grid holds a way exactly when the grid with a line in every gap between box edges, which stands
+    /// for every position, holds one. Random overlapping and touching boxes on integer coordinates, with and without a
+    /// clearance of the end boxes.
+    #[test]
+    fn the_sparse_grid_reaches_whatever_every_position_reaches() {
+        let mut state: u64 = 203;
+        let mut next = move |below: u64| {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) % below
+        };
+        // A line in the middle of every gap, and beyond the outermost edges.
+        let every = |obstacles: &[&Outline], vertical: bool, ends: [f64; 2]| {
+            let mut edges: Vec<f64> = obstacles
+                .iter()
+                .flat_map(|o| {
+                    let r = o.bounds();
+                    if vertical {
+                        [r.x, r.x + r.width]
+                    } else {
+                        [r.y, r.y + r.height]
+                    }
+                })
+                .collect();
+            edges.sort_by(f64::total_cmp);
+            edges.dedup();
+            let mut lines = ends.to_vec();
+            lines.extend([edges[0] - 6., edges[edges.len() - 1] + 6.]);
+            lines.extend(edges.windows(2).map(|w| (w[0] + w[1]) / 2.));
+            lines.sort_by(f64::total_cmp);
+            lines.dedup();
+            lines
+        };
+        let (mut found, mut blocked, mut fewer) = (0, 0, 0);
+        for round in 0..600 {
+            let mut list = vec![(0., 40., 10., 10.), (90., 40., 10., 10.)];
+            for _ in 0..8 + next(30) {
+                let (x, y) = (next(100) as f64 - 5., next(100) as f64 - 5.);
+                let (w, h) = (1 + next(25), 1 + next(25));
+                list.push((x, y, w as f64, h as f64));
+            }
+            let outlines = boxes(&list);
+            let obstacles: Vec<&Outline> = outlines.iter().collect();
+            let mut own = vec![false; obstacles.len()];
+            own[..2].fill(true);
+            let clearance = if round % 2 == 0 { 0. } else { 7. };
+            let original = r(&[(10., 45.), (11., 45.), (89., 45.), (90., 45.)]);
+            let (a, b) = (original.points[1].clone(), original.points[2].clone());
+            let mut counters = channel::SearchCounters::default();
+            let mut reach = |xs: &[f64], ys: &[f64]| {
+                search_turns(&original, &obstacles, (&a, &b), xs, ys, &mut counters)
+            };
+            let all = reach(
+                &every(&obstacles, true, [a.x, b.x]),
+                &every(&obstacles, false, [a.y, b.y]),
+            );
+            let xs = sparse_lines(&obstacles, &own, clearance, true, [a.x, b.x]);
+            let ys = sparse_lines(&obstacles, &own, clearance, false, [a.y, b.y]);
+            let sparse = reach(&xs, &ys);
+            assert_eq!(all.is_some(), sparse.is_some(), "round {round}: {list:?}");
+            fewer += usize::from(xs.len() < every(&obstacles, true, [a.x, b.x]).len());
+            match sparse {
+                Some(route) => {
+                    orthogonal_and_free(&route, &obstacles);
+                    found += 1;
+                }
+                None => blocked += 1,
+            }
+        }
+        // Both answers occur, and the sparse grid is the smaller one.
+        assert!(
+            found > 50 && blocked > 50,
+            "{found} found, {blocked} blocked"
+        );
+        assert!(fewer > 500, "{fewer}");
+    }
+
     /// A straight run split at a vertex is one line: a route crossing it exactly at that vertex crosses once. Touching
     /// an end does not cross; a reversal (spike) is kept as drawn; redundant points on a run change nothing.
     #[test]

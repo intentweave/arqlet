@@ -4135,6 +4135,7 @@ fn routing_params(options: &LayoutOptions) -> arqlet_routing::Params {
         own_clearance: options
             .required_clearance
             .map_or(0., |c| c + options.track_spacing),
+        sparse_grid: options.sparse_repair_grid,
     }
 }
 
@@ -5306,6 +5307,7 @@ fn compute_once(
                 .or_default() += pops;
         }
         run.search.windowed_grids += completed.search.windowed_grids;
+        run.search.sparse_grids += completed.search.sparse_grids;
         run.search.delegated_nanos = run
             .search
             .delegated_nanos

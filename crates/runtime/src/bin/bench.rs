@@ -306,6 +306,7 @@ fn completion_variant(
             "legacyGridPops":drawing.search.legacy_grid_pops,
             "legacyGridPopsByRoute":drawing.search.legacy_grid_pops_by_route,
             "windowedGrids":drawing.search.windowed_grids,
+            "sparseGrids":drawing.search.sparse_grids,
             "planning":drawing.planning.as_ref().map(planning_work),
             "constructionReuse":drawing.construction_reuse.as_ref().map(construction_reuse_work),
             "coordination":drawing.coordination_work.as_ref().map(coordination_work),
