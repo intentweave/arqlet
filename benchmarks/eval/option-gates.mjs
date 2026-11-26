@@ -1,5 +1,8 @@
 // Usage: node benchmarks/eval/option-gates.mjs --arms '[["name",{...options}],...]' [--pose uniform|native] [--limit 150]
-//        [--json OUT] [DATASET ...]; needs target/release/layout-command and `npm ci` in benchmarks/eval (elk-rs).
+//        [--refine] [--json OUT] [DATASET ...]; needs target/release/layout-command and `npm ci` in benchmarks/eval (elk-rs).
+//
+// With `--refine`, every arm (the default arm too) also refines its imported drawing and the refined drawing is scored:
+// for options that act in the refinement. The table then has the refinement's strategy and its time.
 //
 // The quality gates for layout options against the default, in `DEFAULT_OBJECTIVES` order: sibling overlaps, line–node
 // hits, crossings, bends, then length and area; plus whether single pass ran and how many routes it delegated to the
@@ -18,6 +21,7 @@ const option = (name, fallback) => { const i = args.indexOf(name); return i >= 0
 const LIMIT = Number(option('--limit', 150));
 const POSE = option('--pose', 'uniform');
 const JSON_OUT = option('--json', null);
+const REFINE = args.includes('--refine') && Boolean(args.splice(args.indexOf('--refine'), 1));
 const ARMS = [['default', {}], ...JSON.parse(option('--arms', '[]'))];
 const LAYERED = ['activity-order', 'arqlet-pipeline', 'bpmn-pools', 'can-bus', 'cloud-architecture', 'deployment-cluster',
   'er-diagram', 'layerweave-code', 'mixed-large', 'network-vlan', 'org-chart', 'petri-net', 'state-order', 'state-tcp',
@@ -46,9 +50,10 @@ const load = name => {
 };
 
 const rows = [];
-console.log(`pose ${POSE}, limit ${LIMIT}\n`);
-console.log('| dataset | arm | single pass | delegated | overlaps | hits | crossings | bends | length | width × height | area (k) | ms |');
-console.log('|---|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|');
+console.log(`pose ${POSE}, limit ${LIMIT}${REFINE ? ', refined' : ''}\n`);
+console.log('| dataset | arm | single pass | delegated | overlaps | hits | crossings | bends | length | width × height | area (k) | ms |' +
+  (REFINE ? ' refine ms | strategy |' : ''));
+console.log('|---|---|---|---:|---:|---:|---:|---:|---:|---|---:|---:|' + (REFINE ? '---:|---|' : ''));
 for (const name of selected) {
   if (!existsSync(join(ROOT, 'benchmarks/datasets', `${name}.json`))) continue;
   const first = arqlet({op: 'import', graph: load(name), limit: LIMIT});
@@ -58,10 +63,17 @@ for (const name of selected) {
     try {
       // The native pose keeps the view's own options and adds the arm's.
       const base = POSE === 'native' ? first.snapshot.options ?? {} : {};
-      const r = arqlet({op: 'import', graph: {...view}, limit: view.nodes.length, options: {...base, ...options}});
+      let r = arqlet({op: 'import', graph: {...view}, limit: view.nodes.length, options: {...base, ...options}});
+      let refinement = {};
+      if (REFINE) {
+        const s = r.snapshot;
+        const refined = arqlet({op: 'refine', snapshot: s, expectedRevision: s.revision, expectedLayoutVersion: s.layoutVersion});
+        refinement = {refineMs: Math.round(refined.ms * 10) / 10, strategy: refined.snapshot.optimization.strategy};
+        r = {snapshot: refined.snapshot, ms: r.ms};
+      }
       const sp = (r.snapshot.layoutDiagnostics ?? []).find(d => d.startsWith('Single pass: '));
       row[arm] = {...score(normalizeArqlet(r.snapshot)), singlePass: Boolean(sp),
-        delegated: sp ? Number(sp.match(/(\d+) delegated/)?.[1] ?? 0) : null, ms: Math.round(r.ms * 10) / 10};
+        delegated: sp ? Number(sp.match(/(\d+) delegated/)?.[1] ?? 0) : null, ms: Math.round(r.ms * 10) / 10, ...refinement};
     } catch (error) { row[arm] = {failed: String(error.message ?? error).split('\n')[0].slice(0, 120)}; }
   }
   if (POSE === 'uniform') {
@@ -71,7 +83,8 @@ for (const name of selected) {
   for (const [arm] of ARMS) {
     const a = row[arm];
     console.log(a.failed ? `| ${name} | ${arm} | failed: ${a.failed} | | | | | | | | | |`
-      : `| ${name} | ${arm} | ${a.singlePass ? 'yes' : '**no**'} | ${a.delegated ?? '–'} | ${a.overlaps} | ${a.hits} | ${a.crossings} | ${a.bends} | ${a.length} | ${a.width} × ${a.height} | ${Math.round(a.area / 1000)} | ${a.ms} |`);
+      : `| ${name} | ${arm} | ${a.singlePass ? 'yes' : '**no**'} | ${a.delegated ?? '–'} | ${a.overlaps} | ${a.hits} | ${a.crossings} | ${a.bends} | ${a.length} | ${a.width} × ${a.height} | ${Math.round(a.area / 1000)} | ${a.ms} |` +
+        (REFINE ? ` ${a.refineMs} | ${a.strategy} |` : ''));
   }
 }
 const names = ARMS.map(a => a[0]);
@@ -94,4 +107,4 @@ for (const arm of names.slice(1)) {
     .map(r => `${r.name} (${GATES.filter(k => r[arm][k] !== r.default[k]).map(k => `${k} ${r.default[k]}→${r[arm][k]}`).join(', ')})`);
   console.log(`- ${arm}: ${worse.length ? worse.join('; ') : 'none'}`);
 }
-if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify({kind: 'option-gates', pose: POSE, limit: LIMIT, arms: ARMS, rows}, null, 1) + '\n');
+if (JSON_OUT) writeFileSync(JSON_OUT, JSON.stringify({kind: 'option-gates', pose: POSE, limit: LIMIT, refine: REFINE, arms: ARMS, rows}, null, 1) + '\n');

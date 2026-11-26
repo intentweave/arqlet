@@ -3,16 +3,17 @@ import {LEAF} from "./lib.mjs";
 
 // With `containerDirections`, a container with a fixed lr or tb direction of its own gets it as `elk.direction`; when any
 // differs from the root's, the containers are laid out separately (`SEPARATE_CHILDREN`), which is how ELK takes mixed
-// directions. Without it, one direction at the root and `INCLUDE_CHILDREN` (the uniform task).
+// directions. Without it, one direction at the root and `INCLUDE_CHILDREN` (the uniform task). `layoutOptions` are added
+// to the root and to every container.
 const DIRECTION = {lr: 'RIGHT', tb: 'DOWN', hybrid: 'RIGHT'};
-export async function elkLayout(view, engine, {containerDirections = false} = {}) {
+export async function elkLayout(view, engine, {containerDirections = false, layoutOptions: extra = {}} = {}) {
   const totalStarted = performance.now();
   const containers = new Set(view.nodes.map(n => n.parentId).filter(Boolean));
   const own = id => containerDirections ? {lr: 'RIGHT', tb: 'DOWN'}[view.containerDirections?.[id]] : undefined;
   const mixed = containerDirections && [...containers].some(id => own(id) && own(id) !== DIRECTION[view.defaultDirection]);
   const elkNodes = new Map();
   for (const n of view.nodes) {
-    const layoutOptions = own(n.id) ? {'elk.direction': own(n.id)} : {};
+    const layoutOptions = containers.has(n.id) ? {...extra, ...(own(n.id) ? {'elk.direction': own(n.id)} : {})} : {};
     elkNodes.set(n.id, containers.has(n.id) ? {id: n.id, children: [], layoutOptions} : {id: n.id, ...LEAF});
   }
   const root = {id: 'root', children: [], edges: []};
@@ -25,6 +26,7 @@ export async function elkLayout(view, engine, {containerDirections = false} = {}
     'elk.direction': DIRECTION[view.defaultDirection],
     'elk.edgeRouting': 'ORTHOGONAL',
     'elk.hierarchyHandling': mixed ? 'SEPARATE_CHILDREN' : 'INCLUDE_CHILDREN',
+    ...extra,
   };
   const prepareMs = performance.now() - totalStarted;
   const started = performance.now();

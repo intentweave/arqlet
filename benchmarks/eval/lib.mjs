@@ -15,9 +15,12 @@ if (!existsSync(LAYOUT_COMMAND)) {
 }
 
 // ---------- Arqlet ----------
+// A call that exceeds the time limit (`ARQLET_TIMEOUT_MS`, default ten minutes) is killed and fails.
+const TIMEOUT_MS = Number(process.env.ARQLET_TIMEOUT_MS ?? 600000);
 export function arqlet(request) {
   const started = performance.now();
-  const result = spawnSync(LAYOUT_COMMAND, [], {input: JSON.stringify(request), encoding: 'utf8', maxBuffer: 256 * 1024 * 1024});
+  const result = spawnSync(LAYOUT_COMMAND, [], {input: JSON.stringify(request), encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, timeout: TIMEOUT_MS, killSignal: 'SIGKILL'});
+  if (result.error) throw new Error(`${LAYOUT_COMMAND}: ${result.error.message}`);
   if (result.status !== 0) throw new Error(result.stderr);
   const response = JSON.parse(result.stdout);
   if (!response.ok) throw new Error(response.error);
