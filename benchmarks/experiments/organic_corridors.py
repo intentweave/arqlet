@@ -21,7 +21,11 @@ need is larger than its width.
 The demand predicts today's hits if R1, R2 and R3 hold.
 
 Usage: organic_corridors.py --bin target/release/layout-command --work DIR --out FILE.jsonl
-       [--costs 24] [--views NAME,...] [--timing RUNS]
+       [--costs 1] [--views NAME,...] [--timing RUNS]
+       organic_corridors.py --summarize FILE.jsonl ...
+
+With a `layout-command` built with `corridor-router-failures.patch` the records also say why routes end up through boxes.
+`--today` records only the drawing without the report, to compare binaries (the router without its grid bound).
 """
 import argparse
 import json
@@ -35,12 +39,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 EPS = 1e-6
 
-# (units, buses, children, edges, seed) of bus-mesh.mjs, bus lines as `lines`.
+# (units, buses, children, edges, seed) of bus-mesh.mjs, bus lines as `lines`. The seed chooses the bus memberships only,
+# so it makes no second view without buses.
 MESH = [
     (100, 0, 60, 250, 7), (100, 30, 60, 250, 7), (100, 30, 120, 500, 7), (100, 30, 240, 1000, 7),
     (100, 30, 0, 0, 7), (100, 0, 120, 500, 7), (100, 0, 240, 1000, 7),
     (100, 30, 60, 250, 11), (100, 30, 60, 250, 13), (100, 30, 120, 500, 11), (100, 30, 120, 500, 13),
-    (100, 0, 120, 500, 11), (100, 0, 120, 500, 13), (200, 60, 120, 500, 7), (50, 15, 120, 500, 7),
+    (200, 60, 120, 500, 7), (50, 15, 120, 500, 7),
 ]
 # Organic views of the corpus. As shipped most draw straight edges, which the plan leaves out; here every edge is
 # orthogonal (the routing settings of the graph are removed).
@@ -86,12 +91,12 @@ def request(kind, spec):
 def run(binary, body, work, limit):
     """One `layout-command` process: its answer, wall and CPU seconds. A process without CPU time after two minutes is
     hung (seen on the machine the results were recorded on) and is started again."""
-    source, target = work / "request.json", work / "answer.json"
+    source, target, errors = work / "request.json", work / "answer.json", work / "errors.txt"
     source.write_text(json.dumps(body))
     for attempt in range(3):
-        with source.open() as stdin, target.open("w") as stdout:
+        with source.open() as stdin, target.open("w") as stdout, errors.open("w") as stderr:
             started = time.time()
-            process = subprocess.Popen([binary], stdin=stdin, stdout=stdout)
+            process = subprocess.Popen([binary], stdin=stdin, stdout=stdout, stderr=stderr)
             checked = False
             while True:
                 pid, status, usage = os.wait4(process.pid, os.WNOHANG)
@@ -119,7 +124,8 @@ def run(binary, body, work, limit):
             if not answer.get("ok"):
                 return {"error": answer.get("error")}
             return {"snapshot": answer["snapshot"], "wall": time.time() - started,
-                    "cpu": usage.ru_utime + usage.ru_stime}
+                    "cpu": usage.ru_utime + usage.ru_stime,
+                    "log": [line.split("\t")[1:] for line in errors.read_text().splitlines() if line.startswith("EXP\t")]}
         print(f"  attempt {attempt + 1} ended with {process.returncode}", file=sys.stderr)
     return {"error": "no answer"}
 
@@ -278,6 +284,54 @@ def plan_summary(plan):
     }
 
 
+def router_failures(request_body, snapshot, log):
+    """With the instrumented router of `corridor-router-failures.patch`: why each route that ends up through a box does.
+    A line of its log is one repair of a route: its id, the obstacles, whether a way was found, and, when not, whether one
+    exists on the grid of the whole view (no bound on the grid's size). The last repair of a route counts."""
+    last = {}
+    for edge, _, found, unbounded in log:
+        last[edge] = (found == "1", unbounded == "1")
+    parent, boxes = absolute(snapshot)
+
+    def up(i):
+        while i:
+            yield i
+            i = parent.get(i)
+
+    edges = {e["id"]: e for e in snapshot["graph"]["edges"]}
+    taps = {t["edge"]: b for b in request_body["graph"].get("buses", [])
+            for t in b.get("taps", [])}
+    failed = [e for e, (found, _) in last.items() if not found]
+    out = {"repaired": len(last), "failed": len(failed), "failedWayExists": sum(last[e][1] for e in failed),
+           "through": {}}
+    for route in snapshot["routes"]:
+        edge = edges.get(route["id"])
+        if edge is None:
+            continue
+        skip = set(up(edge["source"])) | set(up(edge["target"]))
+        if not any(i not in skip and through(route["points"], b) for i, b in boxes.items()):
+            continue
+        e = route["id"]
+        kind = "router"
+        ids = [e]
+        if e in taps:
+            kind = "tap"
+            ends = (edge["source"], edge["target"])
+            ids = [t["edge"] for t in taps[e]["taps"] if t["node"] in ends or t["edge"] == e]
+        records = [last[i] for i in ids if i in last]
+        if any(not found and not unbounded for found, unbounded in records):
+            why = "noWayOnTheWholeGrid"
+        elif any(not found for found, _ in records):
+            why = "gridBound"
+        elif records:
+            why = "changedAfterAWayWasFound"
+        else:
+            why = "neverRepaired"
+        key = f"{kind}:{why}"
+        out["through"][key] = out["through"].get(key, 0) + 1
+    return out
+
+
 def measure(request_body, snapshot, plans):
     """Today's routes through boxes against the plan of the root area."""
     parent, boxes = absolute(snapshot)
@@ -293,7 +347,8 @@ def measure(request_body, snapshot, plans):
         return list(up(i))[-1]
 
     edges = {e["id"]: e for e in snapshot["graph"]["edges"]}
-    taps = {t["edge"]: b for b in request_body["graph"].get("buses", []) for t in b["taps"]}
+    taps = {t["edge"]: b for b in request_body["graph"].get("buses", [])
+            for t in b.get("taps", [])}
     straight = set(snapshot.get("straightEdges", []))
     routes = [r for r in snapshot["routes"] if r["id"] in edges and r["id"] not in straight]
     total = {"routes": 0, "of": len(routes), "boxHits": 0}
@@ -444,7 +499,127 @@ def measure(request_body, snapshot, plans):
     return out
 
 
+def mean(values):
+    values = [v for v in values if v is not None]
+    return sum(values) / len(values) if values else None
+
+
+def fmt(value, digits=2):
+    return "-" if value is None else f"{value:.{digits}f}"
+
+
+def summarize(files):
+    """The tables of the results file, from the records."""
+    records = [json.loads(line) for f in files for line in Path(f).read_text().splitlines()]
+    measured = [r for r in records if "areas" in r]
+    for r in records:
+        if "failed" in r:
+            print(f"FAILED {r['view']} {r.get('routeCost')}: {r['failed']}")
+    costs = sorted({r["routeCost"] for r in measured})
+    print("drawing unchanged in", sum(r["drawingUnchanged"] for r in measured), "of", len(measured), "records")
+    for cost in costs:
+        of = [r for r in measured if r["routeCost"] == cost]
+        print(f"\n## route cost {cost:g}\n")
+        print("| View | Routes through boxes: router, taps | Pairs of boxes: all, short | Demand on them: p95, max |"
+              " Missing width: median, max | Length, turns against cost 0 |")
+        print("| --- | --- | --- | --- | --- | --- |")
+        for r in of:
+            root = next((a for a in r["areas"] if a["area"] == "<root>"), None)
+            if root is None:
+                continue
+            zero = next((q for q in measured if q["view"] == r["view"] and q["routeCost"] == 0), None)
+            ratio = "-"
+            if zero:
+                z = next(a for a in zero["areas"] if a["area"] == "<root>")
+                if z["length"] and z["turns"]:
+                    ratio = f"{root['length'] / z['length']:.2f}, {root['turns'] / z['turns']:.2f}"
+            kinds = r["today"]["byKind"]
+            print(f"| {r['view']} | {kinds['router']['through']} of {kinds['router']['routes']}, "
+                  f"{kinds['tap']['through']} of {kinds['tap']['routes']} | {root['pairs']}, {root['shortPairs']} | "
+                  f"{root['innerDemandP95']}, {root['innerDemandMax']} | {root['needExtraMedian']:.0f}, "
+                  f"{root['needExtraMax']:.0f} | {ratio} |")
+        for kind in ("router", "tap"):
+            with_hits = [r for r in of if kind in r and r[kind]["pairs"]["hits"]]
+            if not with_hits:
+                continue
+            total = {k: sum(r[kind]["pairs"][k] for r in with_hits) for k in with_hits[0][kind]["pairs"]}
+            base = total["hits"] / total["pairs"]
+            print(f"\n### {kind}: {len(with_hits)} views with hits, {total['hits']} hits in {total['pairs']} pairs\n")
+            print("| Flag on a pair | Pairs flagged | Hits among them | Recall | Precision | Lift |")
+            print("| --- | --- | --- | --- | --- | --- |")
+            for label, flagged, hits in (("planned way beside the box along a short corridor", "short", "shortHits"),
+                                         ("planned way beside the box", "beside", "besideHits"),
+                                         ("straight line between the ends crosses the box (no plan)", "chord",
+                                          "chordHits")):
+                precision = total[hits] / total[flagged] if total[flagged] else None
+                print(f"| {label} | {total[flagged]} | {total[hits]} | {fmt(total[hits] / total['hits'])} | "
+                      f"{fmt(precision, 3)} | {fmt(precision / base if precision is not None else None, 1)} |")
+            verdict = (total["short"] and total["shortHits"] / total["hits"] >= 0.5 and total["beside"]
+                       and total["shortHits"] / total["short"] > total["besideHits"] / total["beside"])
+            holding = sum(
+                1 for r in with_hits for p in [r[kind]["pairs"]]
+                if p["short"] and p["shortHits"] / p["hits"] >= 0.5
+                and p["shortHits"] / p["short"] > p["besideHits"] / p["beside"])
+            print(f"\nR1 pooled: {'holds' if verdict else 'does not hold'}; holds on {holding} of "
+                  f"{len(with_hits)} views.")
+            for rule, key, what in (("R2", "routeAuc", "routes"), ("R3", "boxAuc", "boxes"), ("", "pairAuc", "pairs")):
+                names = list(with_hits[0][kind][key])
+                usable = [r for r in with_hits if any(v is not None for v in r[kind][key].values())]
+                means = {n: mean([r[kind][key][n] for r in usable]) for n in names}
+                print(f"\nAUC over {what}, mean of {len(usable)} views:\n")
+                print("| " + " | ".join(names) + " |")
+                print("|" + " --- |" * len(names))
+                print("| " + " | ".join(fmt(means[n]) for n in names) + " |")
+                if not rule:
+                    continue
+                plan = max((n for n in names if n.startswith("plan")), key=lambda n: means[n] or 0)
+                other = max((n for n in names if n.startswith("base")), key=lambda n: means[n] or 0)
+                wins = sum(1 for r in usable if r[kind][key][plan] is not None
+                           and r[kind][key][plan] > max(0.5, r[kind][key][other] or 0))
+                holds = (means[plan] or 0) > max(0.5, means[other] or 0)
+                print(f"\n{rule}: {'holds' if holds else 'does not hold'} on the mean ({plan} {fmt(means[plan])} "
+                      f"against {other} {fmt(means[other])}); {plan} is ahead on {wins} of {len(usable)} views.")
+            if kind == "router":
+                names = list(with_hits[0][kind]["boxSpearman"])
+                print("\nSpearman of the box scores with the number of routes through the box, mean:\n")
+                print("| " + " | ".join(names) + " |")
+                print("|" + " --- |" * len(names))
+                print("| " + " | ".join(fmt(mean([r[kind]["boxSpearman"][n] for r in with_hits])) for n in names) + " |")
+        sides = [r["portSides"] for r in of if "portSides" in r]
+        ends = sum(p["ends"] for p in sides)
+        if ends:
+            print(f"\nPlanned port side equal to the side of today's route: "
+                  f"{sum(p['same'] for p in sides)} of {ends} ends.")
+    default = [r for r in measured if r["routeCost"] == (1 if 1 in costs else costs[0])]
+    print("\n## Sizes (root area) and the report\n")
+    print("| View | Boxes | Routes | Corridors | Junctions | x: variables, constraints (joint) | y: the same |"
+          " Separation by demand: variables, constraints per axis | CPU s off, on | Report, KB |")
+    print("| --- |" + " --- |" * 9)
+    for r in default:
+        a = next((a for a in r["areas"] if a["area"] == "<root>"), None)
+        if a is None:
+            continue
+        x, y = a["systems"]["x"], a["systems"]["y"]
+        print(f"| {r['view']} | {a['boxes']} | {a['routes']} | {a['corridors']} | {a['junctions']} | "
+              f"{x['jointVariables']}, {x['jointConstraints']} | {y['jointVariables']}, {y['jointConstraints']} | "
+              f"{x['nodeVariables']}, {x['nodePairs']} / {y['nodePairs']} | {r['cpuOff']}, {r['cpuOn']} | "
+              f"{r['reportBytes'] / 1000:.0f} |")
+    failures = [r for r in default if "routerFailures" in r]
+    if failures:
+        print("\n## Why routes end up through boxes (instrumented router)\n")
+        total = {}
+        for r in failures:
+            f = r["routerFailures"]
+            print(r["view"], json.dumps(f))
+            for k, v in f["through"].items():
+                total[k] = total.get(k, 0) + v
+        print("total", json.dumps(total, sort_keys=True))
+
+
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--summarize":
+        summarize(sys.argv[2:])
+        return
     parser = argparse.ArgumentParser()
     parser.add_argument("--bin", default=str(ROOT / "target/release/layout-command"))
     parser.add_argument("--work", required=True, help="a directory for the request and answer files")
@@ -452,6 +627,8 @@ def main():
     parser.add_argument("--costs", default="1", help="route costs, comma separated")
     parser.add_argument("--views", default="")
     parser.add_argument("--timing", type=int, default=0, help="only times: this many runs with and without the option")
+    parser.add_argument("--today", action="store_true",
+                        help="only today's drawing (no report): routes through boxes and CPU time, for another binary")
     parser.add_argument("--limit", type=int, default=900)
     args = parser.parse_args()
     work = Path(args.work)
@@ -466,8 +643,13 @@ def main():
         "os": platform.platform(),
         "revision": sh("git", "rev-parse", "HEAD"),
         "dirty": bool(sh("git", "status", "--porcelain", "--", "crates")),
-        "binary": str(Path(args.bin).resolve().relative_to(ROOT)),
-        "command": "organic_corridors.py " + " ".join(a for a in sys.argv[1:] if str(work) not in a and a != "--work"),
+        # A binary outside the repository is named by its file name only.
+        "binary": (str(Path(args.bin).resolve().relative_to(ROOT)) if Path(args.bin).resolve().is_relative_to(ROOT)
+                   else Path(args.bin).name),
+        # The arguments that decide what is measured; no paths.
+        "command": ("organic_corridors.py --today" if args.today else f"organic_corridors.py --costs {args.costs}")
+                   + (f" --views {args.views}" if args.views else "")
+                   + (f" --timing {args.timing}" if args.timing else ""),
     }
     with open(args.out, "a") as out:
         for name in wanted:
@@ -486,6 +668,10 @@ def main():
                             with_plan["options"]["organicCorridors"] = {"routeCost": cost}
                             got = run(args.bin, with_plan, work, args.limit)
                         times[label].append({k: got[k] for k in ("wall", "cpu")} if "snapshot" in got else got)
+                        plans = got.get("snapshot", {}).get("corridorPlans")
+                        if plans:
+                            record["reportBytes"] = len(json.dumps(plans, separators=(",", ":")))
+                            record["sizes"] = next((plan_summary(p) for p in plans if p["area"] == "<root>"), None)
                 record["times"] = times
                 record["loadAfter"] = os.getloadavg()
                 out.write(json.dumps(record) + "\n")
@@ -497,6 +683,14 @@ def main():
                 out.write(json.dumps({**record, "failed": base}) + "\n")
                 print(name, base, file=sys.stderr)
                 continue
+            if args.today:
+                today = measure(body, base["snapshot"], [])["today"]
+                line = {**record, "cpuOff": round(base["cpu"], 3), "today": today}
+                out.write(json.dumps(line) + "\n")
+                out.flush()
+                print(name, "through", today["routes"], "router", today["byKind"]["router"]["through"], "taps",
+                      today["byKind"]["tap"]["through"], "cpu", line["cpuOff"], file=sys.stderr)
+                continue
             for cost in (float(c) for c in args.costs.split(",")):
                 with_plan["options"]["organicCorridors"] = {"routeCost": cost}
                 got = run(args.bin, with_plan, work, args.limit)
@@ -506,12 +700,16 @@ def main():
                     continue
                 snapshot = got["snapshot"]
                 plans = snapshot.pop("corridorPlans", [])
-                snapshot["options"].pop("organicCorridors", None)
-                reference = json.loads(json.dumps(base["snapshot"]))
+                # Everything but the options: default options are left out of an answer altogether, so only with the
+                # report's option present can a view with otherwise default options differ there.
+                options = snapshot.pop("options", {})
+                options.pop("organicCorridors", None)
+                reference = dict(base["snapshot"])
+                expected = reference.pop("options", None)
                 line = {
                     **record,
                     "routeCost": cost,
-                    "drawingUnchanged": snapshot == reference,
+                    "drawingUnchanged": snapshot == reference and expected in (None, options),
                     "cpuOff": round(base["cpu"], 3),
                     "cpuOn": round(got["cpu"], 3),
                     "reportBytes": len(json.dumps(plans, separators=(",", ":"))),
@@ -519,6 +717,8 @@ def main():
                     "otherAreas": sum(not (p["routes"] or p["area"] == "<root>") for p in plans),
                     **measure(body, base["snapshot"], plans),
                 }
+                if base["log"]:
+                    line["routerFailures"] = router_failures(body, base["snapshot"], base["log"])
                 out.write(json.dumps(line) + "\n")
                 out.flush()
                 root = next((a for a in line["areas"] if a["area"] == "<root>"), {})

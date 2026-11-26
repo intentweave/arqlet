@@ -32,6 +32,9 @@ const requests = [
   ['import organic-100', {op: 'import', graph: graph('benchmarks/datasets/organic-100.json'), limit: 200}],
   ['import tree-100', {op: 'import', graph: graph('benchmarks/datasets/tree-100.json'), limit: 200}],
   ['import mixed-layouts', {op: 'import', graph: graph('benchmarks/datasets/mixed-layouts.json'), limit: 200}],
+  // The corridor plan of organic areas (`organicCorridors`, #156): the report is computed in integers.
+  ['import organic corridors', {op: 'import', graph: graph('benchmarks/datasets/vehicle-buses-organic.json'), limit: 200,
+    options: {organicCorridors: {}, busStyle: 'lines'}}],
   ['elkLayout', {op: 'elkLayout', graph: elk}],
   ['elkLayout refined', {op: 'elkLayout', graph: elk, refine: true}],
   ['overview 10 000', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json')}],

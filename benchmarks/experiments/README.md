@@ -1,6 +1,7 @@
 # Experiments (not merged)
 
-Patches that were measured and not merged. Each applies to commit `1a514c8` (A2, first step).
+Patches that were measured and not merged. Each applies to commit `1a514c8` (A2, first step) unless its section names
+another.
 Apply with `git apply benchmarks/experiments/<name>.patch`.
 
 ## `local-channel-candidate.patch`
@@ -28,3 +29,11 @@ hugging 2 on state-tcp (`profiles-20261021T151732Z`).
 The key comparison alone is merged (`profiles-20261021T151732Z`: all inputs better or equal, run time unchanged).
 The local candidate is not merged. To reoptimize it, the local candidate needs a path to the same results as the
 full reroute on state-tcp, and the run time has to be measured against the full reroute on the same machine.
+
+## `corridor-router-failures.patch`
+
+Applies to `84d87af` and to main `70d744b` (the router is the same). An instrumented router for step C1 of the organic
+corridors (#156): every repair of a route writes `EXP`, its id, the obstacles, whether a way was found and, when not,
+whether one exists on the grid of the whole view, to standard error. `organic_corridors.py --bin` with a
+`layout-command` built with it records why routes end up through boxes
+(`benchmarks/results/organic-corridor-plan-20261126.md`). Not meant to be merged: it searches every failed route again.

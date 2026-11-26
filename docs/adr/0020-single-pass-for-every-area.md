@@ -116,8 +116,8 @@ strategy, and it offers **border ports** to the area around it, as ADR 0017's ar
 
 ## Amendment: routes planned inside organic regions (2026-11-23)
 
-Status: proposed (#156). Nothing below is built yet; each step comes behind the option `organicCorridors` (off, omitted)
-and is accepted only by the quality gate of decision 6.
+Status: proposed (#156). Each step comes behind the option `organicCorridors` (off, omitted) and is accepted only by the
+quality gate of decision 6. Only C1 is built; its outcome (2026-11-26) is recorded at the end.
 
 ### Context
 
@@ -249,3 +249,35 @@ organic playground examples, mixed-large and the other organic views of the corp
   and C2, not set by intuition.
 - Large regions (above 300 children the scalable stress takes over): the corridor graph is linear in the neighbour pairs,
   but the routing on it is not free; the time is part of every step.
+
+### C1 outcome (2026-11-26)
+
+Built behind `organicCorridors` (a report, `corridorPlans`; the drawing is unchanged) and measured:
+[results](../../benchmarks/results/organic-corridor-plan-20261126.md). The numbers and their limits are there.
+
+- **The question of C1** ("does the planned demand predict where routes go through boxes today?"): **no** at the
+  default route cost. The ADR names no threshold; the reading was fixed in the measurement script before its first run
+  (where, which routes and which boxes, each against what is known without a plan). Two of its three parts fail at the
+  default; all three hold only at route cost 0, narrowly, where the demand is that of shortest ways. The straight line
+  between an edge's ends, without any plan, finds the boxes hit better than the short corridors do.
+- **The cause given under Context does not explain today's failures on the generated views.** Of 461 routes the router
+  draws through a box, 437 have a way with the same clearance and stubs that the router does not search: it takes the
+  grid of the whole view only up to 120 000 cells. Without that bound (an experiment, not merged) 461 become 24, at up
+  to 37 times the CPU time on one view and less on another. Missing room can explain at most the 23 with no way. The bus
+  taps through boxes (247) do not change with the bound; what draws them there was not investigated.
+- **What it means for C2.** Its expectation, that after separation by demand no route goes through a box, is not
+  supported: the separation moves boxes apart, and the router's grid still has its lines beside every box. A wider gap
+  did change the counts (`organicGap`, [results](../../benchmarks/results/organic-gap-20261123.md)), so a separation
+  may change them too, but not for the reason given here, and this measurement gives no reason to expect the planned
+  demand to place that room well. C2 is not started. The nearer step is the router's search on large views, then this
+  comparison again.
+- **Sizes and widths for a later decision.** About a third of all neighbour pairs would be short (one route already needs
+  30 against the gap of 24), and the busiest corridor of a view would need up to 1 638 units with one track per route.
+  The joint system has up to 1 605 variables and 17 679 constraints per axis on the generated views, 5 to 43 times the
+  constraints of separation by demand; whether `vpsc` solves either was not tried.
+- **Route cost**, measured: 1 by default (6 % more planned length for half the missing width); 24 lengthens the planned
+  ways by a third.
+- **Departures from the text above**: the corridors are cut from the free space directly (a search radius of
+  `scanline_pairs` gives pairs, not free space or junctions); the plan is made on the boxes the layout ends with, after
+  the geometry repair, which moved a few root boxes by up to 1 200 units after the arrangement; the port is a side, not
+  a point on it; the space at an area's outer edge costs a route nothing and is never short.

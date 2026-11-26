@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `organicCorridors` (provisional, off, #156): a measurement of organic areas. The drawing is unchanged; the snapshot gets
+  `corridorPlans`, with the corridors between neighbouring boxes, a planned way per edge, the demand and the gap each
+  corridor would need, and the sizes of the constraint systems of ADR 0020's later steps. Its measurement found that the
+  demand does not predict today's routes through boxes, most of which come from the router's grid bound
+  (`benchmarks/results/organic-corridor-plan-20261126.md`).
 - Lanes inside every container (provisional, ADR 0022 M4d): behind the parent hierarchy, or a dimension drawn as boxes, a second
   criterion `as: lanes` cuts every layered area into bands, the top level included; drawn inside each container. Playground:
   *Second structure as bands* (phases with *As lanes*, lanes inside the containers without).
