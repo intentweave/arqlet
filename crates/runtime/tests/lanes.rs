@@ -292,3 +292,142 @@ fn no_bands_without_lanes_or_where_they_are_not_applied() {
     let s = import_graph_with(organic, 500, &lanes("pool")).unwrap();
     assert!(build_scene(&s).unwrap().membership_lanes.is_empty());
 }
+
+/// Lanes by `first`, phases by `second`, and the parent hierarchy last.
+fn grid(first: &str, second: &str) -> LayoutOptions {
+    let mut options = lanes(first);
+    options.grouping_priority.insert(
+        1,
+        GroupingCriterion {
+            by: second.into(),
+            render: GroupingRendering::Lanes,
+            ..Default::default()
+        },
+    );
+    options
+}
+
+#[test]
+fn phases_follow_one_another_along_the_flow_and_make_a_grid_with_the_lanes() {
+    let cases = [
+        (POOLS, "pool", "phase"),
+        (POOLS, "phase", "pool"),
+        (THREE, "zone", "layer"),
+        (THREE, "team", "zone"),
+        (THREE, "layer", "team"),
+    ];
+    // Also the pipeline before single pass, which ranks by the cycle break alone.
+    for ((text, first, second), legacy) in cases.iter().flat_map(|c| [(*c, false), (*c, true)]) {
+        let g = graph(text);
+        let mut options = grid(first, second);
+        if legacy {
+            options.single_pass_auto = false;
+            options.single_pass = false;
+        }
+        let s = import_graph_with(g.clone(), 500, &options).unwrap();
+        assert_eq!(s.options.single_pass, !legacy, "{first} x {second}");
+        assert!(s.geometry_issues.is_empty(), "{:?}", s.geometry_issues);
+        let at = arqlet_layout::absolute_all(&s.graph, &s.boxes);
+        // Every node of a phase lies after every node of the phase before, along x (the fixtures flow left to right).
+        let phase = arqlet_model::grouping::top_level_phases(&s.graph, second);
+        let mut extent: std::collections::BTreeMap<usize, (f64, f64)> = Default::default();
+        for (id, p) in &phase {
+            let r = &at[id.as_str()];
+            let e = extent.entry(*p).or_insert((r.x, r.x + r.width));
+            *e = (e.0.min(r.x), e.1.max(r.x + r.width));
+        }
+        let list: Vec<_> = extent.values().collect();
+        for w in list.windows(2) {
+            assert!(w[0].1 < w[1].0, "{first} x {second}: {list:?}");
+        }
+        // The lanes still lie behind one another across the flow.
+        assert_bands(&s, &g, first, false);
+        let scene = build_scene(&s).unwrap();
+        let phase_bands: Vec<_> = scene.membership_lanes.iter().filter(|l| l.phase).collect();
+        let lane_bands = scene.membership_lanes.len() - phase_bands.len();
+        assert_eq!(phase_bands.len(), extent.len(), "{first} x {second}");
+        assert!(lane_bands > 1);
+        let report = &scene.membership_report[1];
+        assert!(report.applied, "{}", report.summary);
+        assert!(
+            report
+                .summary
+                .contains("phases along the flow, 0 out of place"),
+            "{}",
+            report.summary
+        );
+        // Phases are bands, not hulls.
+        assert!(!scene.membership_hulls.iter().any(|h| h.dimension == second));
+        // Every edge keeps its logical direction, also one that runs back from a later phase.
+        for e in &s.graph.edges {
+            let (Some(t), Some(r)) = (&e.target, s.routes.iter().find(|r| r.id == e.id)) else {
+                continue;
+            };
+            let near = |p: &arqlet_model::Point, id: &str| {
+                let b = &at[id];
+                p.x >= b.x - 1.
+                    && p.x <= b.x + b.width + 1.
+                    && p.y >= b.y - 1.
+                    && p.y <= b.y + b.height + 1.
+            };
+            assert!(
+                near(&r.points[0], &e.source) && near(r.points.last().unwrap(), t),
+                "{}",
+                e.id
+            );
+        }
+    }
+}
+
+#[test]
+fn the_grid_of_pools_and_phases_is_the_target_of_the_fixture() {
+    // The fixture's own priority: pools across, phases along. Two lanes, three phases, every task in its cell.
+    let g = graph(POOLS);
+    let value: serde_json::Value = serde_json::from_str(POOLS).unwrap();
+    let options: LayoutOptions =
+        serde_json::from_value(serde_json::json!({"groupingPriority": value["groupingPriority"]}))
+            .unwrap();
+    let s = import_graph_with(g.clone(), 500, &options).unwrap();
+    let scene = build_scene(&s).unwrap();
+    let cells: Vec<(String, bool)> = scene
+        .membership_lanes
+        .iter()
+        .map(|l| (l.group.clone(), l.phase))
+        .collect();
+    assert_eq!(
+        cells,
+        [
+            ("customer", false),
+            ("supplier", false),
+            ("request", true),
+            ("approval", true),
+            ("fulfil", true)
+        ]
+        .map(|(g, p)| (g.to_string(), p))
+    );
+    let at = arqlet_layout::absolute_all(&s.graph, &s.boxes);
+    let band = |group: &str| {
+        &scene
+            .membership_lanes
+            .iter()
+            .find(|l| l.group == group)
+            .unwrap()
+            .rect
+    };
+    for d in &g.memberships.dimensions {
+        for group in &d.groups {
+            let b = band(&group.id);
+            for m in &group.members {
+                let r = &at[m.as_str()];
+                assert!(
+                    r.x >= b.x
+                        && r.x + r.width <= b.x + b.width
+                        && r.y >= b.y
+                        && r.y + r.height <= b.y + b.height,
+                    "{m} outside {}",
+                    group.id
+                );
+            }
+        }
+    }
+}

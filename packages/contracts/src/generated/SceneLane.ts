@@ -9,4 +9,9 @@ export type SceneLane = { dimension: string, dimensionLabel: string, group: stri
 /**
  * What to write on the band: the group's label, or its id where it has none.
  */
-label: string, rect: Rect, vertical: boolean, };
+label: string, rect: Rect, vertical: boolean,
+/**
+ * A phase along the flow (the second criterion as lanes, M4b), not a lane across it. Phases have a header strip for their
+ * names on the side where the lanes start.
+ */
+phase?: boolean, };

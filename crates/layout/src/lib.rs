@@ -6111,7 +6111,13 @@ fn known_reversals(
         if !global::Flattening::of(parent, graph, index, options, &children).is_empty() {
             return None;
         }
-        let (_, links, ranks) = area_ranks(&children, index, options, false, 1., false, pins);
+        let phase = if parent.is_none() {
+            crate::lanes::phases(graph, options)
+        } else {
+            BTreeMap::new()
+        };
+        let (_, links, ranks) =
+            area_ranks(&children, index, options, false, 1., false, pins, &phase);
         out.insert(
             parent.unwrap_or("<root>").to_string(),
             links
@@ -6229,6 +6235,7 @@ fn area_ranks(
     isolated_pitch: f64,
     vertical: bool,
     pins: &pinned::Places,
+    phase: &BTreeMap<String, usize>,
 ) -> (
     Vec<Option<usize>>,
     BTreeSet<(String, String)>,
@@ -6270,8 +6277,43 @@ fn area_ranks(
     let mut free: BTreeSet<usize> = (0..ids.len()).filter(|&i| indegree[i] == 0).collect();
     let mut rank_of = vec![0usize; ids.len()];
     let mut kahn_slots: Vec<usize> = Vec::with_capacity(ids.len());
+    // Provisional (ADR 0022 M4b): with phases, the phases are taken one after the other. Within the earliest phase that has
+    // nodes left, a node is free when no node of that phase still links to it: a link from a later phase is turned.
+    let phase_of: Vec<usize> = ids
+        .iter()
+        .map(|id| phase.get(id.as_str()).copied().unwrap_or(0))
+        .collect();
+    let phased = !phase.is_empty();
+    let mut floor = vec![0usize; ids.len()];
     while let Some(&first) = remaining.first() {
-        let next = free.first().copied().unwrap_or(first);
+        let next = if phased {
+            let current = remaining.iter().map(|&i| phase_of[i]).min().unwrap_or(0);
+            let open = |i: usize| {
+                incoming[i]
+                    .iter()
+                    .all(|&j| !remaining.contains(&j) || phase_of[j] != current)
+            };
+            remaining
+                .iter()
+                .copied()
+                .filter(|&i| phase_of[i] == current)
+                .find(|&i| open(i))
+                .or_else(|| remaining.iter().copied().find(|&i| phase_of[i] == current))
+                .unwrap_or(first)
+        } else {
+            free.first().copied().unwrap_or(first)
+        };
+        if phased {
+            // A phase starts in the rank after the last of every earlier phase.
+            let start = kahn_slots
+                .iter()
+                .filter(|&&i| phase_of[i] < phase_of[next])
+                .map(|&i| rank_of[i] + 1)
+                .max()
+                .unwrap_or(0);
+            floor[next] = start;
+            rank_of[next] = rank_of[next].max(start);
+        }
         remaining.remove(&next);
         free.remove(&next);
         kahn_slots.push(next);
@@ -6313,6 +6355,16 @@ fn area_ranks(
                 .map(|&from| rank_of[from] + 1)
                 .max()
                 .unwrap_or(0);
+            if phased {
+                let start = kahn_slots
+                    .iter()
+                    .take_while(|&&i| i != id)
+                    .filter(|&&i| phase_of[i] < phase_of[id])
+                    .map(|&i| rank_of[i] + 1)
+                    .max()
+                    .unwrap_or(0);
+                rank_of[id] = rank_of[id].max(start).max(floor[id].min(start));
+            }
         }
     }
     let mut ranks: BTreeMap<String, usize> = ids
@@ -6682,6 +6734,11 @@ fn place(
             isolated_pitch,
             matches!(direction_for(graph, parent), Mode::Orientation(o) if o.vertical()),
             &pins,
+            &if parent.is_none() && flattening.is_empty() {
+                crate::lanes::phases(graph, options)
+            } else {
+                BTreeMap::new()
+            },
         );
         let owner = |id: usize| owner_among(&child_position, index, id);
         let mut levels: BTreeMap<usize, Vec<String>> = BTreeMap::new();
