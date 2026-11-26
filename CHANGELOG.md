@@ -52,7 +52,9 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   through boxes are no longer routed a second time; nothing draws or reads them (#150). A generated view with its
   one-bus containers collapsed imported in up to 5.5 times the time of the open view; it no longer pays for that pass
   (`benchmarks/results/bus-collapse-20261126.md`). The drawing is unchanged. `busTaps` (the routes, ports and border
-  crossings kept for the taps) and `recomputedContainers` can differ. Views with bars are laid out as before.
+  crossings kept for the taps) and `recomputedContainers` can differ, and so can one line of `layoutDiagnostics`
+  ("Engine choice not tried"), which stays where that pass had left no route through a box. Views with bars are laid out
+  as before, and stay slower collapsed than open.
 - `arqlet-layout` (Rust): `compute_compared`, the layout for a drawing that is compared with another one.
 - `openBookmark(bookmark, {force: true})` of another graph's long-form bookmark restores what the graph has and reports
   the rest (`missing`, `ignored`); before, one unknown id refused the whole restore. `openBookmark` also takes text.

@@ -32,4 +32,4 @@ full reroute on state-tcp, and the run time has to be measured against the full 
 ## `bus-collapse-phases.patch`
 
 Not a candidate: temporary timing prints for the phase table of `benchmarks/results/bus-collapse-20261126.md` (#150).
-It applies to the commit that added that file. `bus-collapse.mjs` records the printed lines.
+It applies to commit `70b4b9a`. `bus-collapse.mjs` records the printed lines.
