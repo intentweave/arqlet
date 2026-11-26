@@ -156,21 +156,31 @@ change no answer that does not ask for them. Usage: [integration guide](../integ
    the alternative and was rejected: a client without the graph cannot resolve it, the taps of buses given as data have
    no input edge, and a host with the graph already has the order (`resolvedEdgeIds`). On request, because it makes every
    answer larger and most hosts have the graph.
-2. **Continuation by node id** (`start.nodes`, `id → {x, y, r}`; excluding `x`, `y`, `r`): read onto the current
-   hierarchy (`arqlet_layout::overview::continue_by_id`), then laid out as any continuation. A node without a usable
-   place (none, a new container, or an entry outside its container's earlier disc) is put next to the nodes it is linked
-   to, and its container makes room or settles. A container that lost a node counts as changed. The earlier disc of a
-   container judges its members only when it holds at least half of them or they gather elsewhere, so that a disc the
-   host set smaller than its content (`radii`) does not send them all anew.
-3. **Added clusters are matched by place.** Their ids are positions in a clustering. Discs of one container do not
-   overlap, so the earlier discs say which nodes shared a cluster: each cluster takes as its predecessor the earlier
-   cluster disc that holds at least half of the nodes below it with the best Jaccard share; members outside it are placed
-   anew; that disc is kept when it has the same id or is exactly the disc around the remaining members; otherwise the cluster
-   gets the smallest disc (nearly) around them. An unchanged graph therefore continues exactly as by node index,
-   whatever the ids say.
+2. **Continuation by node id** (`start.nodes`, `id → {x, y, r}`; excluding `x`, `y`, `r`): read onto the graph as it
+   is now (`arqlet_layout::overview::continue_by_id`), then laid out as any continuation. A node without a usable place
+   (none, a new container, or an entry outside its container's earlier disc) is put next to the nodes it is linked to,
+   and its container makes room or settles. A container that lost a node counts as changed, as does one whose children
+   no longer fit together at their places (a node that moved up out of a container). The earlier disc of a container
+   judges its members only when it holds at least half of them or they gather elsewhere, so that a disc the host set
+   smaller than its content (`radii`) does not send them all anew.
+3. **The added clusters continue; the changed graph is not clustered anew** (`clusters_by_id`). Discs of one container
+   do not overlap, so the earlier cluster discs say which nodes each cluster held, whatever the graph would be clustered
+   into now. Each keeps its id; a new node joins the cluster of the nodes it is linked to most; a cluster with fewer
+   than two children is dissolved; containers without earlier clusters are clustered as a new graph's. An unchanged
+   graph therefore continues exactly as by node index.
+
+   Rejected: clustering the changed graph anew and matching its clusters to the earlier discs by their members (built
+   first, commit `78a5bbd`). Louvain regroups far more than what changed, so many nodes were placed anew and the new
+   clusters' discs overlapped; removing the overlaps without forces grew the root disc up to 31 times on a flat generated
+   graph with 5 % of the nodes changed, and 1.6 times on a hierarchical one with 0.1 %. Kept clusters grow it by at most
+   1.2 times on the same changes ([movements](../../benchmarks/results/overview-continuation-20261126.md)).
+
+   The price: the clusters of a continuation drift from those of a fresh layout as changes add up (a node whose links
+   moved to another community stays where it was). The host decides when to lay out without `start`.
 
 Open: the drill-down from an `OverviewModel` without the input graph (part 2 of #209) builds on 1; it may want edge ids,
-which would be another request field.
+which would be another request field. Not kept from the places: which nodes a cluster held whose disc the host set
+smaller than its content; an entry could name its parent for that.
 
 ## Real data (2026-11-11)
 

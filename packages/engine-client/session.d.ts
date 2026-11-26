@@ -323,7 +323,8 @@ export function httpRun(
 
 /**
  * An overview request without `op` and `graph` (`OverviewRequest` in `@arqlet/contracts`): `start` without positions
- * continues from the last overview, `start.nodes` (places by node id) from the places given, also on a new graph.
+ * continues from the last overview, `start.nodes` (places by node id) from the places given, also on a new graph, and
+ * keeps their clusters.
  */
 export type OverviewSessionRequest = Omit<OverviewRequest, 'graph'>;
 

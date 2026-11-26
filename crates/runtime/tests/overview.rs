@@ -1482,63 +1482,67 @@ fn a_removed_node_is_ignored_and_reported_and_the_rest_stays() {
     }
 }
 
-/// The community of a node: its parent in the overview.
-fn community_of(o: &Value, id: &str) -> usize {
-    o["parent"][at(o, id)].as_i64().unwrap() as usize
+/// The cluster of a node: its parent's id in the overview, or "" at the top level.
+fn cluster_of(o: &Value, id: &str) -> String {
+    match o["parent"][at(o, id)].as_i64().unwrap() {
+        -1 => String::new(),
+        p => o["ids"][p as usize].as_str().unwrap().to_string(),
+    }
 }
 
 #[test]
-fn renumbered_communities_continue_by_their_members() {
+fn clusters_keep_their_ids_where_the_graph_alone_would_name_others() {
     let graph = rings();
     let first = answer(&json!({"op": "overview", "graph": graph}));
     assert_eq!(first["stats"]["communities"], 4);
-    // The first ring's nodes last: Louvain numbers the communities by their first node, so the ids name other rings.
+    // The first ring's nodes last: Louvain numbers the communities by their first node, so clustered anew the same ids
+    // name other rings.
     let mut turned = graph.clone();
     turned["nodes"].as_array_mut().unwrap().rotate_left(40);
+    let fresh = answer(&json!({"op": "overview", "graph": turned}));
+    assert_ne!(cluster_of(&fresh, "r1n0"), cluster_of(&first, "r1n0"));
     let o = answer(&json!({"op": "overview", "graph": turned,
         "start": {"nodes": places(&first)}}));
-    let ring = |o: &Value, r: usize| {
-        o["ids"][community_of(o, &format!("r{r}n0"))]
-            .as_str()
-            .unwrap()
-            .to_string()
-    };
-    assert_ne!(ring(&o, 1), ring(&first, 1), "the ids are positions");
     assert_eq!(
         o["continuation"],
         json!({"continued": 160, "anew": 0, "ignored": []})
     );
     for r in 0..4 {
         for i in 0..40 {
-            assert!(
-                moved_by(&first, &o, &format!("r{r}n{i}")) < 0.02,
-                "r{r}n{i}"
-            );
+            let id = format!("r{r}n{i}");
+            assert_eq!(cluster_of(&o, &id), cluster_of(&first, &id), "{id}");
+            assert!(moved_by(&first, &o, &id) < 0.02, "{id}");
         }
-        let (a, b) = (
-            community_of(&first, &format!("r{r}n0")),
-            community_of(&o, &format!("r{r}n0")),
-        );
         // Hundredths: a radius is measured again from rounded places.
+        let cluster = cluster_of(&first, &format!("r{r}n0"));
         for k in ["x", "y", "r"] {
-            let (was, is) = (first[k][a].as_f64().unwrap(), o[k][b].as_f64().unwrap());
-            assert!((was - is).abs() < 0.02, "ring {r}: {k} {was} {is}");
+            let (was, is) = (&first[k][at(&first, &cluster)], &o[k][at(&o, &cluster)]);
+            assert!(
+                (was.as_f64().unwrap() - is.as_f64().unwrap()).abs() < 0.02,
+                "{cluster}: {k} {was} {is}"
+            );
         }
     }
 }
 
 #[test]
-fn a_node_that_changed_its_community_is_placed_anew_there() {
+fn a_changed_community_keeps_its_cluster_and_takes_the_new_nodes_linked_to_it() {
     let graph = rings();
     let first = answer(&json!({"op": "overview", "graph": graph}));
-    // r0n7 now calls and is called by ring 2 instead of ring 0.
+    // Ring 1 loses half of its nodes, ring 2 gets six new ones, and r0n7 now calls only into ring 2.
+    let gone: Vec<String> = (20..40).map(|i| format!("r1n{i}")).collect();
     let mut changed = graph.clone();
-    for (k, e) in changed["edges"]
+    changed["nodes"]
         .as_array_mut()
         .unwrap()
-        .iter_mut()
-        .enumerate()
-    {
+        .retain(|n| !gone.iter().any(|g| n["id"] == **g));
+    let edges = changed["edges"].as_array_mut().unwrap();
+    edges.retain(|e| {
+        ["source", "target"]
+            .iter()
+            .all(|k| !gone.iter().any(|g| e[k] == **g))
+    });
+    for (k, e) in edges.iter_mut().enumerate() {
         for end in ["source", "target"] {
             if e[end] == "r0n7" {
                 let other = if end == "source" { "target" } else { "source" };
@@ -1546,46 +1550,146 @@ fn a_node_that_changed_its_community_is_placed_anew_there() {
             }
         }
     }
+    for i in 0..6 {
+        let id = format!("new{i}");
+        for d in 0..3 {
+            changed["edges"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"id": format!("{id}-{d}"),
+                "kind": "call", "source": id, "target": format!("r2n{}", i * 5 + d)}));
+        }
+        changed["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id": id, "kind": "fn", "label": id, "parentId": null}));
+    }
+    // Clustered anew, r0n7 goes with ring 2.
+    let fresh = answer(&json!({"op": "overview", "graph": changed}));
+    assert_eq!(cluster_of(&fresh, "r0n7"), cluster_of(&fresh, "r2n0"));
     for settle in [false, true] {
-        let o = answer(&json!({"op": "overview", "graph": changed,
-            "start": {"nodes": places(&first), "settle": settle}, "threads": 3}));
-        assert_eq!(
-            community_of(&o, "r0n7"),
-            community_of(&o, "r2n0"),
-            "it changed its community"
-        );
+        let request = json!({"op": "overview", "graph": changed,
+            "start": {"nodes": places(&first), "settle": settle}, "threads": 3});
+        let o = answer(&request);
         assert_nested(&o);
         assert_eq!(
             o["continuation"],
-            json!({"continued": 159, "anew": 1, "ignored": []})
+            json!({"continued": 140, "anew": 6, "ignored": sorted(&gone)})
         );
-        // The others stay in their communities, which stay about where they were.
-        let wide = first["r"][community_of(&first, "r2n0")].as_f64().unwrap();
-        let most = (0..4)
-            .flat_map(|r| (0..40).map(move |i| format!("r{r}n{i}")))
-            .filter(|id| id != "r0n7")
-            .map(|id| moved_by(&first, &o, &id))
+        // The clusters are the earlier ones: r0n7 stays where it was, the new nodes join the ring they call.
+        assert_eq!(o["stats"]["communities"], 4);
+        assert_eq!(cluster_of(&o, "r0n7"), cluster_of(&first, "r0n7"));
+        assert_eq!(cluster_of(&o, "r1n0"), cluster_of(&first, "r1n0"));
+        for i in 0..6 {
+            assert_eq!(
+                cluster_of(&o, &format!("new{i}")),
+                cluster_of(&first, "r2n0")
+            );
+        }
+        let radius = |o: &Value, id: &str| o["r"][at(o, &cluster_of(o, id))].as_f64().unwrap();
+        if settle {
+            // The smaller cluster closes up.
+            assert!(radius(&o, "r1n0") < 0.9 * radius(&first, "r1n0"));
+        }
+        let wide = radius(&first, "r2n0");
+        let most = changed["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| n["id"].as_str().unwrap())
+            .filter(|id| !id.starts_with("new"))
+            .map(|id| moved_by(&first, &o, id))
             .fold(0., f64::max);
         eprintln!("changed community, settle {settle}: moved at most {most:.2} (community radius {wide:.2})");
         assert!(most < wide, "settle {settle}: {most} >= {wide}");
-        if !settle {
-            for i in 0..40 {
-                assert!(moved_by(&first, &o, &format!("r1n{i}")) < wide / 4.);
-            }
+        // Continuing that answer by id, unchanged, finds the same clusters and moves nothing.
+        let again = answer(&json!({"op": "overview", "graph": changed,
+            "start": {"nodes": places(&o)}}));
+        assert_eq!(again["ids"], o["ids"]);
+        assert_eq!(again["parent"], o["parent"]);
+        for id in o["ids"].as_array().unwrap() {
+            assert!(moved_by(&o, &again, id.as_str().unwrap()) < 0.05, "{id}");
         }
     }
-    // The places of the graph's nodes alone do as well: each cluster's disc then follows from its members.
+}
+
+/// Ids as `continuation.ignored` lists them.
+fn sorted(ids: &[String]) -> Vec<String> {
+    let mut ids = ids.to_vec();
+    ids.sort();
+    ids
+}
+
+#[test]
+fn clusters_are_dissolved_made_or_left_out_as_the_graph_and_the_options_say() {
+    let graph = rings();
+    let first = answer(&json!({"op": "overview", "graph": graph}));
+    // All of ring 3 but one node: its cluster is dissolved, the node stays where it was.
+    let mut changed = graph.clone();
+    changed["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|n| n["id"] == "r3n0" || !n["id"].as_str().unwrap().starts_with("r3"));
+    changed["edges"].as_array_mut().unwrap().retain(|e| {
+        ["source", "target"].iter().all(|k| {
+            let id = e[k].as_str().unwrap();
+            id == "r3n0" || !id.starts_with("r3")
+        })
+    });
+    let o = answer(&json!({"op": "overview", "graph": changed,
+        "start": {"nodes": places(&first)}}));
+    assert_nested(&o);
+    assert_eq!(o["stats"]["communities"], 3);
+    assert_eq!(cluster_of(&o, "r3n0"), "");
+    assert!(moved_by(&first, &o, "r3n0") < 0.05);
+    // Communities switched off: none is kept, and the nodes stay where they were.
+    let o = answer(
+        &json!({"op": "overview", "graph": graph, "options": {"communities": 0},
+        "start": {"nodes": places(&first)}}),
+    );
+    assert_eq!(o["stats"]["communities"], 0);
+    assert_eq!(o["continuation"]["continued"], 160);
+    for i in 0..40 {
+        assert!(moved_by(&first, &o, &format!("r1n{i}")) < 0.05);
+    }
+    // Without the places of the earlier clusters, the graph is clustered anew and those clusters laid out anew.
     let mut leaves = places(&first);
     leaves
         .as_object_mut()
         .unwrap()
         .retain(|id, _| !id.starts_with("community:"));
     let o = answer(&json!({"op": "overview", "graph": graph, "start": {"nodes": leaves}}));
-    assert_eq!(o["continuation"]["continued"], 160);
     assert_nested(&o);
-    for i in 0..40 {
-        assert!(moved_by(&first, &o, &format!("r1n{i}")) < 1.);
+    assert_eq!(
+        o["continuation"],
+        json!({"continued": 0, "anew": 160, "ignored": []})
+    );
+    // A new container with many children is clustered, whatever else is kept.
+    let mut changed = graph.clone();
+    changed["nodes"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id": "box", "kind": "dir", "label": "box", "parentId": null}));
+    for node in rings()["nodes"].as_array().unwrap() {
+        let id = format!("box/{}", node["id"].as_str().unwrap());
+        changed["nodes"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"id": id, "kind": "fn", "label": id, "parentId": "box"}));
     }
+    for edge in rings()["edges"].as_array().unwrap() {
+        let mut e = edge.clone();
+        for k in ["id", "source", "target"] {
+            e[k] = json!(format!("box/{}", e[k].as_str().unwrap()));
+        }
+        changed["edges"].as_array_mut().unwrap().push(e);
+    }
+    let o = answer(&json!({"op": "overview", "graph": changed,
+        "start": {"nodes": places(&first)}}));
+    assert_nested(&o);
+    assert_eq!(o["stats"]["communities"], 8);
+    assert!(cluster_of(&o, "box/r0n0").starts_with("community:box:"));
+    assert_eq!(cluster_of(&o, "r0n0"), cluster_of(&first, "r0n0"));
 }
 
 #[test]
@@ -1709,6 +1813,36 @@ fn places_by_id_are_checked_and_work_in_a_session() {
     // The session then continues from that answer without positions.
     let after = session.run_value(&json!({"op": "overview", "start": {}}));
     assert_eq!(after["ok"], true, "{after}");
+    // Places keep their clusters where the graph alone would make others; the session builds on them while requests
+    // have a start, and clusters the graph anew without one.
+    let flat = rings();
+    let mut turned = flat.clone();
+    turned["nodes"].as_array_mut().unwrap().rotate_left(40);
+    let first = session.run_value(&json!({"op": "overview", "graph": flat}));
+    let from = places(&first["overview"]);
+    let kept = session.run_value(&json!({"op": "overview", "graph": turned,
+        "start": {"nodes": from}}));
+    let moved = session.run_value(&json!({"op": "overview", "start": {}, "positionsOnly": true}));
+    assert_eq!(moved["overview"]["positionsOnly"], true, "{moved}");
+    for (i, x) in moved["overview"]["x"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+    {
+        let was = kept["overview"]["x"][i].as_f64().unwrap();
+        assert!((x.as_f64().unwrap() - was).abs() < 0.05, "node {i}");
+    }
+    let anew = session.run_value(&json!({"op": "overview", "positionsOnly": true}));
+    assert_eq!(
+        anew["overview"],
+        answer(&json!({"op": "overview", "graph": turned}))
+    );
+    // The same graph, with places that name the other clusters: whole, since the host's ids and parents change.
+    let other = session.run_value(&json!({"op": "overview", "positionsOnly": true,
+        "start": {"nodes": from}}));
+    assert!(other["overview"]["parent"].is_array(), "{other}");
+    assert_eq!(other["overview"]["parent"], kept["overview"]["parent"]);
     // A typed request with places is a request the operation takes.
     let typed = arqlet_model::OverviewRequest {
         graph: Some(serde_json::from_value(graph).unwrap()),
@@ -1734,4 +1868,102 @@ fn places_by_id_are_checked_and_work_in_a_session() {
     let o = answer(&v);
     let typed: arqlet_model::Overview = serde_json::from_value(o.clone()).unwrap();
     assert_eq!(serde_json::to_value(&typed).unwrap(), o);
+}
+
+/// Random changes of a graph, revision after revision: nodes removed (with what they hold), added, moved to another
+/// container, edges rewired.
+fn changed_at_random(graph: &Value, next: &mut impl FnMut(usize) -> usize, step: usize) -> Value {
+    let mut nodes = graph["nodes"].as_array().unwrap().clone();
+    let mut edges = graph["edges"].as_array().unwrap().clone();
+    let holds = |nodes: &[Value], id: &Value| nodes.iter().any(|n| n["parentId"] == *id);
+    for _ in 0..next(4) {
+        let mut gone = vec![nodes[next(nodes.len())]["id"].clone()];
+        let mut at = 0;
+        while at < gone.len() {
+            let under: Vec<Value> = nodes
+                .iter()
+                .filter(|n| n["parentId"] == gone[at])
+                .map(|n| n["id"].clone())
+                .collect();
+            gone.extend(under);
+            at += 1;
+        }
+        if gone.len() < nodes.len() / 3 {
+            nodes.retain(|n| !gone.contains(&n["id"]));
+            edges.retain(|e| !gone.contains(&e["source"]) && !gone.contains(&e["target"]));
+        }
+    }
+    for k in 0..next(8) {
+        let beside = nodes[next(nodes.len())].clone();
+        let id = format!("s{step}-{k}");
+        nodes.push(json!({"id": id, "kind": "fn", "label": id, "parentId": beside["parentId"]}));
+        if next(3) > 0 {
+            edges.push(
+                json!({"id": format!("{id}-e"), "kind": "call", "source": id, "target": beside["id"]}),
+            );
+        }
+    }
+    // A leaf to any other node (which may turn into a container) or to the top level.
+    for _ in 0..next(4) {
+        let leaf = next(nodes.len());
+        if holds(&nodes, &nodes[leaf]["id"].clone()) {
+            continue;
+        }
+        let to = next(nodes.len());
+        let parent = if to == leaf || next(4) == 0 {
+            Value::Null
+        } else {
+            nodes[to]["id"].clone()
+        };
+        nodes[leaf]["parentId"] = parent;
+    }
+    for _ in 0..next(30) {
+        let (e, to) = (next(edges.len()), next(nodes.len()));
+        edges[e]["target"] = nodes[to]["id"].clone();
+    }
+    json!({"nodes": nodes, "edges": edges})
+}
+
+#[test]
+fn a_graph_changed_at_random_continues_without_overlaps() {
+    let mut seed = 11u64;
+    let mut next = move |below: usize| {
+        seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (seed >> 33) as usize % below.max(1)
+    };
+    let cases = [
+        (hierarchical(3, 3, 8), json!({})),
+        (
+            hierarchical(3, 3, 8),
+            json!({"communities": 4, "satellites": 0.5}),
+        ),
+        (
+            hierarchical(2, 4, 12),
+            json!({"communities": 6, "chains": true}),
+        ),
+        (rings(), json!({"communities": 30})),
+        (rings(), json!({"communities": 12, "satellites": 0.3})),
+    ];
+    for (case, (mut graph, options)) in cases.into_iter().enumerate() {
+        let mut last = answer(&json!({"op": "overview", "graph": graph, "options": options}));
+        for step in 0..8 {
+            graph = changed_at_random(&graph, &mut next, step);
+            let request = json!({"op": "overview", "graph": graph, "options": options,
+                "start": {"nodes": places(&last), "settle": step % 2 == 1}, "threads": 1});
+            let o = answer(&request);
+            let mut parallel = request.clone();
+            parallel["threads"] = json!(4);
+            assert_eq!(answer(&parallel), o, "case {case}, step {step}");
+            assert_nested(&o);
+            let report = &o["continuation"];
+            assert_eq!(
+                report["continued"].as_u64().unwrap() + report["anew"].as_u64().unwrap(),
+                graph["nodes"].as_array().unwrap().len() as u64,
+                "case {case}, step {step}"
+            );
+            last = o;
+        }
+    }
 }

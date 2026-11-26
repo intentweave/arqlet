@@ -15,6 +15,6 @@ continued: number,
 anew: number,
 /**
  * Ids of entries that name no node of the overview (removed nodes), in id order. Ids of clusters the overview
- * added (`community:…`) are not listed: their places are matched by their members, not by id.
+ * added (`community:…`) that are gone are not listed.
  */
 ignored: Array<string>, };

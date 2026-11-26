@@ -574,6 +574,9 @@ const plain = request => {
   return {...request, start: fixed};
 };
 
+// An overview's places by node id, as `start.nodes` takes them.
+const placesOf = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id, {x: o.x[i], y: o.y[i], r: o.r[i]}]));
+
 // The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
 // Defaults as the engine's (`communities` 120, `satellites` 0); `groups` and `hubs` compared as given.
 const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null, options?.hubs ?? null]);
@@ -592,6 +595,9 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
   const opened = resident ? Promise.resolve(run.openSession()) : null;
   // `graph` is kept here only without a resident session; `started`: an `open` was asked for (it may still run).
   let graph = null, started = false, last = null, clusters = null, generation = 0, queue = Promise.resolve();
+  // Whether the last overview's clusters are those of places by id: an engine given the graph again would cluster it
+  // anew, so a continuation of it is sent by id too.
+  let byPlaces = false;
 
   const send = async request => {
     if (resident) {
@@ -616,6 +622,12 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
     if (start && start.x === undefined && start.nodes === undefined) {
       if (!last || request.graph) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
       if (clustersOf(request.options) !== clusters) return {ok: false, error: 'The clusters changed since the last overview; lay out without start.'};
+      if (byPlaces) {
+        const answer = await run({...sent, start: {...start, nodes: placesOf(last)}});
+        if (!answer.ok) return answer;
+        const {continuation: _own, ...overview} = answer.overview;
+        return {...answer, overview};
+      }
       sent.start = {...start, x: last.x, y: last.y, r: last.r};
     }
     return run(sent);
@@ -641,6 +653,7 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
       if (answer.ok) {
         last = answer.overview;
         clusters = clustersOf(request.options);
+        byPlaces = !!request.start && (request.start.nodes !== undefined || (byPlaces && request.start.x === undefined));
         if (fresh && !resident) graph = request.graph;
       }
       return answer;

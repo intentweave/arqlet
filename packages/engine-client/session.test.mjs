@@ -322,6 +322,34 @@ test('an overview session passes edge data and places by id on, the same in both
   await kept.close();
 });
 
+test('an overview continued by id keeps its clusters over later layouts, in both kinds of session', {skip: !engine}, async () => {
+  // Four dense rings without containers: communities. With the first ring last, clustering anew names them otherwise.
+  const ids = Array.from({length: 160}, (_, i) => `r${Math.floor(i / 40)}n${i % 40}`);
+  const rings = {nodes: ids.map(id => ({id, kind: 'fn', label: id})), edges: ids.flatMap((id, i) => [1, 2, 3].map(d => (
+    {id: `${id}-${d}`, kind: 'call', source: id, target: ids[i - i % 40 + (i + d) % 40]})))};
+  const turned = {...rings, nodes: [...rings.nodes.slice(40), ...rings.nodes.slice(0, 40)]};
+  const kept = createOverviewSession(engine);
+  const sent = createOverviewSession(engine, {resident: false});
+  const both = async step => {
+    const [a, b] = [await step(kept), await step(sent)];
+    assert.equal(a.ok, true, a.error);
+    assert.deepEqual(a, b);
+    return a.overview;
+  };
+  const options = {communities: 60};
+  const first = await both(s => s.open(rings, {options}));
+  const places = Object.fromEntries(first.ids.map((id, i) => [id, {x: first.x[i], y: first.y[i], r: first.r[i]}]));
+  const continued = await both(s => s.open(turned, {options, start: {nodes: places}}));
+  const later = await both(s => s.layOut({options, start: {}}));
+  assert.deepEqual(later.ids, continued.ids);
+  assert.deepEqual(later.parent, continued.parent);
+  const again = await both(s => s.layOut({options, start: {settle: true}}));
+  assert.deepEqual(again.parent, continued.parent);
+  const anew = await both(s => s.layOut({options}));
+  assert.notDeepEqual(anew.parent, continued.parent);
+  await kept.close();
+});
+
 test('a compacting filter lays the view out again without the hidden, in both kinds of session', {skip: !engine}, async () => {
   const g = {nodes: [{id: 'p', kind: 'package', label: 'p'}, {id: 'q', kind: 'package', label: 'q'},
     ...['a', 'b'].map(id => ({id, kind: 'file', label: id, parentId: 'p'})),

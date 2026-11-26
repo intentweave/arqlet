@@ -3712,7 +3712,7 @@ pub struct OverviewContinuation {
     /// one the entry lay in.
     pub anew: u32,
     /// Ids of entries that name no node of the overview (removed nodes), in id order. Ids of clusters the overview
-    /// added (`community:…`) are not listed: their places are matched by their members, not by id.
+    /// added (`community:…`) that are gone are not listed.
     pub ignored: Vec<String>,
 }
 
@@ -4204,7 +4204,8 @@ pub struct OverviewStart {
     #[cfg_attr(feature = "ts", ts(optional))]
     pub r: Option<Vec<f64>>,
     /// Provisional: the places of an earlier overview by node id, added clusters included, for the overview of a graph
-    /// that may have changed. Not with `x`, `y` or `r`.
+    /// that may have changed: those clusters continue with their ids. Not with `x`, `y` or `r`. A later request without
+    /// a session continues the answer by id again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub nodes: Option<BTreeMap<String, OverviewPlace>>,

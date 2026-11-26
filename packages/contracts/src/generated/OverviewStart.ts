@@ -9,6 +9,7 @@ import type { OverviewPlace } from "./OverviewPlace";
 export type OverviewStart = { x?: Array<number>, y?: Array<number>, r?: Array<number>,
 /**
  * Provisional: the places of an earlier overview by node id, added clusters included, for the overview of a graph
- * that may have changed. Not with `x`, `y` or `r`.
+ * that may have changed: those clusters continue with their ids. Not with `x`, `y` or `r`. A later request without
+ * a session continues the answer by id again.
  */
 nodes?: { [key in string]: OverviewPlace }, settle?: boolean, };

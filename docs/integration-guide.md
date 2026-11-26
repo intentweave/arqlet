@@ -116,7 +116,9 @@ per edge `k` (the pair `edges[2k]`, `edges[2k + 1]`):
 | `edgeKind[k]` | the edge's kind, an index into `edgeKinds` |
 | `edgeWeight[k]` | how many edges it stands for (`Edge.weight`); the field is left out when every edge counts 1 |
 
-Without `edgeData` the answer is as before. The taps of buses given as data are edges of the overview and carry their
+Without `edgeData` the answer is as before. With it, the gzipped answer grew by 3 to 4 % for six kinds and 8 to 9 %
+with weights too, on generated code graphs of 10 000 and 100 000 nodes
+([sizes](../benchmarks/results/overview-edge-data-20261126.md)). The taps of buses given as data are edges of the overview and carry their
 kinds. With `columns: true`, `edgeKind` and `edgeWeight` are two more `u32` columns after `links`; `edgeKinds` stays in
 the JSON. A positions-only answer leaves them out with the edges: a session answers one only while `edgeData` is the same
 as in its last overview, and a whole overview when it changed.
@@ -129,26 +131,40 @@ const next = run({op: 'overview', graph: changed, start: {nodes: places(previous
 next.overview.continuation;   // {continued, anew, ignored}
 ```
 
-Give every node of the previous answer, the added clusters included. `start.nodes` excludes `start.x`, `y` and `r` (the
-same graph, by node index); a request with both is refused. `settle` and `moved` work as before; a moved node needs an
-earlier place in its cluster. A session takes `start.nodes` too, also together with a new graph.
+Give every node of the previous answer, **the added clusters included**. `start.nodes` excludes `start.x`, `y` and `r`
+(the same graph, by node index); a request with both is refused. `settle` and `moved` work as before; a moved node needs
+an earlier place in its cluster. A session takes `start.nodes` too, also together with a new graph.
 
+What continues:
+
+- **The added clusters stay** (`community:…`, communities and satellite groups), with their ids. Their ids are positions
+  in a clustering: a changed graph clustered anew (a request without `start`) would group much of it differently and may
+  give the same id to other members. With `start.nodes`, each node stays in the cluster whose earlier disc held it, so
+  `intent` and `radii` by cluster id still name the same cluster. A cluster left with fewer than two children is
+  dissolved. Only a container without earlier clusters (a new one, or one that now has more than `communities` children)
+  is clustered, and what its new clusters hold is laid out anew. `communities: 0` or `satellites: 0` keeps no cluster of
+  that sort.
 - A node continues from its entry. It is **placed anew** when it has none, when its container has none (a new container
   and what it holds), or when its entry lies outside its container's earlier disc (it changed its container). A
   container that changed its parent keeps its inner arrangement.
-- A node placed anew starts next to the nodes it is linked to (else outside what is there). Overlaps are then removed,
-  which can push others; with `settle` the changed containers settle by forces. The same holds for a node that moved to
-  a container around its old one: it starts where it was and the two part.
-- Entries for ids the graph no longer has are **ignored** and listed in `continuation.ignored`.
-- **Added clusters** (`community:…`, communities and satellite groups) have ids that are positions in a clustering, so
-  the same id may name other members on the next revision. Their entries are matched by place, not by id: a cluster
-  continues from the earlier cluster disc that held most of its members, members that were outside it are placed anew,
-  and a cluster no earlier disc fits gets the disc around its members' places. Their entries are never listed as
-  ignored. Compare clusters across revisions by their members, not by their ids; so does a host's own state by cluster id
-  (`intent`, `radii`).
-- Unchanged graph and options: the same answer as `start` by node index. A graph whose clustering changed thoroughly
-  (other `communities` or `satellites`, many rewired edges) moves much; lay it out without `start` if the old places no
-  longer help.
+- A node placed anew joins the cluster of the nodes it is linked to most and starts next to them (else outside what is
+  there). Overlaps are then removed, which can push others; with `settle` the changed containers settle by forces. The
+  same holds for a node that moved to a container around its old one: it starts where it was and the two part.
+- Entries for ids the graph no longer has are **ignored** and listed in `continuation.ignored`. Entries of clusters that
+  are gone are not listed.
+- Unchanged graph and options: the same answer as `start` by node index.
+
+**Keep continuing by id.** The clusters of such an answer are not those the graph alone gives, so a later request without
+a session must send `start.nodes` again; `start` by node index belongs to a request without them. A session (and
+`createOverviewSession`, resident or not) does this itself for a `start` without positions.
+
+Without `settle` the nodes move least, and gaps stay open, so the drawing grows slowly over many changes; with it the
+changed containers close up and move more. Lay out without `start` when the old places and clusters no longer help.
+On generated graphs with 0.1 to 5 % of the nodes changed, nodes moved less than without a start
+([movements](../benchmarks/results/overview-continuation-20261126.md)); this is no general guarantee.
+
+Limits: other cluster options do not regroup a container that keeps its clusters. A cluster the host set smaller than
+its content (`radii`) does not hold all its members in the places, so those it does not hold leave it.
 
 ## 5. Offers from another engine: refinement
 

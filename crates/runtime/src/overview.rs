@@ -9,7 +9,7 @@ use arqlet_model::{
     OverviewPlace, OverviewPositions, OverviewRepresentation, OverviewStats,
 };
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The largest graph the operation accepts (nodes). A guard against unbounded requests, not a measured limit.
 pub const MAX_OVERVIEW_NODES: usize = 1_000_000;
@@ -75,13 +75,16 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
     Ok(options)
 }
 
+/// The places of a request with `start.nodes`, and the clusters of the hierarchy that were kept from them.
+type FromPlaces = (BTreeMap<String, OverviewPlace>, BTreeSet<usize>);
+
 /// The hints of a request: `radii` (node id → radius, for clusters a host shows structured) and `start` to continue
 /// from: `{x, y, r}` of a previous overview of the same graph, in its node order, or `{nodes}`, its places by node id,
-/// of this graph or an earlier one. With the latter also what became of the places.
+/// of this graph or an earlier one (read by `hierarchy_of`). With the latter also what became of the places.
 fn hints_of(
     v: &Value,
     h: &overview::Hierarchy,
-    options: &OverviewOptions,
+    from_places: Option<&FromPlaces>,
 ) -> Result<(OverviewHints, Option<OverviewContinuation>), String> {
     let mut hints = OverviewHints::default();
     let mut continuation = None;
@@ -110,15 +113,9 @@ fn hints_of(
         }
     }
     if let Some(start) = v.get("start") {
-        let mut previous = match start.get("nodes") {
-            Some(places) => {
-                if ["x", "y", "r"].iter().any(|k| start.get(k).is_some()) {
-                    return Err(
-                        "Overview start takes x, y and r (by node index) or nodes (by node id), not both"
-                            .into(),
-                    );
-                }
-                let (previous, report) = overview::continue_by_id(h, &places_of(places)?, options);
+        let mut previous = match from_places {
+            Some((places, kept)) => {
+                let (previous, report) = overview::continue_by_id(h, places, kept);
                 continuation = Some(report);
                 previous
             }
@@ -180,9 +177,22 @@ fn hints_of(
     Ok((hints, continuation))
 }
 
-/// `start.nodes`: node id → `{x, y, r}`.
-fn places_of(v: &Value) -> Result<BTreeMap<String, OverviewPlace>, String> {
-    v.as_object()
+/// `start.nodes` of a request, when it has them: node id → `{x, y, r}`.
+fn places_of(v: &Value) -> Result<Option<BTreeMap<String, OverviewPlace>>, String> {
+    let Some(start) = v.get("start") else {
+        return Ok(None);
+    };
+    let Some(nodes) = start.get("nodes") else {
+        return Ok(None);
+    };
+    if ["x", "y", "r"].iter().any(|k| start.get(k).is_some()) {
+        return Err(
+            "Overview start takes x, y and r (by node index) or nodes (by node id), not both"
+                .into(),
+        );
+    }
+    nodes
+        .as_object()
         .ok_or("Overview start nodes must be an object: node id -> {x, y, r}")?
         .iter()
         .map(|(id, p)| {
@@ -194,7 +204,8 @@ fn places_of(v: &Value) -> Result<BTreeMap<String, OverviewPlace>, String> {
                 )),
             }
         })
-        .collect()
+        .collect::<Result<_, String>>()
+        .map(Some)
 }
 
 /// The representation values of a request (ADR 0018, addendum; ADR 0015): `intent` (the user's decisions by node id)
@@ -260,8 +271,8 @@ pub fn overview_response(v: &Value, threads: usize) -> Value {
 pub(crate) fn overview_of(v: &Value, threads: usize) -> Result<Overview, String> {
     let graph = graph_of(v)?;
     let options = options_of(v)?;
-    let (graph, h) = hierarchy_of(&graph, v, &options)?;
-    lay_out(&graph, &h, v, &options, threads)
+    let (graph, h, from_places) = hierarchy_of(&graph, v, &options)?;
+    lay_out(&graph, &h, from_places.as_ref(), v, &options, threads)
 }
 
 /// The graph of a request, checked.
@@ -287,12 +298,13 @@ fn hierarchy_key(v: &Value, options: &OverviewOptions) -> Value {
     })
 }
 
-/// The graph with the groups the data gives, and its cluster hierarchy.
+/// The graph with the groups the data gives, and its cluster hierarchy: with `start.nodes`, the clusters of those
+/// places continue (`clusters_by_id`).
 fn hierarchy_of(
     graph: &Graph,
     v: &Value,
     options: &OverviewOptions,
-) -> Result<(Graph, overview::Hierarchy), String> {
+) -> Result<(Graph, overview::Hierarchy, Option<FromPlaces>), String> {
     // Groups the data gives (node id → path of group names), as containers of kind `group`, the same as an import's
     // `groups`; communities then divide what is still large.
     let groups: std::collections::BTreeMap<String, Vec<String>> = match v["options"].get("groups") {
@@ -312,26 +324,35 @@ fn hierarchy_of(
     let expanded = arqlet_layout::with_bus_nodes(graph);
     let graph =
         arqlet_layout::communities::with_given_groups(expanded.as_ref().unwrap_or(graph), &groups)?;
-    let h = overview::with_satellites(
-        overview::with_communities_except(
-            overview::hierarchy(&graph),
+    let base = overview::hierarchy(&graph);
+    let hubs = crate::hubs_of(&hubs);
+    if let Some(places) = places_of(v)? {
+        let (h, kept) = overview::clusters_by_id(
+            base,
+            &places,
             options.communities,
-            &crate::hubs_of(&hubs),
-        )?,
+            &hubs,
+            options.satellites,
+        )?;
+        return Ok((graph, h, Some((places, kept))));
+    }
+    let h = overview::with_satellites(
+        overview::with_communities_except(base, options.communities, &hubs)?,
         options.satellites,
     )?;
-    Ok((graph, h))
+    Ok((graph, h, None))
 }
 
 /// Lays out a hierarchy (of `graph`, with its groups) as the request `v` says (options, hints, representation).
 fn lay_out(
     graph: &Graph,
     h: &overview::Hierarchy,
+    from_places: Option<&FromPlaces>,
     v: &Value,
     options: &OverviewOptions,
     threads: usize,
 ) -> Result<Overview, String> {
-    let (mut hints, continuation) = hints_of(v, h, options)?;
+    let (mut hints, continuation) = hints_of(v, h, from_places)?;
     // `edgeData`: each edge's kind and weight in the answer.
     let edge_data = edge_data_of(v)?;
     // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
@@ -488,13 +509,15 @@ fn edge_data_of(v: &Value) -> Result<bool, String> {
 /// the cluster hierarchy with the options it was built with, and the last positions. A host sends the graph once; later
 /// requests leave it out, and a `start` without positions (`{"settle": …}` or `{}`) continues from the last layout, if
 /// the options the clusters depend on (`communities`, `satellites`, `groups`) are the same. A `start` with `nodes`
-/// (places by id) continues from those instead, with a new graph too. The
+/// (places by id) continues from those instead, with their clusters and with a new graph too; later requests with a
+/// `start` build on these clusters, one without clusters the graph anew. The
 /// answers are the same as those of `dispatch` given the graph and the positions in full.
 #[derive(Default)]
 pub struct OverviewSession {
     graph: Option<Graph>,
-    /// The options the hierarchy depends on, the graph with its groups, and the hierarchy.
-    hierarchy: Option<(Value, Graph, overview::Hierarchy)>,
+    /// The options the hierarchy depends on, the graph with its groups, the hierarchy, and whether its clusters are
+    /// those of places by id (`start.nodes`) instead of the graph's own.
+    hierarchy: Option<(Value, Graph, overview::Hierarchy, bool)>,
     /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout, and whether it was
     /// answered with the edges' data.
     last: Option<(Value, Value, bool)>,
@@ -507,7 +530,7 @@ impl OverviewSession {
     /// `crate::memory`).
     pub fn heap_estimate(&self) -> usize {
         self.graph.as_ref().map_or(0, crate::memory::graph)
-            + self.hierarchy.as_ref().map_or(0, |(options, graph, _)| {
+            + self.hierarchy.as_ref().map_or(0, |(options, graph, ..)| {
                 crate::memory::value(options) + crate::memory::graph(graph)
             })
             + self.last.as_ref().map_or(0, |(a, b, _)| {
@@ -573,17 +596,25 @@ impl OverviewSession {
                 )
             }
         };
-        // The hierarchy the session has, while the graph and the options it depends on stay the same.
+        // The hierarchy the session has, while the graph and the options it depends on stay the same; places by id bring
+        // their own clusters, and a request without `start` does not build on those of earlier places.
         let key = hierarchy_key(v, &options);
-        let reuse =
-            new_graph.is_none() && self.hierarchy.as_ref().is_some_and(|(k, _, _)| *k == key);
+        let by_id = v["start"].get("nodes").is_some();
+        let continues = v.get("start").is_some();
+        let reuse = new_graph.is_none()
+            && !by_id
+            && self
+                .hierarchy
+                .as_ref()
+                .is_some_and(|(k, _, _, from_places)| *k == key && (continues || !from_places));
         let built = if reuse {
             None
         } else {
             Some(hierarchy_of(graph, v, &options)?)
         };
-        let (grouped, h) = match (&built, &self.hierarchy) {
-            (Some((g, h)), _) | (None, Some((_, g, h))) => (g, h),
+        let (grouped, h, from_places) = match (&built, &self.hierarchy) {
+            (Some((g, h, from_places)), _) => (g, h, from_places.as_ref()),
+            (None, Some((_, g, h, _))) => (g, h, None),
             (None, None) => return Err("The overview session lost its hierarchy".into()),
         };
         // A start without positions continues from the last layout of the same clusters.
@@ -608,7 +639,7 @@ impl OverviewSession {
                 }
             }
         }
-        let overview = lay_out(grouped, h, &request, &options, threads)?;
+        let overview = lay_out(grouped, h, from_places, &request, &options, threads)?;
         // The same clusters as the last overview of this session: its ids, labels, parents, kinds, edges and links hold,
         // and so do the edges' data, which the host has when that answer had them.
         let edge_data = edge_data_of(v)?;
@@ -616,15 +647,19 @@ impl OverviewSession {
             && self
                 .last
                 .as_ref()
-                .is_some_and(|(clusters, _, data)| *clusters == key && *data == edge_data);
+                .is_some_and(|(clusters, _, data)| *clusters == key && *data == edge_data)
+            && self
+                .hierarchy
+                .as_ref()
+                .is_some_and(|(_, _, last, _)| last.ids == h.ids && last.parent == h.parent);
         // Accepted: keep what the next request builds on.
         let last = (
             key.clone(),
             json!({"x": overview.x, "y": overview.y, "r": overview.r}),
             edge_data,
         );
-        if let Some((g, h)) = built {
-            self.hierarchy = Some((key, g, h));
+        if let Some((g, h, from_places)) = built {
+            self.hierarchy = Some((key, g, h, from_places.is_some()));
         }
         if let Some(g) = new_graph {
             self.graph = Some(g);

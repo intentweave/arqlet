@@ -15,7 +15,7 @@ use arqlet_model::{Edge, Graph};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod continuation;
-pub use continuation::continue_by_id;
+pub use continuation::{clusters_by_id, continue_by_id};
 
 /// Provisional options of the overview.
 #[derive(Clone, Debug, PartialEq)]
@@ -72,7 +72,7 @@ pub struct OverviewHints {
     /// Radii by node index, in place of the leaf radius or the container's arrangement.
     pub radius: BTreeMap<usize, f64>,
     /// A previous overview to start from: absolute centres and radii by node index (for a changed graph, as
-    /// `continue_by_id` reads them).
+    /// `clusters_by_id` and `continue_by_id` read them).
     pub start: Option<Previous>,
 }
 
@@ -95,8 +95,8 @@ pub struct Previous {
     /// among the others, which make room (or settle). A node with `centre` and `radius` keeps its inner arrangement all
     /// the same. A container whose children are all here is arranged as without a start.
     pub anew: BTreeSet<usize>,
-    /// Provisional: containers that changed although no radius of a child tells it (a child left, or a child's disc was
-    /// worked out anew): they make room, or settle, like those with a changed radius.
+    /// Provisional: containers that changed although no radius of a child tells it (a child left, or children no longer
+    /// fit together): they make room, or settle, like those with a changed radius.
     pub changed: BTreeSet<Container>,
 }
 
@@ -379,6 +379,16 @@ pub fn with_communities_except(
     threshold: usize,
     hubs: &Hubs,
 ) -> Result<Hierarchy, String> {
+    with_communities_where(h, threshold, hubs, &|_| true)
+}
+
+/// `with_communities_except`, splitting only the containers `split` names.
+fn with_communities_where(
+    h: Hierarchy,
+    threshold: usize,
+    hubs: &Hubs,
+    split: &dyn Fn(Container) -> bool,
+) -> Result<Hierarchy, String> {
     if threshold == 0 {
         return Ok(h);
     }
@@ -390,6 +400,7 @@ pub fn with_communities_except(
         .filter(|&i| h.children[i].len() > threshold)
         .map(Container::Node)
         .chain((h.roots.len() > threshold).then_some(Container::Root))
+        .filter(|&c| split(c))
         .collect();
     for container in containers {
         let members = h.members(container).to_vec();
@@ -583,6 +594,15 @@ fn outward_edges(h: &Hierarchy) -> Vec<f64> {
 /// the smaller index). A hub with satellites becomes a cluster `community:<container>:sat.<k>` holding them, named by
 /// the hub (`cluster_labels`), unless it would hold the whole container. `share` 0 leaves the hierarchy as it is.
 pub fn with_satellites(h: Hierarchy, share: f64) -> Result<Hierarchy, String> {
+    with_satellites_where(h, share, &|_| true)
+}
+
+/// `with_satellites`, in the containers `split` names only.
+fn with_satellites_where(
+    h: Hierarchy,
+    share: f64,
+    split: &dyn Fn(Container) -> bool,
+) -> Result<Hierarchy, String> {
     if share <= 0. {
         return Ok(h);
     }
@@ -595,6 +615,7 @@ pub fn with_satellites(h: Hierarchy, share: f64) -> Result<Hierarchy, String> {
         .filter(|&i| h.children[i].len() > 2)
         .map(Container::Node)
         .chain((h.roots.len() > 2).then_some(Container::Root))
+        .filter(|&c| split(c))
         .collect();
     for container in containers {
         let members = h.members(container);
