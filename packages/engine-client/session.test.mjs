@@ -322,6 +322,34 @@ test('an overview session passes edge data and places by id on, the same in both
   await kept.close();
 });
 
+test('an overview session passes a work budget on and reports the work only to the request that asked', {skip: !engine}, async () => {
+  const kept = createOverviewSession(engine);
+  const sent = createOverviewSession(engine, {resident: false});
+  const both = async step => {
+    const [a, b] = [await step(kept), await step(sent)];
+    assert.equal(a.ok, true, a.error);
+    assert.deepEqual(a, b);
+    return a.overview;
+  };
+  const options = {communities: 0};
+  const first = await both(s => s.open(graph, {options}));
+  assert.equal(first.work, undefined);
+  const counted = await both(s => s.layOut({options, start: {}, workBudget: Number.MAX_SAFE_INTEGER}));
+  assert.equal(counted.work.limited, false);
+  assert.ok(counted.work.used > 0);
+  // No work at all: valid discs, the containers packed; refusing instead leaves the session as it was.
+  const packed = await both(s => s.layOut({options, workBudget: 0}));
+  assert.equal(packed.work.limited, true);
+  assert.equal(packed.stats.overlaps, 0);
+  const refused = await kept.layOut({options, workBudget: 0, overBudget: 'refuse'});
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, /^Overview work budget exhausted: /);
+  // A later request without a budget has no report, also when only the positions came back.
+  const plain = await both(s => s.layOut({options, start: {}}));
+  assert.equal(plain.work, undefined);
+  await kept.close();
+});
+
 test('an overview continued by id keeps its clusters over later layouts, in both kinds of session', {skip: !engine}, async () => {
   // Four dense rings without containers: communities. With the first ring last, clustering anew names them otherwise.
   const ids = Array.from({length: 160}, (_, i) => `r${Math.floor(i / 40)}n${i % 40}`);

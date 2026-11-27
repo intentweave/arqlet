@@ -3,6 +3,7 @@ import type { OverviewBusLine } from "./OverviewBusLine";
 import type { OverviewContinuation } from "./OverviewContinuation";
 import type { OverviewRepresentation } from "./OverviewRepresentation";
 import type { OverviewStats } from "./OverviewStats";
+import type { OverviewWork } from "./OverviewWork";
 
 /**
  * Provisional (ADR 0018): the answer of the `overview` operation, `{ok, overview}`. Arrays are indexed by node: the
@@ -68,4 +69,8 @@ edgeWeight?: number[],
 /**
  * Provisional, for a request with `start.nodes`: what became of the earlier places.
  */
-continuation?: OverviewContinuation, };
+continuation?: OverviewContinuation,
+/**
+ * Provisional (#211), for a request with `workBudget`: the work the overview used and what the budget left out.
+ */
+work?: OverviewWork, };

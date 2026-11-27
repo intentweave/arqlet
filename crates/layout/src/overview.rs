@@ -15,7 +15,131 @@ use arqlet_model::{Edge, Graph};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod continuation;
-pub use continuation::{clusters_by_id, continue_by_id};
+pub use continuation::{clusters_by_id, clusters_by_id_within, continue_by_id};
+
+/// Provisional (#211, ADR 0018 addendum): counts deterministic units of work at the safe points of the overview's
+/// iterative phases (a Louvain sweep, a force tick, a separation round). `false` means the work must stop there; the
+/// piece is then discarded whole. Counted in `u64`, so that WASM (32-bit `usize`) counts the same.
+pub trait Meter {
+    fn spend(&mut self, units: u64) -> bool;
+}
+
+/// A meter that never stops (the overview without a budget).
+pub struct Unlimited;
+
+impl Meter for Unlimited {
+    fn spend(&mut self, _: u64) -> bool {
+        true
+    }
+}
+
+/// A meter that stops once more than `limit` units are spent.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Limit {
+    pub limit: u64,
+    pub used: u64,
+}
+
+impl Limit {
+    pub fn new(limit: u64) -> Self {
+        Self { limit, used: 0 }
+    }
+}
+
+impl Meter for Limit {
+    fn spend(&mut self, units: u64) -> bool {
+        self.used = self.used.saturating_add(units);
+        self.used <= self.limit
+    }
+}
+
+/// Provisional (#211): the work budget of one overview, spent in a fixed order (clustering container by container, then
+/// the arrangement level by level, in index order within a level). The first piece that does not fit into what is left
+/// ends the budgeted work (`exhausted`); `used` counts the work of the pieces that fit, and never exceeds `limit`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Budget {
+    pub limit: u64,
+    pub used: u64,
+    /// The share of `used` that went into clustering.
+    pub clustering: u64,
+    pub exhausted: bool,
+    /// Containers whose communities were not computed because the budget was used up.
+    pub unclustered: Vec<Container>,
+    /// The piece that did not fit: its phase (`clustering` or `arrangement`) and container.
+    pub stopped: Option<(&'static str, Container)>,
+}
+
+impl Budget {
+    pub fn new(limit: u64) -> Self {
+        Self {
+            limit,
+            used: 0,
+            clustering: 0,
+            exhausted: false,
+            unclustered: Vec::new(),
+            stopped: None,
+        }
+    }
+
+    /// A budget nothing exceeds: counts the work, never stops it.
+    pub fn unlimited() -> Self {
+        Self::new(u64::MAX)
+    }
+
+    /// What is left (0 once exhausted).
+    pub fn remaining(&self) -> u64 {
+        if self.exhausted {
+            0
+        } else {
+            self.limit.saturating_sub(self.used)
+        }
+    }
+
+    /// Runs one piece of `phase` in `container` with what is left: its result when it fit (its work is counted), else
+    /// `None`, and the budget is exhausted. Nothing runs once it is.
+    pub fn piece<R>(
+        &mut self,
+        phase: &'static str,
+        container: Container,
+        f: impl FnOnce(&mut dyn Meter) -> Option<R>,
+    ) -> Option<R> {
+        if self.exhausted {
+            return None;
+        }
+        let mut meter = Limit::new(self.remaining());
+        match f(&mut meter) {
+            Some(r) => {
+                self.accept(phase, meter.used);
+                Some(r)
+            }
+            None => {
+                self.stop(phase, container);
+                None
+            }
+        }
+    }
+
+    /// Counts the work of a piece that fit.
+    pub fn accept(&mut self, phase: &'static str, units: u64) {
+        self.used = self.used.saturating_add(units);
+        if phase == "clustering" {
+            self.clustering = self.clustering.saturating_add(units);
+        }
+    }
+
+    /// The piece of `phase` in `container` did not fit: the budgeted work ends here.
+    pub fn stop(&mut self, phase: &'static str, container: Container) {
+        if !self.exhausted {
+            self.exhausted = true;
+            self.stopped = Some((phase, container));
+        }
+    }
+}
+
+/// `⌈log₂ k⌉ + 2`, the units per child of a Barnes–Hut tick (the tree's depth and the gravity), at least 2.
+fn tree_units(k: usize) -> u64 {
+    2 + u64::from(64 - (k as u64).leading_zeros())
+}
 
 /// Provisional options of the overview.
 #[derive(Clone, Debug, PartialEq)]
@@ -110,14 +234,15 @@ fn anchored(
     overlaps: usize,
     (anchor, at): (usize, (f64, f64)),
     recentre: bool,
-) -> Arrangement {
+    meter: &mut dyn Meter,
+) -> Option<Arrangement> {
     let (dx, dy) = (at.0 - x[anchor].0, at.1 - x[anchor].1);
     for p in &mut x {
         p.0 += dx;
         p.1 += dy;
     }
     let (cx, cy) = if recentre {
-        enclosing_centre(&x, r)
+        enclosing_centre(&x, r, meter)?
     } else {
         (0., 0.)
     };
@@ -130,12 +255,12 @@ fn anchored(
         .zip(r)
         .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
         .fold(0., f64::max);
-    Arrangement {
+    Some(Arrangement {
         positions: x,
         radius: reach + options.padding,
         overlaps,
         shift: (cx, cy),
-    }
+    })
 }
 
 /// After a level is arranged: a container centred again on its children (`Arrangement::shift`) stands that much further
@@ -379,15 +504,28 @@ pub fn with_communities_except(
     threshold: usize,
     hubs: &Hubs,
 ) -> Result<Hierarchy, String> {
-    with_communities_where(h, threshold, hubs, &|_| true)
+    with_communities_where(h, threshold, hubs, &|_| true, &mut Budget::unlimited())
 }
 
-/// `with_communities_except`, splitting only the containers `split` names.
+/// Provisional (#211): `with_communities_except` within a work budget. Each container's Louvain is one piece: one that
+/// does not fit into what is left is discarded and its container, and every container after it, stays unsplit
+/// (`Budget::unclustered`). Within budget the same as `with_communities_except`.
+pub fn with_communities_within(
+    h: Hierarchy,
+    threshold: usize,
+    hubs: &Hubs,
+    budget: &mut Budget,
+) -> Result<Hierarchy, String> {
+    with_communities_where(h, threshold, hubs, &|_| true, budget)
+}
+
+/// `with_communities_except`, splitting only the containers `split` names, within `budget`.
 fn with_communities_where(
     h: Hierarchy,
     threshold: usize,
     hubs: &Hubs,
     split: &dyn Fn(Container) -> bool,
+    budget: &mut Budget,
 ) -> Result<Hierarchy, String> {
     if threshold == 0 {
         return Ok(h);
@@ -458,7 +596,13 @@ fn with_communities_where(
         }
         // The levels of Louvain, from the members up: `levels[l][c]` is the community at level l + 1 of community c at
         // level l (level 0: the members).
-        let levels = louvain(members.len(), &links);
+        let Some(levels) = budget.piece("clustering", container, |meter| {
+            louvain(members.len(), &links, meter)
+        }) else {
+            // Over budget: the container stays as it is, its hubs included.
+            budget.unclustered.push(container);
+            continue;
+        };
         // Clusters per level, top down, so that every cluster's parent exists when it is made.
         let mut cluster_of: Vec<Vec<Option<usize>>> = Vec::new();
         let mut sizes: Vec<Vec<usize>> = vec![vec![1; members.len()]];
@@ -779,8 +923,13 @@ fn add_cluster(
 
 /// Louvain on `k` nodes with weighted links: the community of every node, level by level (`result[l][c]`: the community
 /// at level l + 1 of community c at level l), until a level merges nothing. Communities are numbered in order of their
-/// first node, so the result depends only on the input. Nodes without links stay alone.
-fn louvain(k: usize, links: &[(usize, usize, f64)]) -> Vec<Vec<usize>> {
+/// first node, so the result depends only on the input. Nodes without links stay alone. `None` when the meter stops it
+/// (units: per level the links read and aggregated, per sweep the nodes and the links visited).
+fn louvain(
+    k: usize,
+    links: &[(usize, usize, f64)],
+    meter: &mut dyn Meter,
+) -> Option<Vec<Vec<usize>>> {
     let mut result = Vec::new();
     let mut nodes = k;
     let mut edges: BTreeMap<(usize, usize), f64> = BTreeMap::new();
@@ -788,6 +937,9 @@ fn louvain(k: usize, links: &[(usize, usize, f64)]) -> Vec<Vec<usize>> {
         *edges.entry((a.min(b), a.max(b))).or_default() += w;
     }
     for _ in 0..32 {
+        if !meter.spend(nodes as u64 + edges.len() as u64) {
+            return None;
+        }
         // Adjacency with self-loops kept (the inside of an aggregated community), and degrees.
         let mut adjacent: Vec<Vec<(usize, f64)>> = vec![Vec::new(); nodes];
         let mut degree = vec![0f64; nodes];
@@ -811,7 +963,11 @@ fn louvain(k: usize, links: &[(usize, usize, f64)]) -> Vec<Vec<usize>> {
         let mut tot = degree.clone();
         let mut weight_to = vec![0f64; nodes];
         let mut touched: Vec<usize> = Vec::new();
+        let sweep = nodes as u64 + adjacent.iter().map(|a| a.len() as u64).sum::<u64>();
         for _ in 0..64 {
+            if !meter.spend(sweep) {
+                return None;
+            }
             let mut moved = false;
             for i in 0..nodes {
                 let own = community[i];
@@ -874,7 +1030,7 @@ fn louvain(k: usize, links: &[(usize, usize, f64)]) -> Vec<Vec<usize>> {
         edges = aggregated;
         nodes = count;
     }
-    result
+    Some(result)
 }
 
 /// The containers grouped by height: level 0 holds the containers whose children are all leaves, and every container
@@ -1014,31 +1170,65 @@ pub fn arrange(
     options: &OverviewOptions,
     start: Option<&Previous>,
 ) -> Arrangement {
+    arrange_metered(h, container, radius, options, start, &mut Unlimited)
+        .expect("an unlimited meter never stops")
+}
+
+/// Whether a container continued from `previous` changed: a child without a previous place, a change named in
+/// `Previous::changed`, or a child with a place whose radius changed.
+fn changed_in(
+    previous: &Previous,
+    container: Container,
+    members: &[usize],
+    radius: &[f64],
+) -> bool {
+    members.iter().any(|m| previous.anew.contains(m))
+        || previous.changed.contains(&container)
+        || members.iter().any(|&m| {
+            !previous.anew.contains(&m) && (radius[m] - previous.radius[m]).abs() > SAME_RADIUS
+        })
+}
+
+/// Provisional (#211): `arrange` counting its work on `meter` (the start, every force tick, every separation round, the
+/// enclosing circle; ADR 0018, addendum of 2026-11-27). `None` when the meter stops it; otherwise the same arrangement
+/// as `arrange`.
+pub fn arrange_metered(
+    h: &Hierarchy,
+    container: Container,
+    radius: &[f64],
+    options: &OverviewOptions,
+    start: Option<&Previous>,
+    meter: &mut dyn Meter,
+) -> Option<Arrangement> {
     let members = h.members(container);
     let k = members.len();
     let local: BTreeMap<usize, usize> = members.iter().enumerate().map(|(i, &m)| (m, i)).collect();
     let r: Vec<f64> = members.iter().map(|&m| radius[m]).collect();
     if k == 0 {
-        return Arrangement {
+        return Some(Arrangement {
             positions: Vec::new(),
             radius: options.node_radius,
             overlaps: 0,
             shift: (0., 0.),
-        };
+        });
     }
     if k == 1 {
-        return Arrangement {
+        return Some(Arrangement {
             positions: vec![(0., 0.)],
             radius: r[0] + if options.chains { 0. } else { options.padding },
             overlaps: 0,
             shift: (0., 0.),
-        };
+        });
     }
     let links: Vec<(usize, usize, f64)> = h
         .container_links(container)
         .iter()
         .map(|&(a, b, w)| (local[&a], local[&b], w))
         .collect();
+    // The start: reading the children and their links (a kept arrangement costs no more).
+    if !meter.spend(k as u64 + links.len() as u64) {
+        return None;
+    }
     // Whether anything of a previous arrangement is there to continue from.
     let start = start.filter(|p| members.iter().any(|m| !p.anew.contains(m)));
     let mut x = match start {
@@ -1057,12 +1247,7 @@ pub fn arrange(
                 })
                 .collect();
             let placed: Vec<bool> = members.iter().map(|m| !previous.anew.contains(m)).collect();
-            let changed = placed.contains(&false)
-                || previous.changed.contains(&container)
-                || members
-                    .iter()
-                    .zip(&placed)
-                    .any(|(&m, &p)| p && (radius[m] - previous.radius[m]).abs() > SAME_RADIUS);
+            let changed = changed_in(previous, container, members, radius);
             place_anew(&mut x, &placed, &r, &links, options.gap);
             let x = x;
             // A child the user moved: put where it was put, held there while the others settle around it.
@@ -1094,20 +1279,22 @@ pub fn arrange(
                     x[j] = (p.0 - origin.0, p.1 - origin.1);
                 }
                 let (pin, at) = (held[0].0, x[held[0].0]);
-                simulate_held(&mut x, &r, &links, options, DRAG_ALPHA, Some(pin));
-                let overlaps = separate(&mut x, &r, options.gap);
-                return anchored(x, &r, options, overlaps, (pin, at), recentre);
+                if !simulate_held(&mut x, &r, &links, options, DRAG_ALPHA, Some(pin), meter) {
+                    return None;
+                }
+                let overlaps = separate(&mut x, &r, options.gap, meter)?;
+                return anchored(x, &r, options, overlaps, (pin, at), recentre, meter);
             }
             if let Some(Some(j)) = carrier {
                 // The others make room for the carrier, which keeps its place.
                 let at = x[j];
                 let mut x = x;
                 let overlaps = if changed {
-                    make_room(&mut x, &r, options.gap)
+                    make_room(&mut x, &r, options.gap, meter)?
                 } else {
                     0
                 };
-                return anchored(x, &r, options, overlaps, (j, at), recentre);
+                return anchored(x, &r, options, overlaps, (j, at), recentre, meter);
             }
             if !changed {
                 // Kept as it was: only the radius is measured again (it may have been set by a host before).
@@ -1116,12 +1303,12 @@ pub fn arrange(
                     .zip(&r)
                     .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
                     .fold(0., f64::max);
-                return Arrangement {
+                return Some(Arrangement {
                     positions: x,
                     radius: reach + options.padding,
                     overlaps: 0,
                     shift: (0., 0.),
-                };
+                });
             }
             if previous.settle {
                 // The forces settle the container again, from where its children are.
@@ -1130,30 +1317,35 @@ pub fn arrange(
                 // A child changed its radius: the others make room, and nothing else moves (no forces, no new centre), so
                 // that a change the user made does not shift what is around it more than it must.
                 let mut x = x;
-                let overlaps = make_room(&mut x, &r, options.gap);
+                let overlaps = make_room(&mut x, &r, options.gap, meter)?;
                 let reach = x
                     .iter()
                     .zip(&r)
                     .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
                     .fold(0., f64::max);
-                return Arrangement {
+                return Some(Arrangement {
                     positions: x,
                     radius: reach + options.padding,
                     overlaps,
                     shift: (0., 0.),
-                };
+                });
             }
         }
         None => spiral(&r, &links, options.gap),
     };
     let alpha = if start.is_some() { SETTLE_ALPHA } else { 1. };
-    simulate(&mut x, &r, &links, options, alpha);
-    let mut overlaps = separate(&mut x, &r, options.gap);
-    if in_rows(&members, &local, &mut x, &r, options) {
-        overlaps = separate(&mut x, &r, options.gap);
+    if !simulate_held(&mut x, &r, &links, options, alpha, None, meter) {
+        return None;
+    }
+    let mut overlaps = separate(&mut x, &r, options.gap, meter)?;
+    if in_rows(members, &local, &mut x, &r, options) {
+        if !meter.spend(k as u64) {
+            return None;
+        }
+        overlaps = separate(&mut x, &r, options.gap, meter)?;
     }
     // Centre the disc on (nearly) the smallest circle around the children, and take the radius that holds them.
-    let (cx, cy) = enclosing_centre(&x, &r);
+    let (cx, cy) = enclosing_centre(&x, &r, meter)?;
     for p in &mut x {
         p.0 -= cx;
         p.1 -= cy;
@@ -1163,12 +1355,128 @@ pub fn arrange(
         .zip(&r)
         .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
         .fold(0., f64::max);
-    Arrangement {
+    Some(Arrangement {
         positions: x,
         radius: reach + options.padding,
         overlaps,
         shift: (0., 0.),
+    })
+}
+
+/// Provisional (#211): what a container not arranged within the work budget gets instead.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Fallback {
+    /// The same as `arrange` (a container of at most one child costs nothing to arrange).
+    Same,
+    /// The unchanged arrangement of a continuation, kept as it was (as `arrange` keeps it).
+    Kept,
+    /// The children packed in rows (`packed`).
+    Packed,
+}
+
+/// Provisional (#211): the arrangement of a container that the work budget left out, without forces and not budgeted
+/// (`O(k log k)`): with at most one child as `arrange`; an unchanged container of a continuation as it was; any other
+/// with its children packed in rows (`packed`). No overlaps, every child inside the container's disc.
+pub fn fallback(
+    h: &Hierarchy,
+    container: Container,
+    radius: &[f64],
+    options: &OverviewOptions,
+    start: Option<&Previous>,
+) -> (Arrangement, Fallback) {
+    let members = h.members(container);
+    let k = members.len();
+    if k <= 1 {
+        return (
+            arrange(h, container, radius, options, start),
+            Fallback::Same,
+        );
     }
+    let r: Vec<f64> = members.iter().map(|&m| radius[m]).collect();
+    let start = start.filter(|p| members.iter().any(|m| !p.anew.contains(m)));
+    let (x, kind) = match start {
+        Some(previous) if !changed_in(previous, container, members, radius) => {
+            let origin = match container {
+                Container::Root => (0., 0.),
+                Container::Node(c) => previous.centre[c],
+            };
+            let x = members
+                .iter()
+                .map(|&m| {
+                    (
+                        previous.centre[m].0 - origin.0,
+                        previous.centre[m].1 - origin.1,
+                    )
+                })
+                .collect();
+            (x, Fallback::Kept)
+        }
+        _ => {
+            let local: BTreeMap<usize, usize> =
+                members.iter().enumerate().map(|(i, &m)| (m, i)).collect();
+            let links: Vec<(usize, usize, f64)> = h
+                .container_links(container)
+                .iter()
+                .map(|&(a, b, w)| (local[&a], local[&b], w))
+                .collect();
+            (packed(&r, &links, options.gap), Fallback::Packed)
+        }
+    };
+    let reach = x
+        .iter()
+        .zip(&r)
+        .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
+        .fold(0., f64::max);
+    (
+        Arrangement {
+            positions: x,
+            radius: reach + options.padding,
+            overlaps: 0,
+            shift: (0., 0.),
+        },
+        kind,
+    )
+}
+
+/// The children in rows, centred on the origin: in the order of `walk_order` (linked children side by side), each in a
+/// square of its diameter and a little more than the gap, the rows as high as their largest square and about as wide as
+/// the squares' total area is square. The squares do not overlap, so neither do the discs (with the gap).
+fn packed(r: &[f64], links: &[(usize, usize, f64)], gap: f64) -> Vec<(f64, f64)> {
+    let side = |i: usize| 2. * r[i] + gap * 1.01;
+    let order = walk_order(r.len(), links);
+    let width = order.iter().map(|&i| side(i) * side(i)).sum::<f64>().sqrt();
+    let mut x = vec![(0., 0.); r.len()];
+    let mut row: Vec<usize> = Vec::new();
+    let (mut along, mut top) = (0., 0.);
+    let (mut left, mut right, mut bottom) = (f64::INFINITY, f64::NEG_INFINITY, 0f64);
+    let mut flush = |row: &mut Vec<usize>, top: &mut f64, x: &mut [(f64, f64)]| {
+        let height = row.iter().map(|&i| side(i)).fold(0., f64::max);
+        let mut at = 0.;
+        for &i in row.iter() {
+            x[i] = (at + side(i) / 2., *top + height / 2.);
+            left = left.min(at);
+            at += side(i);
+            right = right.max(at);
+        }
+        *top += height;
+        bottom = bottom.max(*top);
+        row.clear();
+    };
+    for &i in &order {
+        if !row.is_empty() && along + side(i) > width {
+            flush(&mut row, &mut top, &mut x);
+            along = 0.;
+        }
+        row.push(i);
+        along += side(i);
+    }
+    flush(&mut row, &mut top, &mut x);
+    let (cx, cy) = ((left + right) / 2., bottom / 2.);
+    for p in &mut x {
+        p.0 -= cx;
+        p.1 -= cy;
+    }
+    x
 }
 
 /// Places the children without a previous place (`placed` false) among those with one, in the container's frame. One
@@ -1256,6 +1564,23 @@ fn place_anew(
 /// child (ties: the smaller index); unlinked children follow in index order.
 fn spiral(r: &[f64], links: &[(usize, usize, f64)], gap: f64) -> Vec<(f64, f64)> {
     let k = r.len();
+    let order = walk_order(k, links);
+    let golden = std::f64::consts::PI * (3. - 5f64.sqrt());
+    let mut x = vec![(0., 0.); k];
+    let mut area = 0.;
+    for (slot, &i) in order.iter().enumerate() {
+        let size = r[i] + gap;
+        area += size * size;
+        let distance = area.sqrt() * 1.2;
+        let angle = slot as f64 * golden;
+        x[i] = (distance * angle.p_cos(), distance * angle.p_sin());
+    }
+    x
+}
+
+/// The order of a breadth-first walk over the links from the most linked child (ties: the smaller index); unlinked
+/// children follow in index order.
+fn walk_order(k: usize, links: &[(usize, usize, f64)]) -> Vec<usize> {
     let mut adjacent: Vec<Vec<usize>> = vec![Vec::new(); k];
     let mut weight = vec![0f64; k];
     for &(a, b, w) in links {
@@ -1284,32 +1609,12 @@ fn spiral(r: &[f64], links: &[(usize, usize, f64)], gap: f64) -> Vec<(f64, f64)>
             }
         }
     }
-    let golden = std::f64::consts::PI * (3. - 5f64.sqrt());
-    let mut x = vec![(0., 0.); k];
-    let mut area = 0.;
-    for (slot, &i) in order.iter().enumerate() {
-        let size = r[i] + gap;
-        area += size * size;
-        let distance = area.sqrt() * 1.2;
-        let angle = slot as f64 * golden;
-        x[i] = (distance * angle.p_cos(), distance * angle.p_sin());
-    }
-    x
+    order
 }
 
-/// The force simulation of `arrange`.
-fn simulate(
-    x: &mut [(f64, f64)],
-    r: &[f64],
-    links: &[(usize, usize, f64)],
-    options: &OverviewOptions,
-    start_alpha: f64,
-) {
-    simulate_held(x, r, links, options, start_alpha, None);
-}
-
-/// `simulate` with one child (`held`) kept where it is, as d3-force's fixed positions: it pushes and pulls the others but
-/// does not move.
+/// The force simulation of `arrange`, with one child (`held`) kept where it is, as d3-force's fixed positions: it pushes
+/// and pulls the others but does not move. False when the meter stops it (counted per tick: the links, the Barnes–Hut
+/// tree and gravity per child, and the pairs the collision examines).
 fn simulate_held(
     x: &mut [(f64, f64)],
     r: &[f64],
@@ -1317,7 +1622,8 @@ fn simulate_held(
     options: &OverviewOptions,
     start_alpha: f64,
     held: Option<usize>,
-) {
+    meter: &mut dyn Meter,
+) -> bool {
     let pin = held.map(|h| (h, x[h]));
     let k = x.len();
     let ticks = options.ticks.max(1);
@@ -1359,7 +1665,10 @@ fn simulate_held(
             v[i].0 += fx - x[i].0 * options.gravity * alpha;
             v[i].1 += fy - x[i].1 * options.gravity * alpha;
         }
-        collide(x, &mut v, r, options.gap, COLLIDE_STRENGTH);
+        let (_, examined) = collide(x, &mut v, r, options.gap, COLLIDE_STRENGTH);
+        if !meter.spend(links.len() as u64 + k as u64 * tree_units(k) + examined) {
+            return false;
+        }
         for i in 0..k {
             v[i].0 *= 1. - VELOCITY_DECAY;
             v[i].1 *= 1. - VELOCITY_DECAY;
@@ -1371,12 +1680,19 @@ fn simulate_held(
             v[h] = (0., 0.);
         }
     }
+    true
 }
 
 /// Pushes overlapping discs (with the gap) apart on the predicted positions `x + v`: each pair loses `strength` of its
 /// overlap along the line between the centres, the smaller disc moving more. Candidates come from a sweep over the discs
-/// sorted by their left edge. Returns the number of overlapping pairs found.
-fn collide(x: &[(f64, f64)], v: &mut [(f64, f64)], r: &[f64], gap: f64, strength: f64) -> usize {
+/// sorted by their left edge. Returns the number of overlapping pairs found, and of the pairs examined.
+fn collide(
+    x: &[(f64, f64)],
+    v: &mut [(f64, f64)],
+    r: &[f64],
+    gap: f64,
+    strength: f64,
+) -> (usize, u64) {
     let k = x.len();
     let p: Vec<(f64, f64)> = (0..k).map(|i| (x[i].0 + v[i].0, x[i].1 + v[i].1)).collect();
     let mut order: Vec<usize> = (0..k).collect();
@@ -1386,12 +1702,14 @@ fn collide(x: &[(f64, f64)], v: &mut [(f64, f64)], r: &[f64], gap: f64, strength
             .then(a.cmp(b))
     });
     let mut found = 0;
+    let mut examined = 0u64;
     for (s, &i) in order.iter().enumerate() {
         let right = p[i].0 + r[i] + gap;
         for &j in &order[s + 1..] {
             if p[j].0 - r[j] >= right {
                 break;
             }
+            examined += 1;
             let (dx, dy) = (p[j].0 - p[i].0, p[j].1 - p[i].1);
             let reach = r[i] + r[j] + gap;
             let l2 = dx * dx + dy * dy;
@@ -1416,19 +1734,23 @@ fn collide(x: &[(f64, f64)], v: &mut [(f64, f64)], r: &[f64], gap: f64, strength
             v[j].1 += uy * overlap * sj;
         }
     }
-    found
+    (found, examined)
 }
 
 /// Rounds of full collision steps until no discs overlap. When a stretch of `STRETCH_EVERY` rounds leaves overlaps (a dense
 /// pack relaxes slowly pair by pair), the positions are stretched by `STRETCH` about their centre, which lengthens every
 /// distance; so the separation ends, after at most `SEPARATION_ROUNDS` rounds. Returns the overlapping pairs left.
-fn separate(x: &mut [(f64, f64)], r: &[f64], gap: f64) -> usize {
+fn separate(x: &mut [(f64, f64)], r: &[f64], gap: f64, meter: &mut dyn Meter) -> Option<usize> {
     let k = x.len();
     for round in 0..SEPARATION_ROUNDS {
         let mut v = vec![(0f64, 0f64); k];
         // A little more than the gap, so that rounding does not leave touching discs counted as overlaps.
-        if collide(x, &mut v, r, gap * 1.01, 1.) == 0 {
-            return 0;
+        let (found, examined) = collide(x, &mut v, r, gap * 1.01, 1.);
+        if !meter.spend(k as u64 + examined) {
+            return None;
+        }
+        if found == 0 {
+            return Some(0);
         }
         for i in 0..k {
             x[i].0 += v[i].0;
@@ -1443,7 +1765,8 @@ fn separate(x: &mut [(f64, f64)], r: &[f64], gap: f64) -> usize {
         }
     }
     let mut v = vec![(0f64, 0f64); k];
-    collide(x, &mut v, r, gap, 0.)
+    let (found, examined) = collide(x, &mut v, r, gap, 0.);
+    meter.spend(k as u64 + examined).then_some(found)
 }
 
 /// The rounds of the approximation of the smallest enclosing circle.
@@ -1453,13 +1776,16 @@ const ENCLOSING_ROUNDS: usize = 256;
 /// shrinking share (1 / (round + 2)) of the way to the farthest point of the disc that reaches farthest (Bădoiu and
 /// Clarkson, "Smaller core-sets for balls", SODA 2003, for points; the farthest point of a disc stands for the disc).
 /// Only the centre is approximate: the radius is always measured from it, so every disc is held.
-fn enclosing_centre(x: &[(f64, f64)], r: &[f64]) -> (f64, f64) {
+fn enclosing_centre(x: &[(f64, f64)], r: &[f64], meter: &mut dyn Meter) -> Option<(f64, f64)> {
     let mut c = centre(x, r);
     let reach =
         |c: (f64, f64), i: usize| ((x[i].0 - c.0).powi(2) + (x[i].1 - c.1).powi(2)).sqrt() + r[i];
     let worst = |c: (f64, f64)| (0..x.len()).map(|i| reach(c, i)).fold(0., f64::max);
     let (mut best, mut best_reach) = (c, worst(c));
     for round in 0..ENCLOSING_ROUNDS {
+        if !meter.spend(2 * x.len() as u64) {
+            return None;
+        }
         let far = (0..x.len())
             .max_by(|&a, &b| reach(c, a).total_cmp(&reach(c, b)).then(b.cmp(&a)))
             .unwrap();
@@ -1477,25 +1803,29 @@ fn enclosing_centre(x: &[(f64, f64)], r: &[f64]) -> (f64, f64) {
             (best, best_reach) = (c, w);
         }
     }
-    best
+    Some(best)
 }
 
 /// Removes the overlaps of discs that start from their previous places, moving them as little as it can: rounds of
 /// full collision steps without any other force (the larger disc of a pair moves less), up to `SEPARATION_ROUNDS`; only
 /// if that does not end it, `separate` (which may stretch) finishes. Returns the overlapping pairs left.
-fn make_room(x: &mut [(f64, f64)], r: &[f64], gap: f64) -> usize {
+fn make_room(x: &mut [(f64, f64)], r: &[f64], gap: f64, meter: &mut dyn Meter) -> Option<usize> {
     let k = x.len();
     for _ in 0..SEPARATION_ROUNDS {
         let mut v = vec![(0f64, 0f64); k];
-        if collide(x, &mut v, r, gap * 1.01, 1.) == 0 {
-            return 0;
+        let (found, examined) = collide(x, &mut v, r, gap * 1.01, 1.);
+        if !meter.spend(k as u64 + examined) {
+            return None;
+        }
+        if found == 0 {
+            return Some(0);
         }
         for i in 0..k {
             x[i].0 += v[i].0;
             x[i].1 += v[i].1;
         }
     }
-    separate(x, r, gap)
+    separate(x, r, gap, meter)
 }
 
 /// The centre of discs weighted by their area.
@@ -2090,6 +2420,111 @@ mod tests {
             .collect();
         let h = with_communities(hierarchy(&graph(nodes, edges)), 120).unwrap();
         assert_eq!(h.ids.len(), 150);
+    }
+
+    /// A flat graph of `rings` rings of `size` nodes, each with chords, and one edge between neighbouring rings.
+    fn rings(rings: usize, size: usize) -> Graph {
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+        for r in 0..rings {
+            for i in 0..size {
+                nodes.push(node(&format!("r{r}n{i}"), None));
+                for d in [1, 3] {
+                    edges.push(edge(
+                        &format!("r{r}e{i}-{d}"),
+                        &format!("r{r}n{i}"),
+                        Some(&format!("r{r}n{}", (i + d) % size)),
+                    ));
+                }
+            }
+            edges.push(edge(
+                &format!("x{r}"),
+                &format!("r{r}n0"),
+                Some(&format!("r{}n1", (r + 1) % rings)),
+            ));
+        }
+        graph(nodes, edges)
+    }
+
+    #[test]
+    fn a_metered_arrangement_is_the_same_until_its_limit_stops_it() {
+        let h = hierarchy(&rings(3, 40));
+        let options = OverviewOptions::default();
+        let radius = radii(&h, &BTreeMap::new(), &options, &OverviewHints::default());
+        let whole = arrange(&h, Container::Root, &radius, &options, None);
+        let mut counted = Limit::new(u64::MAX);
+        let metered =
+            arrange_metered(&h, Container::Root, &radius, &options, None, &mut counted).unwrap();
+        assert_eq!(metered, whole);
+        let used = counted.used;
+        assert!(used > 0);
+        // Exactly that much is enough; one unit less stops it.
+        let mut exact = Limit::new(used);
+        assert_eq!(
+            arrange_metered(&h, Container::Root, &radius, &options, None, &mut exact),
+            Some(whole)
+        );
+        let mut short = Limit::new(used - 1);
+        assert_eq!(
+            arrange_metered(&h, Container::Root, &radius, &options, None, &mut short),
+            None
+        );
+    }
+
+    #[test]
+    fn a_budget_leaves_containers_unsplit_from_the_first_that_does_not_fit() {
+        let g = rings(4, 50);
+        let full = with_communities(hierarchy(&g), 20).unwrap();
+        let mut counted = Budget::unlimited();
+        let within =
+            with_communities_within(hierarchy(&g), 20, &Hubs::default(), &mut counted).unwrap();
+        assert_eq!(within.ids, full.ids);
+        assert_eq!(within.parent, full.parent);
+        assert!(counted.clustering > 0 && counted.used == counted.clustering);
+        assert!(!counted.exhausted && counted.unclustered.is_empty());
+        let mut short = Budget::new(counted.clustering - 1);
+        let cut = with_communities_within(hierarchy(&g), 20, &Hubs::default(), &mut short).unwrap();
+        assert_eq!(cut.ids.len(), 200, "the top level stays unsplit");
+        assert_eq!(short.used, 0);
+        assert!(short.exhausted);
+        assert_eq!(short.unclustered, vec![Container::Root]);
+        assert_eq!(short.stopped, Some(("clustering", Container::Root)));
+    }
+
+    #[test]
+    fn packed_discs_of_any_size_do_not_overlap_and_stay_in_their_container() {
+        // Radii from a leaf to large clusters, linked in a chain and partly unlinked.
+        let r: Vec<f64> = (0..60)
+            .map(|i| match i % 7 {
+                0 => 40.,
+                3 => 13.5,
+                _ => 4.,
+            })
+            .collect();
+        let links: Vec<(usize, usize, f64)> = (0..40).map(|i| (i, i + 1, 1.)).collect();
+        let gap = 2.;
+        let x = packed(&r, &links, gap);
+        for i in 0..r.len() {
+            for j in i + 1..r.len() {
+                let d = ((x[i].0 - x[j].0).powi(2) + (x[i].1 - x[j].1).powi(2)).sqrt();
+                assert!(d >= r[i] + r[j] + gap, "{i} and {j} overlap");
+            }
+        }
+        let mut v = vec![(0., 0.); r.len()];
+        assert_eq!(collide(&x, &mut v, &r, gap, 0.).0, 0);
+        // The fallback of a container holds them all within its padding.
+        let h = hierarchy(&rings(2, 30));
+        let options = OverviewOptions::default();
+        let radius = radii(&h, &BTreeMap::new(), &options, &OverviewHints::default());
+        let (a, how) = fallback(&h, Container::Root, &radius, &options, None);
+        assert_eq!(how, Fallback::Packed);
+        assert_eq!(a.overlaps, 0);
+        for p in &a.positions {
+            assert!(
+                (p.0 * p.0 + p.1 * p.1).sqrt() + options.node_radius
+                    <= a.radius - options.padding + 1e-9
+            );
+        }
     }
 }
 

@@ -3707,6 +3707,50 @@ pub struct Overview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub continuation: Option<OverviewContinuation>,
+    /// Provisional (#211), for a request with `workBudget`: the work the overview used and what the budget left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub work: Option<OverviewWork>,
+}
+
+/// Provisional (#211, ADR 0018 addendum of 2026-11-27): the work of an overview with a work budget (`workBudget`).
+/// Units are deterministic counts of the iterative phases (clustering, arranging the containers), the same on every
+/// target and for any number of threads. Containers are node indices, -1 for the top level (as `parent`).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewWork {
+    /// The budget of the request.
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub budget: u64,
+    /// The units of the work the answer holds; never more than `budget`. When `limited`, the rest went into the piece
+    /// that did not fit, which was discarded.
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub used: u64,
+    /// The share of `used` that went into clustering (communities).
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub clustering: u64,
+    /// Whether the budget left anything out (the lists below say what).
+    pub limited: bool,
+    /// Containers that were not divided into communities although they would have been.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub unclustered: Vec<i64>,
+    /// Containers whose children were packed in rows instead of arranged (an unchanged container of a continuation keeps
+    /// its arrangement either way and is not listed).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub packed: Vec<i64>,
+}
+
+/// Provisional (#211): what an overview does when its work budget runs out (`overBudget`).
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum OverBudget {
+    /// Answer what is ready, the rest packed or kept, with `work.limited`.
+    #[default]
+    Answer,
+    /// Refuse the request (`Overview work budget exhausted: …`); a session keeps its state.
+    Refuse,
 }
 
 /// Provisional: what became of the places given by node id (`OverviewStart::nodes`).
@@ -4025,6 +4069,10 @@ pub struct OverviewPositions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub continuation: Option<OverviewContinuation>,
+    /// For a request with `workBudget` (`Overview::work`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub work: Option<OverviewWork>,
 }
 
 impl OverviewPositions {
@@ -4041,6 +4089,7 @@ impl OverviewPositions {
             bus_lines: overview.bus_lines,
             stats: overview.stats,
             continuation: overview.continuation,
+            work: overview.work,
         }
     }
 }
@@ -4136,6 +4185,15 @@ pub struct OverviewRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub edge_data: Option<bool>,
+    /// Provisional (#211): a deterministic work budget in units (`Overview::work`); the answer reports the work. Without
+    /// it the overview runs to the end, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional, type = "number"))]
+    pub work_budget: Option<u64>,
+    /// Provisional (#211): answer what is ready (`answer`, the default) or refuse when the work budget runs out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub over_budget: Option<OverBudget>,
     /// Worker threads (native only); the answer is the same for any number.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number"))]

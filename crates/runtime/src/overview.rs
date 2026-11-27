@@ -2,11 +2,12 @@
 //! (`arqlet_layout::overview`), running the containers of one level in parallel on native builds. The result is the same
 //! for any thread count.
 use arqlet_layout::overview::{
-    self, Arrangement, Container, OverviewHints, OverviewOptions, Previous,
+    self, Arrangement, Budget, Container, Fallback, Meter, OverviewHints, OverviewOptions, Previous,
 };
 use arqlet_model::{
-    validate, ConfigSet, Graph, Overview, OverviewConfig, OverviewContinuation, OverviewIntent,
-    OverviewPlace, OverviewPositions, OverviewRepresentation, OverviewStats,
+    validate, ConfigSet, Graph, OverBudget, Overview, OverviewConfig, OverviewContinuation,
+    OverviewIntent, OverviewPlace, OverviewPositions, OverviewRepresentation, OverviewStats,
+    OverviewWork,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -73,6 +74,148 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
         }
     }
     Ok(options)
+}
+
+/// Provisional (#211): the work budget of a request (`workBudget`) and what to do when it runs out (`overBudget`).
+#[derive(Clone, Copy, Debug)]
+struct WorkRequest {
+    limit: u64,
+    refuse: bool,
+}
+
+fn work_of(v: &Value) -> Result<Option<WorkRequest>, String> {
+    let limit = match v.get("workBudget") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(
+            value
+                .as_u64()
+                .ok_or("Overview workBudget must be a non-negative integer")?,
+        ),
+    };
+    let over: Option<OverBudget> = match v.get("overBudget") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(
+            serde_json::from_value(value.clone())
+                .map_err(|_| "Overview overBudget must be answer or refuse")?,
+        ),
+    };
+    match (limit, over) {
+        (None, Some(_)) => Err("Overview overBudget needs a workBudget".into()),
+        (None, None) => Ok(None),
+        (Some(limit), over) => Ok(Some(WorkRequest {
+            limit,
+            refuse: over == Some(OverBudget::Refuse),
+        })),
+    }
+}
+
+/// The budget of a request: unlimited without `workBudget` (the work is counted all the same).
+fn budget_of(work: Option<WorkRequest>) -> Budget {
+    work.map_or_else(Budget::unlimited, |w| Budget::new(w.limit))
+}
+
+/// A container as the answer names it: its node index, -1 for the top level.
+fn container_index(container: Container) -> i64 {
+    match container {
+        Container::Root => -1,
+        Container::Node(i) => i as i64,
+    }
+}
+
+/// The refusal of a request with `overBudget: refuse` whose budget ran out (a stable prefix for hosts).
+fn refusal(h: &overview::Hierarchy, budget: &Budget) -> String {
+    let (phase, container) = budget.stopped.unwrap_or(("arrangement", Container::Root));
+    let name = match container {
+        Container::Root => "the top level".to_string(),
+        Container::Node(i) => h.ids.get(i).cloned().unwrap_or_default(),
+    };
+    format!(
+        "Overview work budget exhausted: the {phase} of {name} did not fit into the {} units left of {} ({} used)",
+        budget.limit.saturating_sub(budget.used),
+        budget.limit,
+        budget.used
+    )
+}
+
+/// The meter of one container arranged in parallel (#211): it stops at its own limit (the level's remaining budget)
+/// and once the work of the whole level together exceeds that limit. `own` tells the first from the second.
+#[cfg(not(target_arch = "wasm32"))]
+struct Shared<'a> {
+    used: u64,
+    limit: u64,
+    total: &'a std::sync::atomic::AtomicU64,
+    own: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Meter for Shared<'_> {
+    fn spend(&mut self, units: u64) -> bool {
+        self.used = self.used.saturating_add(units);
+        if self.used > self.limit {
+            self.own = true;
+            return false;
+        }
+        let total = self
+            .total
+            .fetch_add(units, std::sync::atomic::Ordering::Relaxed)
+            .saturating_add(units);
+        total <= self.limit
+    }
+}
+
+/// Arranges one level within the budget (#211, ADR 0018 addendum): the containers in index order, each with what is
+/// left, until the first that does not fit; it and all after it get `None` (the caller's fallback). With threads the
+/// containers run in parallel first (`Shared`), then are taken in index order; one stopped only by the level's shared
+/// counter while all before it fit is arranged again with what is left. The result depends only on each container's
+/// own work, so it is the same for any number of threads.
+fn arrange_level(
+    level: &[Container],
+    threads: usize,
+    budget: &mut Budget,
+    arrange: &(dyn Fn(Container, &mut dyn Meter) -> Option<Arrangement> + Sync),
+) -> Vec<Option<Arrangement>> {
+    #[cfg(not(target_arch = "wasm32"))]
+    if threads > 1 && level.len() > 1 && !budget.exhausted {
+        let limit = budget.remaining();
+        let total = std::sync::atomic::AtomicU64::new(0);
+        let tried = crate::parallel_map(level, threads, |&container| {
+            let mut meter = Shared {
+                used: 0,
+                limit,
+                total: &total,
+                own: false,
+            };
+            let done = arrange(container, &mut meter);
+            (done, meter.used, meter.own)
+        });
+        let mut out = Vec::with_capacity(level.len());
+        for (&container, (done, used, own)) in level.iter().zip(tried) {
+            let done = match done {
+                _ if budget.exhausted => None,
+                Some(a) if used <= budget.remaining() => {
+                    budget.accept("arrangement", used);
+                    Some(a)
+                }
+                Some(_) => {
+                    budget.stop("arrangement", container);
+                    None
+                }
+                // Over the whole level's limit on its own: it does not fit into what is left either.
+                None if own => {
+                    budget.stop("arrangement", container);
+                    None
+                }
+                None => budget.piece("arrangement", container, |meter| arrange(container, meter)),
+            };
+            out.push(done);
+        }
+        return out;
+    }
+    let _ = threads;
+    level
+        .iter()
+        .map(|&container| budget.piece("arrangement", container, |meter| arrange(container, meter)))
+        .collect()
 }
 
 /// The places of a request with `start.nodes`, and the clusters of the hierarchy that were kept from them.
@@ -276,8 +419,18 @@ pub fn overview_response(v: &Value, threads: usize) -> Value {
 pub(crate) fn overview_of(v: &Value, threads: usize) -> Result<Overview, String> {
     let graph = graph_of(v)?;
     let options = options_of(v)?;
-    let (graph, h, from_places) = hierarchy_of(&graph, v, &options)?;
-    lay_out(&graph, &h, from_places.as_ref(), v, &options, threads)
+    let work = work_of(v)?;
+    let mut budget = budget_of(work);
+    let (graph, h, from_places) = hierarchy_of(&graph, v, &options, &mut budget)?;
+    lay_out(
+        &graph,
+        &h,
+        from_places.as_ref(),
+        v,
+        &options,
+        threads,
+        work.map(|w| (w, budget)),
+    )
 }
 
 /// The graph of a request, checked.
@@ -304,11 +457,12 @@ fn hierarchy_key(v: &Value, options: &OverviewOptions) -> Value {
 }
 
 /// The graph with the groups the data gives, and its cluster hierarchy: with `start.nodes`, the clusters of those
-/// places continue (`clusters_by_id`).
+/// places continue (`clusters_by_id`). Louvain runs within `budget` (#211).
 fn hierarchy_of(
     graph: &Graph,
     v: &Value,
     options: &OverviewOptions,
+    budget: &mut Budget,
 ) -> Result<(Graph, overview::Hierarchy, Option<FromPlaces>), String> {
     // Groups the data gives (node id → path of group names), as containers of kind `group`, the same as an import's
     // `groups`; communities then divide what is still large.
@@ -332,23 +486,26 @@ fn hierarchy_of(
     let base = overview::hierarchy(&graph);
     let hubs = crate::hubs_of(&hubs);
     if let Some(places) = places_of(v)? {
-        let (h, kept) = overview::clusters_by_id(
+        let (h, kept) = overview::clusters_by_id_within(
             base,
             &places,
             options.communities,
             &hubs,
             options.satellites,
+            budget,
         )?;
         return Ok((graph, h, Some((places, kept))));
     }
     let h = overview::with_satellites(
-        overview::with_communities_except(base, options.communities, &hubs)?,
+        overview::with_communities_within(base, options.communities, &hubs, budget)?,
         options.satellites,
     )?;
     Ok((graph, h, None))
 }
 
-/// Lays out a hierarchy (of `graph`, with its groups) as the request `v` says (options, hints, representation).
+/// Lays out a hierarchy (of `graph`, with its groups) as the request `v` says (options, hints, representation). With a
+/// work budget (#211; its request and the budget the clustering left), the containers are arranged within it and the
+/// answer reports the work.
 fn lay_out(
     graph: &Graph,
     h: &overview::Hierarchy,
@@ -356,8 +513,17 @@ fn lay_out(
     v: &Value,
     options: &OverviewOptions,
     threads: usize,
+    work: Option<(WorkRequest, Budget)>,
 ) -> Result<Overview, String> {
     let (mut hints, continuation) = hints_of(v, h, from_places)?;
+    let (refuse, mut budget) = match work {
+        Some((request, budget)) => (request.refuse, Some(budget)),
+        None => (false, None),
+    };
+    if refuse && budget.as_ref().is_some_and(|b| b.exhausted) {
+        return Err(refusal(h, budget.as_ref().unwrap()));
+    }
+    let mut packed: Vec<i64> = Vec::new();
     // `edgeData`: each edge's kind and weight in the answer.
     let edge_data = edge_data_of(v)?;
     // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
@@ -388,12 +554,50 @@ fn lay_out(
     let mut arrangements: BTreeMap<Container, Arrangement> = BTreeMap::new();
     for level in &levels {
         let radius = overview::radii(&h, &arrangements, &options, &hints);
-        let done = crate::parallel_map(level, threads, |&container| {
-            overview::arrange(&h, container, &radius, &options, hints.start.as_ref())
-        });
+        let done = match budget.as_mut() {
+            None => crate::parallel_map(level, threads, |&container| {
+                overview::arrange(&h, container, &radius, &options, hints.start.as_ref())
+            }),
+            Some(budget) => {
+                let start = hints.start.as_ref();
+                let tried = arrange_level(level, threads, budget, &|container, meter| {
+                    overview::arrange_metered(&h, container, &radius, &options, start, meter)
+                });
+                if refuse && budget.exhausted {
+                    return Err(refusal(h, budget));
+                }
+                level
+                    .iter()
+                    .zip(tried)
+                    .map(|(&container, done)| {
+                        done.unwrap_or_else(|| {
+                            let (a, how) =
+                                overview::fallback(&h, container, &radius, &options, start);
+                            if how == Fallback::Packed {
+                                packed.push(container_index(container));
+                            }
+                            a
+                        })
+                    })
+                    .collect()
+            }
+        };
         arrangements.extend(level.iter().copied().zip(done));
         overview::carry_shifts(&mut hints, level, &arrangements);
     }
+    packed.sort_unstable();
+    let work = budget.map(|b| {
+        let mut unclustered: Vec<i64> = b.unclustered.iter().map(|&c| container_index(c)).collect();
+        unclustered.sort_unstable();
+        OverviewWork {
+            budget: b.limit,
+            used: b.used,
+            clustering: b.clustering,
+            limited: b.exhausted,
+            unclustered,
+            packed,
+        }
+    });
     let o = overview::assemble(&h, &arrangements, &options, &hints);
     let parent: Vec<i64> = h
         .parent
@@ -498,6 +702,7 @@ fn lay_out(
         edge_kind,
         edge_weight,
         continuation,
+        work,
     })
 }
 
@@ -523,6 +728,9 @@ pub struct OverviewSession {
     /// The options the hierarchy depends on, the graph with its groups, the hierarchy, and whether its clusters are
     /// those of places by id (`start.nodes`) instead of the graph's own.
     hierarchy: Option<(Value, Graph, overview::Hierarchy, bool)>,
+    /// The clustering work of that hierarchy (#211), charged again when a request with a work budget reuses it, and
+    /// whether its clustering was complete (a hierarchy with containers the budget left unsplit is not reused).
+    clustering: (u64, bool),
     /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout, and whether it was
     /// answered with the edges' data.
     last: Option<(Value, Value, bool)>,
@@ -606,17 +814,26 @@ impl OverviewSession {
         let key = hierarchy_key(v, &options);
         let by_id = v["start"].get("nodes").is_some();
         let continues = v.get("start").is_some();
+        let work = work_of(v)?;
+        let mut budget = budget_of(work);
+        // A hierarchy is reused only if its clustering was complete and fits this budget: then `dispatch` would build the
+        // same one with the same work, which is charged.
+        let (clustered, complete) = self.clustering;
         let reuse = new_graph.is_none()
             && !by_id
+            && complete
+            && clustered <= budget.limit
             && self
                 .hierarchy
                 .as_ref()
                 .is_some_and(|(k, _, _, from_places)| *k == key && (continues || !from_places));
         let built = if reuse {
+            budget.accept("clustering", clustered);
             None
         } else {
-            Some(hierarchy_of(graph, v, &options)?)
+            Some(hierarchy_of(graph, v, &options, &mut budget)?)
         };
+        let clustering = (budget.clustering, !budget.exhausted);
         let (grouped, h, from_places) = match (&built, &self.hierarchy) {
             (Some((g, h, from_places)), _) => (g, h, from_places.as_ref()),
             (None, Some((_, g, h, _))) => (g, h, None),
@@ -644,7 +861,15 @@ impl OverviewSession {
                 }
             }
         }
-        let overview = lay_out(grouped, h, from_places, &request, &options, threads)?;
+        let overview = lay_out(
+            grouped,
+            h,
+            from_places,
+            &request,
+            &options,
+            threads,
+            work.map(|w| (w, budget)),
+        )?;
         // The same clusters as the last overview of this session: its ids, labels, parents, kinds, edges and links hold,
         // and so do the edges' data, which the host has when that answer had them.
         let edge_data = edge_data_of(v)?;
@@ -665,6 +890,7 @@ impl OverviewSession {
         );
         if let Some((g, h, from_places)) = built {
             self.hierarchy = Some((key, g, h, from_places.is_some()));
+            self.clustering = clustering;
         }
         if let Some(g) = new_graph {
             self.graph = Some(g);
