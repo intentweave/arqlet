@@ -126,6 +126,17 @@ the next input stops it. Nothing moves; it is off unless asked for, and off when
 bindOverviewNavigation(canvas, renderer, {idle: {after: 8000, breathe: {amplitude: 0.06, period: 4000}}});
 ```
 
+A host that hides the overview for a while (for example under a drill-down) pauses the renderer instead of destroying
+it (provisional): while paused it draws nothing, not even breathing, keeps its GPU resources, model and view, and the
+navigation binding ignores input and holds its idle wait. Calls that change the state are taken and drawn at `resume()`,
+which draws one frame at once and goes on with what ran (a morph or breathing, from where it stood):
+
+```js
+renderer.pause();                 // the overview is covered
+renderer.setState({selected: i}); // taken now, drawn at resume
+renderer.resume();                // visible again: one frame at once, animations go on
+```
+
 See `apps/playground/overview.js` in the repository for collapsing, structuring in place and animated changes.
 
 In React, the renderer belongs to an effect; a sketch (not tested in this repository):

@@ -274,7 +274,8 @@ function schedule() { clearTimeout(timer); timer = setTimeout(evaluate, 140); }
 // Continuous zoom (ADR 0025 O4): when a structured cluster's disc covers the whole view (the view's diagonal inside it),
 // the scene view of that cluster takes over, exactly where the overview shows it (`sceneViewOf`), drawn as the overview's
 // scene look draws it; when the scene view zooms out until the disc would no longer cover the view, the overview takes
-// back at the matching view (`overviewViewOf`). Not under the orbit, the galaxy style or the lens.
+// back at the matching view (`overviewViewOf`). Not under the orbit, the galaxy style or the lens. While the scene view
+// covers it, the overview renderer is paused.
 const HAND_OVER = 1.05, HAND_BACK = 0.95;
 let handed = null;
 // How well the disc of cluster i covers a view: the room from the view's centre to the disc's rim, on the screen, over
@@ -303,6 +304,9 @@ async function handOver() {
     handed.view = view;
     handed.unbind = bindSceneNavigation(host, view);
     requestAnimationFrame(() => { host.style.opacity = '1'; });
+    // Once the scene view covers it, the overview stops drawing (idle breathing included) until it takes back.
+    const covered = renderer;
+    setTimeout(() => { if (handed?.host === host) covered.pause(); }, 220);
     status(`${nameOf(model, i)}: scene view (${view.backend}); zoom out to return to the overview`);
     return;
   }
@@ -315,6 +319,8 @@ function handBack(view) {
   handed = null;
   renderer.setView(overviewViewOf(model, back.i, back.scene, view));
   renderer.setStructured($('scene-look').checked ? 'scene' : 'cluster');
+  // Drawn once, with the view and look above, and going on with what ran before the pause.
+  renderer.resume();
   back.unbind?.();
   back.host.style.opacity = '0';
   setTimeout(() => { back.view.destroy(); back.host.remove(); }, 220);

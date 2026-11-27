@@ -13,6 +13,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `unclustered`, `packed`); `overBudget: "refuse"` fails cleanly instead. The same answer for any thread count, natively
   and in WASM; without `workBudget` nothing changes. New contract types `OverviewWork` and `OverBudget`. How to choose
   a budget: [integration guide](docs/integration-guide.md#bounding-an-overviews-work-provisional).
+- Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
+  a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
+  (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every
+  call that changes them, drawn at `resume`; the animations' clock stands still, so a morph or breathing goes on where
+  it stood. `resume()` draws one frame at once. Both are idempotent, `destroy()` works in either state, `paused` tells
+  which, and it is the same on WebGPU, WebGL 2 and WebGL 1. A `bindOverviewNavigation` binding takes no input while its
+  renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
+  overview page pauses the overview while the scene view of a cluster covers it.
 
 ## 0.10.0 — 2026-11-27
 
