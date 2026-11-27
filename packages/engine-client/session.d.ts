@@ -342,7 +342,9 @@ export interface OverviewSession {
   /** Lays out `graph`; replaces the graph the session had. */
   open(graph: Graph, request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options).
-   * With `edgeData: true` the answer has each edge's kind and weight (ask each time). Provisional: `workBudget` bounds
+   * With `edgeData: true` the answer has each edge's kind and weight (ask each time). With `containerStats: true` it has
+   * each container's inner-edge share and modularity term and the modularity per depth (`containerStats`, ask each
+   * time). Provisional: `workBudget` bounds
    * the work deterministically and the answer reports it (`work`); `overBudget: 'refuse'` refuses instead of packing
    * what did not fit, and the session keeps its last overview (ask each time). */
   layOut(request?: OverviewSessionRequest): Promise<OverviewAnswer>;
@@ -370,7 +372,7 @@ export function createOverviewSession(
     resident?: boolean | 'auto';
     /**
      * Provisional (ADR 0019, step 4): the overview's numbers (`parent`, `x`, `y`, `r`, `kind`, `edges`, `links`, and
-     * with `edgeData` `edgeKind` and `edgeWeight`) as typed arrays instead of JSON arrays, moved without JSON (copied once out of the engine's memory, transferred from a
+     * with `edgeData` `edgeKind` and `edgeWeight`, with `containerStats` its arrays, in `overview.containerStats`) as typed arrays instead of JSON arrays, moved without JSON (copied once out of the engine's memory, transferred from a
      * worker). Needs a resident session in an engine that offers `overview` (WASM, a worker); an answer says so
      * otherwise. Default false: the arrays are plain, as before. Typed arrays index like arrays; a `start` built from
      * them is sent as plain arrays.

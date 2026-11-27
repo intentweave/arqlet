@@ -7,6 +7,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **Inner-edge share and modularity per container on request** (#236, provisional; ADR 0018 addendum of
+  2026-11-28): `containerStats: true` adds `containerStats` to the `overview` answer: per container (node index, -1 the
+  root) the weight of the edges inside it and of those touching it, their share, and its term of the modularity of the
+  partition at its depth, plus the modularity of each depth, so that a host can mark weak containers of its own
+  partition (`groups`) or of the communities. The same numbers for any thread count, natively and in WASM; typed
+  columns in the columnar answer (`containerStats.*`); not part of `positionsOnly` answers. Without the flag nothing
+  changes. New contract type `OverviewContainerStats`. Formula and usage:
+  [integration guide](docs/integration-guide.md#marking-weak-containers-provisional).
 - **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
   `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
   out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,

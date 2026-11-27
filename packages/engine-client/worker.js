@@ -37,7 +37,7 @@ self.onmessage=async({data})=>{
     // As for the scene's columns: the numbers of the overview are copied once and transferred.
     if(!session.overview)throw Error('This engine has no columnar overview');
     const result=session.overview(data.request,{copy:true});const transfer=[];
-    if(result.ok)for(const v of Object.values(result.overview))if(ArrayBuffer.isView(v))transfer.push(v.buffer);
+    if(result.ok)for(const v of [...Object.values(result.overview),...Object.values(result.overview.containerStats??{})])if(ArrayBuffer.isView(v))transfer.push(v.buffer);
     self.postMessage({requestId:data.requestId,...result},transfer);return;
    }
    running=data.requestId;const result=session.run(data.request);running=null;
