@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
+  `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
+  out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,
+  `unclustered`, `packed`); `overBudget: "refuse"` fails cleanly instead. The same answer for any thread count, natively
+  and in WASM; without `workBudget` nothing changes. New contract types `OverviewWork` and `OverBudget`. How to choose
+  a budget: [integration guide](docs/integration-guide.md#bounding-an-overviews-work-provisional).
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
   a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
   (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every
@@ -22,6 +28,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   pinned by a test in `crates/runtime/tests/overview.rs`. Mentioned in the READMEs and ADR 0018.
 - Every npm package (`arqlet`, `@arqlet/contracts`, `@arqlet/engine-client`, `@arqlet/viewer`, `@arqlet/query`) ships
   `CHANGELOG.md`, copied by `prepack` (`tools/npm-prepack.mjs`) as the licenses are.
+
+### Fixed
+
+- **A `patch` into a view with buses draws what an import of the patched graph draws** (#228, ADR 0029 C). It started
+  from the earlier drawing and drew far worse in layered views with bus lines and organic views with bus bars: on the
+  generated bus meshes of #212, 1 043 and 2 091 routes through nodes where an import has none, and 1 374 where it has 36.
+  Organic views with bus lines already drew the import's drawing and are unchanged; views without buses still continue
+  their earlier drawing. Such a patch now takes an import's time: about the same in layered views, much longer in organic
+  views with bus bars where the import runs its second routing pass (the dense view of #212: 2.0 s before, 16.5 s now;
+  `benchmarks/results/patch-as-import-20261127.md`; measured before the faster second pass of #229). Revisions and stale
+  checks are unchanged.
 
 ## 0.10.0 — 2026-11-27
 

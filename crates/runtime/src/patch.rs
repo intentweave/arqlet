@@ -1,11 +1,11 @@
 //! Provisional: the `patch` operation. Changes the source graph of a view without a new import: adds nodes and edges, and
 //! removes nodes (each with what it holds and the edges at them) and edges. The view keeps its state (collapsed
-//! containers, filter, options). An abstracting view (level of detail, communities, groups) is laid out from scratch, as a
-//! toggle lays it out, so the drawing is the one a fresh import of the changed graph gets with the same view; other views
+//! containers, filter, options). An abstracting view (level of detail, communities, groups) and a view with buses are laid
+//! out from scratch, so the drawing is the one a fresh import of the changed graph gets with the same view; other views
 //! are laid out again from their earlier positions. A graph change: the revision and the layout version advance; stale
 //! requests are refused.
 use crate::{abstracts, project_view, view_options, View};
-use arqlet_model::{validate, GraphPatch, Snapshot};
+use arqlet_model::{validate, Graph, GraphPatch, NodeShape, Snapshot};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub fn patch_snapshot(
@@ -187,7 +187,11 @@ pub fn patch_snapshot(
     // warm start was slower and worse (benchmarks/results/toggle-layout-20261112.md; a patch that loaded 1 173 member
     // edges into an opened container gave a drawing 45 times taller from the earlier places), and the drawing depends
     // only on the graph and the view. Otherwise every node is placed again, starting from where the earlier layout put it.
-    let mut result = if abstracts(&layout_options) {
+    // A view with buses likewise (#228, ADR 0029 C): the earlier drawing made it much worse there. Layered areas reused
+    // their earlier plans without the ordering an import rebuilds, and organic areas with bus bars started from the
+    // earlier places: 1 043 to 2 091 routes through nodes where an import has none, 1 374 where it has 36
+    // (benchmarks/results/bus-patch-20261127.md). Organic views with bus lines were already laid out as an import.
+    let mut result = if abstracts(&layout_options) || has_buses(&projected) {
         arqlet_layout::compute(&projected, None, &BTreeSet::new(), &layout_options)?
     } else {
         let dirty: BTreeSet<String> = projected.nodes.iter().map(|n| n.id.clone()).collect();
@@ -203,6 +207,11 @@ pub fn patch_snapshot(
     result.collapsed_ids = collapsed.into_iter().collect();
     result.omitted_unresolved_edges = omitted;
     Ok(result)
+}
+
+/// Whether the view the layout sees has buses: given as data or as edges (`Graph::buses`), or as nodes of shape `busLine`.
+fn has_buses(view: &Graph) -> bool {
+    !view.buses.is_empty() || view.nodes.iter().any(|n| n.shape == NodeShape::BusLine)
 }
 
 /// The memberships after a patch: `removeMemberships` first (a whole dimension, or a group with the groups nested in it;
