@@ -105,6 +105,18 @@ requests.push(
   ['overview continued by id over its budget', {op: 'overview', graph: changed, start: {nodes: places}, workBudget: 300000}],
   ['overview over its budget, refused', {op: 'overview', graph: large, workBudget: 20000000, overBudget: 'refuse'}],
 );
+// Filling packed containers later (#235): one by one, all at once within a budget that runs out (4 threads), the top
+// level, and by id.
+const cut = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overview', graph: large, workBudget: 20000000}), maxBuffer: 1 << 30}).toString()).overview;
+const cutStart = {x: cut.x, y: cut.y, r: cut.r};
+const packedIds = cut.work.packed.filter(c => c >= 0).map(c => cut.ids[c]);
+const cutPlaces = Object.fromEntries(cut.ids.map((id, i) => [id, {x: cut.x[i], y: cut.y[i], r: cut.r[i], parent: cut.ids[cut.parent[i]]}]));
+requests.push(
+  ['overview filling one container', {op: 'overview', graph: large, start: {...cutStart, fill: packedIds.slice(-1)}}],
+  ['overview filling all within a budget, 4 threads', {op: 'overview', graph: large, start: {...cutStart, fill: packedIds}, workBudget: 3000000, threads: 4}],
+  ['overview filling the top level', {op: 'overview', graph: large, start: {...cutStart, fillTop: true}}],
+  ['overview filling by id', {op: 'overview', graph: large, start: {nodes: cutPlaces, fill: packedIds.slice(0, 5)}}],
+);
 // The long form of a view that changed its source graph (#195), read against the view as imported: its digest is found
 // again by writing the bookmark's decisions into that graph, with the same answer natively and in WASM.
 const ask = request => JSON.parse(execFileSync(native, {input: JSON.stringify(request), maxBuffer: 1 << 30}).toString());

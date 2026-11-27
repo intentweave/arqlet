@@ -69,6 +69,7 @@ export * from './Overview';
 export * from './OverviewBusLine';
 export * from './OverviewConfig';
 export * from './OverviewContinuation';
+export * from './OverviewFill';
 export * from './OverviewIntent';
 export * from './OverviewLayoutOptions';
 export * from './OverviewPlace';

@@ -2,12 +2,13 @@
 //! (`arqlet_layout::overview`), running the containers of one level in parallel on native builds. The result is the same
 //! for any thread count.
 use arqlet_layout::overview::{
-    self, Arrangement, Budget, Container, Fallback, Meter, OverviewHints, OverviewOptions, Previous,
+    self, Arrangement, Budget, Container, Fallback, Filled, Meter, OverviewHints, OverviewOptions,
+    Previous,
 };
 use arqlet_model::{
     validate, ConfigSet, Graph, OverBudget, Overview, OverviewConfig, OverviewContinuation,
-    OverviewIntent, OverviewPlace, OverviewPositions, OverviewRepresentation, OverviewStats,
-    OverviewWork,
+    OverviewFill, OverviewIntent, OverviewPlace, OverviewPositions, OverviewRepresentation,
+    OverviewStats, OverviewWork,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -339,16 +340,90 @@ fn hints_of(
                 })
                 .collect::<Result<_, String>>()?;
         }
+        if let Some(named) = fill_of(start, h, &index, &mut ignored)? {
+            for container in named {
+                // The disc it keeps: the radius a host gives it now, else its earlier one; none for the top level and
+                // for a container without an earlier place.
+                let disc = match container {
+                    Container::Node(i) if !previous.anew.contains(&i) => {
+                        hints.radius.get(&i).copied().unwrap_or(previous.radius[i])
+                    }
+                    _ => f64::INFINITY,
+                };
+                previous.fill.insert(container, disc);
+            }
+            // A moved node inside a filled container would not stay where it was put.
+            for &m in previous.moved.keys() {
+                let inside = previous.fill.contains_key(&Container::Root)
+                    || std::iter::successors(h.parent[m], |&p| h.parent[p])
+                        .any(|p| previous.fill.contains_key(&Container::Node(p)));
+                if inside {
+                    return Err(format!(
+                        "Overview start moved {}, which lies inside a container it fills",
+                        h.ids[m]
+                    ));
+                }
+            }
+            previous.keep_radii = true;
+        }
         hints.start = Some(previous);
     }
     Ok((hints, continuation, ignored))
 }
 
-/// What a request's hints asked for that a hierarchy cut by the work budget does not have (#211, `hints_of`).
+/// `start.fill` and `start.fillTop` of a request (#235): the containers named, or `None` when it names none of the two.
+/// Ids that name no container (no node, or a node without children) are left out and listed in `ignored.fill`.
+fn fill_of(
+    start: &Value,
+    h: &overview::Hierarchy,
+    index: &BTreeMap<&str, usize>,
+    ignored: &mut Ignored,
+) -> Result<Option<Vec<Container>>, String> {
+    let ids = match start.get("fill") {
+        None | Some(Value::Null) => None,
+        Some(Value::Array(list)) => Some(
+            list.iter()
+                .map(|id| {
+                    id.as_str()
+                        .ok_or("Overview start fill must be a list of node ids")
+                })
+                .collect::<Result<Vec<&str>, _>>()?,
+        ),
+        Some(_) => return Err("Overview start fill must be a list of node ids".into()),
+    };
+    let top = match start.get("fillTop") {
+        None | Some(Value::Null) => None,
+        Some(value) => Some(
+            value
+                .as_bool()
+                .ok_or("Overview start fillTop must be true or false")?,
+        ),
+    };
+    if ids.is_none() && top.is_none() {
+        return Ok(None);
+    }
+    let mut named = Vec::new();
+    if top == Some(true) {
+        named.push(Container::Root);
+    }
+    let mut left_out = Vec::new();
+    for id in ids.unwrap_or_default() {
+        match index.get(id) {
+            Some(&i) if !h.children[i].is_empty() => named.push(Container::Node(i)),
+            _ => left_out.push(id.to_string()),
+        }
+    }
+    ignored.fill = Some(left_out);
+    Ok(Some(named))
+}
+
+/// What a request's hints asked for that a hierarchy cut by the work budget does not have (#211, `hints_of`), and the
+/// ids in `start.fill` that name no container (#235; `Some` when the request names containers to fill).
 #[derive(Default)]
 struct Ignored {
     start: bool,
     radii: Vec<String>,
+    fill: Option<Vec<String>>,
 }
 
 /// `start.nodes` of a request, when it has them: node id → `{x, y, r, parent?}`.
@@ -557,6 +632,8 @@ fn lay_out(
     let cut = budget.as_ref().is_some_and(|b| !b.unclustered.is_empty());
     let (mut hints, continuation, ignored) = hints_of(v, h, from_places, cut)?;
     let mut packed: Vec<i64> = Vec::new();
+    // What became of the containers to fill (#235).
+    let (mut filled, mut unfit): (Vec<i64>, Vec<(i64, f64)>) = (Vec::new(), Vec::new());
     // `edgeData`: each edge's kind and weight in the answer.
     let edge_data = edge_data_of(v)?;
     // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
@@ -606,7 +683,11 @@ fn lay_out(
                         done.unwrap_or_else(|| {
                             let (a, how) =
                                 overview::fallback(&h, container, &radius, &options, start);
-                            if how == Fallback::Packed {
+                            // A container to fill that the budget left out keeps its places, and is listed as
+                            // packed so that the host asks again (#235).
+                            let unfilled = a.filled.is_none()
+                                && start.is_some_and(|p| p.fill.contains_key(&container));
+                            if how == Fallback::Packed || unfilled {
                                 packed.push(container_index(container));
                             }
                             a
@@ -615,10 +696,27 @@ fn lay_out(
                     .collect()
             }
         };
+        for (&container, a) in level.iter().zip(&done) {
+            match a.filled {
+                Some(Filled::InDisc) => filled.push(container_index(container)),
+                Some(Filled::Unfit(needed)) => {
+                    unfit.push((container_index(container), round(needed)))
+                }
+                None => {}
+            }
+        }
         arrangements.extend(level.iter().copied().zip(done));
         overview::carry_shifts(&mut hints, level, &arrangements);
     }
     packed.sort_unstable();
+    filled.sort_unstable();
+    unfit.sort_unstable_by_key(|&(c, _)| c);
+    let fill = ignored.fill.map(|ignored| OverviewFill {
+        filled,
+        unfit: unfit.iter().map(|&(c, _)| c).collect(),
+        needed: unfit.iter().map(|&(_, r)| r).collect(),
+        ignored,
+    });
     let work = budget.map(|b| {
         let mut unclustered: Vec<i64> = b.unclustered.iter().map(|&c| container_index(c)).collect();
         unclustered.sort_unstable();
@@ -738,6 +836,7 @@ fn lay_out(
         edge_weight,
         continuation,
         work,
+        fill,
     })
 }
 

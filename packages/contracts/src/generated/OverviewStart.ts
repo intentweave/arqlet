@@ -18,4 +18,14 @@ nodes?: { [key in string]: OverviewPlace }, settle?: boolean,
  * Provisional: nodes the user moved, by id, to their new centres: each one's container settles around it. Needs
  * earlier places (`x`, `y`, `r`, `nodes`, or a session's), and with `nodes` an earlier place of that node.
  */
-moved?: { [key in string]: Point }, };
+moved?: { [key in string]: Point },
+/**
+ * Provisional (#235): containers, by id, whose interior is arranged anew inside their earlier disc, as a layout
+ * without `start` would arrange it; everything else keeps its place (`Overview::fill` reports what became of
+ * them). Needs earlier places, as `moved` does. Not recursive: name nested containers too.
+ */
+fill?: Array<string>,
+/**
+ * Provisional (#235): arrange the top level anew as well (its children keep their discs and what they hold).
+ */
+fillTop?: boolean, };
