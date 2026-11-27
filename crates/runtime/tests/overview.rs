@@ -2209,3 +2209,140 @@ fn parents_that_say_nothing_or_something_wrong_are_handled() {
         json!({"continued": 159, "anew": 1, "ignored": ["gone"]})
     );
 }
+
+/// A partition of `rings()` a host computed itself: node id → path of group names.
+fn partition(path: impl Fn(usize, usize) -> Value) -> Value {
+    Value::Object(
+        (0..4)
+            .flat_map(|r| (0..40).map(move |i| (r, i)))
+            .map(|(r, i)| (format!("r{r}n{i}"), path(r, i)))
+            .collect(),
+    )
+}
+
+/// The ids of an overview that are no nodes of `rings()`.
+fn added_ids(o: &Value) -> Vec<String> {
+    o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| id.as_str().unwrap().to_string())
+        .filter(|id| !id.starts_with('r'))
+        .collect()
+}
+
+#[test]
+fn a_partition_of_the_host_is_shown_as_given_and_a_switch_keeps_the_groups_both_have() {
+    let graph = rings();
+    let request = |groups: &Value, start: Option<Value>| {
+        let mut r = json!({"op": "overview", "graph": graph,
+            "options": {"groups": groups, "communities": 0}});
+        if let Some(nodes) = start {
+            r["start"] = json!({"nodes": nodes});
+        }
+        answer(&r)
+    };
+    // A: package → community, nested; every node has a path.
+    let a_groups = partition(|r, _| json!([format!("p{}", r % 2), format!("ring{r}")]));
+    let a = request(&a_groups, None);
+    assert_nested(&a);
+    assert_eq!(a["stats"]["communities"], 0, "no Louvain");
+    assert_eq!(
+        sorted(&added_ids(&a)),
+        sorted(&[
+            "group:#:p0".into(),
+            "group:#:p0/ring0".into(),
+            "group:#:p0/ring2".into(),
+            "group:#:p1".into(),
+            "group:#:p1/ring1".into(),
+            "group:#:p1/ring3".into(),
+        ])
+    );
+    assert_eq!(a["labels"][at(&a, "group:#:p0/ring2")], "ring2");
+    assert_eq!(cluster_of(&a, "group:#:p0/ring2"), "group:#:p0");
+    for r in 0..4 {
+        assert_eq!(
+            cluster_of(&a, &format!("r{r}n7")),
+            format!("group:#:p{}/ring{r}", r % 2)
+        );
+    }
+    // Inside a container the id names it: `group:<container>:<path>`.
+    let nested = answer(&json!({"op": "overview", "graph": hierarchical(2, 2, 4),
+        "options": {"groups": {"g0/f0": ["X"], "g0/f1": ["X"]}, "communities": 0}}));
+    assert_eq!(cluster_of(&nested, "g0/f0"), "group:g0:X");
+    assert_eq!(cluster_of(&nested, "group:g0:X"), "g0");
+
+    // With `communities` > 0, Louvain divides a group with more children than that, inside the group.
+    let flat = partition(|r, _| json!([format!("p{}", r % 2)]));
+    let divided = answer(&json!({"op": "overview", "graph": graph,
+        "options": {"groups": flat, "communities": 8}}));
+    assert_nested(&divided);
+    assert_eq!(divided["stats"]["communities"], 8);
+    assert!(cluster_of(&divided, "r0n0").starts_with("community:group:#:p0:"));
+
+    // B: rings 0 and 1 merged into one community of p0; rings 2 and 3 as in A.
+    let b_groups = partition(|r, _| {
+        if r < 2 {
+            json!(["p0", "merged"])
+        } else {
+            json!([format!("p{}", r % 2), format!("ring{r}")])
+        }
+    });
+    let b = request(&b_groups, Some(places_with_parents(&a)));
+    assert_nested(&b);
+    assert_eq!(b["stats"]["communities"], 0);
+    // What keeps its path continues (80 nodes, groups p0, p1, p0/ring2, p1/ring3); the nodes whose path changed and the
+    // new group are placed anew; the groups of A that B lacks are reported as ignored ids.
+    assert_eq!(
+        b["continuation"],
+        json!({"continued": 84, "anew": 81,
+            "ignored": ["group:#:p0/ring0", "group:#:p1/ring1"]})
+    );
+    assert_eq!(cluster_of(&b, "r0n3"), "group:#:p0/merged");
+    // A kept group keeps its inner arrangement; the group itself may move, as its container changed.
+    for r in 2..4 {
+        let group = format!("group:#:p{}/ring{r}", r % 2);
+        for i in 0..40 {
+            let id = format!("r{r}n{i}");
+            let rel = |o: &Value, k: &str| {
+                o[k][at(o, &id)].as_f64().unwrap() - o[k][at(o, &group)].as_f64().unwrap()
+            };
+            assert!((rel(&a, "x") - rel(&b, "x")).abs() < 0.02, "{id}");
+            assert!((rel(&a, "y") - rel(&b, "y")).abs() < 0.02, "{id}");
+        }
+    }
+
+    // C shares no path with A: every node is placed anew, the same answer as C without a start.
+    let c_groups = partition(|_, i| json!(["all", format!("mod{}", i % 4)]));
+    let c = request(&c_groups, Some(places_with_parents(&a)));
+    assert_eq!(c["continuation"]["continued"], 0);
+    assert_eq!(c["continuation"]["ignored"].as_array().unwrap().len(), 6);
+    assert_eq!(without_continuation(c), request(&c_groups, None));
+
+    // Back to A with the places of A's answer, as a host keeps them per partition: A again, nothing moves.
+    let again = request(&a_groups, Some(places_with_parents(&a)));
+    assert_eq!(
+        again["continuation"],
+        json!({"continued": 166, "anew": 0, "ignored": []})
+    );
+    for id in a["ids"].as_array().unwrap() {
+        assert!(moved_by(&a, &again, id.as_str().unwrap()) < 0.02, "{id}");
+    }
+    // Back to A from B's places: what B kept continues, rings 0 and 1 are placed anew again.
+    let from_b = request(&a_groups, Some(places_with_parents(&b)));
+    assert_nested(&from_b);
+    assert_eq!(
+        from_b["continuation"],
+        json!({"continued": 84, "anew": 82, "ignored": ["group:#:p0/merged"]})
+    );
+
+    // A session switches the same way, with the places sent again (its own last places belong to A's clusters).
+    use arqlet_runtime::engine_session::EngineSession;
+    let mut session = EngineSession::new();
+    session.run_value(&json!({"op": "overview", "graph": graph,
+        "options": {"groups": a_groups, "communities": 0}}));
+    let switched = session.run_value(&json!({"op": "overview",
+        "options": {"groups": b_groups, "communities": 0},
+        "start": {"nodes": places_with_parents(&a)}}));
+    assert_eq!(switched["overview"], b);
+}

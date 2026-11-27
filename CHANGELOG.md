@@ -15,6 +15,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   which, and it is the same on WebGPU, WebGL 2 and WebGL 1. A `bindOverviewNavigation` binding takes no input while its
   renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
   overview page pauses the overview while the scene view of a cluster covers it.
+- Integration guide: *Showing your own partition* (overview): a partition the host computed (for example with Leiden)
+  as `groups`, flat or nested, with `communities: 0` shown as given; what Louvain does inside large groups, labels, the
+  stable group ids, and switching between two partitions with `start.nodes` (a group both have keeps its inner
+  arrangement, nodes whose path changed are placed anew, groups that are gone are listed in `continuation.ignored`),
+  pinned by a test in `crates/runtime/tests/overview.rs`. Mentioned in the READMEs and ADR 0018.
+- Every npm package (`arqlet`, `@arqlet/contracts`, `@arqlet/engine-client`, `@arqlet/viewer`, `@arqlet/query`) ships
+  `CHANGELOG.md`, copied by `prepack` (`tools/npm-prepack.mjs`) as the licenses are.
 
 ## 0.10.0 — 2026-11-27
 
@@ -50,6 +57,11 @@ direction opens again on a new import.
   the graph; an expression that reads a variable without a value; a computed value beyond 16 MiB. A map in content or a
   parameter is a map now, and a map in a JSON answer is `{"map": {…}}`. An `overview` request with an `edgeData` that is
   not a boolean is refused (it was ignored).
+- **Overview texts on a light background:** the overview renderer (`createOverviewRenderer`) takes its tone from its
+  clear colour (`background`, `setBackground`): above one half relative luminance it is `light` (`renderer.tone`) and
+  draws the texts of its `labels` canvas dark itself (cluster and node names, the lens rim; galaxy name tags light with
+  dark text). In 0.9 they were always light. A host that inverted the label canvas for a light background (for example
+  with a CSS `filter: invert(1)`) must stop, or its texts turn light again.
 - **Rust hosts** that build these types field by field have new fields: `Snapshot`, `LayoutOptions`, `Scene`,
   `SceneMark`, `SceneMembershipReport` and `AreaPlan`; `Request` has new variants. In `arqlet-query`: `Value::Map`, the
   `plan::Expr` variants `Call`, `Map`, `Index`, `Slice` and `Comprehension`, `plan::Op::Union` and
