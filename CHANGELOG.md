@@ -5,6 +5,20 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
+  sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
+  pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time
+  each. `@arqlet/node` (`packages/node`, `private` until publishing is decided) loads it with the interface of the WASM
+  engine: `loadNativeEngine({sessionBytes})` answers an asynchronous `run` with `openSession()` (`run`, `close`,
+  `columns`, `overview`) that `createSession` takes, and `loadEngine({engine})` chooses native, WASM or the first that
+  loads (`ARQLET_ENGINE`). The answers are byte-identical to the WASM engine's (`tools/platform-parity.mjs --node`).
+  Build it with `node packages/node/build.mjs`. Not yet: prebuilt binaries, progressive publications.
+- **Sessions usable from several threads (provisional; ADR 0024 C2):** `arqlet_runtime::shared_sessions::SharedSessionStore`,
+  the store of the native adapter: one short lock for its book, one lock per session, a byte limit that never drops a
+  running session.
+
 ## 0.10.0 — 2026-11-27
 
 A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list
