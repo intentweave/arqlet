@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {orbitPoint, orbitDepth, overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, sceneViewOf, overviewViewOf, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES, pathOf, revealPathDecisions, viewOfNodes} from './overview.js';
+import {orbitPoint, orbitDepth, overviewModel, overviewBuffers, pickNode, viewOf, subtreeOf, structuredExcerpt, structuredExcerptOf, EXCERPT_EDGE_PREFIX, representationsOf, flowDirectionOf, displayName, resolvedEdgeIds, clipToFrame, BORDER_PREFIX, ownersOf, placeScene, sceneViewOf, overviewViewOf, pickExpanded, labelsOf, nameOf, chainOf, SHAPE_STRIDE, LINE_STRIDE, OUTLINES, pathOf, revealPathDecisions, viewOfNodes} from './overview.js';
 
 // Two clusters: c (with leaves a, b) and d (with leaf e); edges a→b, b→a (a cycle) and a→e.
 const overview = {
@@ -268,6 +268,164 @@ test('the engine’s overview feeds the model and the drill-down lays out', {ski
   }) ?? [NaN, NaN]);
   assert.ok(Number.isFinite(fx) && Number.isFinite(fy), `no leg starts on the border of c0 (edge ${k})`);
   assert.equal(scene.scene.nodes.filter(n => n.id.startsWith('c0/')).length, 20);
+});
+
+// The excerpt from the overview alone (#209 part 2) against `structuredExcerpt` on the graph: the same graph once the
+// excerpt's edge names (`edge:k`) are read as the input ids, and nodes compared by what the answer carries.
+function sameExcerpt(graph, model, id, options = {}) {
+  const ids = resolvedEdgeIds(graph);
+  const full = structuredExcerpt(graph, model, id, options), alone = structuredExcerptOf(model, id, options);
+  const node = n => ({id: n.id, kind: n.kind, label: n.label ?? '', parentId: n.parentId ?? null});
+  const edge = e => [e.id, e.source, e.target, e.kind, e.weight ?? 1];
+  assert.deepEqual(alone.graph.nodes.map(node), full.graph.nodes.map(node), `nodes of ${id}`);
+  assert.deepEqual(alone.graph.edges.map(e => edge({...e, id: ids[Number(e.id.slice(EXCERPT_EDGE_PREFIX.length))]})), full.graph.edges.map(edge), `edges of ${id}`);
+  assert.equal(alone.graph.defaultDirection, full.graph.defaultDirection);
+  assert.deepEqual(alone.options, full.options);
+  assert.deepEqual([alone.leaving, alone.inner, alone.standIns], [full.leaving, full.inner, full.standIns]);
+  return alone;
+}
+
+// An overview answer without positions, from a graph, as the engine indexes it (nodes in input order, then `added`
+// clusters `[id, parent id]` that take over the children named in `into`), with edge data.
+function answerOf(graph, {added = [], into = {}, edgeData = true} = {}) {
+  const ids = [...graph.nodes.map(n => n.id), ...added.map(([id]) => id)];
+  const at = new Map(ids.map((id, i) => [id, i]));
+  const parentId = new Map([...graph.nodes.map(n => [n.id, n.parentId ?? null]), ...added]);
+  for (const [child, cluster] of Object.entries(into)) parentId.set(child, cluster);
+  const kinds = [...new Set([...graph.nodes.map(n => n.kind), ...(added.length ? ['community'] : [])])];
+  const resolved = graph.edges.filter(e => e.target != null);
+  const edgeKinds = [...new Set(resolved.map(e => e.kind))];
+  return {
+    schemaVersion: 1, ids, parent: ids.map(id => (parentId.get(id) == null ? -1 : at.get(parentId.get(id)))),
+    x: ids.map(() => 0), y: ids.map(() => 0), r: ids.map(() => 1), rootRadius: 1, links: [],
+    labels: [...graph.nodes.map(n => n.label), ...added.map(([id]) => `${id} +1`)],
+    kinds, kind: [...graph.nodes.map(n => kinds.indexOf(n.kind)), ...added.map(() => kinds.indexOf('community'))],
+    edges: resolved.flatMap(e => [at.get(e.source), at.get(e.target)]),
+    stats: {communities: added.length},
+    ...(edgeData ? {
+      edgeKinds, edgeKind: resolved.map(e => edgeKinds.indexOf(e.kind)),
+      ...(resolved.some(e => (e.weight ?? 1) > 1) ? {edgeWeight: resolved.map(e => e.weight ?? 1)} : {}),
+    } : {}),
+  };
+}
+
+// A seeded generator of nested graphs with cycles, self-loops, parallel and opposite edges, weights, several kinds and
+// unresolved edges.
+function generated(seed, size = 60) {
+  let s = seed >>> 0;
+  const random = () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = list => list[Math.floor(random() * list.length)];
+  const nodes = [], containers = [null];
+  for (let i = 0; i < size; i++) {
+    const parentId = pick(containers), id = `${parentId ?? 'top'}/n${i}`;
+    nodes.push({id, kind: pick(['fn', 'type', 'file']), label: `n${i}`, parentId, ...(random() < 0.2 ? {shape: 'circle'} : {})});
+    if (random() < 0.3) containers.push(id);
+  }
+  const edges = [];
+  for (let k = 0; k < size * 2; k++) {
+    const source = pick(nodes).id, target = random() < 0.05 ? null : random() < 0.05 ? source : pick(nodes).id;
+    edges.push({id: `e${k}`, kind: pick(['calls', 'uses']), source, target, ...(random() < 0.15 ? {weight: 2 + Math.floor(random() * 5)} : {})});
+    if (random() < 0.1 && target) edges.push({id: `p${k}`, kind: 'calls', source, target}, {id: `o${k}`, kind: 'calls', source: target, target: source});
+  }
+  return {nodes, edges};
+}
+
+test('an excerpt from the overview alone is the excerpt of the graph', () => {
+  // The hand-made case: a → e leaves c, to the stand-in of d; kinds and weights from the edge data.
+  const typed = {
+    nodes: [{id: 'c', kind: 'dir', label: 'C', parentId: null}, {id: 'a', kind: 'fn', label: 'A', parentId: 'c'}, {id: 'b', kind: 'fn', label: 'B', parentId: 'c'}, {id: 'd', kind: 'dir', label: 'D', parentId: null}, {id: 'e', kind: 'fn', label: 'E', parentId: 'd'}],
+    edges: [{id: 'ab', kind: 'calls', source: 'a', target: 'b'}, {id: 'ba', kind: 'uses', source: 'b', target: 'a', weight: 3}, {id: 'ae', kind: 'calls', source: 'a', target: 'e'}, {id: 'open', kind: 'calls', source: 'a', target: null}],
+  };
+  const m = overviewModel(answerOf(typed));
+  const alone = sameExcerpt(typed, m, 'c', {direction: 'lr'});
+  assert.equal(alone.edgeData, true);
+  assert.deepEqual(alone.graph.edges, [
+    {id: 'edge:0', kind: 'calls', source: 'a', target: 'b'},
+    {id: 'edge:1', kind: 'uses', source: 'b', target: 'a', weight: 3},
+    {id: 'edge:2', kind: 'calls', source: 'a', target: BORDER_PREFIX + 'd'},
+  ]);
+  assert.deepEqual(alone.graph.nodes.at(-1), {id: BORDER_PREFIX + 'd', kind: 'border', label: 'd', parentId: null});
+  // The same through `structuredExcerpt` without a graph.
+  assert.deepEqual(structuredExcerpt(null, m, 'c'), structuredExcerptOf(m, 'c'));
+  assert.throws(() => structuredExcerptOf(m, 'nope'), /Unknown node/);
+  // Added clusters become containers, named as `structuredExcerpt` names them.
+  const withCluster = overviewModel(answerOf(typed, {added: [['community:c:1.0', 'c']], into: {a: 'community:c:1.0', b: 'community:c:1.0'}}));
+  sameExcerpt(typed, withCluster, 'c');
+  assert.deepEqual(structuredExcerptOf(withCluster, 'c').graph.nodes.find(n => n.id === 'community:c:1.0'),
+    {id: 'community:c:1.0', kind: 'community', label: '≈ 1.0', parentId: 'c'});
+  // Seen from inside: d's excerpt has c's leaf a as the stand-in's source, direction kept.
+  assert.deepEqual(structuredExcerptOf(m, 'd').graph.edges, [{id: 'edge:2', kind: 'calls', source: BORDER_PREFIX + 'c', target: 'e'}]);
+});
+
+test('on generated graphs both excerpts agree for every node, also with columns and added clusters', () => {
+  for (let seed = 1; seed <= 25; seed++) {
+    const g = generated(seed);
+    const answer = answerOf(g);
+    // Columns (`columns: true`) arrive as typed arrays.
+    const columns = {...answer, parent: Int32Array.from(answer.parent), edges: Uint32Array.from(answer.edges), kind: Uint32Array.from(answer.kind),
+      edgeKind: Uint32Array.from(answer.edgeKind), ...(answer.edgeWeight ? {edgeWeight: Uint32Array.from(answer.edgeWeight)} : {})};
+    for (const a of [answer, columns]) {
+      const m = overviewModel(a);
+      for (const node of g.nodes) sameExcerpt(g, m, node.id);
+    }
+    // A top-level cluster added over the first three top-level nodes.
+    const tops = g.nodes.filter(n => n.parentId == null).slice(0, 3).map(n => n.id);
+    if (tops.length < 2) continue;
+    const m = overviewModel(answerOf(g, {added: [['community:.:1.0', null]], into: Object.fromEntries(tops.map(id => [id, 'community:.:1.0']))}));
+    for (const id of [...tops, 'community:.:1.0']) sameExcerpt(g, m, id);
+  }
+});
+
+test('without edge data the excerpt has one kind and counts every edge once, and says so', () => {
+  const g = generated(7);
+  const m = overviewModel(answerOf(g, {edgeData: false}));
+  const top = g.nodes.find(n => n.parentId == null && g.nodes.some(c => c.parentId === n.id)).id;
+  const alone = structuredExcerptOf(m, top);
+  assert.equal(alone.edgeData, false);
+  assert.ok(alone.graph.edges.length > 0);
+  assert.ok(alone.graph.edges.every(e => e.kind === '' && e.weight === undefined));
+  // The ends are those of the excerpt with edge data.
+  const ends = x => x.graph.edges.map(e => [e.id, e.source, e.target]);
+  assert.deepEqual(ends(alone), ends(structuredExcerptOf(overviewModel(answerOf(g)), top)));
+});
+
+test('bundled, the leaving edges of a node to a stand-in count as one weighted edge per kind and direction', () => {
+  const g = {
+    nodes: [{id: 'c', kind: 'dir', label: 'c', parentId: null}, {id: 'a', kind: 'fn', label: 'a', parentId: 'c'}, {id: 'd', kind: 'dir', label: 'd', parentId: null},
+      {id: 'e', kind: 'fn', label: 'e', parentId: 'd'}, {id: 'f', kind: 'fn', label: 'f', parentId: 'd'}],
+    edges: [{id: '1', kind: 'calls', source: 'a', target: 'e'}, {id: '2', kind: 'calls', source: 'a', target: 'f', weight: 4},
+      {id: '3', kind: 'uses', source: 'a', target: 'e'}, {id: '4', kind: 'calls', source: 'e', target: 'a'}, {id: '5', kind: 'calls', source: 'a', target: 'a'}],
+  };
+  const m = overviewModel(answerOf(g));
+  const bundled = structuredExcerptOf(m, 'c', {bundle: true});
+  assert.deepEqual(bundled.graph.edges, [
+    {id: 'edge:0', kind: 'calls', source: 'a', target: 'border:d', weight: 5},
+    {id: 'edge:2', kind: 'uses', source: 'a', target: 'border:d'},
+    {id: 'edge:3', kind: 'calls', source: 'border:d', target: 'a'},
+    {id: 'edge:4', kind: 'calls', source: 'a', target: 'a'},
+  ]);
+  assert.deepEqual([bundled.leaving, bundled.inner, bundled.standIns], [4, 1, 1]);
+  assert.equal(structuredExcerptOf(m, 'c').graph.edges.length, 5, 'unbundled: one edge per overview edge');
+});
+
+test('the engine’s overview with edge data gives the excerpt of the graph, communities included', {skip: !existsSync(fileURLToPath(wasm))}, async () => {
+  const {loadEngine} = await import('../engine-client/engine.js');
+  const run = await loadEngine(wasm);
+  for (const seed of [3, 11, 19]) {
+    // A large flat container is split into communities by the overview: its excerpt holds them as containers.
+    const g = generated(seed, 120);
+    for (let i = 0; i < 160; i++) {
+      g.nodes.push({id: `flat/n${i}`, kind: 'fn', label: `f${i}`, parentId: 'flat'});
+      g.edges.push({id: `f${i}`, kind: i % 3 ? 'calls' : 'uses', source: `flat/n${i}`, target: `flat/n${(i * 7 + 1) % 160}`});
+      if (i % 20 === 0) g.edges.push({id: `fx${i}`, kind: 'calls', source: `flat/n${i}`, target: g.nodes[i % 120].id, weight: 2});
+    }
+    g.nodes.push({id: 'flat', kind: 'dir', label: 'flat', parentId: null});
+    const result = run({op: 'overview', graph: g, edgeData: true});
+    assert.equal(result.ok, true, result.error);
+    assert.ok(result.overview.stats.communities > 0, 'the flat container is split');
+    const m = overviewModel(result.overview);
+    for (const id of m.overview.ids) if (m.children[m.index.get(id)].length) sameExcerpt(g, m, id);
+  }
 });
 
 test('the fisheye lens enlarges its middle, leaves its rim and outside in place, and can be inverted', async () => {
