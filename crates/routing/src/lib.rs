@@ -641,12 +641,362 @@ fn corridor_span(
     (floor, ceiling)
 }
 
+/// #229: the nodes of a drawing in a uniform grid over their boxes, so that the overlap resolution tests a route only
+/// against the obstacles near it, not against every node. The grid gives a superset of the obstacles that can matter, and
+/// each of them is tested exactly as before, so every count and every span is the one the scan over all nodes gives.
+struct ObstacleGrid {
+    x0: f64,
+    y0: f64,
+    cell: f64,
+    cols: usize,
+    rows: usize,
+    /// The nodes (by their index in the order of the boxes) whose box, grown by the margin, meets each cell; row-major.
+    cells: Vec<Vec<u32>>,
+}
+
+impl ObstacleGrid {
+    /// Cells per side of the grid at most.
+    const SIDE: f64 = 64.;
+
+    /// `boxes`: every node's box already grown by the largest margin an outline of it can have.
+    fn new(boxes: &[Bounds]) -> Self {
+        let (mut x0, mut y0, mut x1, mut y1) = (
+            f64::INFINITY,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+        );
+        for b in boxes {
+            x0 = x0.min(b[0]);
+            y0 = y0.min(b[1]);
+            x1 = x1.max(b[2]);
+            y1 = y1.max(b[3]);
+        }
+        if !(x0.is_finite() && y0.is_finite() && x1.is_finite() && y1.is_finite()) {
+            (x0, y0, x1, y1) = (0., 0., 1., 1.);
+        }
+        let cell = ((x1 - x0).max(y1 - y0) / Self::SIDE).max(1.);
+        let cols = (((x1 - x0) / cell).floor() as usize + 1).min(Self::SIDE as usize + 1);
+        let rows = (((y1 - y0) / cell).floor() as usize + 1).min(Self::SIDE as usize + 1);
+        let mut grid = ObstacleGrid {
+            x0,
+            y0,
+            cell,
+            cols,
+            rows,
+            cells: vec![Vec::new(); cols * rows],
+        };
+        for (n, b) in boxes.iter().enumerate() {
+            let (c0, c1) = (grid.col(b[0]), grid.col(b[2]));
+            let (r0, r1) = (grid.row(b[1]), grid.row(b[3]));
+            for r in r0..=r1 {
+                for c in c0..=c1 {
+                    grid.cells[r * cols + c].push(n as u32);
+                }
+            }
+        }
+        grid
+    }
+
+    /// The column of `x`, clamped to the grid: monotone in `x`, so two closed ranges that meet share a column.
+    fn col(&self, x: f64) -> usize {
+        ((x - self.x0) / self.cell)
+            .floor()
+            .max(0.)
+            .min((self.cols - 1) as f64) as usize
+    }
+
+    fn row(&self, y: f64) -> usize {
+        ((y - self.y0) / self.cell)
+            .floor()
+            .max(0.)
+            .min((self.rows - 1) as f64) as usize
+    }
+
+    /// Calls `f` with every node whose grown box may meet the closed box `b`, the first time `scratch` meets it.
+    /// `strip` widens the box across to the whole grid: `Some(true)` all rows (a horizontal segment's corridor), `Some(false)`
+    /// all columns.
+    fn visit(
+        &self,
+        b: &Bounds,
+        strip: Option<bool>,
+        scratch: &mut Stamps,
+        mut f: impl FnMut(usize),
+    ) {
+        let (c0, c1) = if strip == Some(false) {
+            (0, self.cols - 1)
+        } else {
+            (self.col(b[0]), self.col(b[2]))
+        };
+        let (r0, r1) = if strip == Some(true) {
+            (0, self.rows - 1)
+        } else {
+            (self.row(b[1]), self.row(b[3]))
+        };
+        for r in r0..=r1 {
+            for c in c0..=c1 {
+                for &n in &self.cells[r * self.cols + c] {
+                    if scratch.first(n as usize) {
+                        f(n as usize);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Marks for a scan that meets items more than once: `first` is true the first time an item is met since `next`.
+struct Stamps {
+    epoch: u64,
+    seen: Vec<u64>,
+    /// A list to reuse between scans.
+    found: Vec<u32>,
+}
+
+impl Stamps {
+    fn new(items: usize) -> Self {
+        Stamps {
+            epoch: 0,
+            seen: vec![0; items],
+            found: Vec::new(),
+        }
+    }
+
+    fn next(&mut self) {
+        self.epoch += 1;
+    }
+
+    fn first(&mut self, item: usize) -> bool {
+        let new = self.seen[item] != self.epoch;
+        self.seen[item] = self.epoch;
+        new
+    }
+}
+
+/// The nodes of the overlap resolution: ids, boxes and shapes in the order of `rects`, and their grid.
+struct OverlapNodes<'a> {
+    ids: Vec<&'a str>,
+    rects: Vec<&'a Rect>,
+    shapes: Vec<NodeShape>,
+    grid: ObstacleGrid,
+}
+
+impl<'a> OverlapNodes<'a> {
+    fn new(rects: &'a BTreeMap<String, Rect>, info: &NodeInfo<'_>, params: Params) -> Self {
+        let ids: Vec<&str> = rects.keys().map(String::as_str).collect();
+        let boxes: Vec<&Rect> = rects.values().collect();
+        let shapes = ids
+            .iter()
+            .map(|id| info.get(id).map_or_else(NodeShape::default, |(_, s)| *s))
+            .collect();
+        // An outline is the box, the box grown by the clearance, or (in a corridor) the box grown by the own clearance; a
+        // disc lies inside its box. One unit more absorbs the rounding of those sums.
+        let margin = params.clearance.max(params.own_clearance).max(0.) + 1.;
+        let grown: Vec<Bounds> = boxes
+            .iter()
+            .map(|r| {
+                [
+                    r.x - margin,
+                    r.y - margin,
+                    r.x + r.width + margin,
+                    r.y + r.height + margin,
+                ]
+            })
+            .collect();
+        OverlapNodes {
+            ids,
+            rects: boxes,
+            shapes,
+            grid: ObstacleGrid::new(&grown),
+        }
+    }
+}
+
+/// The obstacles of one edge for the overlap resolution, built once: the outlines of the nodes it may not cross (its own
+/// endpoints and every node that is not excluded for it), in the order of the nodes, as `obstacle` gives them.
+struct EdgeObstacles {
+    outlines: Vec<Outline>,
+    /// The box of each outline as a corridor bounds it: grown by the own clearance for the edge's own nodes.
+    spans: Vec<Rect>,
+    /// For each node, the index of its outline, or `u32::MAX` for a node the edge may cross.
+    slot: Vec<u32>,
+    /// The outlines that are discs: always tested, not looked up in the grid.
+    discs: Vec<u32>,
+}
+
+impl EdgeObstacles {
+    fn new(edge: &Edge, info: &NodeInfo<'_>, nodes: &OverlapNodes<'_>, params: Params) -> Self {
+        let skip = excluded_with(info, edge);
+        let mut built = EdgeObstacles {
+            outlines: Vec::new(),
+            spans: Vec::new(),
+            slot: vec![u32::MAX; nodes.ids.len()],
+            discs: Vec::new(),
+        };
+        for (n, id) in nodes.ids.iter().enumerate() {
+            let endpoint = *id == edge.source || edge.target.as_deref() == Some(*id);
+            if !(endpoint || !skip.contains(*id)) {
+                continue;
+            }
+            let outline = obstacle(id, nodes.rects[n], nodes.shapes[n], edge, params);
+            let mut b = outline.bounds();
+            if endpoint && params.own_clearance > 0. {
+                b = Rect {
+                    x: b.x - params.own_clearance,
+                    y: b.y - params.own_clearance,
+                    width: b.width + 2. * params.own_clearance,
+                    height: b.height + 2. * params.own_clearance,
+                };
+            }
+            let k = built.outlines.len() as u32;
+            if matches!(outline, Outline::Disc { .. }) {
+                built.discs.push(k);
+            }
+            built.slot[n] = k;
+            built.outlines.push(outline);
+            built.spans.push(b);
+        }
+        built
+    }
+
+    /// How many of the outlines `route` hits (`hits_outline`), the count a test of every outline gives. A rectangle is hit
+    /// only by an axis-parallel segment that runs inside it, so its box meets the segment's box and the grid finds it;
+    /// discs and routes with an oblique segment are tested against every outline concerned.
+    fn hits(&self, route: &Route, nodes: &OverlapNodes<'_>, scratch: &mut Stamps) -> usize {
+        let p = probe(route);
+        if route
+            .points
+            .windows(2)
+            .any(|w| !horizontal(&w[0], &w[1]) && !vertical(&w[0], &w[1]))
+        {
+            return self
+                .outlines
+                .iter()
+                .filter(|o| hits_outline_probe(&p, o))
+                .count();
+        }
+        let mut count = self
+            .discs
+            .iter()
+            .filter(|k| hits_outline_probe(&p, &self.outlines[**k as usize]))
+            .count();
+        scratch.next();
+        for w in route.points.windows(2) {
+            let b = [
+                w[0].x.min(w[1].x),
+                w[0].y.min(w[1].y),
+                w[0].x.max(w[1].x),
+                w[0].y.max(w[1].y),
+            ];
+            nodes.grid.visit(&b, None, scratch, |n| {
+                let k = self.slot[n];
+                if k != u32::MAX {
+                    let outline = &self.outlines[k as usize];
+                    if matches!(outline, Outline::Rect(_)) && hits_outline_probe(&p, outline) {
+                        count += 1;
+                    }
+                }
+            });
+        }
+        count
+    }
+
+    /// The free span of a corridor around a segment: the nearest obstacle boundary on each side (clearance included, the
+    /// own clearance for the edge's own nodes) over the segment's range. Obstacles that contain the segment's line are
+    /// ignored: the segment already violates them and cannot be judged by a span. The result of `corridor_span`.
+    fn corridor(
+        &self,
+        nodes: &OverlapNodes<'_>,
+        scratch: &mut Stamps,
+        horizontal_segment: bool,
+        line: f64,
+        range: (f64, f64),
+    ) -> (f64, f64) {
+        let mut span = (f64::NEG_INFINITY, f64::INFINITY);
+        self.narrow(nodes, scratch, horizontal_segment, line, range, &mut span);
+        span
+    }
+
+    /// Narrows `span` (floor, ceiling) by the obstacles beside `line` over `range`, as a scan of the outlines in their order
+    /// does. Only obstacles that overlap the range along the segment count, and the grid's strip over the range holds all
+    /// of them; they are met in the order of the outlines, so the same comparisons run in the same order.
+    fn narrow(
+        &self,
+        nodes: &OverlapNodes<'_>,
+        scratch: &mut Stamps,
+        horizontal_segment: bool,
+        line: f64,
+        range: (f64, f64),
+        span: &mut (f64, f64),
+    ) {
+        let strip = if horizontal_segment {
+            [range.0, 0., range.1, 0.]
+        } else {
+            [0., range.0, 0., range.1]
+        };
+        let mut found = std::mem::take(&mut scratch.found);
+        found.clear();
+        scratch.next();
+        nodes
+            .grid
+            .visit(&strip, Some(horizontal_segment), scratch, |n| {
+                let k = self.slot[n];
+                if k != u32::MAX {
+                    found.push(k);
+                }
+            });
+        found.sort_unstable();
+        let (floor, ceiling) = span;
+        for k in &found {
+            let b = &self.spans[*k as usize];
+            let (along0, along1, across0, across1) = if horizontal_segment {
+                (b.x, b.x + b.width, b.y, b.y + b.height)
+            } else {
+                (b.y, b.y + b.height, b.x, b.x + b.width)
+            };
+            if along1.min(range.1) - along0.max(range.0) <= EPS {
+                continue;
+            }
+            if across1 <= line + EPS {
+                *floor = floor.max(across1);
+            } else if across0 >= line - EPS {
+                *ceiling = ceiling.min(across0);
+            }
+        }
+        scratch.found = found;
+    }
+}
+
+/// The obstacles of each route's edge, built when the route is first searched (#229).
+struct EdgeObstacleCache<'a, 'b> {
+    nodes: &'b OverlapNodes<'a>,
+    info: &'b NodeInfo<'a>,
+    params: Params,
+    built: Vec<Option<std::rc::Rc<EdgeObstacles>>>,
+}
+
+impl EdgeObstacleCache<'_, '_> {
+    fn of(&mut self, index: usize, edge: &Edge) -> std::rc::Rc<EdgeObstacles> {
+        if self.built[index].is_none() {
+            self.built[index] = Some(std::rc::Rc::new(EdgeObstacles::new(
+                edge,
+                self.info,
+                self.nodes,
+                self.params,
+            )));
+        }
+        self.built[index].clone().expect("built above")
+    }
+}
+
 /// #156: the axis-parallel segments of routes by their line, so the routes a route shares a segment with (as
 /// `shares_segment` decides it: collinear within `EPS`, overlapping by more than `EPS`) are found without comparing it with
 /// every route. Kept up to date as routes move (`remove`, `insert`).
 #[derive(Default)]
 struct SegmentIndex {
-    /// Horizontal segments by the floor of their y, vertical ones by the floor of their x: (route, line, from, to).
+    /// Horizontal segments by the floor of their y, vertical ones by the floor of their x: (route, line, from, to). #229: a
+    /// segment is listed under every floor its line takes within twice `EPS` (one or two), so a segment within `EPS` of it is
+    /// found under the floor of its own line alone.
     horizontal: BTreeMap<i64, Vec<(usize, f64, f64, f64)>>,
     vertical: BTreeMap<i64, Vec<(usize, f64, f64, f64)>>,
 }
@@ -674,6 +1024,11 @@ impl SegmentIndex {
         line.floor() as i64
     }
 
+    /// The floors under which a segment on `line` is listed.
+    fn keys(line: f64) -> std::ops::RangeInclusive<i64> {
+        Self::key(line - 2. * EPS)..=Self::key(line + 2. * EPS)
+    }
+
     fn insert(&mut self, j: usize, route: &Route) {
         for (h, line, a, b) in Self::segments(route) {
             let map = if h {
@@ -681,9 +1036,9 @@ impl SegmentIndex {
             } else {
                 &mut self.vertical
             };
-            map.entry(Self::key(line))
-                .or_default()
-                .push((j, line, a, b));
+            for k in Self::keys(line) {
+                map.entry(k).or_default().push((j, line, a, b));
+            }
         }
     }
 
@@ -694,8 +1049,10 @@ impl SegmentIndex {
             } else {
                 &mut self.vertical
             };
-            if let Some(list) = map.get_mut(&Self::key(line)) {
-                list.retain(|(k, ..)| *k != j);
+            for key in Self::keys(line) {
+                if let Some(list) = map.get_mut(&key) {
+                    list.retain(|(k, ..)| *k != j);
+                }
             }
         }
     }
@@ -707,9 +1064,8 @@ impl SegmentIndex {
         let mut found = Vec::new();
         for (h, line, a, b) in Self::segments(route) {
             let map = if h { &self.horizontal } else { &self.vertical };
-            let key = Self::key(line);
-            for k in [key - 1, key, key + 1] {
-                for &(j, other, c, d) in map.get(&k).map(Vec::as_slice).unwrap_or(&[]) {
+            if let Some(list) = map.get(&Self::key(line)) {
+                for &(j, other, c, d) in list {
                     if !skip(j) && (line - other).abs() < EPS && overlap(a, b, c, d) {
                         found.push(j);
                     }
@@ -719,6 +1075,34 @@ impl SegmentIndex {
         found.sort_unstable();
         found.dedup();
         found
+    }
+
+    /// `sharing(route, skip).len()`, counted with `seen` instead of a sorted list (#229).
+    fn sharing_count(
+        &self,
+        route: &Route,
+        seen: &mut Stamps,
+        skip: impl Fn(usize) -> bool,
+    ) -> usize {
+        let overlap =
+            |a: f64, b: f64, c: f64, d: f64| a.max(b).min(c.max(d)) - a.min(b).max(c.min(d)) > EPS;
+        let mut count = 0;
+        seen.next();
+        for (h, line, a, b) in Self::segments(route) {
+            let map = if h { &self.horizontal } else { &self.vertical };
+            if let Some(list) = map.get(&Self::key(line)) {
+                for &(j, other, c, d) in list {
+                    if !skip(j)
+                        && (line - other).abs() < EPS
+                        && overlap(a, b, c, d)
+                        && seen.first(j)
+                    {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        count
     }
 }
 
@@ -734,10 +1118,16 @@ fn resolve_overlaps(
 ) -> Vec<Route> {
     let edges: BTreeMap<_, _> = graph.edges.iter().map(|e| (e.id.as_str(), e)).collect();
     let info = parent_map(graph);
-    let obstacles: Vec<(String, Rect)> = rects
-        .iter()
-        .map(|(id, r)| (id.clone(), r.clone()))
-        .collect();
+    // #229: the nodes in a grid, and each edge's obstacles built once, so that the hits and corridors of the candidates are
+    // tested against the nodes near them (the same counts and spans as a test of every node).
+    let nodes = OverlapNodes::new(rects, &info, params);
+    let mut obstacles = EdgeObstacleCache {
+        nodes: &nodes,
+        info: &info,
+        params,
+        built: vec![None; routes.len()],
+    };
+    let mut scratch = Stamps::new(nodes.ids.len());
     let mut result = routes.to_vec();
     // #156: the routes' bounds, kept up to date as routes move; an overlap is tested only where the bounds meet
     // (`shares_probe` tests them first, so the count is the same).
@@ -750,6 +1140,8 @@ fn resolve_overlaps(
     let mut stuck: Vec<Option<Bounds>> = vec![None; result.len()];
     // The candidate moves of a route at a segment (`shifted_candidates`), kept until the route moves.
     let mut moves: MoveCache = BTreeMap::new();
+    // The routes each of those moves shares a segment with, kept until a route moves near them (#229).
+    let mut lists: ListCache = BTreeMap::new();
     let forget = |stuck: &mut Vec<Option<Bounds>>, moved: &[Bounds]| {
         for entry in stuck.iter_mut() {
             if entry.is_some_and(|region| moved.iter().any(|b| !apart(&region, b))) {
@@ -759,11 +1151,7 @@ fn resolve_overlaps(
     };
     // The routes sharing a segment, from the segment index (the same count `shares_segment` gives).
     let mut segments = SegmentIndex::of(&result);
-    let overlaps = |all: &[Route], segments: &SegmentIndex, index: usize, route: &Route| -> usize {
-        segments
-            .sharing(route, |j| j == index || all[j].bundle_of.is_some())
-            .len()
-    };
+    let mut shared = Stamps::new(result.len());
     for _ in 0..OVERLAP_ROUNDS {
         let mut changed = false;
         for index in 0..result.len() {
@@ -773,40 +1161,18 @@ fn resolve_overlaps(
             if stuck[index].is_some() {
                 continue;
             }
-            let current = overlaps(&result, &segments, index, &result[index]);
+            let current = segments.sharing_count(&result[index], &mut shared, |j| {
+                j == index || result[j].bundle_of.is_some()
+            });
             if current == 0 {
                 continue;
             }
             let Some(edge) = edges.get(result[index].id.as_str()) else {
                 continue;
             };
-            let skip = excluded_with(&info, edge);
             // The obstacles this route may not cross, built once for all its candidates.
-            let outlines: Vec<Outline> = obstacles
-                .iter()
-                .filter(|(id, _)| {
-                    let endpoint =
-                        id == &edge.source || edge.target.as_deref() == Some(id.as_str());
-                    endpoint || !skip.contains(id.as_str())
-                })
-                .map(|(id, rect)| {
-                    obstacle(
-                        id,
-                        rect,
-                        info.get(id.as_str())
-                            .map_or_else(NodeShape::default, |(_, s)| *s),
-                        edge,
-                        params,
-                    )
-                })
-                .collect();
-            let hits_of = |route: &Route| {
-                outlines
-                    .iter()
-                    .filter(|outline| hits_outline(route, outline))
-                    .count()
-            };
-            let hits_before = hits_of(&result[index]);
+            let own = obstacles.of(index, edge);
+            let hits_before = own.hits(&result[index], &nodes, &mut scratch);
             let stubs_before = stub_signs(&result[index]);
             let mut best: Option<(usize, f64, Route)> = None;
             for si in 1..result[index].points.len() - 2 {
@@ -821,16 +1187,8 @@ fn resolve_overlaps(
                 } else {
                     (a.y.min(b.y), a.y.max(b.y))
                 };
-                let (floor, ceiling) = corridor_span(
-                    edge,
-                    &skip,
-                    &obstacles,
-                    &info,
-                    params,
-                    horizontal_segment,
-                    line,
-                    range,
-                );
+                let (floor, ceiling) =
+                    own.corridor(&nodes, &mut scratch, horizontal_segment, line, range);
                 for step in 1..=6 {
                     for sign in [-1., 1.] {
                         let shift = sign * step as f64 * params.track;
@@ -846,16 +1204,17 @@ fn resolve_overlaps(
                             candidate.points[si].x = target;
                             candidate.points[si + 1].x = target;
                         }
-                        if stub_signs(&candidate) != stubs_before
-                            || hits_of(&candidate) > hits_before
-                        {
-                            continue;
-                        }
-                        let count = overlaps(&result, &segments, index, &candidate);
+                        // #229: the overlap count first, the cheaper test that rejects most candidates; a candidate is
+                        // kept only when every test passes, so their order does not change which one is kept.
+                        let count = segments.sharing_count(&candidate, &mut shared, |j| {
+                            j == index || result[j].bundle_of.is_some()
+                        });
                         if count < current
                             && best
                                 .as_ref()
                                 .is_none_or(|(c, s, _)| (count, shift.abs()) < (*c, *s))
+                            && stub_signs(&candidate) == stubs_before
+                            && own.hits(&candidate, &nodes, &mut scratch) <= hits_before
                         {
                             best = Some((count, shift.abs(), candidate));
                         }
@@ -867,12 +1226,21 @@ fn resolve_overlaps(
                 segments.remove(index, &result[index]);
                 segments.insert(index, &route);
                 let new = route_bounds(&route);
+                forget_lists(&mut lists, &[index], &[bounds[index], new]);
                 forget(&mut stuck, &[bounds[index], new]);
                 bounds[index] = new;
                 result[index] = route;
                 changed = true;
             } else if let Some((first, second, partner)) = pair_move(
-                &edges, &info, &obstacles, &result, index, params, &mut moves, &segments,
+                &edges,
+                &mut obstacles,
+                &mut scratch,
+                &result,
+                index,
+                params,
+                &mut moves,
+                &mut lists,
+                &segments,
             ) {
                 moves.retain(|(route, _), _| *route != index && *route != partner);
                 segments.remove(index, &result[index]);
@@ -880,6 +1248,11 @@ fn resolve_overlaps(
                 segments.insert(index, &first);
                 segments.insert(partner, &second);
                 let (new_a, new_b) = (route_bounds(&first), route_bounds(&second));
+                forget_lists(
+                    &mut lists,
+                    &[index, partner],
+                    &[bounds[index], new_a, bounds[partner], new_b],
+                );
                 forget(&mut stuck, &[bounds[index], new_a, bounds[partner], new_b]);
                 bounds[index] = new_a;
                 bounds[partner] = new_b;
@@ -908,35 +1281,6 @@ fn resolve_overlaps(
         }
     }
     result
-}
-
-/// The nodes a route hits that it may not cross: its own endpoints and every node that is not excluded for its edge.
-fn node_hits(
-    route: &Route,
-    edge: &Edge,
-    skip: &BTreeSet<String>,
-    obstacles: &[(String, Rect)],
-    info: &NodeInfo<'_>,
-    params: Params,
-) -> usize {
-    obstacles
-        .iter()
-        .filter(|(id, rect)| {
-            let endpoint = id == &edge.source || edge.target.as_deref() == Some(id.as_str());
-            (endpoint || !skip.contains(id.as_str()))
-                && hits_outline(
-                    route,
-                    &obstacle(
-                        id,
-                        rect,
-                        info.get(id.as_str())
-                            .map_or_else(NodeShape::default, |(_, s)| *s),
-                        edge,
-                        params,
-                    ),
-                )
-        })
-        .count()
 }
 
 /// Indices of the first pair of collinear, overlapping segments of two routes.
@@ -972,10 +1316,9 @@ fn first_shared_segments(a: &Route, b: &Route) -> Option<(usize, usize)> {
 fn shifted_candidates(
     route: &Route,
     near: usize,
-    edge: &Edge,
-    skip: &BTreeSet<String>,
-    obstacles: &[(String, Rect)],
-    info: &NodeInfo<'_>,
+    own: &EdgeObstacles,
+    nodes: &OverlapNodes<'_>,
+    scratch: &mut Stamps,
     params: Params,
 ) -> Vec<(f64, Route)> {
     let mut out = Vec::new();
@@ -983,7 +1326,7 @@ fn shifted_candidates(
         return out;
     }
     let stubs = stub_signs(route);
-    let hits = node_hits(route, edge, skip, obstacles, info, params);
+    let hits = own.hits(route, nodes, scratch);
     let first = near.saturating_sub(1).max(1);
     let last = (near + 1).min(route.points.len() - 3);
     for si in first..=last {
@@ -998,16 +1341,7 @@ fn shifted_candidates(
         } else {
             (a.y.min(b.y), a.y.max(b.y))
         };
-        let (floor, ceiling) = corridor_span(
-            edge,
-            skip,
-            obstacles,
-            info,
-            params,
-            horizontal_segment,
-            line,
-            range,
-        );
+        let (floor, ceiling) = own.corridor(nodes, scratch, horizontal_segment, line, range);
         for step in [-2., -1., 1., 2.] {
             let shift = step * params.track;
             let target = line + shift;
@@ -1022,9 +1356,7 @@ fn shifted_candidates(
                 candidate.points[si].x = target;
                 candidate.points[si + 1].x = target;
             }
-            if stub_signs(&candidate) == stubs
-                && node_hits(&candidate, edge, skip, obstacles, info, params) <= hits
-            {
+            if stub_signs(&candidate) == stubs && own.hits(&candidate, nodes, scratch) <= hits {
                 out.push((shift.abs(), candidate));
             }
         }
@@ -1037,27 +1369,71 @@ fn shifted_candidates(
 /// The candidate moves of route `i` at segment `near`, as `shifted_candidates` gives them (#156).
 type MoveCache = BTreeMap<(usize, usize), Vec<(f64, Route)>>;
 
+/// For each move of a route at a segment (`MoveCache`, the current route last), the routes other than bundle members that
+/// share a segment with it, from the segment index; ascending, each once (#229). With them, the region they depend on: a
+/// route shares a segment with a move only within `EPS` of the move's box, so the box of all the moves, grown, holds every
+/// segment that can change a list. The overlap resolution forgets an entry when a route moves into or out of its region,
+/// and the entries of the routes that move.
+type ListCache = BTreeMap<(usize, usize), (Bounds, Vec<Vec<usize>>)>;
+
+/// The lists of `ListCache` for `moves` of a route whose current route is `current`, with their region.
+fn move_partners(
+    moves: &[(f64, Route)],
+    current: &Route,
+    segments: &SegmentIndex,
+    result: &[Route],
+) -> (Bounds, Vec<Vec<usize>>) {
+    let routes = || {
+        moves
+            .iter()
+            .map(|(_, route)| route)
+            .chain(std::iter::once(current))
+    };
+    let b = routes()
+        .map(route_bounds)
+        .fold(route_bounds(current), |u, b| {
+            [
+                u[0].min(b[0]),
+                u[1].min(b[1]),
+                u[2].max(b[2]),
+                u[3].max(b[3]),
+            ]
+        });
+    let region = [b[0] - 1., b[1] - 1., b[2] + 1., b[3] + 1.];
+    let lists = routes()
+        .map(|route| segments.sharing(route, |j| result[j].bundle_of.is_some()))
+        .collect();
+    (region, lists)
+}
+
+/// Forgets the entries of `lists` that a move of the routes `moved` from or to the boxes `boxes` can change.
+fn forget_lists(lists: &mut ListCache, moved: &[usize], boxes: &[Bounds]) {
+    lists.retain(|(route, _), (region, _)| {
+        !moved.contains(route) && boxes.iter().all(|b| apart(region, b))
+    });
+}
+
 #[allow(clippy::too_many_arguments)]
 fn pair_move(
     edges: &BTreeMap<&str, &Edge>,
-    info: &NodeInfo<'_>,
-    obstacles: &[(String, Rect)],
+    obstacles: &mut EdgeObstacleCache<'_, '_>,
+    scratch: &mut Stamps,
     result: &[Route],
     index: usize,
     params: Params,
     cache: &mut MoveCache,
+    lists: &mut ListCache,
     segments: &SegmentIndex,
 ) -> Option<(Route, Route, usize)> {
-    // #156: overlaps counted from the segment index (the same count `shares_segment` gives).
-    let count = |route: &Route, skip_a: usize, skip_b: usize| -> usize {
-        segments
-            .sharing(route, |j| {
-                j == skip_a || j == skip_b || result[j].bundle_of.is_some()
-            })
-            .len()
+    // #156: overlaps counted from the segment index (the same count `shares_segment` gives). #229: the routes a move shares
+    // a segment with are listed once per move (`ListCache`); its count without `index` and a partner is that list without
+    // the two.
+    let without = |list: &[usize], partner: usize| -> usize {
+        list.len()
+            - usize::from(list.binary_search(&index).is_ok())
+            - usize::from(list.binary_search(&partner).is_ok())
     };
     let edge_a = edges.get(result[index].id.as_str())?;
-    let skip_a = excluded_with(info, edge_a);
     // The partners in ascending order, as a scan of all routes would meet them.
     for partner in segments.sharing(&result[index], |j| {
         j == index || result[j].bundle_of.is_some()
@@ -1065,68 +1441,94 @@ fn pair_move(
         let Some(edge_b) = edges.get(result[partner].id.as_str()) else {
             continue;
         };
-        let skip_b = excluded_with(info, edge_b);
         let (near_a, near_b) = first_shared_segments(&result[index], &result[partner])?;
-        let mut moves_a = cache
+        if let std::collections::btree_map::Entry::Vacant(entry) = cache.entry((index, near_a)) {
+            let own = obstacles.of(index, edge_a);
+            let found = shifted_candidates(
+                &result[index],
+                near_a,
+                &own,
+                obstacles.nodes,
+                scratch,
+                params,
+            );
+            entry.insert(found);
+        }
+        if let std::collections::btree_map::Entry::Vacant(entry) = cache.entry((partner, near_b)) {
+            let own = obstacles.of(partner, edge_b);
+            let found = shifted_candidates(
+                &result[partner],
+                near_b,
+                &own,
+                obstacles.nodes,
+                scratch,
+                params,
+            );
+            entry.insert(found);
+        }
+        let moves_a = &cache[&(index, near_a)];
+        let moves_b = &cache[&(partner, near_b)];
+        // The moves of each route, its current route last at no cost.
+        let move_a = |i: usize| -> (f64, &Route) {
+            moves_a
+                .get(i)
+                .map_or((0., &result[index]), |(cost, route)| (*cost, route))
+        };
+        let move_b = |i: usize| -> (f64, &Route) {
+            moves_b
+                .get(i)
+                .map_or((0., &result[partner]), |(cost, route)| (*cost, route))
+        };
+        lists
             .entry((index, near_a))
-            .or_insert_with(|| {
-                shifted_candidates(
-                    &result[index],
-                    near_a,
-                    edge_a,
-                    &skip_a,
-                    obstacles,
-                    info,
-                    params,
-                )
-            })
-            .clone();
-        moves_a.push((0., result[index].clone()));
-        let mut moves_b = cache
+            .or_insert_with(|| move_partners(moves_a, &result[index], segments, result));
+        lists
             .entry((partner, near_b))
-            .or_insert_with(|| {
-                shifted_candidates(
-                    &result[partner],
-                    near_b,
-                    edge_b,
-                    &skip_b,
-                    obstacles,
-                    info,
-                    params,
-                )
-            })
-            .clone();
-        moves_b.push((0., result[partner].clone()));
-        let before =
-            count(&result[index], index, partner) + count(&result[partner], index, partner) + 1;
+            .or_insert_with(|| move_partners(moves_b, &result[partner], segments, result));
         // A move's overlaps with the other routes do not depend on the partner's move: counted once per move.
-        let counts_a: Vec<usize> = moves_a
+        let counts_a: Vec<usize> = lists[&(index, near_a)]
+            .1
             .iter()
-            .map(|(_, a)| count(a, index, partner))
+            .map(|l| without(l, partner))
             .collect();
-        let counts_b: Vec<usize> = moves_b
+        let counts_b: Vec<usize> = lists[&(partner, near_b)]
+            .1
             .iter()
-            .map(|(_, b)| count(b, index, partner))
+            .map(|l| without(l, partner))
             .collect();
-        let mut best: Option<(usize, f64, Route, Route)> = None;
-        for (ia, (cost_a, a)) in moves_a.iter().enumerate() {
-            for (ib, (cost_b, b)) in moves_b.iter().enumerate() {
-                if *cost_a == 0. && *cost_b == 0. {
+        // The current routes are the last moves.
+        let before = counts_a[counts_a.len() - 1] + counts_b[counts_b.len() - 1] + 1;
+        let mut best: Option<(usize, f64, usize, usize)> = None;
+        for (ia, count_a) in counts_a.iter().enumerate() {
+            let (cost_a, a) = move_a(ia);
+            for (ib, count_b) in counts_b.iter().enumerate() {
+                let (cost_b, b) = move_b(ib);
+                if cost_a == 0. && cost_b == 0. {
+                    continue;
+                }
+                // The shared segment between the two adds at most one: a pair that cannot win without it is not tested.
+                let least = count_a + count_b;
+                let cost = cost_a + cost_b;
+                if least >= before
+                    || best.as_ref().is_some_and(|(n, c, _, _)| {
+                        (least, cost).partial_cmp(&(*n, *c)) != Some(std::cmp::Ordering::Less)
+                    })
+                {
                     continue;
                 }
                 let between = usize::from(shares_segment(a, b));
-                let after = counts_a[ia] + counts_b[ib] + between;
+                let after = least + between;
                 if after < before
                     && best
                         .as_ref()
-                        .is_none_or(|(n, c, _, _)| (after, cost_a + cost_b) < (*n, *c))
+                        .is_none_or(|(n, c, _, _)| (after, cost) < (*n, *c))
                 {
-                    best = Some((after, cost_a + cost_b, a.clone(), b.clone()));
+                    best = Some((after, cost, ia, ib));
                 }
             }
         }
-        if let Some((_, _, a, b)) = best {
-            return Some((a, b, partner));
+        if let Some((_, _, ia, ib)) = best {
+            return Some((move_a(ia).1.clone(), move_b(ib).1.clone(), partner));
         }
     }
     None
@@ -1225,10 +1627,15 @@ pub fn spread_tracks(
         next += 1;
     }
     let info = parent_map(graph);
-    let obstacles: Vec<(String, Rect)> = rects
-        .iter()
-        .map(|(id, r)| (id.clone(), r.clone()))
-        .collect();
+    // #229: each edge's obstacles built once, and the nodes in a grid (the same spans and hit counts as a scan of every node).
+    let nodes = OverlapNodes::new(rects, &info, params);
+    let mut obstacles = EdgeObstacleCache {
+        nodes: &nodes,
+        info: &info,
+        params,
+        built: vec![None; result.len()],
+    };
+    let mut scratch = Stamps::new(nodes.ids.len());
     for group in 0..next {
         let members: Vec<usize> = (0..segments.len())
             .filter(|i| cluster[*i] == group)
@@ -1289,52 +1696,22 @@ pub fn spread_tracks(
         }
         // The free span of the corridor around the group: the nearest obstacle boundary (clearance included) on each
         // side, over the range of each member. The tracks lie inside it; a group that does not fit stays as it is.
-        let mut floor = f64::NEG_INFINITY;
-        let mut ceiling = f64::INFINITY;
+        let mut span = (f64::NEG_INFINITY, f64::INFINITY);
         for member in &ordered {
             let (ri, _, horizontal_segment, _, lo, hi) = segments[*member];
             let Some(edge) = edges.get(result[ri].id.as_str()) else {
                 continue;
             };
-            let skip = excluded_with(&info, edge);
-            for (id, rect) in &obstacles {
-                let endpoint = id == &edge.source || edge.target.as_deref() == Some(id.as_str());
-                if !(endpoint || !skip.contains(id.as_str())) {
-                    continue;
-                }
-                let outline = obstacle(
-                    id,
-                    rect,
-                    info.get(id.as_str())
-                        .map_or_else(NodeShape::default, |(_, s)| *s),
-                    edge,
-                    params,
-                );
-                let mut b = outline.bounds();
-                if endpoint && params.own_clearance > 0. {
-                    // The tracks keep the own clearance from the edge's own nodes.
-                    b = Rect {
-                        x: b.x - params.own_clearance,
-                        y: b.y - params.own_clearance,
-                        width: b.width + 2. * params.own_clearance,
-                        height: b.height + 2. * params.own_clearance,
-                    };
-                }
-                let (along0, along1, across0, across1) = if horizontal_segment {
-                    (b.x, b.x + b.width, b.y, b.y + b.height)
-                } else {
-                    (b.y, b.y + b.height, b.x, b.x + b.width)
-                };
-                if along1.min(hi) - along0.max(lo) <= EPS {
-                    continue;
-                }
-                if across1 <= mean + EPS {
-                    floor = floor.max(across1);
-                } else if across0 >= mean - EPS {
-                    ceiling = ceiling.min(across0);
-                }
-            }
+            obstacles.of(ri, edge).narrow(
+                &nodes,
+                &mut scratch,
+                horizontal_segment,
+                mean,
+                (lo, hi),
+                &mut span,
+            );
         }
+        let (floor, ceiling) = span;
         let span = ceiling - floor;
         let width = |tracks: &[usize]| tracks.iter().max().map_or(0, |m| *m) as f64 * params.track;
         let (track_of, needed) = if span >= width(&layered) - EPS {
@@ -1366,29 +1743,10 @@ pub fn spread_tracks(
             let Some(edge) = edges.get(candidate.id.as_str()) else {
                 continue;
             };
-            let skip = excluded_with(&info, edge);
-            let count = |route: &Route| {
-                obstacles
-                    .iter()
-                    .filter(|(id, rect)| {
-                        let endpoint =
-                            id == &edge.source || edge.target.as_deref() == Some(id.as_str());
-                        (endpoint || !skip.contains(id.as_str()))
-                            && hits_outline(
-                                route,
-                                &obstacle(
-                                    id,
-                                    rect,
-                                    info.get(id.as_str())
-                                        .map_or_else(NodeShape::default, |(_, s)| *s),
-                                    edge,
-                                    params,
-                                ),
-                            )
-                    })
-                    .count()
-            };
-            if count(&candidate) <= count(&result[ri]) {
+            let own = obstacles.of(ri, edge);
+            if own.hits(&candidate, &nodes, &mut scratch)
+                <= own.hits(&result[ri], &nodes, &mut scratch)
+            {
                 result[ri] = candidate;
             }
         }
@@ -1615,6 +1973,30 @@ fn best_route(
             .filter(|z| hits_outline_probe(&middle, z))
             .count()
     };
+    // #229: every test of a candidate against an obstacle or a route starts with their boxes (`apart`), so the obstacles and
+    // routes whose boxes are apart from the box around all candidates count for none of them. They are left out once; the
+    // others keep their order, and every count is the one of the whole lists.
+    let reach = options
+        .iter()
+        .map(route_bounds)
+        .fold(route_bounds(original), |u, b| {
+            [
+                u[0].min(b[0]),
+                u[1].min(b[1]),
+                u[2].max(b[2]),
+                u[3].max(b[3]),
+            ]
+        });
+    let obstacles: Vec<&Outline> = obstacles
+        .into_iter()
+        .filter(|o| !apart(&reach, &rect_bounds(&o.bounds())))
+        .collect();
+    let near: Vec<Probe> = occupied
+        .iter()
+        .filter(|p| !apart(&reach, &p.bounds))
+        .copied()
+        .collect();
+    let occupied = &near[..];
     let mut best = original.clone();
     let mut best_zone = in_zone(&best);
     counters.legacy_candidates += 1;
@@ -3072,6 +3454,144 @@ mod tests {
                 .filter(|&j| j != i && shares_segment(route, &routes[j]))
                 .collect();
             assert_eq!(index.sharing(route, |j| j == i), brute, "route {i}");
+        }
+    }
+
+    /// #229: an edge's obstacles from the grid give the hit count of a scan over every node and, bit for bit, the corridor of
+    /// `corridor_span`, on random nested boxes and discs, routes with short, touching and oblique segments, and with and
+    /// without clearances.
+    #[test]
+    fn the_obstacle_grid_agrees_with_a_scan_of_every_node() {
+        let mut seed: u64 = 229;
+        let mut next = |n: u64| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) % n
+        };
+        let ids: Vec<String> = (0..40).map(|i| format!("n{i}")).collect();
+        let mut graph = two_edge_graph(&ids.iter().map(String::as_str).collect::<Vec<_>>(), &[]);
+        let mut rects = BTreeMap::new();
+        for (i, node) in graph.nodes.iter_mut().enumerate() {
+            let (x, y) = (next(40) as f64 * 10., next(40) as f64 * 10.);
+            let (w, h) = (10. + next(8) as f64 * 10., 10. + next(8) as f64 * 10.);
+            if i >= 30 {
+                // A child inside an earlier node.
+                node.parent_id = Some(format!("n{}", next(30)));
+            }
+            if next(4) == 0 {
+                node.shape = NodeShape::Circle;
+            }
+            rects.insert(
+                node.id.clone(),
+                Rect {
+                    x,
+                    y,
+                    width: w,
+                    height: h,
+                },
+            );
+        }
+        for e in 0..20 {
+            graph.edges.push(Edge {
+                id: format!("e{e}"),
+                kind: "calls".into(),
+                source: format!("n{}", next(40)),
+                target: Some(format!("n{}", next(40))),
+                weight: None,
+            });
+        }
+        let info = parent_map(&graph);
+        for params in [
+            Params::default(),
+            Params {
+                clearance: 4.,
+                own_clearance: 8.,
+                ..Params::default()
+            },
+            Params {
+                clearance: 6.,
+                ..Params::default()
+            },
+        ] {
+            let nodes = OverlapNodes::new(&rects, &info, params);
+            let mut scratch = Stamps::new(nodes.ids.len());
+            let obstacles: Vec<(String, Rect)> = rects
+                .iter()
+                .map(|(id, r)| (id.clone(), r.clone()))
+                .collect();
+            for edge in &graph.edges {
+                let own = EdgeObstacles::new(edge, &info, &nodes, params);
+                let skip = excluded_with(&info, edge);
+                for _ in 0..30 {
+                    let mut p = Point {
+                        x: next(500) as f64 - 20.,
+                        y: next(500) as f64 - 20.,
+                    };
+                    let mut points = vec![p.clone()];
+                    for k in 0..(1 + next(5)) {
+                        let step = match next(10) {
+                            0 => 1e-7,
+                            1 => 0.,
+                            _ => (next(41) as f64 - 20.) * 10.,
+                        };
+                        if next(12) == 0 {
+                            // An oblique segment, as a straight edge has.
+                            p.x += step;
+                            p.y += 7.;
+                        } else if k % 2 == 0 {
+                            p.x += step;
+                        } else {
+                            p.y += step;
+                        }
+                        points.push(p.clone());
+                    }
+                    let route = Route {
+                        id: edge.id.clone(),
+                        points,
+                        weight: 1,
+                        bundle_of: None,
+                    };
+                    let scan = obstacles
+                        .iter()
+                        .filter(|(id, rect)| {
+                            let endpoint =
+                                id == &edge.source || edge.target.as_deref() == Some(id.as_str());
+                            (endpoint || !skip.contains(id.as_str()))
+                                && hits_outline(
+                                    &route,
+                                    &obstacle(id, rect, shape_in(&info, id), edge, params),
+                                )
+                        })
+                        .count();
+                    assert_eq!(own.hits(&route, &nodes, &mut scratch), scan, "{route:?}");
+                    for w in route.points.windows(2) {
+                        let horizontal_segment = horizontal(&w[0], &w[1]);
+                        let (line, range) = if horizontal_segment {
+                            (w[0].y, (w[0].x.min(w[1].x), w[0].x.max(w[1].x)))
+                        } else {
+                            (w[0].x, (w[0].y.min(w[1].y), w[0].y.max(w[1].y)))
+                        };
+                        let expected = corridor_span(
+                            edge,
+                            &skip,
+                            &obstacles,
+                            &info,
+                            params,
+                            horizontal_segment,
+                            line,
+                            range,
+                        );
+                        let found =
+                            own.corridor(&nodes, &mut scratch, horizontal_segment, line, range);
+                        assert_eq!(
+                            (found.0.to_bits(), found.1.to_bits()),
+                            (expected.0.to_bits(), expected.1.to_bits()),
+                            "{route:?}"
+                        );
+                    }
+                }
+            }
         }
     }
 

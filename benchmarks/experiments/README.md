@@ -56,3 +56,11 @@ whether today's windows find a way) to `FILE`; the example `grid_variants` of `a
 
 Applies to main `231c010`. With `ARQLET_TAP_LOG=1`, `layout-command` logs how every bus tap was drawn and the bars of the
 bus lines. `bus_tap_causes.py --bin BINARY --work DIR` classifies the taps through boxes (#203, same results file).
+
+## `second-pass-timer.patch` and `overlap-index.mjs`
+
+Applies to main `f59ec9f` and to the branch of #229. Not a candidate: prints `PHASE secondPass MS` on standard error
+around the second routing pass (`reroute` + `finish` in `compute_counted_inner`), without changing any output.
+`overlap-index.mjs` times two builds made with it on the same imports and compares whole answers;
+`overlap_index_table.py` makes the table and `overlap-index-fingerprints.sh` compares the fingerprints of two `bench`
+builds in the configurations of the stored files (`benchmarks/results/overlap-index-20261127.md`).
