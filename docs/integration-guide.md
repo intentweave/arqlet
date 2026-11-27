@@ -206,6 +206,8 @@ answer.overview.work;   // {budget, used, clustering, limited, unclustered, pack
 | `work.limited` | the budget ran out |
 | `work.unclustered` | containers left without their communities (node indices, -1: the top level) |
 | `work.packed` | containers whose children are packed in rows instead of arranged by forces |
+| `work.startIgnored` | only when true: a `start` by node index made for the complete clustering did not fit the cut one and was left out |
+| `work.radiiIgnored` | only when not empty: ids in `radii` of added clusters the cut clustering does not have, left out |
 
 When the budget runs out, the first container that does not fit ends the budgeted work: what is not split yet stays
 unsplit, what is not arranged yet is packed. The answer is valid all the same: every node has its disc, no discs of one
@@ -214,7 +216,21 @@ continuation keeps its arrangement within any budget. Without `workBudget` the a
 `work`. `work` also comes with `positionsOnly` and `columns` answers; `createOverviewSession` passes both fields on.
 
 Choose `"refuse"` when the host would rather show the last overview: a refused request changes nothing in a session.
-Note that a continuation (`start`) keeps an unchanged packed container as it is; lay out without `start` to arrange it.
+
+Know these limits:
+
+- **Clustering comes first.** A large clustering (a big flat graph split into communities) can use up the budget, and
+  then every container is packed.
+- **Packed stays packed.** A continuation (`start`) keeps an unchanged packed container as it is, like any unchanged
+  arrangement, until the host lays out without `start`.
+- **Threads.** With threads a level may take up to about twice its remaining budget in wall time (a container stopped
+  by the shared counter is arranged again alone). On one thread and in WASM the work exceeds the budget by at most one
+  step (one tick, round or sweep of one container).
+- **Drags** (`start.moved`) are applied in a container kept as it was when the moved node overlaps nothing there;
+  otherwise that container is packed and listed.
+- A continuation by index made for the complete clustering does not fit an answer whose clustering the budget cut:
+  with `"answer"` the start is left out (`startIgnored`), as are `radii` of clusters that are missing (`radiiIgnored`);
+  with `"refuse"` the request is refused with the prefix above.
 An answer with `unclustered` containers has other nodes than the complete overview: continuing it by node index (and
 with `start: {}` in a session) is refused once the clustering completes (the number of values differs); lay out without
 `start` then. By id (`start.nodes`) it continues, and those containers are clustered as new ones.
@@ -232,7 +248,8 @@ On the generated code indexes of `benchmarks/overview/generate.py`, one Apple M3
 WASM engine in Node both spent about 60 million units per second on one thread (157 to 206 million with 4 native
 threads); the whole overview took about 4.4 million units per 1 000 nodes, and the unbudgeted part 52 to 64 ms at 10 000
 nodes and 0.5 to 0.7 s at 100 000 ([results](../benchmarks/results/overview-work-budget-20261127.md),
-`benchmarks/overview/work-rate.mjs`). Other machines and graphs differ: measure your own.
+`benchmarks/overview/work-rate.mjs`). These figures come from a **loaded** machine (load average 4.4 to 6.0 during the
+runs, recorded per row); other machines, loads and graphs differ: measure your own.
 
 ## 5. Offers from another engine: refinement
 

@@ -3739,6 +3739,15 @@ pub struct OverviewWork {
     /// its arrangement either way and is not listed).
     #[cfg_attr(feature = "ts", ts(type = "number[]"))]
     pub packed: Vec<i64>,
+    /// A `start` by node index that did not fit the hierarchy left by `unclustered` (it was made for the complete
+    /// clustering): the overview was laid out without it. Omitted when false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<bool>"))]
+    pub start_ignored: bool,
+    /// Ids in `radii` of added clusters the hierarchy left by `unclustered` does not have, left out. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub radii_ignored: Vec<String>,
 }
 
 /// Provisional (#211): what an overview does when its work budget runs out (`overBudget`).

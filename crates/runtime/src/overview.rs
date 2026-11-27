@@ -224,13 +224,20 @@ type FromPlaces = (BTreeMap<String, OverviewPlace>, BTreeSet<usize>);
 /// The hints of a request: `radii` (node id → radius, for clusters a host shows structured) and `start` to continue
 /// from: `{x, y, r}` of a previous overview of the same graph, in its node order, or `{nodes}`, its places by node id,
 /// of this graph or an earlier one (read by `hierarchy_of`). With the latter also what became of the places.
+///
+/// `cut`: the work budget left containers unsplit (#211), so the hierarchy may lack clusters the host knows. Then a
+/// start by index whose arrays do not fit the hierarchy is left out (the overview is laid out without it), and so is a
+/// radius for an added cluster (`community:…`) the hierarchy does not have; both are reported (`Ignored`) instead of
+/// refused.
 fn hints_of(
     v: &Value,
     h: &overview::Hierarchy,
     from_places: Option<&FromPlaces>,
-) -> Result<(OverviewHints, Option<OverviewContinuation>), String> {
+    cut: bool,
+) -> Result<(OverviewHints, Option<OverviewContinuation>, Ignored), String> {
     let mut hints = OverviewHints::default();
     let mut continuation = None;
+    let mut ignored = Ignored::default();
     let index: BTreeMap<&str, usize> = if v.get("radii").is_some() || v.get("start").is_some() {
         h.ids
             .iter()
@@ -245,9 +252,13 @@ fn hints_of(
             .as_object()
             .ok_or("Overview radii must be an object")?
         {
-            let i = *index
-                .get(id.as_str())
-                .ok_or_else(|| format!("Overview radius for an unknown node: {id}"))?;
+            let Some(&i) = index.get(id.as_str()) else {
+                if cut && id.starts_with(overview::COMMUNITY_PREFIX) {
+                    ignored.radii.push(id.clone());
+                    continue;
+                }
+                return Err(format!("Overview radius for an unknown node: {id}"));
+            };
             let r = r
                 .as_f64()
                 .filter(|r| r.is_finite() && *r > 0.)
@@ -255,7 +266,20 @@ fn hints_of(
             hints.radius.insert(i, r);
         }
     }
-    if let Some(start) = v.get("start") {
+    // A start by index for other nodes than the hierarchy has, after the budget cut the clustering: left out.
+    let unfit = from_places.is_none()
+        && ["x", "y", "r"].iter().any(|k| {
+            v["start"][*k]
+                .as_array()
+                .is_some_and(|list| list.len() != h.ids.len())
+        });
+    let start = v.get("start").filter(|_| {
+        if cut && unfit {
+            ignored.start = true;
+        }
+        !ignored.start
+    });
+    if let Some(start) = start {
         let mut previous = match from_places {
             Some((places, kept)) => {
                 let (previous, report) = overview::continue_by_id(h, places, kept);
@@ -317,7 +341,14 @@ fn hints_of(
         }
         hints.start = Some(previous);
     }
-    Ok((hints, continuation))
+    Ok((hints, continuation, ignored))
+}
+
+/// What a request's hints asked for that a hierarchy cut by the work budget does not have (#211, `hints_of`).
+#[derive(Default)]
+struct Ignored {
+    start: bool,
+    radii: Vec<String>,
 }
 
 /// `start.nodes` of a request, when it has them: node id → `{x, y, r, parent?}`.
@@ -515,14 +546,16 @@ fn lay_out(
     threads: usize,
     work: Option<(WorkRequest, Budget)>,
 ) -> Result<Overview, String> {
-    let (mut hints, continuation) = hints_of(v, h, from_places)?;
     let (refuse, mut budget) = match work {
         Some((request, budget)) => (request.refuse, Some(budget)),
         None => (false, None),
     };
+    // Refused before the hints are read: a hierarchy cut by the budget may not fit them.
     if refuse && budget.as_ref().is_some_and(|b| b.exhausted) {
         return Err(refusal(h, budget.as_ref().unwrap()));
     }
+    let cut = budget.as_ref().is_some_and(|b| !b.unclustered.is_empty());
+    let (mut hints, continuation, ignored) = hints_of(v, h, from_places, cut)?;
     let mut packed: Vec<i64> = Vec::new();
     // `edgeData`: each edge's kind and weight in the answer.
     let edge_data = edge_data_of(v)?;
@@ -596,6 +629,8 @@ fn lay_out(
             limited: b.exhausted,
             unclustered,
             packed,
+            start_ignored: ignored.start,
+            radii_ignored: ignored.radii,
         }
     });
     let o = overview::assemble(&h, &arrangements, &options, &hints);

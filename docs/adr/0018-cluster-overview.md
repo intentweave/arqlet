@@ -194,12 +194,14 @@ request without it is answered exactly as before (byte-identical, the default pa
 
 1. **Request.** `workBudget` (an integer ≥ 0, units of work) and `overBudget`: `"answer"` (the default) or `"refuse"`.
    Every request with `workBudget` gets a report `work` in its answer: `{budget, used, clustering, limited,
-   unclustered, packed}`; the last two list containers by node index, -1 for the top level (as `parent` does).
+   unclustered, packed}`; the last two list containers by node index, -1 for the top level (as `parent` does). Two
+   optional fields report hints left out (item 8): `startIgnored` and `radiiIgnored`.
 2. **Units.** One unit is roughly one pass of an inner loop over a node or a link; counted in `u64` (WASM's `usize` is
    32 bits), the same on every target and for any thread count. Louvain: per sweep the nodes plus the links visited,
    per level the links aggregated. Arranging a container of `k` children with `l` links: the start (`k + l`), per force
-   tick `l + k·(⌈log₂ k⌉ + 2)` plus the pairs the collision examines, per separation or make-room round `k` plus the
-   pairs examined, per round of the enclosing circle `2k`. A container kept as it was costs `k`.
+   tick `l + k·(b + 2)`, `b` the bit length of `k` (`⌊log₂ k⌋ + 1`), plus the pairs the collision examines, per
+   separation or make-room round `k` plus the pairs examined, per round of the enclosing circle `2k`. A container kept
+   as it was costs its start, `k + l`.
 3. **Budgeted phases and safe points.** Only the iterative phases are budgeted: **clustering** (Louvain, per container
    that is split, checked after every sweep and level) and the **arrangement** of every container (the start, every
    tick, every separation round, the enclosing circle; settling, making room and the drag of a continuation are paths
@@ -215,7 +217,9 @@ request without it is answered exactly as before (byte-identical, the default pa
    later pieces (first fit). It uses the budget better, but the pieces discarded on the way are work too, and with
    many of them the time would no longer follow the budget.
 5. **Fallback.** A container with an unchanged arrangement of a continuation keeps it, as without a budget (not
-   listed); any other with two or more children is **packed** (`packed`): its children in rows, in the order of the breadth-first
+   listed), with the children the user moved (`start.moved`) put where they were put if they overlap nothing there
+   (the container is not centred again, so they keep their absolute places; a container that grows by it makes its
+   parent changed); a moved child that would overlap a sibling packs its container instead (listed). Any other with two or more children is **packed** (`packed`): its children in rows, in the order of the breadth-first
    walk over their links that the spiral start uses (linked children stay side by side), each in a square of its
    diameter and the gap, the row as high as its largest disc, the rows about as wide as the squares' total area is
    square; the container's disc is centred on the rows and holds them. No forces, `O(k log k)`, not budgeted. The answer
@@ -240,7 +244,14 @@ request without it is answered exactly as before (byte-identical, the default pa
    it was built (so that its answer equals that of `dispatch`), reuses it only if that clustering was complete and fits
    the budget, and never keeps a hierarchy built with unsplit containers for later requests. `work` is part of
    `OverviewPositions` and of the columnar answer's metadata. An answer with containers left unsplit has other clusters
-   than the last one, so a `positionsOnly` request gets the whole overview then. A continuation (`start`) keeps an
+   than the last one, so a `positionsOnly` request gets the whole overview then. Such a hierarchy may also lack what a
+   request's hints name: a `start` by node index made for the complete clustering (more values than nodes; also a
+   session's `start: {}`), and `radii` of added clusters (`community:…`) it does not have. With `"answer"` they are left
+   out, the overview is laid out without that start (its budget is spent anyway, so its containers are packed), and
+   the answer says so (`startIgnored: true`, `radiiIgnored`); with `"refuse"` the refusal comes first, before the hints
+   are read. Rejected: charging the complete clustering whatever the budget (`used` could exceed `budget`) and
+   refusing the start (no answer, and no stable prefix). Without a cut clustering a start that does not fit is refused
+   as before. A continuation (`start`) keeps an
    unchanged packed container as it is, as it keeps any unchanged arrangement: the host lays out without `start` to
    have it arranged.
 9. **How a host picks a budget.** Lay out graphs of the sizes it serves with `workBudget` larger than any work (for

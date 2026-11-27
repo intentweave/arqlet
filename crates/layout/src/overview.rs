@@ -136,7 +136,8 @@ impl Budget {
     }
 }
 
-/// `⌈log₂ k⌉ + 2`, the units per child of a Barnes–Hut tick (the tree's depth and the gravity), at least 2.
+/// The units per child of a Barnes–Hut tick (the tree's depth and the gravity): the bit length of `k` plus 2, that is
+/// `⌊log₂ k⌋ + 3` for `k ≥ 1`.
 fn tree_units(k: usize) -> u64 {
     2 + u64::from(64 - (k as u64).leading_zeros())
 }
@@ -1375,8 +1376,9 @@ pub enum Fallback {
 }
 
 /// Provisional (#211): the arrangement of a container that the work budget left out, without forces and not budgeted
-/// (`O(k log k)`): with at most one child as `arrange`; an unchanged container of a continuation as it was; any other
-/// with its children packed in rows (`packed`). No overlaps, every child inside the container's disc.
+/// (`O(k log k)`): with at most one child as `arrange`; an unchanged container of a continuation as it was, with the
+/// children the user moved at their new places when they overlap nothing there; any other with its children packed in
+/// rows (`packed`). No overlaps, every child inside the container's disc.
 pub fn fallback(
     h: &Hierarchy,
     container: Container,
@@ -1394,24 +1396,38 @@ pub fn fallback(
     }
     let r: Vec<f64> = members.iter().map(|&m| radius[m]).collect();
     let start = start.filter(|p| members.iter().any(|m| !p.anew.contains(m)));
-    let (x, kind) = match start {
-        Some(previous) if !changed_in(previous, container, members, radius) => {
+    // Kept as it was, with the children the user moved (`Previous::moved`) put where they were put, if that overlaps
+    // nothing; the container is not centred again, so the moved nodes keep their absolute places. Else packed.
+    let kept = start
+        .filter(|previous| !changed_in(previous, container, members, radius))
+        .and_then(|previous| {
             let origin = match container {
                 Container::Root => (0., 0.),
                 Container::Node(c) => previous.centre[c],
             };
-            let x = members
+            let x: Vec<(f64, f64)> = members
                 .iter()
                 .map(|&m| {
-                    (
-                        previous.centre[m].0 - origin.0,
-                        previous.centre[m].1 - origin.1,
-                    )
+                    let at = previous.moved.get(&m).unwrap_or(&previous.centre[m]);
+                    (at.0 - origin.0, at.1 - origin.1)
                 })
                 .collect();
-            (x, Fallback::Kept)
-        }
-        _ => {
+            let moved: Vec<usize> = (0..k)
+                .filter(|&j| previous.moved.contains_key(&members[j]))
+                .collect();
+            let clear = moved.iter().all(|&j| {
+                (0..k).all(|i| {
+                    i == j || {
+                        let (dx, dy) = (x[i].0 - x[j].0, x[i].1 - x[j].1);
+                        (dx * dx + dy * dy).sqrt() >= r[i] + r[j] + options.gap
+                    }
+                })
+            });
+            clear.then_some(x)
+        });
+    let (x, kind) = match kept {
+        Some(x) => (x, Fallback::Kept),
+        None => {
             let local: BTreeMap<usize, usize> =
                 members.iter().enumerate().map(|(i, &m)| (m, i)).collect();
             let links: Vec<(usize, usize, f64)> = h

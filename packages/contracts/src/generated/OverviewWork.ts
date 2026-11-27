@@ -31,4 +31,13 @@ unclustered: number[],
  * Containers whose children were packed in rows instead of arranged (an unchanged container of a continuation keeps
  * its arrangement either way and is not listed).
  */
-packed: number[], };
+packed: number[],
+/**
+ * A `start` by node index that did not fit the hierarchy left by `unclustered` (it was made for the complete
+ * clustering): the overview was laid out without it. Omitted when false.
+ */
+startIgnored?: boolean,
+/**
+ * Ids in `radii` of added clusters the hierarchy left by `unclustered` does not have, left out. Omitted when empty.
+ */
+radiiIgnored?: Array<string>, };

@@ -208,6 +208,13 @@ fn over_budget_refuse_fails_cleanly_and_a_session_keeps_its_state() {
         &json!({"op": "overview", "options": options(), "radii": {"g0/f1": 80.}, "start": {}, "workBudget": 10, "overBudget": "refuse"}),
     );
     assert_eq!(no["ok"], false, "{no}");
+    assert!(
+        no["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("Overview work budget exhausted: "),
+        "{no}"
+    );
     let next = session.run_value(
         &json!({"op": "overview", "options": options(), "radii": {"g0/f1": 80.}, "start": {}}),
     );
@@ -354,4 +361,120 @@ fn an_answer_with_unsplit_containers_continues_by_id_not_by_index() {
     );
     assert_valid(&by_id);
     assert!(by_id["stats"]["communities"].as_u64().unwrap() > 0);
+}
+
+/// The ids of an answer with their indices.
+fn index_of(o: &Value, id: &str) -> usize {
+    o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|x| x == id)
+        .unwrap()
+}
+
+#[test]
+fn a_start_by_index_and_cluster_radii_that_a_cut_clustering_lacks_are_left_out_and_reported() {
+    let g = graph(3, 4, 30);
+    let plain = answer(&json!({"op": "overview", "graph": g, "options": options()}));
+    let community = plain["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|id| id.as_str().unwrap().starts_with("community:"))
+        .unwrap()
+        .clone();
+    let start = json!({"x": plain["x"], "y": plain["y"], "r": plain["r"], "moved": {"g0/f1/n3": {"x": 1., "y": 2.}}});
+    let radii = json!({community.as_str().unwrap(): 30., "g1/f1": 70.});
+    let request = json!({"op": "overview", "graph": g, "options": options(), "start": start, "radii": radii,
+        "workBudget": 10});
+    // Refused with the stable prefix, before the hints are read.
+    let mut refusing = request.clone();
+    refusing["overBudget"] = json!("refuse");
+    let refused = run(&refusing);
+    assert!(
+        refused["error"]
+            .as_str()
+            .unwrap()
+            .starts_with("Overview work budget exhausted: "),
+        "{refused}"
+    );
+    // Answered: valid, laid out without the start, the cluster's radius left out, both reported.
+    let o = answer(&request);
+    assert_valid(&o);
+    let work = &o["work"];
+    assert_eq!(work["limited"], true);
+    assert_eq!(work["startIgnored"], true, "{work}");
+    assert_eq!(work["radiiIgnored"], json!([community]), "{work}");
+    assert_eq!(o["r"][index_of(&o, "g1/f1")], 70.);
+    for threads in [2, 4] {
+        let mut threaded = request.clone();
+        threaded["threads"] = json!(threads);
+        assert_eq!(answer(&threaded), o);
+    }
+    // The same in a session continuing with `start: {}`.
+    let mut session = EngineSession::new();
+    session.run_value(&json!({"op": "overview", "graph": g, "options": options()}));
+    let s = session
+        .run_value(&json!({"op": "overview", "options": options(), "start": {}, "workBudget": 10}));
+    assert_eq!(s["ok"], true, "{s}");
+    assert_eq!(s["overview"]["work"]["startIgnored"], true);
+    let d = answer(&json!({"op": "overview", "graph": g, "options": options(),
+        "start": {"x": plain["x"], "y": plain["y"], "r": plain["r"]}, "workBudget": 10}));
+    assert_eq!(s["overview"], d);
+    // A start that fits, and unknown ids that are no clusters, are as before: a mismatch without a cut is refused as
+    // before, and so is a radius for a node the graph does not have.
+    let wrong = run(&json!({"op": "overview", "graph": g, "options": options(),
+        "start": {"x": [0.], "y": [0.], "r": [1.]}, "workBudget": u64::MAX}));
+    assert!(
+        wrong["error"].as_str().unwrap().contains("same graph"),
+        "{wrong}"
+    );
+    let unknown = run(
+        &json!({"op": "overview", "graph": g, "options": options(), "radii": {"nobody": 3.},
+        "workBudget": 10}),
+    );
+    assert!(
+        unknown["error"].as_str().unwrap().contains("unknown node"),
+        "{unknown}"
+    );
+}
+
+#[test]
+fn a_drag_is_applied_within_any_budget_or_its_container_is_packed_and_listed() {
+    let g = graph(2, 3, 25);
+    let o = json!({"communities": 0});
+    let plain = answer(&json!({"op": "overview", "graph": g, "options": o}));
+    let (x, y, r) = (plain["x"].clone(), plain["y"].clone(), plain["r"].clone());
+    let leaf = index_of(&plain, "g0/f1/n3");
+    let file = index_of(&plain, "g0/f1");
+    let f = |k: &str, i: usize| plain[k][i].as_f64().unwrap();
+    // Moved onto free room inside its file (towards the file's centre would hit others; a tiny step stays clear).
+    let free = (f("x", leaf) + 0.3, f("y", leaf));
+    let to_free = answer(
+        &json!({"op": "overview", "graph": g, "options": o, "workBudget": 0,
+        "start": {"x": x, "y": y, "r": r, "moved": {"g0/f1/n3": {"x": free.0, "y": free.1}}}}),
+    );
+    assert_valid(&to_free);
+    assert!(
+        (to_free["x"][leaf].as_f64().unwrap() - free.0).abs() < 0.02,
+        "the move is applied"
+    );
+    assert!((to_free["y"][leaf].as_f64().unwrap() - free.1).abs() < 0.02);
+    assert_eq!(to_free["work"]["packed"], json!([]));
+    // Moved onto a sibling: its file is packed, and listed.
+    let other = index_of(&plain, "g0/f1/n10");
+    let onto = answer(
+        &json!({"op": "overview", "graph": g, "options": o, "workBudget": 0,
+        "start": {"x": x, "y": y, "r": r, "moved": {"g0/f1/n3": {"x": f("x", other), "y": f("y", other)}}}}),
+    );
+    assert_valid(&onto);
+    assert!(
+        onto["work"]["packed"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(file)),
+        "{}",
+        onto["work"]
+    );
 }
