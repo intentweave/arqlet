@@ -4,7 +4,7 @@ Date: 2026-11-27.
 Status: proposed. Step S1 of [ADR 0023](0023-primary-store-replicas-and-change-stream.md) (item 9) is built behind it,
 provisional and unpublished: `crates/node`, the package `packages/node` (`@arqlet/node`, `private`), and the store usable
 from several threads (`arqlet_runtime::shared_sessions`, step C2 of [ADR 0024](0024-concurrent-sessions-in-a-backend.md)).
-Prebuilt binaries and publishing are designed here and not built.
+Prebuilt binaries and publishing are designed here and not built; publishing follows in a separate issue (section 9).
 
 Related: [ADR 0019](0019-engine-interface.md) (sessions, the columnar data path), [ADR 0023](0023-primary-store-replicas-and-change-stream.md)
 (item 9: sessions as a cache, a native Node adapter; R7: memory and release), [ADR 0024](0024-concurrent-sessions-in-a-backend.md)
@@ -135,14 +135,29 @@ module and the WASM module; `platforms.yml` runs it on all four platforms. `pack
 timer fires during a long layout, that parallel sessions answer as serial ones, the byte limit, `memory`, the columns
 against WASM, and `createSession` with `recycle` into WASM.
 
-### 8. Not supported yet
+### 8. Accepted gaps (owner, 2026-11-27)
 
-- Progressive publications (`refineProgressive`) are not delivered: the call answers with its final result, as the WASM
-  engine does without `onPublish`. Delivering them needs a thread-safe function into JavaScript (Node-API 4) and an order
-  between the publications and the final answer; added when a host needs it.
-- Phase timings (`timings: true`) are collected per process (`arqlet_model::clock`), so with calls running at once they add
-  up across them.
-- A cancel flag for a running call (ADR 0024 item 6): a host drops the answer by revision, as everywhere.
+These are accepted for the adapter as built and documented in `packages/node/README.md`; each is revisited when a host
+needs it.
+
+- **Progressive publications are not delivered.** `refineProgressive` answers with its final result only, as the WASM
+  engine does without `onPublish`. Delivering them needs a thread-safe function into JavaScript (Node-API 4) and an
+  order between the publications and the final answer.
+- **Phase timings are summed across concurrent calls.** `timings: true` reads the per-process collector
+  (`arqlet_model::clock`), so the times of calls running at the same time add up. The layout itself never reads the
+  clock, so answers are unaffected.
+- **No musl Linux or Intel macOS binaries.** Those hosts build from source (`node packages/node/build.mjs`) or use the
+  WASM fallback (`loadEngine({engine: 'auto'})` falls back by itself).
+- No cancel flag for a running call (ADR 0024 item 6): a host drops the answer by revision, as everywhere.
+
+### 9. Publishing is a separate step
+
+The owner decided on 2026-11-27 that publishing is not part of the change that built the adapter: `@arqlet/node` stays
+`private` and out of the release (`NPM_PACKAGES`, `release.yml`), and section 3 is the plan for a separate issue. The
+license notices are ready for it: the napi-rs MIT text, which the `napi` and `napi-sys` crates do not ship, is supplied
+from the upstream repository at the recorded revisions (`tools/third-party-licenses/napi-rs-LICENSE`,
+`tools/third-party-notices.mjs`), and `node tools/third-party-notices.mjs --package arqlet-node --target <triple> --check`
+passes for the four targets.
 
 ## Consequences
 
@@ -164,8 +179,7 @@ admission by memory (ADR 0024 item 3) matters for a native host.
 
 ## Not decided here
 
-- Publishing: whether and when `@arqlet/node` and its platform packages go to npm (the owner decides; the changes to
-  `release.yml` and `docs/releasing.md` are proposed in the pull request that built this).
-- musl Linux and Intel macOS binaries.
+- When `@arqlet/node` and its platform packages are published (section 9: a separate issue; the changes to
+  `release.yml`, `tools/release-check.mjs` and `docs/releasing.md` are in the plan of section 3 and the pull request).
 - Transferring columns without a copy (an external buffer over the session's memory needs a lifetime rule across
   requests; the copies are made on the pool thread).

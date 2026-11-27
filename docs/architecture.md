@@ -505,11 +505,15 @@ A dependency of `crates/node` (`arqlet-node`, `publish = false`) only, recorded 
   process) and on Windows `windows-link` 0.2.1 (`MIT OR Apache-2.0`). Build time only: `napi-derive`, `convert_case`
   0.12.0 (`MIT`), `syn` 2 and 3, `quote`, `proc-macro2`, `unicode-segmentation`, `unicode-ident`.
 - Notices: MIT and ISC require the copyright and license notice to accompany a distribution, and a native module
-  contains these crates. `tools/third-party-notices.mjs --package arqlet-node --target <triple>` collects them, but
-  **`napi` and `napi-sys` ship no license file in their crates** (`--check` fails on them, checked 2026-11-27): before a
-  binary is published, the MIT license text of the napi-rs repository at the recorded revisions has to be added to the
-  notices (an override in the tool for these two crates). Nothing is distributed until then: `@arqlet/node` is
-  `private`.
+  contains these crates. `tools/third-party-notices.mjs --package arqlet-node --target <triple>` collects them. `napi`
+  and `napi-sys` ship no license file in their crates, so their MIT text is supplied from the upstream repository:
+  `LICENSE` of https://github.com/napi-rs/napi-rs at revision `417375ad5ef1d8cb4c49edf13d2cc6c0204bb5b1` (napi 3.16.1)
+  and at `d9cb526c15e63ba30e06b4d169068c9854180595` (napi-sys 3.4.1). The two are identical ("Copyright (c)
+  2020-present LongYinan" and "Copyright (c) 2018 GitHub"; SHA-256 `3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215`),
+  fetched on 2026-11-27 and kept byte for byte in `tools/third-party-licenses/napi-rs-LICENSE`. The tool uses a supplied
+  text only for a crate without its own, keyed by exact version. `--check` passes for `arqlet-node` on the four targets of
+  `platforms.yml` (tested in `tools/third-party-notices.test.mjs`). Nothing is distributed yet: `@arqlet/node` is
+  `private`, and publishing is a separate issue (ADR 0030, section 9).
 
 ## Reuse candidates, not selected dependencies
 

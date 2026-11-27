@@ -37,9 +37,15 @@ The loader looks for the module in this order:
 3. `arqlet.<platform>-<arch>.node` beside `index.js`;
 4. the platform package `@arqlet/node-<key>`, once that is published.
 
-## Not yet
+## Accepted gaps (ADR 0030, section 8)
 
-- Prebuilt binaries and publishing (designed in ADR 0030, section 3).
-- Progressive publications: `refineProgressive` answers with its final result only.
+- **No prebuilt binaries yet.** Publishing is a separate step (ADR 0030, sections 3 and 9); until then the package is
+  `private`.
+- **Progressive publications are not delivered.** `refineProgressive` answers with its final result only, as the WASM
+  engine does without `onPublish`.
+- **Phase timings are per process.** With `timings: true` on calls that run at the same time, their times add up. The
+  answers themselves are unaffected.
+- **No musl Linux or Intel macOS binaries are planned.** On those systems, build from source with `build.mjs`, or let
+  `loadEngine({engine: 'auto'})` fall back to WASM.
 
 License: MIT OR Apache-2.0.
