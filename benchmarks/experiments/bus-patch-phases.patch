@@ -1,0 +1,407 @@
+Temporary probes for benchmarks/results/bus-patch-20261127.md (#212); not part of the engine. Applies to f59ec9f.
+Apply with: git apply benchmarks/experiments/bus-patch-phases.patch
+
+diff --git a/crates/layout/src/lib.rs b/crates/layout/src/lib.rs
+index 07654cb..1dbf8cc 100644
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -429,11 +429,13 @@ fn compute_finished(
+             shared_tracks: None,
+             ..options.clone()
+         };
+-        result = lay(&plain).map(|(mut s, stages)| {
+-            s.options.shared_tracks = options.shared_tracks;
+-            s.layout_diagnostics.push(SHARED_TRACKS_FALLBACK.into());
+-            (s, stages)
+-        });
++        result = arqlet_model::probe::time("sharedTracksAgain", || lay(&plain)).map(
++            |(mut s, stages)| {
++                s.options.shared_tracks = options.shared_tracks;
++                s.layout_diagnostics.push(SHARED_TRACKS_FALLBACK.into());
++                (s, stages)
++            },
++        );
+     }
+     // Provisional (phase timings): the time of this layout and its phases, for a host that installed a clock.
+     if let Ok((_, stages)) = &result {
+@@ -631,6 +633,13 @@ fn compute_counted_buses(
+     let earlier = previous.map(|p| {
+         let mut p = p.clone();
+         bus_line::expand_snapshot(&mut p);
++        // Probe (#212): the boxes of buses that became lines of their own (`bars_to_lines`) come back too, so that their
++        // area can start warm.
++        if std::env::var("ARQLET_PATCH_LOCAL").is_ok_and(|v| v == "1") {
++            for (id, r) in std::mem::take(&mut p.bus_boxes) {
++                p.boxes.entry(id).or_insert(r);
++            }
++        }
+         p
+     });
+     // Provisional (#150): where every bus of this view becomes lines of its own (`bars_to_lines`, below), no later
+@@ -646,7 +655,7 @@ fn compute_counted_buses(
+         Some(expanded) => {
+             let (mut snapshot, stages) =
+                 compute_counted_forced(&expanded, earlier.as_ref(), dirty, options, lines_only)?;
+-            bus_line::collapse(&mut snapshot, view);
++            arqlet_model::probe::time("bus.collapse", || bus_line::collapse(&mut snapshot, view));
+             (snapshot, stages)
+         }
+         None if trunk_roots.is_some() => {
+@@ -662,14 +671,18 @@ fn compute_counted_buses(
+         bus_line::turn_trunks(&mut snapshot, true);
+     }
+     if !organic_heads.is_empty() {
+-        bus_line::bars_to_lines(&mut snapshot, &organic_heads);
++        arqlet_model::probe::time("bus.barsToLines", || {
++            bus_line::bars_to_lines(&mut snapshot, &organic_heads)
++        });
+         if let Some(roots) = organic_roots {
+             snapshot.bus_taps.roots = roots;
+         }
+     }
+     // A bar that stayed after all would hand its tap routes to a later operation: laid out again with nothing left out.
+     if lines_only && bus_line::expand(&snapshot.graph).is_some() {
+-        return compute_counted_buses(graph, previous, dirty, options, true);
++        return arqlet_model::probe::time("bus.relayoutCompared", || {
++            compute_counted_buses(graph, previous, dirty, options, true)
++        });
+     }
+     Ok((snapshot, stages))
+ }
+@@ -751,7 +764,9 @@ fn compute_counted_forced(
+         organic_forces: false,
+         ..options.clone()
+     };
+-    let (mut plain, stages) = compute_counted_body(graph, previous, dirty, &without, lines_only)?;
++    let (mut plain, stages) = arqlet_model::probe::time("organicForcesAgain", || {
++        compute_counted_body(graph, previous, dirty, &without, lines_only)
++    })?;
+     if plain.geometry_issues.len() < forced.0.geometry_issues.len() {
+         // The option stays in the snapshot: a later layout of it goes on as configured.
+         plain.options.organic_forces = true;
+@@ -992,7 +1007,18 @@ fn compute_counted_inner(
+     };
+     organic::check_organic_areas(graph, options.sparse_stress, options.scalable_stress)?;
+     let mut run = Run::new(&|| false);
+-    let mut snapshot = uninterrupted(compute_mode(graph, previous, dirty, 0, options, &mut run))?;
++    let mut snapshot = arqlet_model::probe::time("firstLayout", || {
++        uninterrupted(compute_mode(graph, previous, dirty, 0, options, &mut run))
++    })?;
++    for (reason, n) in &run.search.placement_pass_reasons {
++        arqlet_model::probe::count(&format!("placementPass:{reason}"), *n as u64);
++    }
++    arqlet_model::probe::count(
++        "firstLayoutConflicts",
++        snapshot.route_conflicts.len() as u64,
++    );
++    arqlet_model::probe::count("routesKept", run.search.routes_kept as u64);
++    arqlet_model::probe::count("routesRerouted", run.search.routes_rerouted as u64);
+     let stages = run.search.clone();
+     // An edit that laid out and routed only part of the drawing must not leave it worse than it was. Routes that run into a node
+     // are counted before and after. If the local result has more, the complete layout decides and is kept when it has fewer; a
+@@ -1034,14 +1060,16 @@ fn compute_counted_inner(
+             ));
+         } else if now > then {
+             let everything: BTreeSet<String> = graph.nodes.iter().map(|n| n.id.clone()).collect();
+-            let complete = uninterrupted(compute_mode(
+-                graph,
+-                previous,
+-                &everything,
+-                0,
+-                options,
+-                &mut Run::new(&|| false),
+-            ))?;
++            let complete = arqlet_model::probe::time("editFallback", || {
++                uninterrupted(compute_mode(
++                    graph,
++                    previous,
++                    &everything,
++                    0,
++                    options,
++                    &mut Run::new(&|| false),
++                ))
++            })?;
+             let fewer = hitting(&complete);
+             if fewer < now {
+                 snapshot = complete;
+@@ -1075,7 +1103,9 @@ fn compute_counted_inner(
+         && !snapshot.route_conflicts.is_empty()
+         && !snapshot.options.hierarchical_ordering
+     {
+-        if let Some(better) = engine_choice::improve(graph, previous, &snapshot, &finish)? {
++        if let Some(better) = arqlet_model::probe::time("engineChoice", || {
++            engine_choice::improve(graph, previous, &snapshot, &finish)
++        })? {
+             return Ok((better, stages));
+         }
+     }
+@@ -1087,16 +1117,19 @@ fn compute_counted_inner(
+     // again around all others did not end (a view of 349 nodes and 8778 edges); they are reported.
+     // Provisional (#150): not where the routes are the taps of buses that become lines, which nothing draws or reads
+     // (`undrawn_routes`): a bus view with few routes through boxes spent most of its time here.
++    // Probe (#212): ARQLET_NO_SECOND_PASS=1 skips the second routing pass (#219).
++    let no_second = std::env::var("ARQLET_NO_SECOND_PASS").is_ok_and(|v| v == "1");
+     if whole_reroute
++        && !no_second
+         && !(lines_only && undrawn_routes(&snapshot, engine_choice_fits))
+         && !dragging
+         && !snapshot.route_conflicts.is_empty()
+         && snapshot.route_conflicts.len() <= engine_choice::MAX_REROUTED_ROUTES
+         && snapshot.options.hierarchical_ordering
+     {
+-        let mut routed = reroute(&snapshot);
++        let mut routed = arqlet_model::probe::time("secondPass.reroute", || reroute(&snapshot));
+         labels::decorate(&mut routed);
+-        let mut repaired = finish(routed)?;
++        let mut repaired = arqlet_model::probe::time("secondPass.finish", || finish(routed))?;
+         labels::decorate(&mut repaired);
+         if repaired.route_conflicts.len() < snapshot.route_conflicts.len() {
+             snapshot = repaired;
+@@ -1110,12 +1143,14 @@ fn compute_counted_inner(
+             && !snapshot.route_conflicts.is_empty()
+             && !keeps_routes(&snapshot)
+         {
+-            if let Some(better) = engine_choice::improve(graph, previous, &snapshot, &finish)? {
++            if let Some(better) = arqlet_model::probe::time("engineChoice2", || {
++                engine_choice::improve(graph, previous, &snapshot, &finish)
++            })? {
+                 return Ok((better, stages));
+             }
+         }
+     }
+-    finish(snapshot).map(|mut snapshot| {
++    arqlet_model::probe::time("finish", || finish(snapshot)).map(|mut snapshot| {
+         if too_much_work && !snapshot.route_conflicts.is_empty() {
+             // The count of conflicts is left out: in a view with bus lines they belong to a drawing the bus lines replace (#156).
+             snapshot.layout_diagnostics.push(format!(
+@@ -1527,6 +1562,15 @@ fn compute_mode_selected(
+     } else {
+         options.min_port_spacing
+     };
++    arqlet_model::probe::count(
++        &format!(
++            "selected:previous={} layeredConstruction={} spacing>0={}",
++            previous.is_some(),
++            options.layered_construction,
++            spacing > 0.
++        ),
++        1,
++    );
+     if spacing <= 0. {
+         return compute_once(
+             graph,
+@@ -1553,6 +1597,9 @@ fn compute_mode_selected(
+         return compute_once(graph, previous, dirty, optimize, options, &minimum, run);
+     }
+     // Sizing needs complete placement: a cached box from before a minimum would hide a violation.
++    if previous.is_some() {
++        arqlet_model::probe::count("previousDropped:portSizing", 1);
++    }
+     let containers: BTreeSet<&str> = graph
+         .nodes
+         .iter()
+@@ -5865,6 +5912,7 @@ fn compute_once(
+                     again.insert(id);
+                 }
+             }
++            arqlet_model::probe::count("clearanceWideningRound", 1);
+             if !options.incremental_clearance_widening {
+                 boxes = BTreeMap::new();
+                 changed.clear();
+@@ -8667,6 +8715,14 @@ fn place(
+             } else {
+                 &sizes
+             };
++            arqlet_model::probe::count(
++                &format!(
++                    "organicArea:warm={} children={}",
++                    start.is_some(),
++                    ids.len()
++                ),
++                1,
++            );
+             let (mut placed, extent) = organic::organic_arrange_counted(
+                 &ids,
+                 &link_set,
+diff --git a/crates/model/src/lib.rs b/crates/model/src/lib.rs
+index 50ad0d5..b608e06 100644
+--- a/crates/model/src/lib.rs
++++ b/crates/model/src/lib.rs
+@@ -3,6 +3,7 @@ pub mod clock;
+ pub mod grouping;
+ pub mod math;
+ pub mod outline;
++pub mod probe;
+ 
+ use serde::{Deserialize, Serialize};
+ use std::collections::{BTreeMap, BTreeSet};
+diff --git a/crates/routing/src/lib.rs b/crates/routing/src/lib.rs
+index 4817824..39b50a3 100644
+--- a/crates/routing/src/lib.rs
++++ b/crates/routing/src/lib.rs
+@@ -562,25 +562,34 @@ fn improve_raw(
+     stop: &dyn Fn() -> bool,
+     counters: &mut channel::SearchCounters,
+ ) -> Result<Vec<Route>, channel::Stopped> {
+-    let first = improve_pass(graph, rects, routes, fixed, false, params, stop, counters)?;
+-    let second = improve_pass(graph, rects, &first, fixed, true, params, stop, counters)?;
++    let first = arqlet_model::probe::time("R.improve1", || {
++        improve_pass(graph, rects, routes, fixed, false, params, stop, counters)
++    })?;
++    let second = arqlet_model::probe::time("R.improve2", || {
++        improve_pass(graph, rects, &first, fixed, true, params, stop, counters)
++    })?;
+     if stop() {
+         return Err(channel::Stopped);
+     }
+-    let routed = repair_with_counted(graph, rects, &second, params, counters);
++    let routed = arqlet_model::probe::time("R.repair", || {
++        repair_with_counted(graph, rects, &second, params, counters)
++    });
+     if !params.spread {
+         return Ok(routed);
+     }
+     if stop() {
+         return Err(channel::Stopped);
+     }
+-    let spread = spread_tracks(graph, rects, &routed, params);
++    let spread =
++        arqlet_model::probe::time("R.spread", || spread_tracks(graph, rects, &routed, params));
+     if stop() {
+         return Err(channel::Stopped);
+     }
+     // The separation builds its groups once, so the moves of one group can bring back an overlap in another. The
+     // overlaps that remain are resolved one by one, and only by moves that lower the overlap count (ADR 0005).
+-    Ok(resolve_overlaps(graph, rects, &spread, params))
++    Ok(arqlet_model::probe::time("R.overlaps", || {
++        resolve_overlaps(graph, rects, &spread, params)
++    }))
+ }
+ 
+ /// Rounds of the overlap resolution in one routing run.
+diff --git a/crates/runtime/src/bin/layout-command.rs b/crates/runtime/src/bin/layout-command.rs
+index 0e25e97..9991ae9 100644
+--- a/crates/runtime/src/bin/layout-command.rs
++++ b/crates/runtime/src/bin/layout-command.rs
+@@ -27,7 +27,9 @@ fn main() {
+     }
+     let mut input = String::new();
+     io::stdin().read_to_string(&mut input).unwrap();
+-    println!("{}", arqlet_runtime::dispatch(&input));
++    let out = arqlet_model::probe::time("dispatch", || arqlet_runtime::dispatch(&input));
++    println!("{out}");
++    arqlet_model::probe::print();
+ }
+ 
+ fn sessions() {
+diff --git a/crates/runtime/src/patch.rs b/crates/runtime/src/patch.rs
+index f60e384..42d4a80 100644
+--- a/crates/runtime/src/patch.rs
++++ b/crates/runtime/src/patch.rs
+@@ -159,7 +159,8 @@ pub fn patch_snapshot(
+     }
+     options.hidden.nodes.retain(|id| !removed.contains(id));
+     // Collapsed containers that still are containers of the view (communities and groups included) stay collapsed.
+-    let structured = crate::structured(&graph, &options)?;
++    let structured =
++        arqlet_model::probe::time("patch.structured", || crate::structured(&graph, &options))?;
+     let containers: BTreeSet<&str> = structured
+         .nodes
+         .iter()
+@@ -177,7 +178,9 @@ pub fn patch_snapshot(
+         collapsed,
+         projected,
+         weights,
+-    } = project_view(&graph, &collapsed, &options, abstracts(&options))?;
++    } = arqlet_model::probe::time("patch.project", || {
++        project_view(&graph, &collapsed, &options, abstracts(&options))
++    })?;
+     let layout_options = if abstracts(&options) {
+         view_options(&view, &collapsed, &options, &weights)
+     } else {
+@@ -190,8 +193,33 @@ pub fn patch_snapshot(
+     let mut result = if abstracts(&layout_options) {
+         arqlet_layout::compute(&projected, None, &BTreeSet::new(), &layout_options)?
+     } else {
+-        let dirty: BTreeSet<String> = projected.nodes.iter().map(|n| n.id.clone()).collect();
+-        arqlet_layout::compute(&projected, Some(snapshot), &dirty, &layout_options)?
++        // Probe (#212, not the engine): with ARQLET_PATCH_LOCAL=1 only the added nodes and the containers above them are
++        // placed again, as a local edit (ADR 0012) places them.
++        let dirty: BTreeSet<String> = if std::env::var("ARQLET_PATCH_LOCAL").is_ok_and(|v| v == "1")
++        {
++            let parent: BTreeMap<&str, Option<&str>> = projected
++                .nodes
++                .iter()
++                .map(|n| (n.id.as_str(), n.parent_id.as_deref()))
++                .collect();
++            let mut out = BTreeSet::new();
++            for node in &patch.nodes {
++                let mut at = Some(node.id.as_str());
++                while let Some(id) = at {
++                    if !parent.contains_key(id) || !out.insert(id.to_string()) {
++                        break;
++                    }
++                    at = parent.get(id).copied().flatten();
++                }
++            }
++            arqlet_model::probe::count("patchLocalDirty", out.len() as u64);
++            out
++        } else {
++            projected.nodes.iter().map(|n| n.id.clone()).collect()
++        };
++        arqlet_model::probe::time("patch.compute", || {
++            arqlet_layout::compute(&projected, Some(snapshot), &dirty, &layout_options)
++        })?
+     };
+     result.revision = snapshot.revision + 1;
+     result.base_revision = Some(snapshot.revision);
+diff --git a/crates/model/src/probe.rs b/crates/model/src/probe.rs
+new file mode 100644
+index 0000000..1c3cb21
+--- /dev/null
++++ b/crates/model/src/probe.rs
+@@ -0,0 +1,44 @@
++//! Temporary (#212, benchmarks/experiments/bus-patch-phases.patch): nested wall-clock probes, printed by `layout-command`
++//! as `PHASE path ms count` lines. Not part of the engine.
++use std::cell::RefCell;
++use std::collections::BTreeMap;
++
++thread_local! {
++    static STACK: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
++    static SPENT: RefCell<BTreeMap<String, (f64, u64)>> = const { RefCell::new(BTreeMap::new()) };
++}
++
++/// Runs `f` and adds its time to the path of the probes around it plus `name`.
++pub fn time<T>(name: &'static str, f: impl FnOnce() -> T) -> T {
++    STACK.with(|s| s.borrow_mut().push(name));
++    let key = STACK.with(|s| s.borrow().join("/"));
++    let start = std::time::Instant::now();
++    let out = f();
++    let ms = start.elapsed().as_secs_f64() * 1e3;
++    STACK.with(|s| s.borrow_mut().pop());
++    SPENT.with(|m| {
++        let mut m = m.borrow_mut();
++        let e = m.entry(key).or_insert((0., 0));
++        e.0 += ms;
++        e.1 += 1;
++    });
++    out
++}
++
++/// Adds a count without time (for example a pass reason).
++pub fn count(name: &str, n: u64) {
++    SPENT.with(|m| {
++        let mut m = m.borrow_mut();
++        let e = m.entry(format!("#{name}")).or_insert((0., 0));
++        e.1 += n;
++    });
++}
++
++/// Prints and clears what was collected.
++pub fn print() {
++    SPENT.with(|m| {
++        for (k, (ms, n)) in std::mem::take(&mut *m.borrow_mut()) {
++            eprintln!("PHASE {k} {ms:.1} {n}");
++        }
++    });
++}

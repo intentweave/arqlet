@@ -64,3 +64,11 @@ around the second routing pass (`reroute` + `finish` in `compute_counted_inner`)
 `overlap-index.mjs` times two builds made with it on the same imports and compares whole answers;
 `overlap_index_table.py` makes the table and `overlap-index-fingerprints.sh` compares the fingerprints of two `bench`
 builds in the configurations of the stored files (`benchmarks/results/overlap-index-20261127.md`).
+
+## `bus-patch-phases.patch`
+
+Applies to main `f59ec9f`. Not a candidate: nested wall-clock probes (`PHASE path ms count` on standard error, printed by
+`layout-command`), counters of the decisions a patch meets (organic warm start, port sizing, placement passes), and two
+switches read from the environment by the probe only: `ARQLET_PATCH_LOCAL=1` (a patch places only the added nodes and
+their containers again, and restores the boxes of buses drawn as lines) and `ARQLET_NO_SECOND_PASS=1` (skips the second
+routing pass). `bus-patch.mjs` records the lines; results in `benchmarks/results/bus-patch-20261127.md` (#212).
