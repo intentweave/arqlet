@@ -185,6 +185,41 @@ the discs. A `parent` that is not a string is refused. Parents are taken at thei
 
 Limits: other cluster options do not regroup a container that keeps its clusters.
 
+**Opening a cluster in the browser, without the graph.** The drill-down into a cluster lays out a graph of that cluster:
+`structuredExcerpt(graph, model, id)` builds it from the input graph. A browser that has only the answer builds it with
+`structuredExcerptOf(model, id)` (or `structuredExcerpt(null, model, id)`), from `@arqlet/viewer/overview.js`:
+
+```js
+// Server: the overview with edge data; send the answer only.
+const answer = run({op: 'overview', graph, edgeData: true}).overview;
+
+// Browser: the model of the answer, the excerpt of a cluster, and a view controller on it.
+const model = overviewModel(answer);
+const direction = flowDirectionOf(model, model.index.get(id));   // border ports facing the neighbours
+const excerpt = structuredExcerptOf(model, id, {direction});
+await controller.import(excerpt.graph, {limit: excerpt.graph.nodes.length, options: excerpt.options});
+```
+
+It follows the rule of `structuredExcerpt`: the cluster is the one top-level container with everything below it (the
+overview's nesting, its added clusters as containers), with its inner edges; every edge that leaves it runs to or from
+one stand-in per neighbouring cluster (`border:` + its id: the outer end's ancestor that is a sibling of one of the
+cluster's ancestors), in its own direction. Where both can run they give the same graph, apart from what the answer does
+not carry (checked on generated graphs and on engine answers with communities, `packages/viewer/overview.test.mjs`):
+
+| | From the graph | From the answer alone |
+|---|---|---|
+| edge ids | the input ids | `edge:k`, `k` the edge's index in the answer's `edges` (`EXCERPT_EDGE_PREFIX`) |
+| edge kinds and weights | the input edge's | `edgeKinds[edgeKind[k]]` and `edgeWeight[k]`; without `edgeData`, kind `''` and weight 1 for every edge, and `excerpt.edgeData` is false |
+| nodes | the input nodes, every field | `id`, `kind`, `label` (from `kinds`/`kind` and `labels`) and `parentId`; no `shape` or other field, so a graph that uses them lays out differently |
+
+`overviewTrace` and `overviewNeighbourhood` answer input edge ids, which the excerpt's names cannot be mapped onto without
+the ids; the answer does not carry them yet (open in [#209](https://github.com/intentweave/arqlet/issues/209)). A host
+with the ids maps `edge:k` back through them (`resolvedEdgeIds(graph)[k]`).
+
+`bundle: true` draws the leaving edges of one inner node to one stand-in, of one kind and direction, as one edge whose
+`weight` is the sum of theirs, for a cluster with many leaving edges: fewer routes, each weighted. The graph then differs
+from `structuredExcerpt`'s. Provisional, as the overview.
+
 ### Bounding an overview's work (provisional)
 
 A host that bounds the time of an `overview` request need not terminate its worker and load the engine again: give the

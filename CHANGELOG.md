@@ -21,6 +21,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   which, and it is the same on WebGPU, WebGL 2 and WebGL 1. A `bindOverviewNavigation` binding takes no input while its
   renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
   overview page pauses the overview while the scene view of a cluster covers it.
+- **Opening a cluster of an overview without the graph** (#209 part 2, provisional): `structuredExcerptOf(model, id,
+  {direction, bundle})` in `@arqlet/viewer/overview.js` (also `structuredExcerpt(null, model, id)`, and from `arqlet`)
+  builds the excerpt a drill-down lays out from an overview answer alone, for a host that computes the overview on a
+  server. The same rule as `structuredExcerpt` and, where both run, the same graph (checked on generated graphs and
+  engine answers): the cluster as the one top-level container, its inner edges, and its leaving edges to one stand-in
+  per neighbouring cluster, direction kept. Edge kinds and weights come from the answer's `edgeData` (without it: kind
+  `''`, weight 1, and `edgeData: false` says so); edges are named `edge:k` after their index in the answer
+  (`EXCERPT_EDGE_PREFIX`), so `overviewTrace` answers cannot be mapped onto them without the input edge ids; nodes carry
+  only `id`, `kind`, `label` and `parentId`. `bundle: true` merges the leaving edges of a node to a stand-in per kind and
+  direction into one weighted edge. Flow: [integration guide](docs/integration-guide.md#the-cluster-overview-as-a-server-result-provisional).
 
 ### Fixed
 
