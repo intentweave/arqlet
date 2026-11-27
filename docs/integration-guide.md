@@ -185,6 +185,57 @@ the discs. A `parent` that is not a string is refused. Parents are taken at thei
 
 Limits: other cluster options do not regroup a container that keeps its clusters.
 
+### Showing your own partition (provisional)
+
+A host that computes communities itself (for example with Leiden on a server) gives the overview that partition as the
+option `groups`: node id → path of group names, outermost first. With `communities: 0` the overview shows exactly
+those groups and runs no Louvain:
+
+```js
+// Flat: one level of groups.
+run({op: 'overview', graph, options: {communities: 0, groups: {
+  'svc/a': ['billing'], 'svc/b': ['billing'], 'svc/c': ['search']}}});
+
+// Nested: package → community → module (the modules are nodes of the graph).
+const leiden = run({op: 'overview', graph, options: {communities: 0, groups: {
+  'mod/parse': ['core', 'c7'], 'mod/lex': ['core', 'c7'], 'mod/http': ['net', 'c2']}}});
+```
+
+- **Groups are nodes of kind `group`**, placed between a node and its container: the path is read inside the node's
+  container (its `parentId`), and a node without a path (or with `[]`) stays a direct child of its container. Each
+  group is **labelled with its name**, the last part of its path (`overview.labels`); there is no separate label.
+- **Ids are stable**: `group:<container>:<path joined by />`, with `#` for the top level (`group:#:core`,
+  `group:#:core/c7`; inside container `pkg`: `group:pkg:core`). The same path gives the same id in every request and
+  every revision of the graph, so `intent`, `radii` and `start` can name a group. Renaming a group changes its id. Ids in
+  `groups` the graph does not have are ignored; a group id that a node of the graph already has is refused.
+- **`communities` > 0** (default 120): Louvain also divides every container with more children than that, the groups
+  included, inside it: in a group of 500 modules the communities are clusters `community:group:#:core:<level>.<k>`
+  (kind `community`, labelled after their most connected member, `≈ <name>`). Groups with fewer children are shown as
+  given. Use `communities: 0` when the partition is to be shown as it is.
+- `edgeData`, `columns`, `positionsOnly`, the work per container (`ticks`, the force steps of each container's
+  simulation), `radii`, `intent` and the level of detail of a `configSet` work as without `groups`. A session lays out
+  again on the clusters it has while `groups` (with `communities`, `satellites`, `hubs`) stays the same.
+
+**Switching between two partitions of the same nodes.** Send the other partition as `groups` and the places of the last
+answer, with their parents, as `start.nodes` (the `places` function above). A session needs `start.nodes` too: a
+`start` without positions after a change of `groups` is refused (`clusters changed`). What happens
+(`a_partition_of_the_host_is_shown_as_given_and_a_switch_keeps_the_groups_both_have` in
+`crates/runtime/tests/overview.rs`):
+
+- A group whose id is in both partitions (the same container and the same path) **continues with its inner
+  arrangement**: its members keep their places relative to it. The group itself may move, since its container changed
+  (another group gained or lost members, so its container is laid out again around it).
+- A node whose path changed has another parent and is **placed anew**, next to the nodes it is linked to, in its new
+  group; so is a group that is new. They count as `anew` in `continuation`; groups count like nodes.
+- The groups of the old partition that the new one lacks are **listed in `continuation.ignored`** (unlike the clusters
+  the overview adds itself, which are not listed).
+- Two partitions that share no path: every node is placed anew, and the answer is the same as without `start`.
+- The answer is valid in every case: no overlaps, every disc inside its parent.
+
+To switch back without moving anything, keep the places of each partition's last answer and send those: partition A
+with the places of A's answer continues all of it (`anew: 0`) and nothing moves. Sent with the places of B's answer
+instead, what B shares with A continues and the rest is placed anew again.
+
 ### Bounding an overview's work (provisional)
 
 A host that bounds the time of an `overview` request need not terminate its worker and load the engine again: give the

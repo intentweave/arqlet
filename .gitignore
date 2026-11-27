@@ -20,6 +20,7 @@ __pycache__/
 # npm packaging copies (tools/npm-prepack.mjs)
 /packages/*/LICENSE-APACHE
 /packages/*/LICENSE-MIT
+/packages/*/CHANGELOG.md
 /packages/engine-client/arqlet.wasm
 /packages/engine-client/THIRD_PARTY_NOTICES.md
 /packages/query/arqlet-query.wasm

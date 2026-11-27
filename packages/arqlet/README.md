@@ -111,6 +111,11 @@ renderer.resize();
 bindOverviewNavigation(canvas, renderer, {onClick: i => console.log(overview.ids[i])});
 ```
 
+Clusters come from `parentId`, from Louvain in containers with more than `communities` children (default 120), and
+from a partition the host computed itself: `options: {groups: {nodeId: ['package', 'community']}, communities: 0}`
+shows exactly those groups, nested, with stable ids (`group:#:package/community`); see *Showing your own partition* in
+the [integration guide](https://github.com/intentweave/arqlet/blob/main/docs/integration-guide.md).
+
 A fisheye lens can follow the pointer: it enlarges the middle (here 3 times) and leaves everything outside its radius
 in place, and the texts of what it enlarges appear. Picking sees through it.
 

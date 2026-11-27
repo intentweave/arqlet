@@ -36,6 +36,7 @@
     "README.md",
     "LICENSE-APACHE",
     "LICENSE-MIT",
+    "CHANGELOG.md",
     "THIRD_PARTY_NOTICES.md"
   ],
   "publishConfig": {

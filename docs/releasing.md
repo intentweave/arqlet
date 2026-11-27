@@ -43,8 +43,8 @@ cargo publish --dry-run --workspace --exclude arqlet-wasm --exclude arqlet-contr
 for p in contracts engine-client viewer arqlet query; do (cd packages/$p && pnpm pack --pack-destination /tmp/arqlet-pack); done
 ```
 
-`prepack` (`tools/npm-prepack.mjs`) copies the license files, builds the WASM for `engine-client` and `query` (Rust with
-`wasm32-unknown-unknown`) and bundles the contract types. For those two packages it also writes
+`prepack` (`tools/npm-prepack.mjs`) copies the license files and `CHANGELOG.md`, builds the WASM for `engine-client`
+and `query` (Rust with `wasm32-unknown-unknown`) and bundles the contract types. For those two packages it also writes
 `THIRD_PARTY_NOTICES.md`, the copyright and license notices of the Rust crates linked into their WASM
 (`tools/third-party-notices.mjs`; a crate without a license file fails `node tools/third-party-notices.mjs --check`, for
 the query module with `--package arqlet-query-wasm`, and a release waits for a decision on it).
