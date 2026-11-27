@@ -5,6 +5,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Fixed
+
+- **A `patch` into a view with buses draws what an import of the patched graph draws** (#228, ADR 0029 C). It started
+  from the earlier drawing and drew far worse in layered views with bus lines and organic views with bus bars: on the
+  generated bus meshes of #212, 1 043 and 2 091 routes through nodes where an import has none, and 1 374 where it has 36.
+  Organic views with bus lines already drew the import's drawing and are unchanged; views without buses still continue
+  their earlier drawing. Such a patch now takes an import's time: about the same in layered views, much longer in organic
+  views with bus bars where the import runs its second routing pass (the dense view of #212: 2.0 s before, 16.5 s now;
+  `benchmarks/results/patch-as-import-20261127.md`). Revisions and stale checks are unchanged.
+
 ## 0.10.0 — 2026-11-27
 
 A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list

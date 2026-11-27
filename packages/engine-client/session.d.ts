@@ -230,8 +230,8 @@ export interface Session {
   peek(nodeId: string, init?: {limit?: number}): Promise<ReadAnswer<PeekAnswer>>;
   /**
    * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
-   * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from
-   * where it was.
+   * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views and views with
+   * buses) or again from where it was.
    */
   patch(patch: GraphPatch): Promise<SessionResult>;
   /**
