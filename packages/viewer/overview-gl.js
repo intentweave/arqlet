@@ -916,8 +916,8 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
  * (`renderer.breathe(breathe)`) after `after` milliseconds (default 8000) without input, and stop at the next input; not
  * when the system asks for reduced motion. While the renderer is paused (`renderer.pause()`) the binding takes no input
  * (no zoom, pan, drag, lens, hover or click; a node drag in progress ends with `onNodeDrag(…, 'end')` at its last point)
- * and its idle wait is held; at `resume` the wait starts again unless the drawing still breathes. Returns a function that
- * removes the listeners.
+ * and its idle wait is held; at `resume` the wait starts again (breathing that ran before goes on). Returns a function
+ * that removes the listeners.
  */
 export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick, onNodeDrag, draggable, lens, idle} = {}) {
   let drag = null;
@@ -935,7 +935,7 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     wait();
   };
   awake();
-  // The renderer's pause holds the idle wait and ends a drag; its resume starts the wait again (breathing that ran on
+  // The renderer's pause holds the idle wait and ends a drag; its resume starts the wait again (breathing that ran
   // before the pause goes on).
   const onPause = paused => {
     if (paused) {
@@ -945,7 +945,8 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
       drag = null;
       return;
     }
-    if (idle && !still && !renderer.breathing) wait();
+    // Always armed again: breathing that still fades out (or runs) is restarted or left as it is by the timer's `breathe`.
+    if (idle && !still) wait();
   };
   lifecycle.get(renderer)?.add(onPause);
   // Input on a paused renderer is ignored: it would change what nobody sees.

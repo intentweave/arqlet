@@ -153,7 +153,8 @@ const overview = {
 function gpuFakes(kind) {
   const counts = {frames: 0};
   const listeners = new Map();
-  let clock = 0, next = 1;
+  // Not 0: the renderer takes a breath's stop time of 0 for none, as `performance.now()` never is.
+  let clock = 1000, next = 1;
   const pending = new Map();
   const saved = {};
   for (const name of ['requestAnimationFrame', 'cancelAnimationFrame', 'WebGL2RenderingContext', 'GPUBufferUsage', 'GPUShaderStage', 'GPUTextureUsage']) saved[name] = globalThis[name];
@@ -322,8 +323,8 @@ test('a navigation binding takes no input while paused, holds its idle wait and 
   const f = gpuFakes('webgl2');
   try {
     const r = createOverviewRenderer(f.canvas, overviewModel(overview), f.options);
-    const hovers = [], drags = [];
-    const unbind = bindOverviewNavigation(f.canvas, r, {idle: {after: 1000}, onHover: i => hovers.push(i), onNodeDrag: (i, x, y, phase) => drags.push([i, phase])});
+    const hovers = [], drags = [], doubles = [];
+    const unbind = bindOverviewNavigation(f.canvas, r, {idle: {after: 1000}, onHover: i => hovers.push(i), onDoubleClick: i => doubles.push(i), onNodeDrag: (i, x, y, phase) => drags.push([i, x, y, phase])});
     mock.timers.tick(500);
     r.pause();
     mock.timers.tick(5000);
@@ -345,14 +346,54 @@ test('a navigation binding takes no input while paused, holds its idle wait and 
     r.resume();
     assert.equal(r.breathing, true);
     f.flush();
+    // A double-click is ignored while paused.
+    r.pause();
+    f.fire('dblclick');
+    assert.equal(doubles.length, 0, 'no double-click while paused');
+    r.resume();
+    f.fire('dblclick');
+    assert.equal(doubles.length, 1);
     // A node drag in progress ends at the pause, at its last point.
     r.pick = () => 1;
     f.fire('pointerdown');
-    f.fire('pointermove', {clientX: 40});
+    f.fire('pointermove', {clientX: 40, clientY: 25});
     r.pause();
-    assert.deepEqual(drags, [[1, 'move'], [1, 'end']]);
+    const [x, y] = r.world(40, 25);
+    assert.ok(Number.isFinite(x) && Number.isFinite(y));
+    assert.deepEqual(drags, [[1, x, y, 'move'], [1, x, y, 'end']], 'the end at the last point of the move');
     unbind();
     r.resume();
+    r.destroy();
+  } finally {
+    f.restore();
+    mock.timers.reset();
+  }
+});
+
+test('a pause while breathing fades out still lets the idle breathing start again after resume', async () => {
+  const {createOverviewRenderer} = await import('./overview-gl.js');
+  const {overviewModel} = await import('./overview.js');
+  mock.timers.enable({apis: ['setTimeout']});
+  const f = gpuFakes('webgl2');
+  try {
+    const r = createOverviewRenderer(f.canvas, overviewModel(overview), f.options);
+    const unbind = bindOverviewNavigation(f.canvas, r, {idle: {after: 1000}});
+    mock.timers.tick(1000);
+    assert.equal(r.breathing, true);
+    // Input fades the breathing out (400 ms); the pause comes inside that fade-out.
+    f.fire('pointermove');
+    f.advance(100);
+    f.flush();
+    assert.equal(r.breathing, true, 'still fading out');
+    r.pause();
+    r.resume();
+    // The fade-out ends, then nobody touches the view.
+    f.advance(400);
+    f.flush();
+    assert.equal(r.breathing, false, 'faded out');
+    mock.timers.tick(60000);
+    assert.equal(r.breathing, true, 'idle breathing starts again');
+    unbind();
     r.destroy();
   } finally {
     f.restore();

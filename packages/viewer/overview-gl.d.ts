@@ -122,7 +122,7 @@ export function createOverviewRenderer(
 
 /** Wheel zoom at the pointer, drag panning, and click and hover callbacks. While the renderer is paused it takes no
  * input (a node drag in progress ends with `'end'` at its last point) and holds its idle wait, which starts again at
- * `resume` unless the drawing still breathes. Returns a function that removes them. */
+ * `resume` (breathing that ran before goes on). Returns a function that removes them. */
 export function bindOverviewNavigation(
   canvas: HTMLCanvasElement,
   renderer: OverviewRenderer,
