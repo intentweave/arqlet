@@ -643,7 +643,9 @@ fn corridor_span(
 
 /// #229: the nodes of a drawing in a uniform grid over their boxes, so that the overlap resolution tests a route only
 /// against the obstacles near it, not against every node. The grid gives a superset of the obstacles that can matter, and
-/// each of them is tested exactly as before, so every count and every span is the one the scan over all nodes gives.
+/// each of them is tested exactly as before, so every count and every span is the one the scan over all nodes gives. A box
+/// or a query whose two edges on an axis are in either order spans both; one with a NaN edge spans the whole axis (the
+/// tests compare with NaN, or drop it in `f64::min`/`max`, so such a box can still count).
 struct ObstacleGrid {
     x0: f64,
     y0: f64,
@@ -667,10 +669,14 @@ impl ObstacleGrid {
             f64::NEG_INFINITY,
         );
         for b in boxes {
-            x0 = x0.min(b[0]);
-            y0 = y0.min(b[1]);
-            x1 = x1.max(b[2]);
-            y1 = y1.max(b[3]);
+            for x in [b[0], b[2]].into_iter().filter(|v| v.is_finite()) {
+                x0 = x0.min(x);
+                x1 = x1.max(x);
+            }
+            for y in [b[1], b[3]].into_iter().filter(|v| v.is_finite()) {
+                y0 = y0.min(y);
+                y1 = y1.max(y);
+            }
         }
         if !(x0.is_finite() && y0.is_finite() && x1.is_finite() && y1.is_finite()) {
             (x0, y0, x1, y1) = (0., 0., 1., 1.);
@@ -687,8 +693,8 @@ impl ObstacleGrid {
             cells: vec![Vec::new(); cols * rows],
         };
         for (n, b) in boxes.iter().enumerate() {
-            let (c0, c1) = (grid.col(b[0]), grid.col(b[2]));
-            let (r0, r1) = (grid.row(b[1]), grid.row(b[3]));
+            let (c0, c1) = grid.cols_of(b[0], b[2]);
+            let (r0, r1) = grid.rows_of(b[1], b[3]);
             for r in r0..=r1 {
                 for c in c0..=c1 {
                     grid.cells[r * cols + c].push(n as u32);
@@ -713,6 +719,24 @@ impl ObstacleGrid {
             .min((self.rows - 1) as f64) as usize
     }
 
+    /// The columns between the edges `a` and `b` in either order; all of them when one is NaN.
+    fn cols_of(&self, a: f64, b: f64) -> (usize, usize) {
+        if a.is_nan() || b.is_nan() {
+            (0, self.cols - 1)
+        } else {
+            (self.col(a.min(b)), self.col(a.max(b)))
+        }
+    }
+
+    /// The rows between the edges `a` and `b` in either order; all of them when one is NaN.
+    fn rows_of(&self, a: f64, b: f64) -> (usize, usize) {
+        if a.is_nan() || b.is_nan() {
+            (0, self.rows - 1)
+        } else {
+            (self.row(a.min(b)), self.row(a.max(b)))
+        }
+    }
+
     /// Calls `f` with every node whose grown box may meet the closed box `b`, the first time `scratch` meets it.
     /// `strip` widens the box across to the whole grid: `Some(true)` all rows (a horizontal segment's corridor), `Some(false)`
     /// all columns.
@@ -726,12 +750,12 @@ impl ObstacleGrid {
         let (c0, c1) = if strip == Some(false) {
             (0, self.cols - 1)
         } else {
-            (self.col(b[0]), self.col(b[2]))
+            self.cols_of(b[0], b[2])
         };
         let (r0, r1) = if strip == Some(true) {
             (0, self.rows - 1)
         } else {
-            (self.row(b[1]), self.row(b[3]))
+            self.rows_of(b[1], b[3])
         };
         for r in r0..=r1 {
             for c in c0..=c1 {
@@ -785,22 +809,33 @@ impl<'a> OverlapNodes<'a> {
     fn new(rects: &'a BTreeMap<String, Rect>, info: &NodeInfo<'_>, params: Params) -> Self {
         let ids: Vec<&str> = rects.keys().map(String::as_str).collect();
         let boxes: Vec<&Rect> = rects.values().collect();
-        let shapes = ids
+        let shapes: Vec<NodeShape> = ids
             .iter()
             .map(|id| info.get(id).map_or_else(NodeShape::default, |(_, s)| *s))
             .collect();
-        // An outline is the box, the box grown by the clearance, or (in a corridor) the box grown by the own clearance; a
-        // disc lies inside its box. One unit more absorbs the rounding of those sums.
-        let margin = params.clearance.max(params.own_clearance).max(0.) + 1.;
+        // An outline is the box or its disc, grown by the clearance, or (in a corridor) by the own clearance, never by more:
+        // the grid holds the extent of the box and of the outline of its shape on each axis (both edges, in either order),
+        // grown by the larger clearance. The pad beyond it absorbs the rounding of those sums: one unit, and a few units in
+        // the last place of the coordinates, so it holds at any magnitude. An axis with a NaN edge stays NaN (the whole
+        // axis, `ObstacleGrid`).
+        let reach = params.clearance.max(params.own_clearance).max(0.);
+        let extent = |edges: [f64; 4]| -> (f64, f64) {
+            if edges.iter().any(|v| v.is_nan()) {
+                return (f64::NAN, f64::NAN);
+            }
+            let lo = edges.iter().copied().fold(f64::INFINITY, f64::min);
+            let hi = edges.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            let pad = reach + 1. + 8. * f64::EPSILON * (lo.abs().max(hi.abs()) + reach);
+            (lo - pad, hi + pad)
+        };
         let grown: Vec<Bounds> = boxes
             .iter()
-            .map(|r| {
-                [
-                    r.x - margin,
-                    r.y - margin,
-                    r.x + r.width + margin,
-                    r.y + r.height + margin,
-                ]
+            .zip(&shapes)
+            .map(|(r, shape)| {
+                let o = Outline::of(*shape, r).bounds();
+                let (x0, x1) = extent([r.x, r.x + r.width, o.x, o.x + o.width]);
+                let (y0, y1) = extent([r.y, r.y + r.height, o.y, o.y + o.height]);
+                [x0, y0, x1, y1]
             })
             .collect();
         OverlapNodes {
@@ -3458,8 +3493,8 @@ mod tests {
     }
 
     /// #229: an edge's obstacles from the grid give the hit count of a scan over every node and, bit for bit, the corridor of
-    /// `corridor_span`, on random nested boxes and discs, routes with short, touching and oblique segments, and with and
-    /// without clearances.
+    /// `corridor_span`, on random nested boxes and discs (some with a negative extent or a NaN edge), routes with short,
+    /// touching and oblique segments, and with and without clearances.
     #[test]
     fn the_obstacle_grid_agrees_with_a_scan_of_every_node() {
         let mut seed: u64 = 229;
@@ -3474,7 +3509,22 @@ mod tests {
         let mut rects = BTreeMap::new();
         for (i, node) in graph.nodes.iter_mut().enumerate() {
             let (x, y) = (next(40) as f64 * 10., next(40) as f64 * 10.);
-            let (w, h) = (10. + next(8) as f64 * 10., 10. + next(8) as f64 * 10.);
+            let (mut x, mut y) = (x, y);
+            let (mut w, mut h) = (10. + next(8) as f64 * 10., 10. + next(8) as f64 * 10.);
+            // Boxes the runtime refuses but the public API takes: a negative extent (beyond twice any margin) or a NaN
+            // edge. The scan still counts some of them, so the grid must find them too.
+            match next(10) {
+                0 => w = -w,
+                1 => h = -h,
+                2 => (w, h) = (-w, -h),
+                3 => match next(4) {
+                    0 => x = f64::NAN,
+                    1 => y = f64::NAN,
+                    2 => w = f64::NAN,
+                    _ => h = f64::NAN,
+                },
+                _ => {}
+            }
             if i >= 30 {
                 // A child inside an earlier node.
                 node.parent_id = Some(format!("n{}", next(30)));
