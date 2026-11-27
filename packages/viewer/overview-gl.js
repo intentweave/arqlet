@@ -499,6 +499,9 @@ export function edgeFadeMask(width) {
   return `${one('to right')}, ${one('to bottom')}`;
 }
 
+// Per renderer the navigation bindings that follow its pause and resume (called with true at pause, false at resume).
+const lifecycle = new WeakMap();
+
 /**
  * Draws `model` (from `overviewModel`) into `canvas`. Returns a renderer: `view` is `{centreX, centreY, scale}` with
  * `scale` in CSS pixels per unit; `setState({expanded, collapsed, selected, trace}, {fade})` draws clusters structured in
@@ -508,13 +511,20 @@ export function edgeFadeMask(width) {
  * view change; `options.edgeAlpha` (default 1) scales the opacity of the overview's edges; `options.background` is the
  * clear colour (RGBA in 0..1, `setBackground`). A light background (relative luminance above one half) sets the tone
  * to light: texts are dark, and the galaxy style draws in ink instead of light. `options.edgeFade` (CSS pixels,
- * `setEdgeFade`) fades the drawing out at the canvas edges into the page behind it.
+ * `setEdgeFade`) fades the drawing out at the canvas edges into the page behind it. `pause()` stops all drawing while the
+ * canvas is hidden and `resume()` draws again (provisional).
  */
 export function createOverviewRenderer(canvas, initialModel, options = {}) {
   // WebGPU with a device (`options.device`, from `sceneBackend`), else WebGL 2, else WebGL 1; `options.backend: 'webgl'`
   // keeps WebGL even with a device, `'webgl1'` forces WebGL 1 (the reference the others are checked against).
   const backend = options.device && options.backend !== 'webgl' && options.backend !== 'webgl1' ? webgpuBackend(canvas, options.device) : webglBackend(canvas, options.backend === 'webgl1');
   let model = initialModel, expanded = new Map(), collapsed = new Set(), selected = -1, trace = null;
+  // Paused (`pause`, `resume`): no frame is drawn and no animation frame requested. The animations' clock stands still
+  // meanwhile (`now` leaves out the time spent paused), so a morph, a blend or breathing goes on at resume where it was,
+  // and one started while paused starts at resume. A resize asked for while paused waits for resume too (a hidden canvas
+  // may measure 0).
+  let paused = false, pausedAt = 0, pausedFor = 0, resizeWanted = false, destroyed = false;
+  const now = () => (paused ? pausedAt : performance.now()) - pausedFor;
   // The fisheye lens (`setLens`), in CSS pixels of the canvas, or null.
   let lens = null;
   // Breathing (`breathe`): {amplitude, period, wavelength, start, stop?}; it fades in over `fadeIn` and out over `fadeOut`
@@ -522,10 +532,10 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
   let breath = null;
   const breathState = () => {
     if (!breath) return {phase: 0, amplitude: 0};
-    const now = performance.now();
-    const into = Math.min(1, (now - breath.start) / breath.fadeIn);
-    const out = breath.stop ? Math.max(0, 1 - (now - breath.stop) / breath.fadeOut) : 1;
-    return {phase: 2 * Math.PI * (now - breath.start) / breath.period, amplitude: breath.amplitude * ease(into) * ease(out)};
+    const t = now();
+    const into = Math.min(1, (t - breath.start) / breath.fadeIn);
+    const out = breath.stop ? Math.max(0, 1 - (t - breath.stop) / breath.fadeOut) : 1;
+    return {phase: 2 * Math.PI * (t - breath.start) / breath.period, amplitude: breath.amplitude * ease(into) * ease(out)};
   };
   // A layer: per part a buffer of the start and one of the end of a morph (the same buffer when nothing moves).
   const layer = (from, to = from) => backend.layer(from, to);
@@ -587,7 +597,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     const r = ratio(), b = breathState();
     // In the galaxy style the idle breath is cosmic motion instead (its strength fades in and out as the breath does).
     const strength = galaxy && breath ? b.amplitude / Math.max(breath.amplitude, 1e-9) : 0;
-    const seconds = breath ? (performance.now() - breath.start) / 1000 : 0;
+    const seconds = breath ? (now() - breath.start) / 1000 : 0;
     return {
       centre: [view.centreX, view.centreY], scale: view.scale, size: [canvas.width, canvas.height], ratio: r, t, fade,
       // The lens in device pixels from the canvas centre (y down, as the shaders compute before flipping).
@@ -646,9 +656,10 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       ctx.fillText(label.text, label.x, label.y);
     }
   };
-  const progress = a => a ? Math.min(1, (performance.now() - a.start) / a.duration) : 1;
+  const progress = a => a ? Math.min(1, (now() - a.start) / a.duration) : 1;
   const tick = () => {
     frame = 0;
+    if (paused || destroyed) return;
     if (morphing) {
       const p = ease(progress(morphing));
       if (morphing.view) {
@@ -660,12 +671,22 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       if (progress(morphing) >= 1) finishMorph();
     }
     if (fading && progress(fading) >= 1) { drop(previous); previous = null; fading = null; }
-    if (breath?.stop && performance.now() - breath.stop >= breath.fadeOut) breath = null;
+    if (breath?.stop && now() - breath.stop >= breath.fadeOut) breath = null;
     // Breathing alone leaves the texts as they are: they do not move, and placing them every frame is work.
     renderer.draw({labels: !!(morphing || fading) || !breath});
     if (morphing || fading || breath) frame = requestAnimationFrame(tick);
   };
-  const animate = () => { if (!frame) frame = requestAnimationFrame(tick); };
+  const animate = () => { if (!frame && !paused && !destroyed) frame = requestAnimationFrame(tick); };
+  // One drawing on the next frame (however often the lens or the orbit changes), and the animation going on after it;
+  // while paused nothing: resume draws.
+  const soon = () => {
+    if (paused || destroyed || frame) return;
+    frame = requestAnimationFrame(() => { frame = 0; renderer.draw(); if (morphing || fading || breath) animate(); });
+  };
+  const matchSize = () => {
+    const w = Math.round(canvas.clientWidth * ratio()), h = Math.round(canvas.clientHeight * ratio());
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  };
   const finishMorph = () => {
     if (!morphing) return;
     const done = morphing;
@@ -705,7 +726,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       if (!valid && !lens) return;
       lens = valid ? {x: next.x, y: next.y, radius: next.radius, magnification: next.magnification} : null;
       // One drawing per frame, however often the pointer moves.
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; renderer.draw(); if (morphing || fading || breath) animate(); });
+      soon();
     },
     setExpanded(map) { renderer.setState({expanded: map}); },
     /** The outline per node kind (`circle`, `square`, `octagon`, `diamond`); kinds not named are circles. */
@@ -743,7 +764,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     setNames(next) { names = {nodes: !!next?.nodes, details: !!next?.details}; renderer.draw(); },
     setOrbit(next) {
       orbit = next ? {yaw: next.yaw ?? 0, pitch: Math.max(-1.3, Math.min(1.3, next.pitch ?? 0)), depth: next.depth ?? (model.overview.rootRadius || 1) / 2} : null;
-      if (!frame) frame = requestAnimationFrame(() => { frame = 0; renderer.draw(); if (morphing || fading || breath) animate(); });
+      soon();
     },
     /**
      * Draws clusters structured (`expanded`, index → {scene}), collapsed into one disc (`collapsed`, indices) and marks
@@ -756,7 +777,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
         // A blend still running keeps fading what it had: the older drawing is dropped only when the new one is whole.
         drop(previous);
         previous = current;
-        fading = {start: performance.now(), duration: fade};
+        fading = {start: now(), duration: fade};
       } else drop(current);
       current = layer(data());
       if (fade > 0) animate(); else renderer.draw();
@@ -783,14 +804,41 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
       }
       drop(current);
       current = layer(from, to);
-      morphing = {start: performance.now(), duration, to, view: view ? [{...renderer.view}, {...view}] : null, old};
+      morphing = {start: now(), duration, to, view: view ? [{...renderer.view}, {...view}] : null, old};
       animate();
       return true;
     },
     resize() {
-      const w = Math.round(canvas.clientWidth * ratio()), h = Math.round(canvas.clientHeight * ratio());
-      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      if (paused) { resizeWanted = true; return; }
+      matchSize();
       renderer.draw();
+    },
+    /** Provisional: whether the renderer is paused (see `pause`). */
+    get paused() { return paused; },
+    /**
+     * Provisional: stops drawing while the canvas is hidden (for example under a drill-down): no frame, no animation frame
+     * requested, the animations' clock held. The GPU resources, the model, the view and the state are kept, and every call
+     * that changes them is taken (the view's `onView` included) but drawn only at `resume`. Idempotent.
+     */
+    pause() {
+      if (paused || destroyed) return;
+      paused = true;
+      pausedAt = performance.now();
+      if (frame) { cancelAnimationFrame(frame); frame = 0; }
+      for (const f of lifecycle.get(renderer) ?? []) f(true);
+    },
+    /**
+     * Provisional: ends a pause: matches the canvas size if a resize was asked for meanwhile, draws one frame at once and
+     * goes on with what was running (a morph, a blend or breathing, from where it stood). Idempotent.
+     */
+    resume() {
+      if (!paused || destroyed) return;
+      pausedFor += performance.now() - pausedAt;
+      paused = false;
+      if (resizeWanted) { resizeWanted = false; matchSize(); }
+      renderer.draw();
+      if (morphing || fading || breath) animate();
+      for (const f of lifecycle.get(renderer) ?? []) f(false);
     },
     /** The backend drawing it: 'webgpu', 'webgl2' or 'webgl'. */
     get backend() { return backend.kind; },
@@ -806,15 +854,17 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
         if (!breath) return;
         // At once (fadeOut 0): gone with the next drawing.
         if (fadeOut <= 0) { breath = null; return; }
-        if (!breath.stop) { breath.stop = performance.now(); breath.fadeOut = fadeOut; animate(); }
+        if (!breath.stop) { breath.stop = now(); breath.fadeOut = fadeOut; animate(); }
         return;
       }
       const {amplitude = 0.06, period = 4000, wavelength = 600, fadeIn = 1500} = settings;
       if (breath && !breath.stop) return;
-      breath = {amplitude, period: Math.max(period, 100), wavelength: Math.max(wavelength, 1), fadeIn: Math.max(fadeIn, 1), fadeOut, start: performance.now()};
+      breath = {amplitude, period: Math.max(period, 100), wavelength: Math.max(wavelength, 1), fadeIn: Math.max(fadeIn, 1), fadeOut, start: now()};
       animate();
     },
     draw({labels = true} = {}) {
+      // Paused: drawn at resume.
+      if (paused || destroyed) return;
       const view = renderer.view;
       const t = morphing ? ease(progress(morphing)) : 0;
       const f = fading ? ease(progress(fading)) : 1;
@@ -843,7 +893,10 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     /** The scene node under a CSS pixel inside a structured cluster (see `pickExpanded`), or null. */
     pickScene(clientX, clientY) { return pickExpanded(model, expanded, ...renderer.world(clientX, clientY)); },
     destroy() {
-      if (frame) cancelAnimationFrame(frame);
+      if (destroyed) return;
+      destroyed = true;
+      if (frame) { cancelAnimationFrame(frame); frame = 0; }
+      lifecycle.delete(renderer);
       if (edgeFade) { edgeFade = 0; applyEdgeFade(); }
       drop(current); drop(previous);
       backend.destroy();
@@ -851,6 +904,7 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
     },
   };
   if (options.edgeFade) renderer.setEdgeFade(options.edgeFade);
+  lifecycle.set(renderer, new Set());
   return renderer;
 }
 
@@ -860,7 +914,10 @@ export function createOverviewRenderer(canvas, initialModel, options = {}) {
  * `lens` (a function that returns `{radius, magnification}` or null, asked on every move), a fisheye lens follows the
  * pointer and is gone when the pointer leaves the canvas. With `idle` (`{after, breathe}`), the discs start to breathe
  * (`renderer.breathe(breathe)`) after `after` milliseconds (default 8000) without input, and stop at the next input; not
- * when the system asks for reduced motion. Returns a function that removes the listeners.
+ * when the system asks for reduced motion. While the renderer is paused (`renderer.pause()`) the binding takes no input
+ * (no zoom, pan, drag, lens, hover or click; a node drag in progress ends with `onNodeDrag(…, 'end')` at its last point)
+ * and its idle wait is held; at `resume` the wait starts again (breathing that ran before goes on). Returns a function
+ * that removes the listeners.
  */
 export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDoubleClick, onNodeDrag, draggable, lens, idle} = {}) {
   let drag = null;
@@ -868,14 +925,33 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
   // the user asked the system for less motion.
   const still = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
   let idleTimer = 0;
+  const wait = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (!drag && !renderer.paused) renderer.breathe(idle.breathe ?? {}); }, idle.after ?? 8000);
+  };
   const awake = () => {
     if (!idle || still) return;
     renderer.breathe(null);
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => { if (!drag) renderer.breathe(idle.breathe ?? {}); }, idle.after ?? 8000);
+    wait();
   };
   awake();
-  const input = () => awake();
+  // The renderer's pause holds the idle wait and ends a drag; its resume starts the wait again (breathing that ran
+  // before the pause goes on).
+  const onPause = paused => {
+    if (paused) {
+      clearTimeout(idleTimer);
+      // A node drag ends where the node was last moved to, so the host is not left in the middle of it.
+      if (drag?.moved && drag.node >= 0 && drag.last) onNodeDrag(drag.node, ...drag.last, 'end');
+      drag = null;
+      return;
+    }
+    // Always armed again: breathing that still fades out (or runs) is restarted or left as it is by the timer's `breathe`.
+    if (idle && !still) wait();
+  };
+  lifecycle.get(renderer)?.add(onPause);
+  // Input on a paused renderer is ignored: it would change what nobody sees.
+  const off = () => !!renderer.paused;
+  const input = () => { if (!off()) awake(); };
   const follow = e => {
     if (!lens) return;
     const settings = lens(), rect = canvas.getBoundingClientRect();
@@ -884,6 +960,7 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
   const leave = () => { if (lens) renderer.setLens(null); };
   const wheel = e => {
     e.preventDefault();
+    if (off()) return;
     awake();
     const [wx, wy] = renderer.world(e.clientX, e.clientY);
     const v = renderer.view, factor = Math.exp(-e.deltaY * 0.0015);
@@ -903,15 +980,16 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     if (draggable) return draggable(i);
     return i >= 0 && m && !m.children[i].length ? i : -1;
   };
-  const down = e => { awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, orbit: renderer.orbit, moved: false, node: leafAt(e)}; canvas.setPointerCapture?.(e.pointerId); };
+  const down = e => { if (off()) return; awake(); drag = {x: e.clientX, y: e.clientY, view: renderer.view, orbit: renderer.orbit, moved: false, node: leafAt(e)}; canvas.setPointerCapture?.(e.pointerId); };
   const move = e => {
+    if (off()) return;
     awake();
     follow(e);
     if (!drag) { onHover?.(renderer.pick(e.clientX, e.clientY), e); return; }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
     drag.moved = true;
-    if (drag.node >= 0) { onNodeDrag(drag.node, ...renderer.world(e.clientX, e.clientY), 'move'); return; }
+    if (drag.node >= 0) { drag.last = renderer.world(e.clientX, e.clientY); onNodeDrag(drag.node, ...drag.last, 'move'); return; }
     // Under the orbit a drag turns the drawing (about half a turn across the canvas); with Shift it pans.
     if (drag.orbit && !e.shiftKey) {
       renderer.setOrbit({...drag.orbit, yaw: drag.orbit.yaw + dx * 0.006, pitch: drag.orbit.pitch + dy * 0.006});
@@ -925,7 +1003,7 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
     drag = null;
   };
   const cancel = () => { drag = null; };
-  const double = e => onDoubleClick?.(renderer.pick(e.clientX, e.clientY), e);
+  const double = e => off() || onDoubleClick?.(renderer.pick(e.clientX, e.clientY), e);
   canvas.addEventListener('dblclick', double);
   canvas.addEventListener('wheel', wheel, {passive: false});
   canvas.addEventListener('pointerdown', down);
@@ -935,6 +1013,7 @@ export function bindOverviewNavigation(canvas, renderer, {onClick, onHover, onDo
   canvas.addEventListener('pointerleave', leave);
   globalThis.addEventListener?.('keydown', input);
   return () => {
+    lifecycle.get(renderer)?.delete(onPause);
     clearTimeout(idleTimer);
     renderer.breathe(null, {fadeOut: 0});
     globalThis.removeEventListener?.('keydown', input);
