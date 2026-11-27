@@ -73,6 +73,8 @@ const requests = [
 // A view whose repair grid is over its bound, with the sparse grid (#203).
 const mesh = JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '100', '0', 'organic', 'lines', '120', '500'], {maxBuffer: 1 << 30}).toString());
 requests.push(['import over the grid bound, sparse repair', {...mesh, options: {...mesh.options, sparseRepairGrid: true}}]);
+// A bus view whose first routing leaves conflicts, so the second routing pass and its overlap resolution run (#212, #229).
+requests.push(['import with the second routing pass', JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '60', '12', 'organic', 'lines', '60', '250'], {maxBuffer: 1 << 30}).toString())]);
 // The operation `query` (ADR 0021, M5b) on a snapshot and its content, without a session: the rows must be the same
 // natively and in WASM. (Without the cargo feature both engines answer the same refusal, which also compares equal.)
 const imported = JSON.parse(execFileSync(native, {
@@ -129,6 +131,14 @@ const small = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overv
   start: {x: before.overview.x, y: before.overview.y, r: before.overview.r}}), maxBuffer: 1 << 30}).toString()).overview;
 const parented = Object.fromEntries(small.ids.map((id, i) => [id, {x: small.x[i], y: small.y[i], r: small.r[i], parent: small.ids[small.parent[i]]}]));
 requests.push(['overview continued by id with parents', {op: 'overview', graph: changed, start: {nodes: parented}}]);
+// A work budget that runs out (#211): in the clustering, in the arrangement (natively on 4 threads, which must not
+// matter), and in a continuation; the work counts are part of the answer.
+requests.push(
+  ['overview over its budget in the clustering', {op: 'overview', graph: large, workBudget: 40000}],
+  ['overview over its budget in the arrangement, 4 threads', {op: 'overview', graph: large, workBudget: 20000000, threads: 4}],
+  ['overview continued by id over its budget', {op: 'overview', graph: changed, start: {nodes: places}, workBudget: 300000}],
+  ['overview over its budget, refused', {op: 'overview', graph: large, workBudget: 20000000, overBudget: 'refuse'}],
+);
 // The long form of a view that changed its source graph (#195), read against the view as imported: its digest is found
 // again by writing the bookmark's decisions into that graph, with the same answer natively and in WASM.
 const ask = request => JSON.parse(execFileSync(native, {input: JSON.stringify(request), maxBuffer: 1 << 30}).toString());

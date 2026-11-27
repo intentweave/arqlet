@@ -486,6 +486,9 @@ impl OverviewColumns {
             if let Some(continuation) = &overview.continuation {
                 meta["continuation"] = serde_json::to_value(continuation).unwrap_or_default();
             }
+            if let Some(work) = &overview.work {
+                meta["work"] = serde_json::to_value(work).unwrap_or_default();
+            }
             meta
         } else {
             let mut whole = serde_json::to_value(&overview).unwrap_or_default();

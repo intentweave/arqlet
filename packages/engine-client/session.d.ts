@@ -230,8 +230,8 @@ export interface Session {
   peek(nodeId: string, init?: {limit?: number}): Promise<ReadAnswer<PeekAnswer>>;
   /**
    * Provisional: changes the graph without a new import (removals first; a removed node takes what it holds and its
-   * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views) or again from
-   * where it was.
+   * edges along); the view keeps its state and is laid out as a toggle lays it out (abstracting views and views with
+   * buses) or again from where it was.
    */
   patch(patch: GraphPatch): Promise<SessionResult>;
   /**
@@ -342,7 +342,9 @@ export interface OverviewSession {
   /** Lays out `graph`; replaces the graph the session had. */
   open(graph: Graph, request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options).
-   * With `edgeData: true` the answer has each edge's kind and weight (ask each time). */
+   * With `edgeData: true` the answer has each edge's kind and weight (ask each time). Provisional: `workBudget` bounds
+   * the work deterministically and the answer reports it (`work`); `overBudget: 'refuse'` refuses instead of packing
+   * what did not fit, and the session keeps its last overview (ask each time). */
   layOut(request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Provisional: the paths between two nodes of the overview's graph, read only (`GraphTrace`). */
   trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<ReadAnswer<GraphTrace>>;

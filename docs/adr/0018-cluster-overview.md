@@ -115,6 +115,13 @@ The third step closes the open points of the second:
   to the smaller community). Every Louvain level is a level of clusters (`community:<container>:<level>.<k>`, kind
   `community`, after the graph's nodes); communities under 8 nodes are no clusters, children without links are gathered.
   A structured excerpt keeps the overview's nesting, so communities become containers there.
+- **Groups the data gives** (`groups`, node id → path of group names, as an import's `groups`;
+  `arqlet_layout::communities::with_given_groups`): containers of kind `group` between a node and its container, nested
+  along the path, labelled with their name, with the id `group:<container>:<path>` (`#` for the top level). They are
+  nodes of the graph for the overview, so Louvain then divides only what is still larger than `communities` (0: a host's
+  partition shown as given), and a continuation by node id treats a changed path as a changed container: a group both
+  partitions have keeps its inner arrangement, a node whose path changed is placed anew, groups that are gone are
+  reported as ignored ids ([integration guide](../integration-guide.md)).
 
 The fourth step keeps the drawing still and makes the choices visible:
 
@@ -183,6 +190,82 @@ change no answer that does not ask for them. Usage: [integration guide](../integ
 
 Open, both later: the drill-down from an `OverviewModel` without the input graph (part 2 of #209) builds on 1 and may
 want edge ids, which would be another request field; a session continuing a new graph from its own places on `start: {}`.
+
+## Addendum (2026-11-27): a work budget (#211)
+
+A host that bounds the time of an `overview` request (a worker thread with a timeout on a server) has to terminate the
+thread and load the engine again when the limit strikes. It wants a bound that keeps the engine usable. A wall-clock
+limit inside the core is ruled out: the core has no clock, and the answer would depend on the machine and its load. The
+overview gets a **deterministic work budget**, as refinement has (`workBudget`, counted in jobs there). Provisional; a
+request without it is answered exactly as before (byte-identical, the default path is not touched).
+
+1. **Request.** `workBudget` (an integer ≥ 0, units of work) and `overBudget`: `"answer"` (the default) or `"refuse"`.
+   Every request with `workBudget` gets a report `work` in its answer: `{budget, used, clustering, limited,
+   unclustered, packed}`; the last two list containers by node index, -1 for the top level (as `parent` does). Two
+   optional fields report hints left out (item 8): `startIgnored` and `radiiIgnored`.
+2. **Units.** One unit is roughly one pass of an inner loop over a node or a link; counted in `u64` (WASM's `usize` is
+   32 bits), the same on every target and for any thread count. Louvain: per sweep the nodes plus the links visited,
+   per level the links aggregated. Arranging a container of `k` children with `l` links: the start (`k + l`), per force
+   tick `l + k·(b + 2)`, `b` the bit length of `k` (`⌊log₂ k⌋ + 1`), plus the pairs the collision examines, per
+   separation or make-room round `k` plus the pairs examined, per round of the enclosing circle `2k`. A container kept
+   as it was costs its start, `k + l`.
+3. **Budgeted phases and safe points.** Only the iterative phases are budgeted: **clustering** (Louvain, per container
+   that is split, checked after every sweep and level) and the **arrangement** of every container (the start, every
+   tick, every separation round, the enclosing circle; settling, making room and the drag of a continuation are paths
+   of the arrangement and count the same). The rest is linear in the graph (reading it, the hierarchy, reading a
+   continuation by id, satellites, labels, assembling, the answer) and is not budgeted: a host bounds it with the size
+   of the graph it accepts. Running out of budget is noticed at the next safe point, so the work done exceeds the
+   budget by at most one step (one tick, round or sweep of one container).
+4. **The first piece that does not fit ends the budgeted work.** Clustering runs container after container, the
+   arrangement level after level and, within a level, in index order. A piece (a container's Louvain, a container's
+   arrangement) whose work does not fit into what is left is discarded whole, and from there on nothing budgeted runs:
+   the containers not yet split stay unsplit (`unclustered`), and every container not yet arranged takes the
+   **fallback**. `used` counts the work the answer holds; it never exceeds `budget`. Rejected: going on with smaller
+   later pieces (first fit). It uses the budget better, but the pieces discarded on the way are work too, and with
+   many of them the time would no longer follow the budget.
+5. **Fallback.** A container with an unchanged arrangement of a continuation keeps it, as without a budget (not
+   listed), with the children the user moved (`start.moved`) put where they were put if they overlap nothing there
+   (the container is not centred again, so they keep their absolute places; a container that grows by it makes its
+   parent changed); a moved child that would overlap a sibling packs its container instead (listed). Any other with two or more children is **packed** (`packed`): its children in rows, in the order of the breadth-first
+   walk over their links that the spiral start uses (linked children stay side by side), each in a square of its
+   diameter and the gap, the row as high as its largest disc, the rows about as wide as the squares' total area is
+   square; the container's disc is centred on the rows and holds them. No forces, `O(k log k)`, not budgeted. The answer
+   stays valid: no overlaps (the squares do not overlap), every child inside its parent's disc, logical edge direction,
+   cycles and self-loops as always. Nothing is pruned: every node has its place. Rejected: a partly simulated container
+   (cut after some ticks) and a separation from there. The separation's own work is unbounded in advance, and a
+   container that is either settled or packed is a report a host can act on.
+6. **Threads.** The answer depends only on each piece's own deterministic work, never on the schedule: with threads, a
+   level's containers are arranged in parallel, each with the level's remaining budget as its limit and a shared
+   counter that stops all of them once the level's work together exceeds it; then the containers are taken in index
+   order, and one that was stopped by the shared counter while all before it fit is arranged again, alone, with what
+   is left. Without threads (and in WASM) every container gets exactly what is left. Both give the same answer; the
+   work a thread spends on a container that is then discarded is not counted in `used`, and with threads a level may
+   take up to about twice its remaining budget in time.
+7. **Answer or refuse.** `"answer"` (the default): what is ready, the rest by the fallback, with `work.limited: true`
+   and the lists above. `"refuse"`: an error `Overview work budget exhausted: …` (a stable prefix), naming the phase
+   and the units, at the first piece that does not fit; nothing of the fallback is computed. Answering is the default
+   because the answer is valid and gives the user something to see, and a host that wants all or nothing can refuse
+   on `limited` itself; refusing exists because a refused request changes nothing in a session (its last places and
+   hierarchy stay those of the last accepted answer) and saves the fallback's work.
+8. **Sessions, columns, positions only.** A session that reuses its hierarchy charges the clustering work recorded when
+   it was built (so that its answer equals that of `dispatch`), reuses it only if that clustering was complete and fits
+   the budget, and never keeps a hierarchy built with unsplit containers for later requests. `work` is part of
+   `OverviewPositions` and of the columnar answer's metadata. An answer with containers left unsplit has other clusters
+   than the last one, so a `positionsOnly` request gets the whole overview then. Such a hierarchy may also lack what a
+   request's hints name: a `start` by node index made for the complete clustering (more values than nodes; also a
+   session's `start: {}`), and `radii` of added clusters (`community:…`) it does not have. With `"answer"` they are left
+   out, the overview is laid out without that start (its budget is spent anyway, so its containers are packed), and
+   the answer says so (`startIgnored: true`, `radiiIgnored`); with `"refuse"` the refusal comes first, before the hints
+   are read. Rejected: charging the complete clustering whatever the budget (`used` could exceed `budget`) and
+   refusing the start (no answer, and no stable prefix). Without a cut clustering a start that does not fit is refused
+   as before. A continuation (`start`) keeps an
+   unchanged packed container as it is, as it keeps any unchanged arrangement: the host lays out without `start` to
+   have it arranged.
+9. **How a host picks a budget.** Lay out graphs of the sizes it serves with `workBudget` larger than any work (for
+   example `2^53 − 1`, the largest integer a JavaScript number holds exactly): `work.used` is the work of the whole
+   overview. Time those requests on the host's machine, and take units per second from them; the budget is the time
+   limit times that rate, less a margin for the linear part (the time of a request with `workBudget: 0`, which packs
+   everything). Measured units per second on generated graphs: [results](../../benchmarks/results/overview-work-budget-20261127.md).
 
 ## Real data (2026-11-11)
 

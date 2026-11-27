@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Prepares an npm package of this repository for `pnpm pack` / `pnpm publish` (run as the package's `prepack`).
-// Always copies the two license files into the package. Flags:
+// Always copies the two license files and CHANGELOG.md into the package. Flags:
 //   --wasm   builds crates/wasm (profile wasm-size, wasm32-unknown-unknown, --locked) and copies it to ./arqlet.wasm, and
 //            writes ./THIRD_PARTY_NOTICES.md: the license notices of the crates linked into that WASM
 //            (tools/third-party-notices.mjs)
@@ -16,7 +16,7 @@ const root = resolve(import.meta.dirname, '..');
 const pkg = process.cwd();
 const flags = new Set(process.argv.slice(2));
 
-for (const name of ['LICENSE-APACHE', 'LICENSE-MIT']) copyFileSync(join(root, name), join(pkg, name));
+for (const name of ['LICENSE-APACHE', 'LICENSE-MIT', 'CHANGELOG.md']) copyFileSync(join(root, name), join(pkg, name));
 
 // The WASM modules the packages ship, by flag: the crate and the file in the package.
 const modules = {

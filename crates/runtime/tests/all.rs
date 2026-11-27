@@ -96,6 +96,8 @@ mod organic_forces;
 mod overlaps;
 #[path = "overview.rs"]
 mod overview;
+#[path = "overview_budget.rs"]
+mod overview_budget;
 #[path = "pack_components.rs"]
 mod pack_components;
 #[path = "paging.rs"]

@@ -19,6 +19,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - **Sessions usable from several threads (provisional; ADR 0024 C2):** `arqlet_runtime::shared_sessions::SharedSessionStore`,
   the store of the native adapter: one short lock for its book, one lock per session, a byte limit that never drops a
   running session.
+- **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
+  `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
+  out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,
+  `unclustered`, `packed`); `overBudget: "refuse"` fails cleanly instead. The same answer for any thread count, natively
+  and in WASM; without `workBudget` nothing changes. New contract types `OverviewWork` and `OverBudget`. How to choose
+  a budget: [integration guide](docs/integration-guide.md#bounding-an-overviews-work-provisional).
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
   a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
   (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every
@@ -27,6 +33,24 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   which, and it is the same on WebGPU, WebGL 2 and WebGL 1. A `bindOverviewNavigation` binding takes no input while its
   renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
   overview page pauses the overview while the scene view of a cluster covers it.
+- Integration guide: *Showing your own partition* (overview): a partition the host computed (for example with Leiden)
+  as `groups`, flat or nested, with `communities: 0` shown as given; what Louvain does inside large groups, labels, the
+  stable group ids, and switching between two partitions with `start.nodes` (a group both have keeps its inner
+  arrangement, nodes whose path changed are placed anew, groups that are gone are listed in `continuation.ignored`),
+  pinned by a test in `crates/runtime/tests/overview.rs`. Mentioned in the READMEs and ADR 0018.
+- Every npm package (`arqlet`, `@arqlet/contracts`, `@arqlet/engine-client`, `@arqlet/viewer`, `@arqlet/query`) ships
+  `CHANGELOG.md`, copied by `prepack` (`tools/npm-prepack.mjs`) as the licenses are.
+
+### Fixed
+
+- **A `patch` into a view with buses draws what an import of the patched graph draws** (#228, ADR 0029 C). It started
+  from the earlier drawing and drew far worse in layered views with bus lines and organic views with bus bars: on the
+  generated bus meshes of #212, 1 043 and 2 091 routes through nodes where an import has none, and 1 374 where it has 36.
+  Organic views with bus lines already drew the import's drawing and are unchanged; views without buses still continue
+  their earlier drawing. Such a patch now takes an import's time: about the same in layered views, much longer in organic
+  views with bus bars where the import runs its second routing pass (the dense view of #212: 2.0 s before, 16.5 s now;
+  `benchmarks/results/patch-as-import-20261127.md`; measured before the faster second pass of #229). Revisions and stale
+  checks are unchanged.
 
 ## 0.10.0 — 2026-11-27
 
@@ -62,6 +86,11 @@ direction opens again on a new import.
   the graph; an expression that reads a variable without a value; a computed value beyond 16 MiB. A map in content or a
   parameter is a map now, and a map in a JSON answer is `{"map": {…}}`. An `overview` request with an `edgeData` that is
   not a boolean is refused (it was ignored).
+- **Overview texts on a light background:** the overview renderer (`createOverviewRenderer`) takes its tone from its
+  clear colour (`background`, `setBackground`): above one half relative luminance it is `light` (`renderer.tone`) and
+  draws the texts of its `labels` canvas dark itself (cluster and node names, the lens rim; galaxy name tags light with
+  dark text). In 0.9 they were always light. A host that inverted the label canvas for a light background (for example
+  with a CSS `filter: invert(1)`) must stop, or its texts turn light again.
 - **Rust hosts** that build these types field by field have new fields: `Snapshot`, `LayoutOptions`, `Scene`,
   `SceneMark`, `SceneMembershipReport` and `AreaPlan`; `Request` has new variants. In `arqlet-query`: `Value::Map`, the
   `plan::Expr` variants `Call`, `Map`, `Index`, `Slice` and `Comprehension`, `plan::Op::Union` and

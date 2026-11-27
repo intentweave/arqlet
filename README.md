@@ -313,8 +313,8 @@ In the playground: section *Filter* (a box per node kind and edge kind, *Close u
 `patch` changes the graph of a view without a new import: `{nodes, edges, removeNodes,
 removeEdges}` (removals first; a removed node takes what it holds and its edges). The
 view keeps its state (collapsed containers, filter); a view with a level of detail,
-communities or groups is laid out as a toggle lays it out (the drawing depends only on
-the graph and the view). A host can start with aggregated edges between collapsed
+communities or groups, or with buses, is laid out as an import of the changed graph lays
+it out (the drawing depends only on the graph and the view). A host can start with aggregated edges between collapsed
 containers and load the member edges of a container when it is opened:
 
 ```js
@@ -335,6 +335,11 @@ bindOverviewNavigation(canvas, renderer, {
   idle: {after: 8000, breathe: {amplitude: 0.06}},   // off under reduced motion
 });
 ```
+
+A host that computes its own communities (for example with Leiden) passes them as
+`options: {groups: {nodeId: ['package', 'community']}, communities: 0}`: the overview shows
+exactly that partition, nested, with stable group ids, and can switch to another partition
+of the same nodes by node id ([integration guide](docs/integration-guide.md#showing-your-own-partition-provisional)).
 
 Paths and neighbourhoods work there too: the overview session traces on its graph, and
 the viewer draws the path over the discs that show it and opens the clusters on the way:
