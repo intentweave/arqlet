@@ -12,7 +12,7 @@ Provisional. Arqlet is a prototype; releases are `0.x` and may break any API.
 | npm | `@arqlet/engine-client` | `arqlet.wasm` (built by `prepack`), loader, worker, ELK-style call, presets |
 | npm | `@arqlet/viewer` | SVG renderer, navigation, route helpers, React Flow mapping |
 | npm | `@arqlet/contracts` | bundled TypeScript types (`dist/index.d.ts`, built by `prepack`) |
-| npm | `@arqlet/query` (provisional; not published yet) | `arqlet-query.wasm` (built by `prepack`), loader and types: queries without the layout engine |
+| npm | `@arqlet/query` (provisional) | `arqlet-query.wasm` (built by `prepack`), loader and types: queries without the layout engine |
 
 Not published: `arqlet-wasm` (its output ships in `@arqlet/engine-client`), `arqlet-contracts` (tooling), `arqlet-node`
 (placeholder), `arqlet-query-cli` (provisional tool of the query layer), `arqlet-query-wasm` (its output ships in
@@ -84,7 +84,9 @@ Afterwards, [check the release](#check-the-release).
 Trusted publishing is configured per package on the registries. Each package must exist there already (all of them do
 since 0.8.0 except `@arqlet/query`); a new crate or npm package is published once by hand (below) before it can be added.
 Until that is done for `@arqlet/query`, the workflow's `npm` job fails at it; it comes last, so the other packages are
-published, and the job is run again after the setup.
+published, and the job is run again after the setup. The first release of a package that is already tagged is published
+from the checked-out tag, which needs `--no-git-checks` (without it pnpm refuses a detached HEAD):
+`pnpm --filter <package> publish --access public --no-git-checks`.
 
 - **GitHub:** an environment `release` (Settings → Environments). Required reviewers on it make every release wait for
   an approval before anything is published.
@@ -125,7 +127,7 @@ missing after it, and a new version can take some minutes to appear.
 ```sh
 v=x.y.z
 # 1. Every npm package has the version.
-for p in arqlet @arqlet/engine-client @arqlet/viewer @arqlet/contracts; do
+for p in arqlet @arqlet/engine-client @arqlet/viewer @arqlet/contracts @arqlet/query; do
   npm view "$p@$v" version >/dev/null 2>&1 && echo "$p $v" || echo "$p MISSING"
 done
 # 2. The npm entry point installs into an empty project and imports.

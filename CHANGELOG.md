@@ -5,6 +5,46 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+## 0.10.0 — 2026-11-27
+
+A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list
+expressions, and gets an npm package of its own, `@arqlet/query`, without the layout engine; several answers it gave
+wrongly in 0.8.0 and 0.9.0 are fixed. Memberships (ADR 0022) can be held together inside their container and drawn as
+lanes and phases, pinned nodes and containers can stay in single pass (behind an option), a view fits into a URL as a
+compact bookmark, the galaxy overview draws on a light background, and bus lines with closed containers import faster.
+A cluster overview computed on a server carries the kind and weight of every edge and continues by node id after the
+graph changed, and the router can search a sparse grid on large views (behind an option). Two panics on views with bus
+lines are fixed, `refine` works on views with a backbone bus, and a long-form bookmark of a view with a changed shape or
+direction opens again on a new import.
+
+### Upgrading from 0.9
+
+- **The engine version is `0.10.0`**: edits of a snapshot from an earlier engine are refused, so import the graph again.
+  Default layouts of the reference views are unchanged; the reference fingerprints are
+  `fingerprints-20261126-default-0.10.0.jsonl` (14 views differ from the 0.9.0 file only in metadata;
+  `layerweave-code`, which is generated from the source, has the same geometry as v0.9.0 on the same graph).
+- **Some drawings differ:** views where an edge or a tap leaves an organic, radial, tree or octilinear container of a
+  layered area next to a bus line, and views with `hubRefs` and region ports (see *Fixed*); membership hulls
+  (provisional). With bus lines, `busTaps`, `recomputedContainers` and one line of `layoutDiagnostics` can differ.
+- **Views with a backbone bus that single pass did not take:** their snapshot says `singlePass: false` and
+  `abstractRouting: false`, and an edit that takes the last backbone bus out of the view stays on that pipeline (see
+  *Fixed*).
+- **Queries answer differently where 0.9.0 was wrong:** a `WHERE` after `ORDER BY`, `SKIP` or `LIMIT`, a label or
+  properties on a repeated node variable, a grouping expression beside an aggregate, and a relationship variable bound
+  by an earlier clause.
+- **Long-form bookmarks:** a revision of the graph that differs from the bookmarked source only in declared shapes,
+  directions, strategies, routing or ports is now the same source (as for compact bookmarks): the bookmark opens, and its
+  values replace the declared ones. Before, it was refused as another graph.
+- **Queries and content that are refused now:** properties named `id`, `kind`, `label`, `parentId` or `weight` beside
+  the graph; an expression that reads a variable without a value; a computed value beyond 16 MiB. A map in content or a
+  parameter is a map now, and a map in a JSON answer is `{"map": {…}}`. An `overview` request with an `edgeData` that is
+  not a boolean is refused (it was ignored).
+- **Rust hosts** that build these types field by field have new fields: `Snapshot`, `LayoutOptions`, `Scene`,
+  `SceneMark`, `SceneMembershipReport` and `AreaPlan`; `Request` has new variants. In `arqlet-query`: `Value::Map`, the
+  `plan::Expr` variants `Call`, `Map`, `Index`, `Slice` and `Comprehension`, `plan::Op::Union` and
+  `plan::Expand::rel_bound`. Overview: `Overview`, `OverviewPositions`, `OverviewRequest`, `OverviewStart` and
+  `layout::overview::Previous`. In `arqlet-routing`: `Params::sparse_grid` and `SearchCounters::sparse_grids`.
+
 ### Added
 
 - The cluster overview as a server result (provisional, #209): with `edgeData: true` the `overview` answer gives every
