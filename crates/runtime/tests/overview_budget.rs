@@ -329,3 +329,29 @@ fn bad_budgets_are_refused_and_the_answer_is_the_typed_contract() {
     v["op"] = json!("overview");
     assert_eq!(answer(&v), o);
 }
+
+#[test]
+fn an_answer_with_unsplit_containers_continues_by_id_not_by_index() {
+    let g = graph(3, 4, 30);
+    let cut = answer(&json!({"op": "overview", "graph": g, "options": options(), "workBudget": 1}));
+    assert!(!cut["work"]["unclustered"].as_array().unwrap().is_empty());
+    let n = cut["ids"].as_array().unwrap().len();
+    // By index, a complete clustering has other nodes: refused.
+    let by_index = run(&json!({"op": "overview", "graph": g, "options": options(),
+        "start": {"x": cut["x"], "y": cut["y"], "r": cut["r"]}}));
+    assert_eq!(by_index["ok"], false, "{by_index}");
+    // By id, it continues and the unsplit containers are clustered as new ones.
+    let places: serde_json::Map<String, Value> = (0..n)
+        .map(|i| {
+            (
+                cut["ids"][i].as_str().unwrap().to_string(),
+                json!({"x": cut["x"][i], "y": cut["y"][i], "r": cut["r"][i]}),
+            )
+        })
+        .collect();
+    let by_id = answer(
+        &json!({"op": "overview", "graph": g, "options": options(), "start": {"nodes": places}}),
+    );
+    assert_valid(&by_id);
+    assert!(by_id["stats"]["communities"].as_u64().unwrap() > 0);
+}

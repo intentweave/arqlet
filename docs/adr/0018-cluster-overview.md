@@ -240,7 +240,9 @@ request without it is answered exactly as before (byte-identical, the default pa
    it was built (so that its answer equals that of `dispatch`), reuses it only if that clustering was complete and fits
    the budget, and never keeps a hierarchy built with unsplit containers for later requests. `work` is part of
    `OverviewPositions` and of the columnar answer's metadata. An answer with containers left unsplit has other clusters
-   than the last one, so a `positionsOnly` request gets the whole overview then.
+   than the last one, so a `positionsOnly` request gets the whole overview then. A continuation (`start`) keeps an
+   unchanged packed container as it is, as it keeps any unchanged arrangement: the host lays out without `start` to
+   have it arranged.
 9. **How a host picks a budget.** Lay out graphs of the sizes it serves with `workBudget` larger than any work (for
    example `2^53 − 1`, the largest integer a JavaScript number holds exactly): `work.used` is the work of the whole
    overview. Time those requests on the host's machine, and take units per second from them; the budget is the time
