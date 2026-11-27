@@ -119,7 +119,10 @@ Extend what `771898d` did for abstracting views to every view whose warm start d
 views, and on the evidence of the layered result all layered views with reused plans): the patch is then exactly a fresh
 import of the patched graph with the same view, which removes the line–node hits of layered and `bar` patches (1 043,
 2 091 and 1 374 to 0, 0 and 36). Cost: layered patches take an import's time (0.23 s instead of 0.17 s); organic `lines`
-patches are unchanged (they already are imports). It changes the default output of patches (to the accepted import
+patches are unchanged (they already are imports); organic `bar` patches take an import's time too, which on the dense view
+is its second routing pass (16.5 s instead of 2.0 s: the warm start skipped the pass only because its first routing left
+over 500 conflicts). Overlooked in the first draft; measured on #228 (`patch-as-import-20261127.md`), and A1 is what
+brings it down. It changes the default output of patches (to the accepted import
 drawing), so the owner decides whether it counts as a fix or goes behind an option.
 
 ## Recommendation
@@ -145,7 +148,8 @@ benefit on the issue's patches is bounded by the placement share.
 ## Risks
 
 - A1 may give less than hoped: the candidate tests themselves, not the obstacle lists, may dominate. The probe settles it.
-- C makes layered patches slower by an import's difference and changes their output; hosts that compare drawings across
+- C makes layered patches slower by an import's difference and organic `bar` patches much slower (an import's second
+  routing pass), and changes their output; hosts that compare drawings across
   versions see the change (the import drawing).
 - A2 changes shared lines and time per view in both directions (#216 showed up to 13.7 times on single views); it needs
   the full gate run.

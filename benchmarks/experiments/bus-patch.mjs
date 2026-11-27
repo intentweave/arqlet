@@ -109,7 +109,7 @@ function tapHits(snapshot) {
     return r;
   };
   const boxes = g.nodes.filter(n => snapshot.boxes[n.id]).map(n => [n.id, abs(n.id)]);
-  const tapNode = new Map(g.buses.flatMap(b => (b.taps ?? []).map(t => [t.edge, t.node])));
+  const tapNode = new Map((g.buses ?? []).flatMap(b => (b.taps ?? []).map(t => [t.edge, t.node])));
   let hits = 0;
   let taps = 0;
   for (const line of Object.values(snapshot.busLines ?? {})) {
