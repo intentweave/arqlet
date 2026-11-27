@@ -336,6 +336,11 @@ bindOverviewNavigation(canvas, renderer, {
 });
 ```
 
+A host that computes its own communities (for example with Leiden) passes them as
+`options: {groups: {nodeId: ['package', 'community']}, communities: 0}`: the overview shows
+exactly that partition, nested, with stable group ids, and can switch to another partition
+of the same nodes by node id ([integration guide](docs/integration-guide.md#showing-your-own-partition-provisional)).
+
 Paths and neighbourhoods work there too: the overview session traces on its graph, and
 the viewer draws the path over the discs that show it and opens the clusters on the way:
 

@@ -115,6 +115,13 @@ The third step closes the open points of the second:
   to the smaller community). Every Louvain level is a level of clusters (`community:<container>:<level>.<k>`, kind
   `community`, after the graph's nodes); communities under 8 nodes are no clusters, children without links are gathered.
   A structured excerpt keeps the overview's nesting, so communities become containers there.
+- **Groups the data gives** (`groups`, node id → path of group names, as an import's `groups`;
+  `arqlet_layout::communities::with_given_groups`): containers of kind `group` between a node and its container, nested
+  along the path, labelled with their name, with the id `group:<container>:<path>` (`#` for the top level). They are
+  nodes of the graph for the overview, so Louvain then divides only what is still larger than `communities` (0: a host's
+  partition shown as given), and a continuation by node id treats a changed path as a changed container: a group both
+  partitions have keeps its inner arrangement, a node whose path changed is placed anew, groups that are gone are
+  reported as ignored ids ([integration guide](../integration-guide.md)).
 
 The fourth step keeps the drawing still and makes the choices visible:
 
