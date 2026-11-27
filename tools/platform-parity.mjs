@@ -97,6 +97,14 @@ const small = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overv
   start: {x: before.overview.x, y: before.overview.y, r: before.overview.r}}), maxBuffer: 1 << 30}).toString()).overview;
 const parented = Object.fromEntries(small.ids.map((id, i) => [id, {x: small.x[i], y: small.y[i], r: small.r[i], parent: small.ids[small.parent[i]]}]));
 requests.push(['overview continued by id with parents', {op: 'overview', graph: changed, start: {nodes: parented}}]);
+// A work budget that runs out (#211): in the clustering, in the arrangement (natively on 4 threads, which must not
+// matter), and in a continuation; the work counts are part of the answer.
+requests.push(
+  ['overview over its budget in the clustering', {op: 'overview', graph: large, workBudget: 40000}],
+  ['overview over its budget in the arrangement, 4 threads', {op: 'overview', graph: large, workBudget: 20000000, threads: 4}],
+  ['overview continued by id over its budget', {op: 'overview', graph: changed, start: {nodes: places}, workBudget: 300000}],
+  ['overview over its budget, refused', {op: 'overview', graph: large, workBudget: 20000000, overBudget: 'refuse'}],
+);
 // The long form of a view that changed its source graph (#195), read against the view as imported: its digest is found
 // again by writing the bookmark's decisions into that graph, with the same answer natively and in WASM.
 const ask = request => JSON.parse(execFileSync(native, {input: JSON.stringify(request), maxBuffer: 1 << 30}).toString());

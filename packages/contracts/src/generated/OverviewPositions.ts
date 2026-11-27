@@ -3,6 +3,7 @@ import type { OverviewBusLine } from "./OverviewBusLine";
 import type { OverviewContinuation } from "./OverviewContinuation";
 import type { OverviewRepresentation } from "./OverviewRepresentation";
 import type { OverviewStats } from "./OverviewStats";
+import type { OverviewWork } from "./OverviewWork";
 
 /**
  * Provisional (sessions): the part of an overview that changes while the clusters stay the same, answered for a request
@@ -21,4 +22,8 @@ busLines?: Array<OverviewBusLine>, stats: OverviewStats,
 /**
  * For a request with `start.nodes` (`Overview::continuation`).
  */
-continuation?: OverviewContinuation, };
+continuation?: OverviewContinuation,
+/**
+ * For a request with `workBudget` (`Overview::work`).
+ */
+work?: OverviewWork, };

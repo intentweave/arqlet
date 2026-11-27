@@ -7,6 +7,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
+  `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
+  out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,
+  `unclustered`, `packed`); `overBudget: "refuse"` fails cleanly instead. The same answer for any thread count, natively
+  and in WASM; without `workBudget` nothing changes. New contract types `OverviewWork` and `OverBudget`. How to choose
+  a budget: [integration guide](docs/integration-guide.md#bounding-an-overviews-work-provisional).
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
   a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
   (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every

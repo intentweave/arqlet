@@ -185,6 +185,72 @@ the discs. A `parent` that is not a string is refused. Parents are taken at thei
 
 Limits: other cluster options do not regroup a container that keeps its clusters.
 
+### Bounding an overview's work (provisional)
+
+A host that bounds the time of an `overview` request need not terminate its worker and load the engine again: give the
+request a **work budget** ([ADR 0018, addendum of 2026-11-27](adr/0018-cluster-overview.md)). It is deterministic: the
+same budget gives the same answer on every machine, natively and in WASM, for any `threads`. A wall-clock limit inside
+the engine does not exist on purpose.
+
+```js
+const answer = run({op: 'overview', graph, workBudget: 30_000_000});
+answer.overview.work;   // {budget, used, clustering, limited, unclustered, packed}
+```
+
+| Field | Meaning |
+|---|---|
+| `workBudget` | units of work for the iterative phases: clustering (Louvain) and arranging each container (forces, separation) |
+| `overBudget` | `"answer"` (default): answer what is ready; `"refuse"`: fail with an error starting `Overview work budget exhausted: ` |
+| `work.used` | units of the work the answer holds, never more than `budget` |
+| `work.clustering` | the part of `used` that went into communities |
+| `work.limited` | the budget ran out |
+| `work.unclustered` | containers left without their communities (node indices, -1: the top level) |
+| `work.packed` | containers whose children are packed in rows instead of arranged by forces |
+| `work.startIgnored` | only when true: a `start` by node index made for the complete clustering did not fit the cut one and was left out |
+| `work.radiiIgnored` | only when not empty: ids in `radii` of added clusters the cut clustering does not have, left out |
+
+When the budget runs out, the first container that does not fit ends the budgeted work: what is not split yet stays
+unsplit, what is not arranged yet is packed. The answer is valid all the same: every node has its disc, no discs of one
+container overlap, children lie inside their parent's disc, edges keep their direction. An unchanged container of a
+continuation keeps its arrangement within any budget. Without `workBudget` the answer is exactly as before and has no
+`work`. `work` also comes with `positionsOnly` and `columns` answers; `createOverviewSession` passes both fields on.
+
+Choose `"refuse"` when the host would rather show the last overview: a refused request changes nothing in a session.
+
+Know these limits:
+
+- **Clustering comes first.** A large clustering (a big flat graph split into communities) can use up the budget, and
+  then every container is packed.
+- **Packed stays packed.** A continuation (`start`) keeps an unchanged packed container as it is, like any unchanged
+  arrangement, until the host lays out without `start`.
+- **Threads.** With threads a level may take up to about twice its remaining budget in wall time (a container stopped
+  by the shared counter is arranged again alone). On one thread and in WASM the work exceeds the budget by at most one
+  step (one tick, round or sweep of one container).
+- **Drags** (`start.moved`) are applied in a container kept as it was when the moved node overlaps nothing there;
+  otherwise that container is packed and listed.
+- A continuation by index made for the complete clustering does not fit an answer whose clustering the budget cut:
+  with `"answer"` the start is left out (`startIgnored`), as are `radii` of clusters that are missing (`radiiIgnored`);
+  with `"refuse"` the request is refused with the prefix above.
+An answer with `unclustered` containers has other nodes than the complete overview: continuing it by node index (and
+with `start: {}` in a session) is refused once the clustering completes (the number of values differs); lay out without
+`start` then. By id (`start.nodes`) it continues, and those containers are clustered as new ones.
+
+**Choosing a budget.** The units are not time; calibrate them on your machine:
+
+1. Lay out graphs of the sizes you serve with `workBudget: Number.MAX_SAFE_INTEGER` and time each request:
+   `work.used` is the work of the whole overview.
+2. Time the same requests with `workBudget: 0`: this is the part the budget does not bound (reading the graph, the
+   hierarchy, packing, the answer); it grows with the graph's size.
+3. Units per second = `used / (time − time at budget 0)`. The budget for a time limit `T` is about
+   `(T − time at budget 0 − margin) × units per second`.
+
+On the generated code indexes of `benchmarks/overview/generate.py`, one Apple M3 under load, the native engine and the
+WASM engine in Node both spent about 60 million units per second on one thread (157 to 206 million with 4 native
+threads); the whole overview took about 4.4 million units per 1 000 nodes, and the unbudgeted part 52 to 64 ms at 10 000
+nodes and 0.5 to 0.7 s at 100 000 ([results](../benchmarks/results/overview-work-budget-20261127.md),
+`benchmarks/overview/work-rate.mjs`). These figures come from a **loaded** machine (load average 4.4 to 6.0 during the
+runs, recorded per row); other machines, loads and graphs differ: measure your own.
+
 ## 5. Offers from another engine: refinement
 
 A refinement improves a layout without changing the view's decisions. It can run anywhere and is applied only if the
@@ -310,6 +376,8 @@ step each, in every mode.
   apart, and the interactive steps never wait behind a refinement.
 - The controller queues its steps in order; `cancel()` drops the ones not started yet. An engine call under way finishes
   (it cannot be interrupted from outside); its result is dropped if it no longer fits.
+- To bound an engine call without terminating the worker, give it a deterministic work budget: `workBudget` on
+  `refine` (jobs) and on `overview` (units, [above](#bounding-an-overviews-work-provisional)).
 - Output is identical for any thread count (`threads` on refinement) and on every platform.
 
 ## 9. Memory
