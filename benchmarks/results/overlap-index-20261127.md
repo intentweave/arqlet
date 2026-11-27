@@ -90,8 +90,9 @@ What made it expensive:
 
 The change (`crates/routing/src/lib.rs`), each step keeping iteration orders, float operations and results:
 
-- `OverlapNodes` / `ObstacleGrid`: the nodes in a uniform grid (at most 64 x 64 cells) over their boxes, grown by the
-  largest clearance plus one unit. `EdgeObstacles`: an edge's outlines built once per route (same filter and `obstacle`
+- `OverlapNodes` / `ObstacleGrid`: the nodes in a uniform grid (at most 64 x 64 cells) over the extent of each box and
+  of its shape's outline, both edges in either order, grown by the largest clearance plus a pad (one unit and a few units
+  in the last place of the coordinates); an axis with a NaN edge spans the whole grid, for boxes and queries alike. `EdgeObstacles`: an edge's outlines built once per route (same filter and `obstacle`
   as before, in node order), with their corridor boxes. Node hits test only the rectangles in the cells of each segment's
   box, with the unchanged `hits_outline` on the whole route (a rectangle can only be hit by an axis-parallel segment
   inside it); discs and routes with an oblique segment are tested against every outline. Corridors visit the strip of
@@ -141,11 +142,18 @@ all nodes any more.
   negated `<`, a closure); the committed code was built again (release, without the timer) and checked once more: all five
   configurations identical to the base build (91 views, threads 1 and 4 identical), and the answers to the dense, small
   and `bar` bus meshes byte for byte equal to the base build's.
+  **Review fix** (after the timed runs): a box with a negative width or height beyond twice the margin landed in no cell,
+  and one with a NaN edge only in the first column or row, while main's scans still count such boxes (reachable only
+  through `arqlet-routing`'s public API; the runtime refuses such boxes). The grid now spans both edges in either order and
+  the whole axis for a NaN edge, and the pad became relative. The views above have no such boxes, so their answers are
+  unchanged: rebuilt with the fix and `origin/main` (`3671e57`, no engine change) merged, all five configurations identical to the base build (91 views, threads 1 and 4 identical; the default also identical to the stored 0.10.0 file), the dense, small and `bar` bus meshes byte for byte equal to the base build's, `tools/platform-parity.mjs` 26 of 26, `cargo test --workspace --locked --profile fast` 1154 passed. The fix only
+  changes how the grid is built; the timings were not run again.
 - **Platforms:** `tools/platform-parity.mjs` 26 of 26 identical between native and WASM (darwin-arm64), with a new
   request that runs the second pass (bus mesh 60/12, so CI checks the overlap resolution on every platform).
 - **Unit test:** `the_obstacle_grid_agrees_with_a_scan_of_every_node` compares the grid's hit counts with a scan and its
-  corridors bit for bit with `corridor_span`, on random nested boxes and discs, short, touching and oblique segments, with
-  and without clearances (a grid with too small a margin fails it). The existing
+  corridors bit for bit with `corridor_span`, on random nested boxes and discs (a fifth of them with a negative extent or
+  a NaN edge), short, touching and oblique segments, with and without clearances (a grid with too small a margin, or the
+  grid before the review fix, fails it). The existing
   `the_segment_index_agrees_with_shares_segment` covers the single-bucket index.
 
 ## Not measured
