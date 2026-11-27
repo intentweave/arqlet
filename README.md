@@ -313,8 +313,8 @@ In the playground: section *Filter* (a box per node kind and edge kind, *Close u
 `patch` changes the graph of a view without a new import: `{nodes, edges, removeNodes,
 removeEdges}` (removals first; a removed node takes what it holds and its edges). The
 view keeps its state (collapsed containers, filter); a view with a level of detail,
-communities or groups is laid out as a toggle lays it out (the drawing depends only on
-the graph and the view). A host can start with aggregated edges between collapsed
+communities or groups, or with buses, is laid out as an import of the changed graph lays
+it out (the drawing depends only on the graph and the view). A host can start with aggregated edges between collapsed
 containers and load the member edges of a container when it is opened:
 
 ```js

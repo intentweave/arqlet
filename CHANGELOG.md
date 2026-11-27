@@ -16,6 +16,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
   overview page pauses the overview while the scene view of a cluster covers it.
 
+### Fixed
+
+- **A `patch` into a view with buses draws what an import of the patched graph draws** (#228, ADR 0029 C). It started
+  from the earlier drawing and drew far worse in layered views with bus lines and organic views with bus bars: on the
+  generated bus meshes of #212, 1 043 and 2 091 routes through nodes where an import has none, and 1 374 where it has 36.
+  Organic views with bus lines already drew the import's drawing and are unchanged; views without buses still continue
+  their earlier drawing. Such a patch now takes an import's time: about the same in layered views, much longer in organic
+  views with bus bars where the import runs its second routing pass (the dense view of #212: 2.0 s before, 16.5 s now;
+  `benchmarks/results/patch-as-import-20261127.md`; measured before the faster second pass of #229). Revisions and stale
+  checks are unchanged.
+
 ## 0.10.0 — 2026-11-27
 
 A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list
