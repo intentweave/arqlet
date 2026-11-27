@@ -341,6 +341,13 @@ mod tests {
             names("MATCH (`my node`) RETURN `my node`.`a b`"),
             ["`my node`.`a b`"]
         );
+        // A name ends at the item's last token: the whitespace and comments that follow are not part of it.
+        assert_eq!(names("MATCH (a) RETURN a.age + 1 LIMIT 1"), ["a.age + 1"]);
+        assert_eq!(
+            names("MATCH (a) RETURN a.age > 3 /* c */ , count(a) + 1\n"),
+            ["a.age > 3", "count(a) + 1"]
+        );
+        assert!(lower("MATCH (a) RETURN a.age + 1 , a.age + 1   ").is_err());
     }
 
     #[test]

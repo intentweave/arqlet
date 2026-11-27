@@ -25,6 +25,10 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   the column order in the HIR, so the lowering no longer reads the syntax tree; a column without `AS` keeps its written
   name, which lets `` RETURN `my node`.`a b` `` run (it was refused), and `RETURN *` is rejected by name. No other plan of
   a supported query changes (`crates/query-cypher/tests/grid.rs` pins the outcome of about 1 600 queries).
+- decypher 0.4.1: a column without `AS` is named by its expression without the whitespace and comments that follow it
+  (`RETURN a.age + 1 LIMIT 1` names `a.age + 1`; 0.9.0 refused such a query), so two items that differ only in them are
+  refused as duplicate columns. The `WHERE` of a `WITH` comes after its `ORDER BY`, `SKIP` and `LIMIT` in the HIR, so the
+  lowering no longer reorders them.
 
 ## 0.10.0 — 2026-11-27
 

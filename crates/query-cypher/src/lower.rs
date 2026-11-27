@@ -77,7 +77,7 @@ fn single(hir: &HirQuery) -> Result<Plan, QueryError> {
     };
     for part in &hir.parts {
         lowering.aliases.clear();
-        for op in in_clause_order(&part.operations) {
+        for op in &part.operations {
             lowering.op(op)?;
         }
     }
@@ -93,31 +93,6 @@ fn single(hir: &HirQuery) -> Result<Plan, QueryError> {
     };
     available(&plan, &hir.arenas)?;
     Ok(plan)
-}
-
-/// The operations of a part of the query in the order they apply. The HIR puts the `WHERE` of a `WITH` ahead of the
-/// `ORDER BY`, `SKIP` and `LIMIT` of the same clause, but it filters what they leave.
-fn in_clause_order(operations: &[Operation]) -> Vec<&Operation> {
-    let cuts = |op: &Operation| {
-        matches!(
-            op,
-            Operation::Sort(_) | Operation::Skip(_) | Operation::Limit(_)
-        )
-    };
-    let mut ordered = Vec::with_capacity(operations.len());
-    let mut filters = Vec::new();
-    for (i, op) in operations.iter().enumerate() {
-        if matches!(op, Operation::Filter(_)) && operations[i + 1..].iter().any(cuts) {
-            filters.push(op);
-            continue;
-        }
-        if !cuts(op) {
-            ordered.append(&mut filters);
-        }
-        ordered.push(op);
-    }
-    ordered.append(&mut filters);
-    ordered
 }
 
 /// Refuses a plan in which an expression reads a variable that holds nothing at that point: it would read null and answer

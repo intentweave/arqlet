@@ -489,6 +489,19 @@ The other changes of 0.4.0 need nothing here: `||` falls to the lowering's refus
 `+` would add numbers that `||` refuses), `trim(… FROM …)` becomes a call of `btrim`, `ltrim` or `rtrim`, which the
 function table rejects, and the `SET` and `REMOVE` changes are behind the rejection of writes.
 
+decypher 0.4.1 (pinned since 2026-11-27) fixes three defects found in review of the upgrade (upstream #154 to #156):
+
+- An item without `AS` is named by its text up to its last token. With 0.4.0 its name took in the whitespace and comments
+  that followed it (`RETURN a.age + 1 LIMIT 1` named the column `a.age + 1 `); 0.9.0 had refused such queries ("cannot
+  place the column"). Items that differ only in that trivia are now duplicate columns, which decypher refuses.
+- The HIR puts the `WHERE` of a `WITH` after its `ORDER BY`, `SKIP` and `LIMIT`, the order in which they apply. The
+  lowering reordered them itself (#184); it now takes the operations in the HIR's order.
+- Text inside a comprehension, quantifier or `reduce` that names the construct's own variable is no longer replaced by a
+  projected column. The refusal of a comprehension variable named like a variable outside it (under *Maps and lists*)
+  is therefore no longer needed; lifting it is left to a follow-up with its own cases.
+
+No plan in `tests/pinned.tsv` changes.
+
 ## Not decided here
 
 - Syntax and scoring of search operators; hybrid ranking; embedding source.
