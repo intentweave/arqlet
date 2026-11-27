@@ -39,7 +39,11 @@ export type NativeRun = ((request: EngineRequest) => Promise<EngineResponse>) & 
 };
 
 /** The WASM engine of `@arqlet/engine-client` (synchronous, on the calling thread), marked as such. */
-export type WasmRun = Run & {kind: 'wasm'};
+export type WasmRun = Run & {
+  kind: 'wasm';
+  /** With `engine: 'auto'`: why the native module was not used (not found, or the error of loading it). */
+  fallbackReason?: string;
+};
 
 export interface NativeOptions {
   /** The module file to load instead of the default lookup (any file name; a cargo build loads as it is). */
@@ -58,11 +62,18 @@ export interface LoadEngineOptions extends NativeOptions {
 /** The key of this platform's prebuilt module and package: `darwin-arm64`, `linux-x64-gnu`, `win32-x64-msvc`, ... */
 export function platformKey(platform?: string, arch?: string): string;
 
-/** The raw binding of the native module (its `NativeEngine` class); loaded once per file. Throws without a module. */
+/**
+ * The raw binding of the native module (its `NativeEngine` class); loaded once per file. Throws without a module. Unlike
+ * `loadNativeEngine`, it does not order the calls of one session: concurrent `sessionRun` calls on one handle are
+ * serialized by the session's lock but may run in any order.
+ */
 export function nativeBinding(options?: {path?: string}): {NativeEngine: new (sessionBytes?: number) => unknown};
 
 /** Whether a native module can be loaded on this machine. */
 export function nativeAvailable(options?: {path?: string}): boolean;
+
+/** Why no native module can be loaded (the lookup's or `process.dlopen`'s error), or null when one loads. */
+export function nativeLoadError(options?: {path?: string}): Error | null;
 
 /** Loads the native engine. Throws when no native module is available. */
 export function loadNativeEngine(options?: NativeOptions): NativeRun;

@@ -5,15 +5,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
-import {join} from 'node:path';
-import {loadEngine, loadNativeEngine, nativeAvailable, platformKey} from './index.js';
+import {join, relative} from 'node:path';
+import {loadEngine, loadNativeEngine, nativeAvailable, nativeLoadError, platformKey} from './index.js';
 import {createEngine} from '../engine-client/wasm-client.js';
 import {createSession} from '../engine-client/session.js';
 
 const root = join(import.meta.dirname, '../..');
 const wasmFile = join(root, 'target/wasm32-unknown-unknown/release/arqlet_wasm.wasm');
 const native = nativeAvailable();
-const skipNative = native ? false : 'no native module built (node packages/node/build.mjs)';
+// In CI (or with ARQLET_REQUIRE_NATIVE) a module that is missing or fails to load is a failure, not a reason to skip.
+if (!native && (process.env.CI || process.env.ARQLET_REQUIRE_NATIVE)) throw nativeLoadError();
+const skipNative = native ? false : `no native module (${nativeLoadError().message}); build one with node packages/node/build.mjs`;
 const skipWasm = skipNative || (existsSync(wasmFile) ? false : 'no WASM build in target/');
 
 // A deterministic graph of `n` nodes in containers of ten, with cycles and parallel edges.
@@ -39,6 +41,12 @@ const script = n => [
   {op: 'intent'},
 ];
 
+test('a relative path is resolved before loading', {skip: skipNative}, () => {
+  const file = join(import.meta.dirname, `arqlet.${process.platform}-${process.arch}.node`);
+  if (!existsSync(file)) return;
+  assert.equal(nativeAvailable({path: relative(process.cwd(), file)}), true);
+});
+
 test('platform key names the prebuilt package', () => {
   assert.equal(platformKey('darwin', 'arm64'), 'darwin-arm64');
   assert.equal(platformKey('win32', 'x64'), 'win32-x64-msvc');
@@ -49,6 +57,7 @@ test('an unknown engine choice is refused, a missing module is reported', async 
   await assert.rejects(loadEngine({engine: 'gpu'}), /Unknown engine/);
   assert.throws(() => loadNativeEngine({path: join(root, 'no-such-module.node')}), /No native Arqlet module/);
   assert.equal(nativeAvailable({path: join(root, 'no-such-module.node')}), false);
+  assert.match(nativeLoadError({path: join(root, 'no-such-module.node')}).message, /No native Arqlet module/);
 });
 
 test('dispatch, sessions and columns answer as the WASM engine', {skip: skipWasm}, async () => {
@@ -168,6 +177,10 @@ test('loadEngine chooses native or WASM', {skip: skipWasm}, async () => {
   assert.equal(auto.kind, 'native');
   const wasm = await loadEngine({engine: 'wasm', wasmUrl: new URL(`file://${wasmFile}`)});
   assert.equal(wasm.kind, 'wasm');
+  assert.equal(wasm.fallbackReason, undefined);
+  const fallback = await loadEngine({engine: 'auto', path: 'no-such-module.node', wasmUrl: new URL(`file://${wasmFile}`)});
+  assert.equal(fallback.kind, 'wasm');
+  assert.match(fallback.fallbackReason, /No native Arqlet module/);
   const request = script(25)[0];
   assert.deepEqual(await native(request), wasm(request));
 });

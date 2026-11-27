@@ -38,7 +38,8 @@ fn guarded(work: impl FnOnce() -> String) -> String {
 }
 
 /// The clock for phase timings (`timings: true` on a request), as the native binaries install it; the layout never reads
-/// it. Phase timings are collected per process, so with several calls running at once they add up across them.
+/// it. Phase timings are collected once per process: with several calls running at once, a request's timings can include
+/// another's phases, and its final `clock::take()` returns and resets what the others collected so far.
 fn install_clock() {
     static ORIGIN: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
     ORIGIN.get_or_init(std::time::Instant::now);
@@ -235,6 +236,14 @@ static LIVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::ne
 unsafe impl std::alloc::GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
         let p = std::alloc::System.alloc(layout);
+        if !p.is_null() {
+            LIVE.fetch_add(layout.size(), std::sync::atomic::Ordering::Relaxed);
+        }
+        p
+    }
+    // Forwarded, so large zeroed allocations keep the system's lazily zeroed pages (the default would write the zeros).
+    unsafe fn alloc_zeroed(&self, layout: std::alloc::Layout) -> *mut u8 {
+        let p = std::alloc::System.alloc_zeroed(layout);
         if !p.is_null() {
             LIVE.fetch_add(layout.size(), std::sync::atomic::Ordering::Relaxed);
         }

@@ -120,8 +120,9 @@ No async runtime or thread-pool crate is added: libuv's pool is Node's own, and 
   soft while several sessions grow at once (ADR 0024 item 2).
 - **Closing** a session removes it from the book; a request already running on it finishes and answers.
 - **Failure:** a panic inside the engine is caught at the adapter boundary and answered as `{ok: false, error: "Engine
-  panic: ..."}` (unwinding into Node would abort the process); a session whose request panicked is closed, since its
-  state may be half changed, and answers that it failed.
+  panic: ..."}` (unwinding into Node would abort the process). The store catches the panic inside the session's call
+  and removes that session at once, since its state may be half changed: it is no longer listed, its weight no longer
+  counts toward `sessionBytes`, and later requests to it answer `Unknown session`.
 - **Memory:** `memory` and `release` answer the module's live heap (`heapBytes`, counted by a wrapper around the system
   allocator, as in WASM); there is no linear memory natively, and freed memory goes back to the system allocator, so
   `recycle` is not needed to give memory back (it still works, for moving a session to another engine).
@@ -143,9 +144,11 @@ needs it.
 - **Progressive publications are not delivered.** `refineProgressive` answers with its final result only, as the WASM
   engine does without `onPublish`. Delivering them needs a thread-safe function into JavaScript (Node-API 4) and an
   order between the publications and the final answer.
-- **Phase timings are summed across concurrent calls.** `timings: true` reads the per-process collector
-  (`arqlet_model::clock`), so the times of calls running at the same time add up. The layout itself never reads the
-  clock, so answers are unaffected.
+- **Phase timings are unreliable under concurrent calls.** `timings: true` reads one collector per process
+  (`arqlet_model::clock`): phases of calls running at the same time land in it together, and the `take()` at the end of
+  one request returns and resets what the others collected so far. A request's `timings` can therefore include another
+  request's phases or miss some of its own. The layout never reads the clock, so the answers are unaffected; a host
+  that measures phases runs those requests one at a time.
 - **No musl Linux or Intel macOS binaries.** Those hosts build from source (`node packages/node/build.mjs`) or use the
   WASM fallback (`loadEngine({engine: 'auto'})` falls back by itself).
 - No cancel flag for a running call (ADR 0024 item 6): a host drops the answer by revision, as everywhere.

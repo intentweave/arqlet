@@ -4,15 +4,17 @@
 // `createSession` of `@arqlet/engine-client` takes it as it takes `workerRun`.
 import {createRequire} from 'node:module';
 import {existsSync} from 'node:fs';
-import {join} from 'node:path';
+import {join, resolve} from 'node:path';
 
 const here = import.meta.dirname;
 
 /** The platform key of the prebuilt module and its package (`darwin-arm64`, `linux-x64-gnu`, `win32-x64-msvc`, ...). */
+let glibc;
 export function platformKey(platform = process.platform, arch = process.arch) {
   if (platform === 'linux') {
-    // glibc or musl: only glibc builds are planned (ADR 0030); a musl system builds from source.
-    const glibc = process.report?.getReport?.().header?.glibcVersionRuntime;
+    // glibc or musl: only glibc builds are planned (ADR 0030); a musl system builds from source. The report is costly
+    // (it collects the whole process state), so it is read once.
+    glibc ??= Boolean(process.report?.getReport?.().header?.glibcVersionRuntime);
     return `linux-${arch}-${glibc ? 'gnu' : 'musl'}`;
   }
   if (platform === 'win32') return `win32-${arch}-msvc`;
@@ -23,8 +25,10 @@ export function platformKey(platform = process.platform, arch = process.arch) {
 // (`build.mjs`), the platform's package (`@arqlet/node-<key>`, an optional dependency once published).
 function candidates(path) {
   const list = [];
-  if (path) return [String(path)];
-  if (process.env.ARQLET_NODE_ADDON) list.push(process.env.ARQLET_NODE_ADDON);
+  // Absolute paths: `process.dlopen` would otherwise resolve a relative one against the process's working directory, or
+  // search the system's library path for a bare name.
+  if (path) return [resolve(String(path))];
+  if (process.env.ARQLET_NODE_ADDON) list.push(resolve(process.env.ARQLET_NODE_ADDON));
   list.push(join(here, `arqlet.${process.platform}-${process.arch}.node`));
   try {
     list.push(createRequire(import.meta.url).resolve(`@arqlet/node-${platformKey()}/arqlet.node`));
@@ -56,7 +60,12 @@ export function nativeBinding({path} = {}) {
 
 /** Whether a native module can be loaded on this machine. */
 export function nativeAvailable(options) {
-  try { nativeBinding(options); return true; } catch { return false; }
+  return nativeLoadError(options) === null;
+}
+
+/** Why no native module can be loaded (the error of the lookup or of `process.dlopen`), or null when one loads. */
+export function nativeLoadError(options) {
+  try { nativeBinding(options); return null; } catch (error) { return error; }
 }
 
 const views = {f32: Float32Array, u32: Uint32Array, i32: Int32Array, f64: Float64Array};
@@ -128,13 +137,16 @@ export function loadNativeEngine({path, sessionBytes} = {}) {
  * Loads an engine for a Node host: `engine` chooses `'native'` (an error without a native module), `'wasm'` (the WASM
  * engine of `@arqlet/engine-client`, synchronous, on this thread) or `'auto'` (native where available, else WASM). The
  * default is `ARQLET_ENGINE` from the environment, else `'auto'`. The answer's `kind` says which one was loaded; both give
- * the same answers.
+ * the same answers. When `'auto'` falls back to WASM, `fallbackReason` says why.
  */
 export async function loadEngine({engine = process.env.ARQLET_ENGINE || 'auto', path, sessionBytes, wasmUrl} = {}) {
   if (!['auto', 'native', 'wasm'].includes(engine)) throw Error(`Unknown engine "${engine}" (auto, native or wasm)`);
-  if (engine === 'native' || (engine === 'auto' && nativeAvailable({path}))) return loadNativeEngine({path, sessionBytes});
+  const problem = engine === 'wasm' ? null : nativeLoadError({path});
+  if (engine === 'native' || (engine === 'auto' && problem === null)) return loadNativeEngine({path, sessionBytes});
   const {loadEngine: loadWasm} = await import('@arqlet/engine-client/engine.js');
   const run = await loadWasm(wasmUrl);
   run.kind = 'wasm';
+  // With 'auto': why the native module was not used (a missing module, or the error of loading it).
+  if (problem) run.fallbackReason = problem.message;
   return run;
 }

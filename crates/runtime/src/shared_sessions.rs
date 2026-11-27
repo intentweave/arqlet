@@ -47,9 +47,11 @@ impl Book {
 /// Why a request found no session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Missing {
-    /// Never opened, closed, or dropped for the limit.
+    /// Never opened, closed, dropped for the limit, or closed because a request on it panicked (`with_session` removes
+    /// such a session at once and passes the panic on to its caller).
     Unknown,
-    /// A request panicked while it held the session; the session was dropped, since its state may be half changed.
+    /// The session's lock was found poisoned (a panic outside `with_session` while it was held); the session was
+    /// dropped, since its state may be half changed.
     Failed,
 }
 
@@ -153,21 +155,23 @@ impl SharedSessionStore {
             Arc::clone(&kept.session)
         };
         // The session's lock: one request at a time. A request that panicked poisoned it; that session is given up.
+        // A panic in `work` is caught here, so the session leaves the book at once (it is not listed, its weight no
+        // longer counts, and it cannot block eviction as an "active" session), and is then passed on to the caller.
         let outcome = match session.lock() {
             Ok(mut guard) => {
-                // A panic in `work` unwinds through here and poisons the lock; the store's book stays consistent, and
-                // `active` is given back below only on the normal path, so the next request finds the poisoned lock and
-                // drops the session.
-                let answer = work(&mut guard);
-                Ok((answer, guard.heap_estimate()))
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&mut guard))) {
+                    Ok(answer) => Ok((answer, guard.heap_estimate())),
+                    Err(payload) => Err(Some(payload)),
+                }
             }
-            Err(_) => Err(Missing::Failed),
+            // Poisoned by a panic that escaped elsewhere while the lock was held: the state may be half changed.
+            Err(_) => Err(None),
         };
         let mut book = self.book();
         book.clock += 1;
         let clock = book.clock;
         match outcome {
-            Err(missing) => {
+            Err(payload) => {
                 // Only this handle's entry, and only if it is still the same session (handles are never reused).
                 if book
                     .open
@@ -176,7 +180,11 @@ impl SharedSessionStore {
                 {
                     book.open.remove(&id);
                 }
-                Err(missing)
+                drop(book);
+                if let Some(payload) = payload {
+                    std::panic::resume_unwind(payload);
+                }
+                Err(Missing::Failed)
             }
             Ok((answer, bytes)) => {
                 if let Some(kept) = book.open.get_mut(&id) {
@@ -356,14 +364,21 @@ mod tests {
 
     #[test]
     fn a_session_whose_request_panicked_is_closed() {
-        let store = SharedSessionStore::default();
+        let store = SharedSessionStore::with_limit(Some(1));
         let (a, b) = (store.open(), store.open());
+        store.run(a, &script(8)[0]);
+        assert!(store.bytes() > 0);
+        // The panic reaches the caller (the adapter answers it as an error) ...
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             store.with_session(a, |_| panic!("deliberate")).ok();
         }));
         assert!(result.is_err());
-        assert_eq!(store.with_session(a, |_| ()).unwrap_err(), Missing::Failed);
+        // ... and the session is gone at once: not listed, its weight no longer counted, nothing evicted for it.
         assert_eq!(store.ids(), vec![b]);
+        assert_eq!(store.bytes(), 0);
+        assert_eq!(store.evicted(), 0);
+        assert_eq!(store.with_session(a, |_| ()).unwrap_err(), Missing::Unknown);
         assert!(store.run(b, &script(8)[0]).contains("\"ok\":true"));
+        assert_eq!(store.ids(), vec![b]);
     }
 }

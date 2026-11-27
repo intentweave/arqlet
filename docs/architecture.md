@@ -502,8 +502,11 @@ A dependency of `crates/node` (`arqlet-node`, `publish = false`) only, recorded 
   `bitflags` 2.13.2, `ctor` 1.0.14, `futures` 0.3.34 with `futures-channel`, `-core`, `-executor`, `-io`, `-sink`,
   `-task`, `-util` (all `MIT OR Apache-2.0`), `nohash-hasher` 0.2.0, `pin-project-lite` 0.2.18, `rustc-hash` 2.1.3 (all
   `Apache-2.0 OR MIT`), `slab` 0.4.12 (`MIT`), `libloading` 0.9.1 (`ISC`; it loads the Node-API symbols from the host
-  process) and on Windows `windows-link` 0.2.1 (`MIT OR Apache-2.0`). Build time only: `napi-derive`, `convert_case`
-  0.12.0 (`MIT`), `syn` 2 and 3, `quote`, `proc-macro2`, `unicode-segmentation`, `unicode-ident`.
+  process) and on Windows `windows-link` 0.2.1 (`MIT OR Apache-2.0`). Build time only, not in the module: `napi-derive`,
+  `napi-derive-backend`, `napi-build`, `futures-macro` 0.3.34 (`MIT OR Apache-2.0`), `convert_case` 0.12.0 (`MIT`), `syn` 2
+  and 3, `quote`, `proc-macro2`, `unicode-segmentation`, `unicode-ident`. `napi-derive`, `napi-derive-backend` and
+  `napi-build` ship no license file either (checked 2026-11-27); they are not distributed, and their license is the same
+  MIT text of the napi-rs repository.
 - Notices: MIT and ISC require the copyright and license notice to accompany a distribution, and a native module
   contains these crates. `tools/third-party-notices.mjs --package arqlet-node --target <triple>` collects them. `napi`
   and `napi-sys` ship no license file in their crates, so their MIT text is supplied from the upstream repository:

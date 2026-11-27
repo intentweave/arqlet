@@ -18,6 +18,12 @@ const session = createSession(run);
 await session.import(graph, {limit: 2000});
 ```
 
+When `'auto'` falls back to WASM, `run.fallbackReason` says why. `nativeLoadError()` gives the same error directly.
+
+The raw `nativeBinding()` (the `NativeEngine` class) does not order the calls of one session. Its lock serializes them,
+but concurrent `sessionRun` calls on one handle may run in any order. `loadNativeEngine` queues them in the order
+sent.
+
 `loadNativeEngine({sessionBytes})` caps the total estimated weight of the sessions. Over that cap, the least recently
 used idle session is dropped. `run.sessions()` lists the open sessions.
 
@@ -43,8 +49,9 @@ The loader looks for the module in this order:
   `private`.
 - **Progressive publications are not delivered.** `refineProgressive` answers with its final result only, as the WASM
   engine does without `onPublish`.
-- **Phase timings are per process.** With `timings: true` on calls that run at the same time, their times add up. The
-  answers themselves are unaffected.
+- **Phase timings are per process.** With `timings: true` on calls that run at the same time, one request's
+  `timings` can include another's phases, or miss some of its own. The answers themselves are unaffected; measure
+  phases one request at a time.
 - **No musl Linux or Intel macOS binaries are planned.** On those systems, build from source with `build.mjs`, or let
   `loadEngine({engine: 'auto'})` fall back to WASM.
 
