@@ -17,7 +17,9 @@ Rendering helpers for Arqlet scenes. The engine computes all geometry; these mod
   `{rules: [{selector: 'edge[kind=import]', style: {stroke: '#e6a560', dash: '4 2'}}, {selector: 'leaf', style: {stroke: 'auto'}}]}`;
   pass it as `style` to `renderSvg`, the scene view or `toReactFlow`; theme colours may come from CSS custom properties
   (`--arqlet-leaf-fill`, `themeFromCss`);
-- `overview.js`, `overview-gl.js`: the cluster overview of a whole graph (engine operation `overview`), drawn with WebGL, with picking and the excerpt for a drill-down.
+- `overview.js`, `overview-gl.js`: the cluster overview of a whole graph (engine operation `overview`), drawn with WebGPU,
+  WebGL 2 or WebGL 1, with picking and the excerpt for a drill-down; `renderer.pause()` and `renderer.resume()`
+  (provisional) stop and restart all drawing while a host hides it, keeping its GPU resources, model and view.
 
 > **Status: prototype.** The API, the JSON protocol and the snapshot format are
 > provisional and may change in any release.

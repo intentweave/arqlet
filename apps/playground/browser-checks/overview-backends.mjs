@@ -1,8 +1,9 @@
 // ADR 0025 O2: the cluster overview on its three backends (WebGPU, WebGL 2, WebGL 1) draws the same picture in every
-// mode: plain, galaxy (on a dark and on a light background, light and ink), orbit, lens, a path, a frame of breathing and a frame of a morph (the clock held still). Each is
+// mode: plain, galaxy (on a dark and on a light background, light and ink), orbit, lens, a path, a frame of breathing and a frame of a morph (the clock held still), state changed while paused and drawn at resume. Each is
 // compared with WebGL 1 pixel by pixel (or, when `packages/viewer/overview-gl-reference.js` exists, with that earlier
 // renderer kept beside it for the comparison: copy the previous `overview-gl.js` there, never commit it). Pictures go to
-// OUT (default: a temporary folder). Starts its own server and Chrome. Not part of CI.
+// OUT (default: a temporary folder). Then, per backend on the real clock, pause and resume (#221): no frame while paused,
+// one at resume, the animations going on after it. Starts its own server and Chrome. Not part of CI.
 // usage: node overview-backends.mjs [graph=vehicle-network]
 import {writeFileSync, mkdtempSync, existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
@@ -65,9 +66,11 @@ try {
       morph: r => { fixed = 1000; r.morph(moved, {duration: 1000}); fixed = 1500; },
       'structured, cluster look': r => structure(r, null),
       'structured, scene look': r => structure(r, 'scene'),
+      // State changed while paused is drawn at resume (#221).
+      'paused, resumed': r => { r.pause(); r.setState({trace: pathOf(model, {nodes: leafIds, edges: []})}); r.setLens({x: W * 0.4, y: H * 0.5, radius: 140, magnification: 2.5}); r.resume(); },
     };
     // The earlier renderer has no scene look: that mode is compared with the WebGL 1 backend.
-    const own = mode => mode === 'structured, scene look' || mode === 'galaxy, light' || !ref;
+    const own = mode => mode === 'structured, scene look' || mode === 'galaxy, light' || mode === 'paused, resumed' || !ref;
     // The clear colour per mode: the galaxy on a light background is drawn in ink.
     const backgroundOf = mode => (mode === 'galaxy, light' ? [0.965, 0.973, 0.984, 1] : bg);
     const make = (kind, mode) => {
@@ -101,13 +104,63 @@ try {
       }
     }
     performance.now = realNow;
-    return {nodes: answer.overview.ids.length, out};
+    // Pause and resume (#221) on every backend, on the real clock: frames counted where the backend draws them (a WebGL
+    // clear, a WebGPU submit) while breathing, while paused with state changed and a blend asked for, at resume and after.
+    const sleep = ms => new Promise(done => setTimeout(done, ms));
+    const pauses = [];
+    for (const kind of [...new Set([...kinds, 'webgl1'])]) {
+      const canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px';
+      document.body.append(canvas);
+      const r = createOverviewRenderer(canvas, model, {background: bg, ...(kind === 'webgpu' ? {device: gpu.device} : kind === 'webgl1' ? {backend: 'webgl1'} : {})});
+      let frames = 0;
+      if (kind === 'webgpu') {
+        const queue = gpu.device.queue, submit = queue.submit;
+        queue.submit = buffers => { frames++; return submit.call(queue, buffers); };
+      } else {
+        const gl = canvas.getContext(kind === 'webgl2' ? 'webgl2' : 'webgl'), clear = gl.clear.bind(gl);
+        gl.clear = mask => { frames++; clear(mask); };
+      }
+      r.setView(view);
+      r.resize();
+      r.breathe({fadeIn: 1});
+      await sleep(250);
+      const breathing = frames;
+      r.pause();
+      r.pause();
+      const atPause = frames;
+      r.setView({...view, scale: view.scale * 1.2});
+      r.setLens({x: W / 2, y: H / 2, radius: 120, magnification: 2});
+      r.setState({selected: model.children.findIndex(c => c.length)}, {fade: 800});
+      r.resize();
+      r.draw();
+      await sleep(400);
+      const paused = frames - atPause;
+      r.resume();
+      r.resume();
+      const atResume = frames - atPause - paused;
+      await sleep(200);
+      const after = frames - atPause - paused - atResume;
+      // The blend (800 ms on the held clock) is still running 200 ms after resume.
+      const animating = r.animating && r.breathing, state = {animating: r.animating, breathing: r.breathing};
+      r.destroy();
+      if (kind === 'webgpu') delete gpu.device.queue.submit;
+      canvas.remove();
+      pauses.push({kind, backend: r.backend, breathing, paused, atResume, after, animating, state});
+    }
+    return {nodes: answer.overview.ids.length, out, pauses};
   })()`);
   console.log(`${graphName}: ${results.nodes} nodes, compared with ${reference ? 'the earlier WebGL 1 renderer' : 'the WebGL 1 backend'}`);
   for (const r of results.out) {
     writeFileSync(join(out, `${r.mode.replace(/[^a-z]+/g, '-')}-${r.kind}.png`), Buffer.from(r.url.split(',')[1], 'base64'));
     if (r.base) continue;
     check(`O2 ${r.mode}: ${r.kind} (${r.backend}) draws as WebGL 1`, r.share < 0.01, `${(r.share * 100).toFixed(2)} % of pixels off`);
+  }
+  for (const p of results.pauses) {
+    check(`#221 ${p.kind} (${p.backend}): frames while breathing`, p.breathing > 2, `${p.breathing} frames`);
+    check(`#221 ${p.kind} (${p.backend}): no frame while paused`, p.paused === 0, `${p.paused} frames`);
+    check(`#221 ${p.kind} (${p.backend}): resume draws one frame at once`, p.atResume === 1, `${p.atResume} frames`);
+    check(`#221 ${p.kind} (${p.backend}): breathing and the blend go on after resume`, p.after > 2 && p.animating, `${p.after} frames, ${JSON.stringify(p.state)}`);
   }
   console.log(`pictures in ${out}`);
   failed = page.checks.some(c => !c.ok);
