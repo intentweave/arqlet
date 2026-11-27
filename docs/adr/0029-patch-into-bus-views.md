@@ -1,7 +1,9 @@
 # ADR 0029: A patch into a bus view: lay it out as an import, make that faster, and keep an incremental patch for later
 
 Date: 2026-11-27.
-Status: proposed (#212). Nothing is built; the owner decides before anything is.
+Status: accepted for C ([#228](https://github.com/intentweave/arqlet/issues/228)) and A1
+([#229](https://github.com/intentweave/arqlet/issues/229)) on 2026-11-27; the rest proposed. See
+[Decisions of 2026-11-27](#decisions-of-2026-11-27).
 
 Related: [ADR 0001](0001-incremental-first.md) (incremental first), [ADR 0006](0006-reactive-layout-session.md)
 (delta-driven repair), [ADR 0012](0012-local-edits.md) (local edits), [ADR 0016](0016-single-pass-default-gate.md)
@@ -159,6 +161,18 @@ benefit on the issue's patches is bounded by the placement share.
 4. Whether B is pursued at all for 0.11, and on which patches it is measured (proposed: the `--partial` cases plus an
    opened container in a corpus view; the issue's all-edges-new patch is not a case where B can win).
 5. The tolerance of "units held" (reported only, per ADR 0016) and whether a patch may move other nodes at all.
+
+## Decisions of 2026-11-27
+
+The owner accepted the recommendations (comment on #212):
+
+1. **C for bus views only, as a fix of the default** (#228): a patch into a view with buses is laid out exactly as an
+   import of the patched graph. Not behind an option; other non-abstracting views keep today's path.
+2. **A1 before #219** (#229), with the gate proposed above: the second pass at least 3 times faster, output
+   byte-identical on every stored fingerprint file and the bus-mesh views.
+3. **#219 keeps its threshold** of 500 conflicts until A1 is measured.
+4. **B is not in 0.11.** It stays proposed, behind the probe B1 described above.
+5. **Units held stay report-only** (as in ADR 0016), not a gate.
 
 ## Not measured
 
