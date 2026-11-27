@@ -1,0 +1,20 @@
+diff --git a/crates/layout/src/lib.rs b/crates/layout/src/lib.rs
+index 07654cb..2a02161 100644
+--- a/crates/layout/src/lib.rs
++++ b/crates/layout/src/lib.rs
+@@ -1094,10 +1094,15 @@ fn compute_counted_inner(
+         && snapshot.route_conflicts.len() <= engine_choice::MAX_REROUTED_ROUTES
+         && snapshot.options.hierarchical_ordering
+     {
++        let probe_started = std::time::Instant::now();
+         let mut routed = reroute(&snapshot);
+         labels::decorate(&mut routed);
+         let mut repaired = finish(routed)?;
+         labels::decorate(&mut repaired);
++        eprintln!(
++            "PHASE secondPass {:.3}",
++            probe_started.elapsed().as_secs_f64() * 1e3
++        );
+         if repaired.route_conflicts.len() < snapshot.route_conflicts.len() {
+             snapshot = repaired;
+         }

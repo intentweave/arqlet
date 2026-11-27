@@ -39,6 +39,8 @@ const requests = [
 // A view whose repair grid is over its bound, with the sparse grid (#203).
 const mesh = JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '100', '0', 'organic', 'lines', '120', '500'], {maxBuffer: 1 << 30}).toString());
 requests.push(['import over the grid bound, sparse repair', {...mesh, options: {...mesh.options, sparseRepairGrid: true}}]);
+// A bus view whose first routing leaves conflicts, so the second routing pass and its overlap resolution run (#212, #229).
+requests.push(['import with the second routing pass', JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '60', '12', 'organic', 'lines', '60', '250'], {maxBuffer: 1 << 30}).toString())]);
 // The operation `query` (ADR 0021, M5b) on a snapshot and its content, without a session: the rows must be the same
 // natively and in WASM. (Without the cargo feature both engines answer the same refusal, which also compares equal.)
 const imported = JSON.parse(execFileSync(native, {
