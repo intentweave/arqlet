@@ -870,8 +870,8 @@ impl Lowering<'_> {
         ))
     }
 
-    /// The columns of the answer, in the order of the last `RETURN`, each an alias of the last part. A column that is not
-    /// one is a variable passed through by `RETURN *`.
+    /// The columns of the answer, in the order of the last `RETURN`, each an alias of the last part. The guard rejects
+    /// `RETURN *`, the only way to a column that is not one, so reaching that means the HIR and the guard disagree.
     fn columns(&self) -> Result<Vec<Column>, QueryError> {
         let ids = self
             .return_columns
@@ -882,7 +882,9 @@ impl Lowering<'_> {
                 let name = self.arenas.bindings.get(*id).name.clone();
                 match self.aliases.get(&name) {
                     Some(&slot) if slot == id.0 => Ok(Column { name, slot }),
-                    _ => Err(QueryError::unsupported("RETURN * is not supported yet")),
+                    _ => Err(QueryError::unsupported(format!(
+                        "cannot place the column `{name}`: the HIR names no alias of the RETURN for it"
+                    ))),
                 }
             })
             .collect()

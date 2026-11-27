@@ -120,7 +120,7 @@ def cases():
     add("net-04", "network-vlan", "MATCH (a:switch)-[r]-(b:switch) RETURN count(*)", "supported", lambda g: count(undirected_matches([e for e in g.edges if g.nodes[e["source"]]["kind"] == "switch" and g.nodes[e["target"]]["kind"] == "switch"])), ["count(*)"], note="eleven switch-to-switch edges of different kinds, each matched in both directions")
     add("net-05", "network-vlan", "MATCH (f:firewall)-[r:allow|deny]->(s:switch) RETURN f.label, count(r) AS rules ORDER BY f.label", "supported", lambda g: sorted([[k, v] for k, v in collections.Counter(g.nodes[e["source"]]["label"] for e in g.of_kind("allow", "deny") if g.nodes[e["source"]]["kind"] == "firewall" and g.nodes[e["target"]]["kind"] == "switch").items()]), ["f.label", "rules"], ordered=True, note="relationship type alternatives with a grouping")
 
-    # Constructs the first release must reject (ADR 0021, items 4 and 5). decypher drops the first four silently.
+    # Constructs the first release must reject (ADR 0021, items 4 and 5). decypher before 0.3 dropped the first four silently; the guard now rejects them from its HIR.
     add("reject-01", "small", "MATCH p = shortestPath((a)-[*]-(b)) RETURN p", "later", error="unsupported", note="a path selector; decypher 0.2 dropped shortestPath (upstream #133)")
     add("reject-02", "small", "MATCH (a)-[:calls]->{1,3}(b) RETURN b", "later", error="unsupported", note="a quantified relationship; decypher 0.2 lowered it to one hop (upstream #134)")
     add("reject-03", "small", "MATCH (n WHERE n.label = 'Parse') RETURN n", "later", error="unsupported", note="WHERE inside a pattern; decypher 0.2 dropped it (upstream #132)")

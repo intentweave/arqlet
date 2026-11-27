@@ -6,6 +6,7 @@
 //! file (`ARQLET_PIN=1 cargo test -p arqlet-query-cypher --test grid`) then shows each query whose outcome changed.
 
 use arqlet_query_cypher::lower;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -137,17 +138,34 @@ fn outcomes_are_pinned() {
         return;
     }
     let want = read(&pinned);
-    let changed: Vec<String> = want
-        .lines()
-        .zip(got.lines())
-        .filter(|(w, g)| w != g)
-        .map(|(w, g)| format!("  was {w}\n  now {g}"))
-        .collect();
+    // By query text, so that a query added to or removed from the fixtures shows as that and shifts nothing else. A query
+    // that appears twice has one outcome.
+    let by_query = |text: &str| -> BTreeMap<String, String> {
+        text.lines()
+            .skip(1)
+            .filter_map(|line| line.split_once('\t'))
+            .map(|(outcome, query)| (query.to_string(), outcome.to_string()))
+            .collect()
+    };
+    let (want, got) = (by_query(&want), by_query(&got));
+    let mut report = Vec::new();
+    for (query, now) in &got {
+        match want.get(query) {
+            Some(was) if was != now => report.push(format!("  changed {was} -> {now}\t{query}")),
+            Some(_) => {}
+            None => report.push(format!("  added   {now}\t{query}")),
+        }
+    }
+    for (query, was) in &want {
+        if !got.contains_key(query) {
+            report.push(format!("  removed {was}\t{query}"));
+        }
+    }
     assert!(
-        changed.is_empty() && want.lines().count() == got.lines().count(),
-        "{} outcomes changed (regenerate with ARQLET_PIN=1 and review the diff):\n{}",
-        changed.len(),
-        changed.join("\n")
+        report.is_empty(),
+        "{} queries differ from pinned.tsv (regenerate with ARQLET_PIN=1 and review the diff):\n{}",
+        report.len(),
+        report.join("\n")
     );
 }
 

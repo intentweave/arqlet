@@ -1,7 +1,8 @@
 //! Provisional (ADR 0021): the openCypher front end of the Arqlet query layer.
 //!
-//! [`check`] parses a query with decypher and runs the **guard**: every construct either runs correctly or is rejected,
-//! never silently changed. The guard walks the syntax tree for what is outside the first release (writes, procedures,
+//! [`check`] parses a query with decypher and runs the **guard**; together with the lowering, which refuses what it
+//! cannot lower (operators such as `^` and `||`, pattern expressions), every construct either runs correctly or is
+//! rejected, never silently changed. The guard walks the syntax tree for what is outside the first release (writes, procedures,
 //! subqueries, unknown functions, `RETURN *`), then the HIR's patterns for what the executor does not run yet (path selectors such as
 //! `shortestPath`, quantified paths, `WHERE` inside a pattern, path variables). The lowering never sees those.
 //!
