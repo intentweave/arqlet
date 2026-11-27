@@ -74,10 +74,24 @@ export interface OverviewRenderer {
   readonly model: OverviewModel;
   /** Whether a morph or a blend is running. */
   readonly animating: boolean;
-  /** Matches the canvas to its CSS size (and device pixel ratio) and draws. */
+  /** Matches the canvas to its CSS size (and device pixel ratio) and draws; while paused both wait for `resume`. */
   resize(): void;
-  /** Draws now; `labels: false` leaves the text canvas as it is. */
+  /** Draws now; `labels: false` leaves the text canvas as it is. While paused nothing (`resume` draws). */
   draw(options?: {labels?: boolean}): void;
+  /** Provisional: whether the renderer is paused. */
+  readonly paused: boolean;
+  /**
+   * Provisional: stops drawing while the canvas is hidden (for example under a drill-down): no frame and no animation
+   * frame (breathing, morphs, blends, lens and orbit updates), the animations' clock held. GPU resources, model, view
+   * and state are kept; calls that change them are taken (`onView` is still called) and drawn at `resume`. A binding
+   * of `bindOverviewNavigation` ignores input and holds its idle wait meanwhile. Idempotent; `destroy` works paused.
+   */
+  pause(): void;
+  /**
+   * Provisional: ends a pause: matches the canvas size if `resize` was called meanwhile, draws one frame at once and goes
+   * on with what was running (a morph, a blend or breathing, from where it stood). Idempotent; nothing after `destroy`.
+   */
+  resume(): void;
   /** The world point under a CSS pixel. */
   world(clientX: number, clientY: number): [number, number];
   /** The deepest node under a CSS pixel, or -1; inside a structured cluster, that cluster. */
@@ -106,7 +120,9 @@ export function createOverviewRenderer(
   options?: OverviewRendererOptions,
 ): OverviewRenderer;
 
-/** Wheel zoom at the pointer, drag panning, and click and hover callbacks. Returns a function that removes them. */
+/** Wheel zoom at the pointer, drag panning, and click and hover callbacks. While the renderer is paused it takes no
+ * input (a node drag in progress ends with `'end'` at its last point) and holds its idle wait, which starts again at
+ * `resume` (breathing that ran before goes on). Returns a function that removes them. */
 export function bindOverviewNavigation(
   canvas: HTMLCanvasElement,
   renderer: OverviewRenderer,

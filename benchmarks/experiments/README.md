@@ -56,3 +56,11 @@ whether today's windows find a way) to `FILE`; the example `grid_variants` of `a
 
 Applies to main `231c010`. With `ARQLET_TAP_LOG=1`, `layout-command` logs how every bus tap was drawn and the bars of the
 bus lines. `bus_tap_causes.py --bin BINARY --work DIR` classifies the taps through boxes (#203, same results file).
+
+## `bus-patch-phases.patch`
+
+Applies to main `f59ec9f`. Not a candidate: nested wall-clock probes (`PHASE path ms count` on standard error, printed by
+`layout-command`), counters of the decisions a patch meets (organic warm start, port sizing, placement passes), and two
+switches read from the environment by the probe only: `ARQLET_PATCH_LOCAL=1` (a patch places only the added nodes and
+their containers again, and restores the boxes of buses drawn as lines) and `ARQLET_NO_SECOND_PASS=1` (skips the second
+routing pass). `bus-patch.mjs` records the lines; results in `benchmarks/results/bus-patch-20261127.md` (#212).

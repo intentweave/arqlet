@@ -5,6 +5,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ## Unreleased
 
+### Added
+
+- Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
+  a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
+  (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every
+  call that changes them, drawn at `resume`; the animations' clock stands still, so a morph or breathing goes on where
+  it stood. `resume()` draws one frame at once. Both are idempotent, `destroy()` works in either state, `paused` tells
+  which, and it is the same on WebGPU, WebGL 2 and WebGL 1. A `bindOverviewNavigation` binding takes no input while its
+  renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
+  overview page pauses the overview while the scene view of a cluster covers it.
+
 ### Fixed
 
 - **A `patch` into a view with buses draws what an import of the patched graph draws** (#228, ADR 0029 C). It started
@@ -13,7 +24,8 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   Organic views with bus lines already drew the import's drawing and are unchanged; views without buses still continue
   their earlier drawing. Such a patch now takes an import's time: about the same in layered views, much longer in organic
   views with bus bars where the import runs its second routing pass (the dense view of #212: 2.0 s before, 16.5 s now;
-  `benchmarks/results/patch-as-import-20261127.md`). Revisions and stale checks are unchanged.
+  `benchmarks/results/patch-as-import-20261127.md`; measured before the faster second pass of #229). Revisions and stale
+  checks are unchanged.
 
 ## 0.10.0 — 2026-11-27
 
