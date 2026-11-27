@@ -1,0 +1,15 @@
+{"meta":{"revision":"e55e2ac","machine":"Mac15,13, Apple M3, 8 cores, 16 GB","node":"v24.21.0","build":"cargo --release (lto thin): arqlet-node cdylib and arqlet-wasm wasm32-unknown-unknown, features query","threadpool":"4 (default)","repeat":3,"loadBefore":"9:44  up 2 days,  9:46, 4 users, load averages: 3,23 6,26 10,47","addonSha":"52af8df6fa2eac86","wasmSha":"db710757f179018d"}}
+{"kind":"native","nodes":100,"limit":110,"dispatch import":42.85,"session import":41.99,"session toggle":40.56,"session scene":3.03,"sessionEstimate":261736,"heapBytes":326368,"linearMemoryBytes":null,"4 sessions serial":144.76,"4 sessions at once":78.85,"maxRssBytes":87638016}
+{"kind":"wasm-worker","nodes":100,"limit":110,"dispatch import":64.6,"session import":46.61,"session toggle":42.37,"session scene":6.67,"sessionEstimate":219496,"heapBytes":245186,"linearMemoryBytes":4390912,"4 sessions serial":206.44,"4 sessions at once":168.13,"maxRssBytes":225722368}
+{"kind":"native","nodes":1000,"limit":1100,"dispatch import":1250.07,"session import":1189.08,"session toggle":1165.1,"session scene":41.57,"sessionEstimate":3875080,"heapBytes":4866166,"linearMemoryBytes":null,"4 sessions serial":5109.62,"4 sessions at once":2334.64,"maxRssBytes":554352640}
+{"kind":"wasm-worker","nodes":1000,"limit":1100,"dispatch import":1712.19,"session import":1238.21,"session toggle":1129.52,"session scene":47.1,"sessionEstimate":3473776,"heapBytes":3428652,"linearMemoryBytes":62062592,"4 sessions serial":4690.18,"4 sessions at once":4141.73,"maxRssBytes":336068608}
+{"kind":"native","nodes":3000,"limit":3300,"dispatch import":4957.81,"session import":5605.12,"session toggle":4477.35,"session scene":84.74,"sessionEstimate":13625633,"heapBytes":16653202,"linearMemoryBytes":null,"4 sessions serial":19908.23,"4 sessions at once":9774.78,"maxRssBytes":2143305728}
+{"kind":"wasm-worker","nodes":3000,"limit":3300,"dispatch import":10993.74,"session import":6420.31,"session toggle":6634.7,"session scene":162.93,"sessionEstimate":12504353,"heapBytes":11966620,"linearMemoryBytes":240713728,"4 sessions serial":29711.86,"4 sessions at once":30808.58,"maxRssBytes":691863552}
+{"loadAfter":"9:49  up 2 days,  9:51, 4 users, load averages: 2,85 4,24 8,31"}
+{"peakRun":"after the sweep, same build, load averages 5,34 4,92 8,25"}
+{"peak":"native","nodes":100,"ok":true,"baseRssBytes":50970624,"maxRssBytes":64241664}
+{"peak":"wasm","nodes":100,"ok":true,"baseRssBytes":84656128,"maxRssBytes":195477504}
+{"peak":"native","nodes":1000,"ok":true,"baseRssBytes":50937856,"maxRssBytes":191856640}
+{"peak":"wasm","nodes":1000,"ok":true,"baseRssBytes":84656128,"maxRssBytes":217399296}
+{"peak":"native","nodes":3000,"ok":true,"baseRssBytes":50905088,"maxRssBytes":640040960}
+{"peak":"wasm","nodes":3000,"ok":true,"baseRssBytes":84574208,"maxRssBytes":356630528}

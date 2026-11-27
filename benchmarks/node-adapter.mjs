@@ -9,7 +9,7 @@
 //   cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --features query --locked
 //   ARQLET_FEATURES=query node benchmarks/node-adapter.mjs [--sizes 100,1000,4000] [--repeat 5] > results.jsonl
 //
-// Also measured: four sessions laid out at once on the native module (libuv's pool, default 4 threads) against the same
+// Also measured: the peak resident memory of one session's import alone (`--peak`), and four sessions laid out at once on the native module (libuv's pool, default 4 threads) against the same
 // four one after the other, and the same four in the one WASM worker.
 import {execFileSync} from 'node:child_process';
 import {join} from 'node:path';
@@ -130,6 +130,23 @@ async function child(kind, n) {
   return out;
 }
 
+// The peak resident memory of one session's import alone, in a fresh process: `--peak native|wasm N` (WASM here on the
+// main thread, without a worker).
+if (args[0] === '--peak') {
+  const [kind, n] = [args[1], Number(args[2])];
+  let run;
+  if (kind === 'native') run = (await import(pathToFileURL(join(root, 'packages/node/index.js')).href)).loadNativeEngine({path: addon});
+  else {
+    const {createEngine} = await import(pathToFileURL(join(root, 'packages/engine-client/wasm-client.js')).href);
+    run = await createEngine((await import('node:fs')).readFileSync(wasmFile));
+  }
+  const base = process.resourceUsage().maxRSS;
+  const session = await run.openSession();
+  const answer = await session.run({op: 'import', graph: graph(n), limit: Math.min(n + Math.ceil(n / 10), 10000), scene: false});
+  console.log(JSON.stringify({peak: kind, nodes: n, ok: answer.ok, baseRssBytes: base * 1024, maxRssBytes: process.resourceUsage().maxRSS * 1024}));
+  process.exit(0);
+}
+
 if (args[0] === '--child') {
   console.log(JSON.stringify(await child(args[1], Number(args[2]))));
   process.exit(0);
@@ -160,6 +177,17 @@ for (const n of sizes) {
       } catch (e) { console.error(`${kind} ${n}: attempt ${attempt + 1} failed: ${e.message.split('\n')[0]}`); }
     }
     console.log(line ?? JSON.stringify({kind, nodes: n, failed: true}));
+  }
+}
+for (const n of sizes) {
+  for (const kind of ['native', 'wasm']) {
+    let line = null;
+    for (let attempt = 0; attempt < 2 && !line; attempt++) {
+      try {
+        line = execFileSync(process.execPath, [import.meta.filename, '--peak', kind, String(n)], {encoding: 'utf8', timeout: 900000}).trim();
+      } catch (e) { console.error(`peak ${kind} ${n}: attempt ${attempt + 1} failed: ${e.message.split('\n')[0]}`); }
+    }
+    console.log(line ?? JSON.stringify({peak: kind, nodes: n, failed: true}));
   }
 }
 console.log(JSON.stringify({loadAfter: sh('uptime', [])}));

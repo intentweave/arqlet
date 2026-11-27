@@ -73,7 +73,9 @@ release list (`NPM_PACKAGES`) until the owner decides to publish it.
   on that runner, so a binary is published only if it answers byte for byte as WASM there; the module is uploaded as an
   artifact. The npm job downloads the four, packs the platform packages and publishes them before `@arqlet/node`, with
   trusted publishing and provenance as the other packages. A missing platform fails the release (no partial set).
-- **Size:** the release build of the module is about the size of the native `layout-command` (section 8 of the results).
+- **Size:** the release build of the module (macOS arm64, `--features query`, not stripped) is 19.8 MB, against 18.7 MB
+  for `layout-command` and 15.9 MB for the WASM module of the same build; a stripped or size-optimized profile for the
+  packages is a decision of the release job.
 
 ### 4. How a host chooses native or WASM
 
@@ -153,8 +155,12 @@ against WASM, and `createSession` with `recycle` into WASM.
 
 ## Measurements
 
-`benchmarks/results/node-adapter-20261127.md`: time per operation and memory, the native module against WASM in a
-worker on the same machine, and four sessions at once against one after the other.
+`benchmarks/results/node-adapter-20261127.md` (Apple M3, under load from another build; single observations): per
+layout the native module computes at about the speed of WASM; it is faster where a whole snapshot crosses the boundary
+(`dispatch import` 1.4× at 1000 nodes, 2.2× at 3000) and where sessions overlap (four at once 2.0–2.2× faster than in
+series; one WASM worker cannot overlap them). It costs memory: one 3000-node import peaks at 610 MB resident natively
+against 340 MB in WASM (64-bit sizes, the system allocator), and four at once at about four times that, which is why
+admission by memory (ADR 0024 item 3) matters for a native host.
 
 ## Not decided here
 
