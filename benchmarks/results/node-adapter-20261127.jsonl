@@ -13,3 +13,6 @@
 {"peak":"wasm","nodes":1000,"ok":true,"baseRssBytes":84656128,"maxRssBytes":217399296}
 {"peak":"native","nodes":3000,"ok":true,"baseRssBytes":50905088,"maxRssBytes":640040960}
 {"peak":"wasm","nodes":3000,"ok":true,"baseRssBytes":84574208,"maxRssBytes":356630528}
+{"peakRun":"2026-11-28 after the alloc_zeroed fix (df9a181), load averages 38,81 41,50 35,37"}
+{"peak":"native","nodes":3000,"ok":true,"baseRssBytes":51363840,"maxRssBytes":628162560}
+{"peak":"wasm","nodes":3000,"ok":true,"baseRssBytes":84754432,"maxRssBytes":367443968}

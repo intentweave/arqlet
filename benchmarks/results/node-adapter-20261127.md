@@ -60,6 +60,24 @@ What the columns mean:
 - **Peak RSS, whole child run:** includes the four sessions at once. Natively those are four layouts held at the same
   time.
 
+### Re-measured after the review (2026-11-28)
+
+The review found that the counting allocator did not forward `alloc_zeroed`. Every zeroed allocation was therefore
+allocated and then written with zeros instead of taking the system's lazily zeroed pages, which can raise resident
+memory. The allocator now forwards it (`df9a181`). The other times are not affected beyond noise: the counting
+itself did not change.
+
+The 3000-node single-import peak was redone with the fixed build:
+
+| engine | before | after |
+|---|---|---|
+| native | 610 MB | 599 MB |
+| WASM (unchanged) | 340 MB | 350 MB |
+
+The load average was about 39 / 42 / 35, so this is a single observation. The difference is within the noise between
+runs, so the conclusion stands: one native 3000-node import peaks at about 1.7–1.8× the WASM module's resident memory.
+The lines are appended to `node-adapter-20261127.jsonl`.
+
 ## Reading
 
 - **Computation is about equal.** The native module computes each layout at about the speed of WASM: session import
