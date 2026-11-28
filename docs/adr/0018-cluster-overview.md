@@ -340,6 +340,45 @@ Open: whether every continuation should keep earlier radii that still hold their
 answers by a hundredth on some containers, and stop discs with free room from shrinking); `fill: []` asks for it now; a fill that settles the arrangement from the packed places instead of a
 fresh start (it would keep the reading order of the rows, at the price of a less tidy result).
 
+## Addendum (2026-11-28): inner-edge share and modularity per container (#236)
+
+A host that shows its own partition (`groups`) or the overview's communities wants to mark weak containers: those whose
+children are not much more connected inside than to the outside. On request (`containerStats: true`) the answer gives
+per container how much of its edges it keeps and its term of the modularity, plus the modularity of each depth.
+Provisional; without the flag answers are byte-identical. Usage: [integration guide](../integration-guide.md).
+
+1. **What is counted.** The resolved edges of the answer (`edges`; unresolved edges are left out before, as everywhere),
+   undirected, each with its weight (`Edge::weight`, 1 when left out), so parallel edges add up. A container's *block*
+   is the container node and everything below it, in the final hierarchy (with the given groups, the added communities
+   and satellites). `in(B)`: the weight of the edges with both ends in `B`; `deg(B)`: the weight of the edge ends in `B`
+   (a self-loop counts once in `in`, twice in `deg`, so that the degrees add up to `2m`). `inner = in(B)`,
+   `touching = deg(B) − in(B)` (inside plus leaving), `share = inner / touching`.
+2. **Modularity per depth** (Newman and Girvan): the partition at depth `d` has the blocks of the nodes at depth `d`
+   (0: top level), and every node above depth `d` is a block of its own, as in a cut through the dendrogram of the
+   containment tree. `Q_d = Σ_B [in(B)/m − (deg(B)/2m)²]`, summed in node index order; a container's `modularity` is
+   its own term at its depth. The root is the one-block partition (depth -1, term 0). The terms of the containers of a
+   depth need not add up to `Q_d`, since leaves at that depth and the nodes above are blocks too; the per-depth sum is
+   given so that a host need not add them itself. Rejected: a modularity per parent (the partition of each container's
+   subgraph into its children). It is a different number for every container, with its own `m`, and does not compare
+   across containers; the per-depth partition is the standard one for a hierarchy of clusters and the issue asks for
+   the modularity of each level as a whole. "Depth" is used instead of "level" because `stats.levels` counts the
+   heights the arrangement runs in.
+3. **Edges of containers.** An edge between a container and a node below it lies inside the container's block (the
+   container node belongs to its own block) and not inside the child holding the node; an edge from a container node
+   to a node outside it touches it. At deeper depths the container node is a block of its own. This differs from
+   `links`, where such an edge counts nowhere: `links` serve the arrangement of children, the stats the partition.
+4. **Determinism.** Weights are integers, so `inner`, `touching`, the degrees and `m` are exact (`u64`); every quotient
+   and the sums per depth are computed in a fixed order, so the numbers are the same for any thread count and natively
+   and in WASM (a platform-parity request). With `m = 0` every share and modularity is 0, and a share is 0 when nothing
+   touches the block (`touching` tells this apart). Cost: one walk up from both ends of every edge, `O(E · depth)`,
+   plus `O(n · depth)` for the per-depth sums; not budgeted (#211), as the rest of the linear part.
+5. **Columns and positions only.** In the columnar answer the arrays are typed columns `containerStats.<field>`
+   (`container`, `depth` as `i32`, as `parent`; the rest `f64`) after the others; `weight` stays in the JSON, and the
+   engine client nests the columns back into `containerStats`, so the answer is shaped like the JSON one. A
+   `positionsOnly` answer does not carry them: they depend only on the clusters and the edges, which such an answer
+   assumes the host has. A session therefore answers one only while `containerStats` is the same as in its last answer
+   (as for `edgeData`), and the whole overview otherwise.
+
 ## Addendum (2026-11-28): Leiden beside Louvain, chosen by an option (#237)
 
 Louvain can leave a community badly connected, or not connected at all: a node that held two parts together moves to

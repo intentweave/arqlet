@@ -14,6 +14,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   default 1) sets the resolution of modularity for both algorithms. Deterministic for any thread count and the same in
   WASM; the work budget counts Leiden in Louvain's units. Louvain stays the default, and requests without the options
   answer as before. New contract type `CommunityAlgorithm`. Measurements: `benchmarks/results/communities-20261128.md`.
+- **Inner-edge share and modularity per container on request** (#236, provisional; ADR 0018 addendum of
+  2026-11-28): `containerStats: true` adds `containerStats` to the `overview` answer: per container (node index, -1 the
+  root) the weight of the edges inside it and of those touching it, their share, and its term of the modularity of the
+  partition at its depth, plus the modularity of each depth, so that a host can mark weak containers of its own
+  partition (`groups`) or of the communities. The same numbers for any thread count, natively and in WASM; typed
+  columns in the columnar answer (`containerStats.*`); not part of `positionsOnly` answers. Without the flag nothing
+  changes. New contract type `OverviewContainerStats`. Formula and usage:
+  [integration guide](docs/integration-guide.md#marking-weak-containers-provisional).
 - **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
   sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
   pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time

@@ -76,12 +76,14 @@ test('dispatch, sessions and columns answer as the WASM engine', {skip: skipWasm
       assert.deepEqual([...a[key]], [...b[key]], key);
     } else assert.deepEqual(a[key], b[key], key);
   }
-  const overview = {op: 'overview', graph: graph(200)};
+  // With the containers' stats (#236): their columns nested into `containerStats`, as by the WASM client.
+  const overview = {op: 'overview', graph: graph(200), containerStats: true};
   const [o, p] = [await mine.overview(overview), theirs.overview(overview, {copy: true})];
-  for (const key of Object.keys(p.overview)) {
-    const [x, y] = [o.overview[key], p.overview[key]];
-    assert.deepEqual(ArrayBuffer.isView(y) ? [...x] : x, ArrayBuffer.isView(y) ? [...y] : y, key);
-  }
+  const plain = v => (ArrayBuffer.isView(v) ? [...v] : v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.fromEntries(Object.entries(v).map(([k, w]) => [k, plain(w)])) : v);
+  assert.deepEqual(Object.keys(o.overview).sort(), Object.keys(p.overview).sort());
+  assert.ok(ArrayBuffer.isView(o.overview.containerStats.share), 'the stats are typed arrays');
+  for (const key of Object.keys(p.overview)) assert.deepEqual(plain(o.overview[key]), plain(p.overview[key]), key);
   await mine.close();
   theirs.close();
 });

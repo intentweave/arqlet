@@ -102,6 +102,8 @@ mod overview;
 mod overview_budget;
 #[path = "overview_fill.rs"]
 mod overview_fill;
+#[path = "overview_stats.rs"]
+mod overview_stats;
 #[path = "pack_components.rs"]
 mod pack_components;
 #[path = "paging.rs"]

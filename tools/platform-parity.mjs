@@ -126,6 +126,8 @@ const changed = {
   ],
 };
 requests.push(['overview with edge data', {op: 'overview', graph: changed, edgeData: true}]);
+// The containers' inner-edge share and modularity (#236): sums of f64 in a fixed order, the same natively and in WASM.
+requests.push(['overview with container stats', {op: 'overview', graph: changed, containerStats: true}]);
 for (const settle of [false, true]) {
   requests.push([`overview continued by id${settle ? ', settling' : ''}`, {op: 'overview', graph: changed, edgeData: true, start: {nodes: places, settle}}]);
 }

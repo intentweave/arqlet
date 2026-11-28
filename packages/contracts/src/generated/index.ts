@@ -69,6 +69,7 @@ export * from './OverBudget';
 export * from './Overview';
 export * from './OverviewBusLine';
 export * from './OverviewConfig';
+export * from './OverviewContainerStats';
 export * from './OverviewContinuation';
 export * from './OverviewFill';
 export * from './OverviewIntent';
