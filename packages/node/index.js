@@ -126,7 +126,14 @@ export function loadNativeEngine({path, sessionBytes} = {}) {
         const parsed = JSON.parse(answer);
         if (!parsed.ok) return parsed;
         const {columns: listed, ...rest} = parsed.overview;
-        return {...parsed, overview: {...rest, ...typed(listed, columns)}};
+        const overview = {...rest};
+        // A column named `object.field` (`containerStats.share`) goes into that object, as in the WASM client.
+        for (const [name, view] of Object.entries(typed(listed, columns))) {
+          const dot = name.indexOf('.');
+          if (dot < 0) overview[name] = view;
+          else overview[name.slice(0, dot)] = {...overview[name.slice(0, dot)], [name.slice(dot + 1)]: view};
+        }
+        return {...parsed, overview};
       }),
     };
   };
