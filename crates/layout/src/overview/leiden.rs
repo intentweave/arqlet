@@ -10,7 +10,7 @@
 //!
 //! Deterministic, without randomness: the queue starts in index order (the paper: random order), and the refinement is
 //! greedy (the paper's limit θ → 0 of its randomised choice): a node joins the well-connected subcommunity with the
-//! largest gain, ties to the smaller one. The guarantee of connected communities holds all the same; it rests on merging
+//! largest gain, ties to the smaller community number. The guarantee of connected communities holds all the same; it rests on merging
 //! nodes still alone into well-connected subsets with a positive gain, not on the randomness. Work is counted in `u64`.
 use super::Meter;
 use std::collections::{BTreeMap, VecDeque};
@@ -61,8 +61,10 @@ impl Level {
 
 /// Leiden on `k` nodes with weighted links, at resolution `gamma`: the community of every node, level by level
 /// (`result[l][c]`: the community at level l + 1 of community c at level l), as `louvain` returns them. Each level is a
-/// refined partition (the last one is the final partition), so every community of every level is connected in the
-/// links. Communities are numbered in order of their first node. Nodes without links stay alone. `None` when the meter
+/// refined partition (the last one is the final partition), whose communities are γ-connected; except, when a
+/// refinement merges nothing, the last level, which is the moving phase's partition split into its connected parts:
+/// connected, but not necessarily γ-connected. So every community of every level is connected in the links.
+/// Communities are numbered in order of their first node. Nodes without links stay alone. `None` when the meter
 /// stops it (units: per level the nodes and links read and aggregated; per node taken from the queue 1 plus its links;
 /// per refinement two passes over the nodes and their links).
 pub(super) fn leiden(
@@ -141,7 +143,7 @@ fn renumber(community: &[usize]) -> (Vec<usize>, usize) {
 
 /// The fast local moving phase (Algorithm A.2 of the paper, `MoveNodesFast`): a queue of every node in index order; a
 /// node taken from it moves to the community with the largest gain (the empty community included, gain 0) if the gain
-/// is real, ties to the smaller community, and its neighbours outside the community it joined that are not queued join
+/// is real, ties to the smaller community number, and its neighbours outside the community it joined that are not queued join
 /// the end of the queue. At most 64 × nodes takes (Louvain: at most 64 sweeps).
 fn move_nodes_fast(
     g: &Level,
@@ -234,7 +236,7 @@ fn move_nodes_fast(
 /// The refinement (Algorithm A.3 of the paper, `RefinePartition` and `MergeNodesSubset`), greedy: within every community
 /// `S` of `part` (`count` of them), every node starts alone; in index order, a node still alone and well connected to
 /// `S` joins the well-connected refined community of a neighbour in `S` with the largest real gain (ties to the smaller
-/// one). Well connected: `E(X, S − X) ≥ γ K_X (K_S − K_X) / 2m`. Returns the refined community of every node.
+/// community number). Well connected: `E(X, S − X) ≥ γ K_X (K_S − K_X) / 2m`. Returns the refined community of every node.
 fn refine(
     g: &Level,
     part: &[usize],

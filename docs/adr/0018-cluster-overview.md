@@ -112,7 +112,7 @@ The third step closes the open points of the second:
 - **Labels** do not overlap: the larger is placed first, a later one that would cover it is left out.
 - **Communities** (`with_communities`): a container with more than `communities` children (default 120; 0 never; the
   root of a flat graph included) is split by Louvain on the links between its children, deterministic (index order, ties
-  to the smaller community). Every Louvain level is a level of clusters (`community:<container>:<level>.<k>`, kind
+  to the smaller community number). Every Louvain level is a level of clusters (`community:<container>:<level>.<k>`, kind
   `community`, after the graph's nodes); communities under 8 nodes are no clusters, children without links are gathered.
   A structured excerpt keeps the overview's nesting, so communities become containers there.
 - **Groups the data gives** (`groups`, node id → path of group names, as an import's `groups`;
@@ -286,7 +286,7 @@ Provisional; a request or snapshot without the new options is computed exactly a
 2. **The algorithm** (per container that is split, on the links between its children, as Louvain):
    - *Fast local moving*: a queue of all nodes in index order (the paper: random order); a node taken from it moves to
      the community with the largest gain, the empty community included (gain 0), only for a real gain (> 1e-12, as
-     Louvain), ties to the smaller community; the neighbours it left in other communities join the end of the queue.
+     Louvain), ties to the smaller community number; the neighbours it left in other communities join the end of the queue.
    - *Refinement*: within every community `S`, each node starts alone. In index order, a node still alone that is well
      connected to `S` (`E(v, S − v) ≥ γ·k_v·(K_S − k_v) / 2m`) joins the refined community `C ⊆ S` of a neighbour that
      is well connected (`E(C, S − C) ≥ γ·K_C·(K_S − K_C) / 2m`) with the largest gain `E(v, C) − γ·k_v·K_C / 2m`, if
@@ -299,13 +299,15 @@ Provisional; a request or snapshot without the new options is computed exactly a
      are connected in the container's links (test). The loop ends after 32 levels at most (the levels then end at
      the last refined partition, connected as every one). When a refinement merges nothing (aggregation would not shrink
      the graph), the last level is the moving phase's partition split into its connected parts, which only raises
-     modularity (no link between the parts) and keeps the guarantee.
+     modularity (no link between the parts) and keeps the communities connected, though not necessarily γ-connected
+     as a refined partition's are.
 3. **Determinism: a greedy refinement, no seed.** The paper picks the refined community at random, with probability
    `∝ exp(ΔH / θ)` (θ = 0.01), so that the refinement explores more partitions; greedy is its limit θ → 0, which the
-   paper names. The guarantees (γ-connected refined communities, hence connected communities) do not depend on the
-   randomness, only on merging nodes still alone into well-connected subsets with a non-negative gain. Greedy was chosen
+   paper names. The guarantees (γ-connected refined communities, hence connected communities; the fallback level of
+   item 2, the moving partition split into connected parts, is connected but not necessarily γ-connected) do not
+   depend on the randomness, only on merging nodes still alone into well-connected subsets with a non-negative gain. Greedy was chosen
    over a fixed seed and a deterministic PRNG because: (a) it follows the rule Louvain here follows already (index order,
-   ties to the smaller community), so the comparison measures the algorithm and nothing else; (b) with a random stream
+   ties to the smaller community number), so the comparison measures the algorithm and nothing else; (b) with a random stream
    every choice depends on how many numbers were drawn before it, so one changed node reshuffles the rest of its
    container's refinement — the clusters of an incremental engine would change for reasons unrelated to the edit (the
    continuation by id keeps clusters for the same reason, addendum of 2026-11-26); (c) `exp` is not among the portable

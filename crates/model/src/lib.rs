@@ -2133,7 +2133,9 @@ impl CommunityHubs {
 
 /// Provisional (#237, ADR 0018 addendum of 2026-11-28): the algorithm that finds communities (`communities`, the
 /// overview's clusters). Louvain (the default) may leave a community whose parts no link joins; Leiden (Traag, Waltman
-/// and van Eck 2019) refines every community into well-connected parts, so every community is connected.
+/// and van Eck 2019) refines every community into well-connected parts, so every community is connected (where a
+/// refinement merges nothing, the last level is the moving partition split into connected parts: connected, not
+/// necessarily well connected).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase")]
@@ -3065,6 +3067,24 @@ impl Default for LayoutOptions {
 impl LayoutOptions {
     pub fn is_default(&self) -> bool {
         *self == Self::default()
+    }
+
+    /// Provisional (#237): an explicit `communityResolution` of 1 is the default and is not stored, so that the snapshot
+    /// is the same as without it (the overview treats it the same way).
+    pub fn normalize_communities(&mut self) {
+        if self.community_resolution == Some(1.) {
+            self.community_resolution = None;
+        }
+    }
+
+    /// Provisional (#237): `communityResolution` must be a finite number > 0, whether communities are found or not.
+    pub fn validate_communities(&self) -> Result<(), String> {
+        match self.community_resolution {
+            Some(x) if !(x.is_finite() && x > 0.) => {
+                Err("communityResolution must be a number > 0".into())
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Drops container entries that follow their content, so that they are stored only when they differ from content.

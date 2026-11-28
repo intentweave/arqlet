@@ -134,6 +134,8 @@ pub fn options_from_patch(patch: &serde_json::Value) -> Result<LayoutOptions, St
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
     options.validate_grouping()?;
+    options.normalize_communities();
+    options.validate_communities()?;
     Ok(options)
 }
 
@@ -1895,6 +1897,8 @@ pub fn configure_snapshot(
     options.normalize_container_sizing();
     options.validate_container_sizing()?;
     options.validate_grouping()?;
+    options.normalize_communities();
+    options.validate_communities()?;
     arqlet_model::grouping::validate(
         &options.grouping_priority,
         &snapshot

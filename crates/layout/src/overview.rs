@@ -510,7 +510,7 @@ pub const COMMUNITY_PREFIX: &str = "community:";
 /// Splits every container with more than `threshold` children (the root included; a flat graph is one such container)
 /// into communities of its children, found by Louvain on the links between them (Blondel, Guillaume, Lambiotte and
 /// Lefebvre, "Fast unfolding of communities in large networks", 2008; reimplemented, deterministic: nodes in index order,
-/// ties to the smaller community). Every level of the Louvain hierarchy becomes a level of clusters, so a flat graph gets
+/// ties to the smaller community number). Every level of the Louvain hierarchy becomes a level of clusters, so a flat graph gets
 /// the nested clusters the overview and the drill-down need. A community of fewer than `MIN_COMMUNITY` nodes is no
 /// cluster; children without links are gathered in one cluster. Added clusters come after the graph's nodes, with ids `community:<container>:<level>.<k>`.
 /// `threshold` 0 leaves the hierarchy as it is.

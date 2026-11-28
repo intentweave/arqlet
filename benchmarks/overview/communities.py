@@ -39,11 +39,21 @@ def load():
     return sh("sysctl", "-n", "vm.loadavg") or (" ".join(f"{x:.2f}" for x in os.getloadavg()))
 
 
+def native_platform():
+    """The machine's own platform: Python may run translated (Rosetta on Apple silicon) and then names x86_64."""
+    translated = sh("sysctl", "-n", "sysctl.proc_translated") == "1"
+    arm64 = sh("sysctl", "-n", "hw.optional.arm64") == "1"
+    arch = "arm64" if arm64 else platform.machine()
+    system = f"{platform.system()} {platform.mac_ver()[0] or platform.release()}"
+    return f"{system} {arch}" + (" (this Python runs translated)" if translated else "")
+
+
 def machine():
-    return {"row": "machine", "platform": platform.platform(),
+    return {"row": "machine", "platform": native_platform(),
             "cpu": sh("sysctl", "-n", "machdep.cpu.brand_string") or platform.processor(), "cores": os.cpu_count(),
             "revision": sh("git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"),
-            "dirty": bool(sh("git", "-C", str(ROOT), "status", "--porcelain")),
+            # Tracked files only: the results file this run writes is untracked.
+            "dirty": bool(sh("git", "-C", str(ROOT), "status", "--porcelain", "--untracked-files=no")),
             "rustc": sh("rustc", "--version"), "build": "release (lto thin)", "loadBefore": load()}
 
 
