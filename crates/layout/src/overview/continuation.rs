@@ -12,8 +12,8 @@
 //!
 //! Everything runs in index or id order, so the result is the same on every platform.
 use super::{
-    build, with_communities_where, with_satellites_where, Budget, Container, Hierarchy, Hubs,
-    Previous, COMMUNITY_PREFIX,
+    build, with_communities_where, with_satellites_where, Budget, Container, Detection, Hierarchy,
+    Hubs, Previous, COMMUNITY_PREFIX,
 };
 use arqlet_model::{OverviewContinuation, OverviewPlace};
 use std::collections::{BTreeMap, BTreeSet};
@@ -304,18 +304,20 @@ pub fn clusters_by_id(
         places,
         communities,
         hubs,
+        &Detection::default(),
         satellites,
         &mut Budget::unlimited(),
     )
 }
 
 /// Provisional (#211): `clusters_by_id` within a work budget: the containers without earlier clusters are clustered as
-/// `with_communities_within` does.
+/// `with_communities_within` does, with `detection` (#237). The kept clusters stay whatever algorithm made them.
 pub fn clusters_by_id_within(
     base: Hierarchy,
     places: &BTreeMap<String, OverviewPlace>,
     communities: usize,
     hubs: &Hubs,
+    detection: &Detection,
     satellites: f64,
     budget: &mut Budget,
 ) -> Result<(Hierarchy, BTreeSet<usize>), String> {
@@ -531,7 +533,14 @@ pub fn clusters_by_id_within(
     }
     let kept = ids.len() - n;
     let h = build(ids, parent, base.edges, base.weights, base.real);
-    let h = with_communities_where(h, communities, hubs, &|c| !settled.contains(&c), budget)?;
+    let h = with_communities_where(
+        h,
+        communities,
+        hubs,
+        detection,
+        &|c| !settled.contains(&c),
+        budget,
+    )?;
     let h = with_satellites_where(h, satellites, &|c| !settled.contains(&c))?;
     Ok(in_cluster_order(h, n..n + kept))
 }
