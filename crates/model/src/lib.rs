@@ -2037,6 +2037,13 @@ pub struct ViewStructure {
     pub validated: bool,
     /// `view` by index, for its projections.
     pub index: std::sync::Arc<GraphIndex>,
+    /// The containers `view` shows in part (`LayoutOptions::partial`), which `key` leaves out: `view` is `base`'s view with
+    /// their rests made. Empty when `view` is the structure itself (and always with a compacting filter, whose key keeps
+    /// `partial`).
+    pub partial: BTreeMap<String, Vec<String>>,
+    /// With `partial` not empty: the structure without it (same source and key), kept across reveals so that a change of
+    /// `partial` derives a view from it and does not structure the source graph again.
+    pub base: Option<std::sync::Arc<ViewStructure>>,
 }
 
 /// The level of detail (provisional): which containers a view shows collapsed at first, by depth and by kind; opening
