@@ -2,14 +2,16 @@
 import type { OverviewBusLine } from "./OverviewBusLine";
 import type { OverviewContinuation } from "./OverviewContinuation";
 import type { OverviewFill } from "./OverviewFill";
+import type { OverviewMovement } from "./OverviewMovement";
 import type { OverviewRepresentation } from "./OverviewRepresentation";
 import type { OverviewStats } from "./OverviewStats";
 import type { OverviewWork } from "./OverviewWork";
 
 /**
  * Provisional (sessions): the part of an overview that changes while the clusters stay the same, answered for a request
- * with `positionsOnly` laid out on the clusters of the session's last overview, with the same `edgeData`. The host keeps
- * ids, labels, parents, kinds, edges (with their data) and links from that answer.
+ * with `positionsOnly` laid out on the clusters of the session's last overview, with the same `edgeData` and
+ * `containerStats`. The host keeps ids, labels, parents, kinds, edges (with their data), links and the containers'
+ * stats from that answer.
  */
 export type OverviewPositions = { schemaVersion: number,
 /**
@@ -31,4 +33,8 @@ work?: OverviewWork,
 /**
  * For a request with `start.fill` (`Overview::fill`).
  */
-fill?: OverviewFill, };
+fill?: OverviewFill,
+/**
+ * For a request with `start.carry` (`Overview::movement`).
+ */
+movement?: OverviewMovement, };

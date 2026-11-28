@@ -1,5 +1,5 @@
 import {isSceneColumns,sceneOfColumns} from './scene-columns.js';
-import {createStyle, glyphOf, routeToGlyphs} from './style.js';
+import {createStyle, glyphOf, orientGlyphs, routeToGlyphs} from './style.js';
 let viewerId=0;
 const markerIds=new WeakMap();
 /** Paint a scene. Selection is an event; this module never mutates or computes layout. */
@@ -203,6 +203,8 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  // Leaves drawn as glyphs (a style's `glyph: 'dot'`): their routes run on to the dot's middle.
  const glyphs=new Map();
  for(const n of nodes.values())if(!parents.has(n.id)&&n.kind!=='attribute'&&!n.rows?.length){const gl=glyphOf(looks.node(n),n.bounds);if(gl)glyphs.set(n.id,gl);}
+ // A tick (a station on one line) or a pill (an interchange) stands across its lines.
+ orientGlyphs(glyphs,scene);
  for(const route of scene.routes){const weight=route.weight??1,isActive=route===active,dim=!!active&&!isActive;
   // The engine's points already contain the arcs of a rounded route (crates/scene realize.rs); they are drawn as given.
   const points=routeToGlyphs(route.points,glyphs.get(route.source),glyphs.get(route.target)).map(p=>`${p.x},${p.y}`).join(' ');
@@ -265,6 +267,8 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  const attribute=n.kind==='attribute';
  const glyph=glyphs.get(n.id);
  const shape=attribute?element('rect',{...r,rx:4,fill:'transparent',stroke:'transparent'})
+  :glyph?.kind==='pill'?element('rect',{x:glyph.cx-glyph.length/2,y:glyph.cy-glyph.thickness/2,width:glyph.length,height:glyph.thickness,rx:glyph.thickness/2,transform:`rotate(${Math.round(Math.atan2(glyph.ny,glyph.nx)*180/Math.PI*1e6)/1e6} ${glyph.cx} ${glyph.cy})`,...look,'stroke-width':glyph.width})
+  :glyph?.kind==='tick'?element('line',{x1:glyph.cx,y1:glyph.cy,x2:glyph.x2,y2:glyph.y2,stroke:look.stroke,'stroke-width':glyph.width,'stroke-linecap':'butt'})
   :glyph?element('circle',{cx:glyph.cx,cy:glyph.cy,r:glyph.r,...look})
   :n.shape==='circle'?element('circle',{cx,cy,r:Math.min(r.width,r.height)/2,...look}):element('rect',{...r,rx:radiusOf(own,r,7),...look});
  g.append(shape);
@@ -272,7 +276,9 @@ function drawScene(svg,host,scene,{onPortDragStart,onLabelDragStart,selected=nul
  g.onpointerleave=()=>shape.setAttribute('stroke',attribute?'transparent':look.stroke);if(pinned.has(n.id)){g.setAttribute('data-pinned-id',n.id);if(!onPin){const pin=element('circle',{cx:round?cx+rad*.62:r.x+r.width-10,cy:round?cy-rad*.62:r.y+10,r:4,fill:T.pin,'pointer-events':'none'});pin.append(element('title',{},'Pinned: layout keeps this position'));g.append(pin);}}
  const size=controlSize(Math.min(r.height*.5,r.width/5,24)),toggled=onToggle&&collapsed.has(n.id);
  // A glyph's name stands outside it, right of and below the dot.
- if(glyph)g.append(element('text',{x:glyph.labelX,y:glyph.labelY,fill:own.text??T.text,'font-size':12,'pointer-events':'none'},n.label.slice(0,32)));
+ // A tick's or a pill's name beyond its tip or end.
+ if(glyph?.kind==='tick'||glyph?.kind==='pill')g.append(element('text',{x:glyph.labelX,y:glyph.labelY,'text-anchor':glyph.align==='left'?'start':glyph.align==='right'?'end':'middle','dominant-baseline':glyph.baseline==='middle'?'middle':glyph.baseline==='top'?'text-before-edge':'text-after-edge',fill:own.text??T.text,'font-size':12,'pointer-events':'none'},n.label.slice(0,32)));
+ else if(glyph)g.append(element('text',{x:glyph.labelX,y:glyph.labelY,fill:own.text??T.text,'font-size':12,'pointer-events':'none'},n.label.slice(0,32)));
  else if(!n.rows?.length)g.append(element('text',round?{x:cx,y:cy+5,'text-anchor':'middle',fill:own.text??T.text,'font-size':13,'pointer-events':'none'}:{x:toggled?r.x+8+size:r.x+10,y:n.kind==='attribute'?r.y+r.height/2+5:r.y+32,fill:own.text??T.text,'font-size':13},(collapsed.has(n.id)&&!onToggle?'▸ ':'')+n.label.slice(0,23)));
  if(toggled)g.append(toggleControl(n,r.x+4,r.y+(r.height-size)/2,size));
  // Rows of a node (ADR 0011): the engine gives each row its rectangle; the viewer draws the text inside it. The first row

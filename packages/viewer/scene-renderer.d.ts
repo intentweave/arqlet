@@ -17,6 +17,18 @@ export interface SceneBackendDriver {
 }
 
 /** The renderer around a backend: view, state, texts, picking, frame scheduling. */
+/** Provisional, exported for tests: draws the labels of a fixed screen size for the texts too small at their own size
+ * (container titles, then leaf and glyph names where they do not overlap) on `ctx`, for `view` on a w×h CSS-pixel
+ * canvas showing `rect`. */
+export function drawLodLabels(
+  ctx: CanvasRenderingContext2D,
+  texts: import('./scene-buffers.js').SceneText[],
+  view: {centreX: number; centreY: number; scale: number},
+  w: number,
+  h: number,
+  rect: {x: number; y: number; width: number; height: number},
+  options: {minTextPixels: number; font: string},
+): void;
 export function rendererShell(canvas: HTMLCanvasElement, scene: Scene | SceneColumnsLike, options: SceneRendererOptions, backend: SceneBackendDriver, kind: 'webgpu' | 'webgl2'): SceneRenderer;
 
 /** Wheel zoom at the pointer and drag panning; a click without movement calls `onClick`. Returns a function that removes them. */

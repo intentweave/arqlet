@@ -28,4 +28,12 @@ fill?: Array<string>,
 /**
  * Provisional (#235): arrange the top level anew as well (its children keep their discs and what they hold).
  */
-fillTop?: boolean, };
+fillTop?: boolean,
+/**
+ * Provisional (#239): with `nodes`, nodes whose container changed (a switch between two partitions given as
+ * `groups`) start from their earlier places instead of being placed anew: a new group from the centre of its
+ * members' earlier places, the members at theirs, then the forces gather them (`continuation.carried`, and
+ * `Overview::movement` says how far the nodes moved). In a session without positions it continues by id from the
+ * last overview, also after the groups or the graph changed.
+ */
+carry?: boolean, };

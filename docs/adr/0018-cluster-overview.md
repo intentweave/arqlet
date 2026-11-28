@@ -1,7 +1,7 @@
 # ADR 0018: A cluster overview of the whole graph as a separate, light layout path
 
 Date: 2026-11-11.
-Status: proposed; implemented: operation `overview`, WebGL renderer, overview page, the three representations with user decisions, rules and the zoom policy, structured clusters in place with border ports.
+Status: proposed; implemented: operation `overview`, WebGL renderer, overview page, the three representations with user decisions, rules and the zoom policy, structured clusters in place with border ports, a work budget, filling containers later, stats per container (`containerStats`), Leiden beside Louvain (`communityAlgorithm`), switching partitions from the old places (`start.carry`).
 
 ## Context
 
@@ -112,7 +112,7 @@ The third step closes the open points of the second:
 - **Labels** do not overlap: the larger is placed first, a later one that would cover it is left out.
 - **Communities** (`with_communities`): a container with more than `communities` children (default 120; 0 never; the
   root of a flat graph included) is split by Louvain on the links between its children, deterministic (index order, ties
-  to the smaller community). Every Louvain level is a level of clusters (`community:<container>:<level>.<k>`, kind
+  to the smaller community number). Every Louvain level is a level of clusters (`community:<container>:<level>.<k>`, kind
   `community`, after the graph's nodes); communities under 8 nodes are no clusters, children without links are gathered.
   A structured excerpt keeps the overview's nesting, so communities become containers there.
 - **Groups the data gives** (`groups`, node id → path of group names, as an import's `groups`;
@@ -340,6 +340,173 @@ Open: whether every continuation should keep earlier radii that still hold their
 answers by a hundredth on some containers, and stop discs with free room from shrinking); `fill: []` asks for it now; a fill that settles the arrangement from the packed places instead of a
 fresh start (it would keep the reading order of the rows, at the price of a less tidy result).
 
+## Addendum (2026-11-28): inner-edge share and modularity per container (#236)
+
+A host that shows its own partition (`groups`) or the overview's communities wants to mark weak containers: those whose
+children are not much more connected inside than to the outside. On request (`containerStats: true`) the answer gives
+per container how much of its edges it keeps and its term of the modularity, plus the modularity of each depth.
+Provisional; without the flag answers are byte-identical. Usage: [integration guide](../integration-guide.md).
+
+1. **What is counted.** The resolved edges of the answer (`edges`; unresolved edges are left out before, as everywhere),
+   undirected, each with its weight (`Edge::weight`, 1 when left out), so parallel edges add up. A container's *block*
+   is the container node and everything below it, in the final hierarchy (with the given groups, the added communities
+   and satellites). `in(B)`: the weight of the edges with both ends in `B`; `deg(B)`: the weight of the edge ends in `B`
+   (a self-loop counts once in `in`, twice in `deg`, so that the degrees add up to `2m`). `inner = in(B)`,
+   `touching = deg(B) − in(B)` (inside plus leaving), `share = inner / touching`.
+2. **Modularity per depth** (Newman and Girvan): the partition at depth `d` has the blocks of the nodes at depth `d`
+   (0: top level), and every node above depth `d` is a block of its own, as in a cut through the dendrogram of the
+   containment tree. `Q_d = Σ_B [in(B)/m − (deg(B)/2m)²]`, summed in node index order; a container's `modularity` is
+   its own term at its depth. The root is the one-block partition (depth -1, term 0). The terms of the containers of a
+   depth need not add up to `Q_d`, since leaves at that depth and the nodes above are blocks too; the per-depth sum is
+   given so that a host need not add them itself. Rejected: a modularity per parent (the partition of each container's
+   subgraph into its children). It is a different number for every container, with its own `m`, and does not compare
+   across containers; the per-depth partition is the standard one for a hierarchy of clusters and the issue asks for
+   the modularity of each level as a whole. "Depth" is used instead of "level" because `stats.levels` counts the
+   heights the arrangement runs in.
+3. **Edges of containers.** An edge between a container and a node below it lies inside the container's block (the
+   container node belongs to its own block) and not inside the child holding the node; an edge from a container node
+   to a node outside it touches it. At deeper depths the container node is a block of its own. This differs from
+   `links`, where such an edge counts nowhere: `links` serve the arrangement of children, the stats the partition.
+4. **Determinism.** Weights are integers, so `inner`, `touching`, the degrees and `m` are exact (`u64`); every quotient
+   and the sums per depth are computed in a fixed order, so the numbers are the same for any thread count and natively
+   and in WASM (a platform-parity request). With `m = 0` every share and modularity is 0, and a share is 0 when nothing
+   touches the block (`touching` tells this apart). Cost: one walk up from both ends of every edge, `O(E · depth)`,
+   plus `O(n · depth)` for the per-depth sums; not budgeted (#211), as the rest of the linear part.
+5. **Columns and positions only.** In the columnar answer the arrays are typed columns `containerStats.<field>`
+   (`container`, `depth` as `i32`, as `parent`; the rest `f64`) after the others; `weight` stays in the JSON, and the
+   engine client nests the columns back into `containerStats`, so the answer is shaped like the JSON one. A
+   `positionsOnly` answer does not carry them: they depend only on the clusters and the edges, which such an answer
+   assumes the host has. A session therefore answers one only while `containerStats` is the same as in its last answer
+   (as for `edgeData`), and the whole overview otherwise.
+
+## Addendum (2026-11-28): Leiden beside Louvain, chosen by an option (#237)
+
+Louvain can leave a community badly connected, or not connected at all: a node that held two parts together moves to
+another community, and nothing later splits what it left behind (the first item of *Not done* below). Leiden (V. A.
+Traag, L. Waltman, N. J. van Eck, "From Louvain to Leiden: guaranteeing well-connected communities", *Scientific
+Reports* 9:5233, 2019) adds a refinement phase that guarantees connected communities. It is implemented from the paper's
+description (its Algorithm A.1–A.3 and section "Leiden algorithm"); no code of any implementation was read or copied.
+Provisional; a request or snapshot without the new options is computed exactly as before (byte-identical).
+
+1. **Options.** `communityAlgorithm`: `"louvain"` (the default, omitted) or `"leiden"`; `communityResolution`: a number
+   \> 0 (the default 1, omitted), the resolution γ of modularity, `Q = Σ_c (e_c / m − γ (K_c / 2m)²)`: above 1 smaller
+   communities, below 1 larger ones. Both algorithms take it; Louvain's gain `w − γ·tot·k / 2m` multiplies by exactly
+   1.0 by default, so its results do not change. The same two names in both places that find communities: the overview's
+   `options` and the layout's `LayoutOptions` (with `communities`; also the `communities` operation, which hands the view's communities to a host as groups). Two option
+   sets, not one shared value, because the overview request and the snapshot's options are separate already, as
+   `communities` and `hubs`/`communityHubs` are. A session reuses its overview hierarchy only for the same two values.
+2. **The algorithm** (per container that is split, on the links between its children, as Louvain):
+   - *Fast local moving*: a queue of all nodes in index order (the paper: random order); a node taken from it moves to
+     the community with the largest gain, the empty community included (gain 0), only for a real gain (> 1e-12, as
+     Louvain), ties to the smaller community number; the neighbours it left in other communities join the end of the queue.
+   - *Refinement*: within every community `S`, each node starts alone. In index order, a node still alone that is well
+     connected to `S` (`E(v, S − v) ≥ γ·k_v·(K_S − k_v) / 2m`) joins the refined community `C ⊆ S` of a neighbour that
+     is well connected (`E(C, S − C) ≥ γ·K_C·(K_S − K_C) / 2m`) with the largest gain `E(v, C) − γ·k_v·K_C / 2m`, if
+     that gain is real. A refined community is therefore connected.
+   - *Aggregation*: a node per refined community; its initial community is the community of the moving phase. Repeat
+     until the moving phase leaves every community as one node.
+   - **Levels.** The refined partitions, one per iteration, nest (each groups the nodes of the one before), and when the
+     loop ends the last one is the final partition. They are the levels of clusters, as Louvain's levels are, with the
+     same ids (`community:<container>:<level>.<k>`, communities numbered by their first node). Every level's communities
+     are connected in the container's links (test). The loop ends after 32 levels at most (the levels then end at
+     the last refined partition, connected as every one). When a refinement merges nothing (aggregation would not shrink
+     the graph), the last level is the moving phase's partition split into its connected parts, which only raises
+     modularity (no link between the parts) and keeps the communities connected, though not necessarily γ-connected
+     as a refined partition's are.
+3. **Determinism: a greedy refinement, no seed.** The paper picks the refined community at random, with probability
+   `∝ exp(ΔH / θ)` (θ = 0.01), so that the refinement explores more partitions; greedy is its limit θ → 0, which the
+   paper names. The guarantees (γ-connected refined communities, hence connected communities; the fallback level of
+   item 2, the moving partition split into connected parts, is connected but not necessarily γ-connected) do not
+   depend on the randomness, only on merging nodes still alone into well-connected subsets with a non-negative gain. Greedy was chosen
+   over a fixed seed and a deterministic PRNG because: (a) it follows the rule Louvain here follows already (index order,
+   ties to the smaller community number), so the comparison measures the algorithm and nothing else; (b) with a random stream
+   every choice depends on how many numbers were drawn before it, so one changed node reshuffles the rest of its
+   container's refinement — the clusters of an incremental engine would change for reasons unrelated to the edit (the
+   continuation by id keeps clusters for the same reason, addendum of 2026-11-26); (c) `exp` is not among the portable
+   functions (`PortableMath`), and a seed would be one more option to keep with snapshots. The price is less
+   exploration, which the measurement below includes. A randomised refinement can be added later behind a seed if
+   measurements ask for it.
+4. **Unchanged around it.** Hubs are left out before (they stay direct children, their links count for no community);
+   satellites are gathered after; groups the data gives come first, and the algorithm divides only what is still
+   larger than `communities`; a container of mostly unlinked children is not split; communities of fewer than 8 nodes
+   and communities holding one community of the level below are no clusters; children without links are gathered.
+   Labels are made the same way (overview: `≈ <most connected member>`; layout: `<best connected member> +N`). A
+   continuation by id keeps the earlier clusters whatever algorithm made them, and clusters a container without
+   earlier clusters with the request's algorithm.
+5. **Work budget** (addendum of 2026-11-27): the same units as Louvain, counted at the same kind of safe points. Per
+   level the nodes plus the links (adjacency and aggregation). The moving phase: per node taken from the queue, 1 plus
+   its links, so a pass over every node costs what a Louvain sweep costs; at most 64 × nodes takes per level (Louvain:
+   at most 64 sweeps). The refinement: two passes (well-connectedness, merging), each the nodes plus the links. The
+   split into connected parts, when it runs: the nodes plus the links. A container's Leiden is one piece, discarded
+   whole when it does not fit, as a container's Louvain.
+6. **Default.** Louvain stays the default; the owner decides. Measured
+   ([results](../../benchmarks/results/communities-20261128.md), generated code index of 10 000 to 100 000 nodes, its
+   flat variant of 2 000 to 50 000, and the reference views): Louvain left no community in parts on any of them (0 of
+   2 991; a search over 20 000 small generated graphs found one case, now a test); modularity is equal within 1 %
+   (Leiden 0.5–0.9 % lower on the flat graphs, 0.4 % higher on organic-300, equal on layerweave-code); Leiden's
+   clustering work is 7–10 % lower on the hierarchical graphs and 2.4–7× lower on the flat ones, and it makes deeper
+   hierarchies with more clusters (+10 % on the code index, up to +64 % on flat graphs). Recommendation: keep Louvain
+   the default until real exports and the readability of the deeper hierarchy say otherwise; Leiden for large flat
+   graphs and for hosts that need the guarantee. The owner approved Louvain as the default (2026-11-28).
+
+## Addendum (2026-11-28): switching partitions from the old places (#239)
+
+A host that shows its own partitions (`groups`) switches between two of the same nodes (by role, by feature) and wants
+to animate it. A continuation by id keeps only what both partitions share: a node whose path changed is placed anew
+beside the nodes it is linked to, and two partitions without a shared path give a fresh layout, so no node starts from
+where it was. Provisional; a request without the new field is answered exactly as before (byte-identical).
+
+1. **An option, not the behaviour of `start.nodes`:** `start.carry: true`, with `start.nodes`. Placing anew beside the
+   linked nodes is right for an edit of the graph (a node moved by an edit into a container far from its old place),
+   and it is documented and pinned by tests; carrying is right for a switch the host animates. The host knows which
+   one it does. Refused without places by id (`start.x`, `y`, `r` have no node whose container changed). Rejected:
+   carrying whenever parents changed. Every answer by id with changed parents would change, edits included.
+2. **Where nodes start.** `continue_by_id` reads the places as before (what continues is unchanged); then
+   `continuation::carry` gives every node it placed anew a start all the same (`Previous::carried`): a node with an
+   entry (a node of the graph, a group whose id both partitions have, a cluster kept by `clusters_by_id`) its entry's
+   absolute centre; a container without an entry (a group of the new partition, a cluster Louvain makes now) the
+   centre of what it holds, weighted by the area of their discs, from the innermost out. A new leaf without an entry is
+   still placed anew. Linear, not budgeted (part of reading the continuation).
+3. **Radii of new groups** are only a start: the disc that holds the members' old discs, plus the padding. The
+   arrangement runs from the leaves up, so a group's radius is measured from its own arrangement before its parent
+   needs it; the seed only marks the container as changed.
+4. **Settling and overlaps.** A container with a carried child runs the forces from those places at the temperature of
+   `settle` (`CARRY_ALPHA` = `SETTLE_ALPHA`), whether or not `settle` is asked, then the existing separation (no
+   overlap at the end, as always), and is centred again with its shift carried to its parent (`carry_shifts`, as for
+   `moved`), so that what it holds keeps its absolute place as far as the forces allow; the top level is not centred
+   again (its disc stays on the origin and holds everything). Every container above a carried node counts as changed
+   (it makes room, or settles with `settle`). Containers without carried children behave as before: a kept group keeps
+   its inner arrangement. Only making room (no forces) was rejected: a new group's members come from all over the old
+   drawing, so its disc would span it and the groups would be pushed apart until the root disc grew several times (the
+   same failure as clustering anew in the addendum of 2026-11-26). A full temperature (1, as a fresh layout) was
+   measured too: it moved more in five of six kinds of switch.
+5. **Report.** `continuation.carried`: how many of `anew` started from a carried place (groups count like nodes, as in
+   `anew`). `movement` (`{nodes, median, max, medianShare, maxShare}`): how far the graph's own nodes with an entry moved
+   from it, on the answered centres; the shares divide by the answer's `rootRadius`. The groups of `groups` are not
+   measured (their ids change with the partition), nor added clusters. A host animates below a share it chooses and
+   draws anew above it. Per container was considered and left out: one figure per answer is what the choice needs.
+6. **Work budget, fill, moved, radii.** A container with carried children has changed, so a budget that does not reach
+   it packs it (`work.packed`), as any changed container. `start.fill` acts on the places after they are read: a
+   carried container named in it is arranged as without a start (a new group has no earlier disc, so it takes the
+   radius it needs). `moved` naming a carried node is refused, as for any node placed anew. `radii` apply as always.
+7. **Sessions, positions only.** In a session, `start: {carry: true}` without positions continues by id from the last
+   overview (its places with their parents, as a host sends them from that answer), also after `groups` or the graph
+   changed; this closes for carry the open point of a session continuing a new graph from its own places. A switch
+   has other clusters, so `positionsOnly` gives the whole answer; `movement` comes with positions-only and columnar
+   answers like `continuation`. `createOverviewSession` sends the last places by id for `start: {carry: true}`.
+8. **Measured** ([results](../../benchmarks/results/overview-partition-switch-20261128.md)): generated code indexes,
+   flat (3 000 and 10 000 nodes), partition A by top directory and file, switched to six partitions. Every answer was
+   valid (no overlaps, every disc inside its parent). Carrying moved the nodes less than today's continuation (median,
+   90th percentile and largest) where files moved, were regrouped or merged, on both graphs. Exceptions: where Louvain
+   divides the new groups (`communities` > 0) the communities made now start on top of each other, and at 10 000 nodes
+   the largest move exceeded today's (255 % against 235 % of the root radius) and the root disc grew to 2.2 times A's;
+   a split lowered the largest moves to a third but raised the median a little; and the same members under other names,
+   which a fresh layout draws exactly as before, move a little (median 5 %) instead of not at all.
+
+Open: whether carrying should become the behaviour of `start.nodes` for switches only (it needs a way to tell a
+switch from an edit); spreading the seeds of clusters made now inside a new group (they start on one point today),
+or a full temperature for them, which measured better there; a host-given weight per node for the seeds.
+
 ## Real data (2026-11-11)
 
 On two real exports (Intentweave, 8 874 nodes; Backstage, 31 758 nodes; `benchmarks/results/overview-real-20261111.md`)
@@ -349,7 +516,8 @@ children is not split into communities.
 
 ## Not done
 
-- Louvain does not guarantee connected communities (Leiden would); a community can hold parts without links between them.
+- Louvain does not guarantee connected communities; a community can hold parts without links between them. Leiden,
+  which does, is available behind `communityAlgorithm: "leiden"` (addendum of 2026-11-28); Louvain is still the default.
 - The decisions are values of a request, not of a stored overview snapshot; saving a session of the overview is open.
 - Level-of-detail rendering of edges beyond the bundling of collapsed clusters.
 - A grid packing of unlinked nodes in the box pipeline: a file without internal edges, structured, is one long row.

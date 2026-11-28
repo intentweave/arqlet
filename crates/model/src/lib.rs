@@ -2131,6 +2131,26 @@ impl CommunityHubs {
     }
 }
 
+/// Provisional (#237, ADR 0018 addendum of 2026-11-28): the algorithm that finds communities (`communities`, the
+/// overview's clusters). Louvain (the default) may leave a community whose parts no link joins; Leiden (Traag, Waltman
+/// and van Eck 2019) refines every community into well-connected parts, so every community is connected (where a
+/// refinement merges nothing, the last level is the moving partition split into connected parts: connected, not
+/// necessarily well connected).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum CommunityAlgorithm {
+    #[default]
+    Louvain,
+    Leiden,
+}
+
+impl CommunityAlgorithm {
+    pub fn is_louvain(&self) -> bool {
+        *self == Self::Louvain
+    }
+}
+
 /// Experimental (`LayoutOptions::pack_components`): how the components of a container are packed.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2439,6 +2459,13 @@ pub struct LayoutOptions {
     /// children, so large nodes are kept apart by the stress itself. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub size_aware_stress: bool,
+    /// Provisional: after the octilinear star placement (strategy `octilinear`), a local search on its lattice moves nodes
+    /// and branches so that the links outside the spanning tree are octilinear too and the lines run straighter and
+    /// shorter, as a hand-drawn metro map (`tree::octilinear_arrange`). Its cost is bounded by a deterministic work
+    /// budget per group; groups above 400 nodes are left as placed. Only the `octilinear` strategy reads it. Off by
+    /// default and omitted when off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub octilinear_refine: bool,
     /// Use the hierarchical layered pipeline where the graph's area modes support it. Set false to use the previous
     /// layered layout for comparison. The pipeline does not change explicit tree, radial or organic area strategies.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
@@ -2511,6 +2538,16 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "CommunityHubs::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<CommunityHubs>"))]
     pub community_hubs: CommunityHubs,
+    /// Provisional (#237): the algorithm `communities` finds them with: `louvain` (the default, omitted) or `leiden`,
+    /// whose communities are always connected.
+    #[serde(default, skip_serializing_if = "CommunityAlgorithm::is_louvain")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<CommunityAlgorithm>"))]
+    pub community_algorithm: CommunityAlgorithm,
+    /// Provisional (#237): the resolution γ of the modularity `communities` optimises, a number > 0: larger gives smaller
+    /// communities. Unset (the default, omitted): 1. Another value is refused when the view is structured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub community_resolution: Option<f64>,
     /// The name before engine 0.4 (`initialCollapse`), refused with a message that names the new one.
     #[serde(
         default,
@@ -2989,6 +3026,7 @@ impl Default for LayoutOptions {
             sparse_stress: false,
             scalable_stress: false,
             size_aware_stress: false,
+            octilinear_refine: false,
             layered_construction: true,
             abstract_routing: true,
             single_pass: true,
@@ -3001,6 +3039,8 @@ impl Default for LayoutOptions {
             lift_edges: None,
             hidden: Hidden::default(),
             community_hubs: CommunityHubs::default(),
+            community_algorithm: CommunityAlgorithm::Louvain,
+            community_resolution: None,
             renamed_initial_collapse: (),
             partial: BTreeMap::new(),
             global_layering: false,
@@ -3035,6 +3075,24 @@ impl Default for LayoutOptions {
 impl LayoutOptions {
     pub fn is_default(&self) -> bool {
         *self == Self::default()
+    }
+
+    /// Provisional (#237): an explicit `communityResolution` of 1 is the default and is not stored, so that the snapshot
+    /// is the same as without it (the overview treats it the same way).
+    pub fn normalize_communities(&mut self) {
+        if self.community_resolution == Some(1.) {
+            self.community_resolution = None;
+        }
+    }
+
+    /// Provisional (#237): `communityResolution` must be a finite number > 0, whether communities are found or not.
+    pub fn validate_communities(&self) -> Result<(), String> {
+        match self.community_resolution {
+            Some(x) if !(x.is_finite() && x > 0.) => {
+                Err("communityResolution must be a number > 0".into())
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Drops container entries that follow their content, so that they are stored only when they differ from content.
@@ -3703,6 +3761,11 @@ pub struct Overview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number[]"))]
     pub edge_weight: Option<Vec<u32>>,
+    /// Provisional (#236), for a request with `containerStats`: how well each container holds its edges, and the
+    /// modularity at each depth.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub container_stats: Option<OverviewContainerStats>,
     /// Provisional, for a request with `start.nodes`: what became of the earlier places.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
@@ -3715,6 +3778,70 @@ pub struct Overview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub fill: Option<OverviewFill>,
+    /// Provisional (#239), for a request with `start.carry`: how far the graph's nodes moved from their entries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub movement: Option<OverviewMovement>,
+}
+
+/// Provisional (#239): how far the nodes of the graph moved from their entries in `start.nodes`, for a host that
+/// chooses between animating a change and drawing it anew. Measured are the graph's own nodes that have an entry and
+/// are in the overview (not the groups of `groups`, whose ids change with the partition, nor added clusters), between
+/// the entry's centre and the answered centre, in the frame both share.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewMovement {
+    /// How many nodes were measured.
+    pub nodes: u32,
+    /// The median and the largest distance (0 without nodes), rounded to hundredths.
+    pub median: f64,
+    pub max: f64,
+    /// `median` and `max` divided by the answer's `rootRadius`, rounded to ten-thousandths.
+    pub median_share: f64,
+    pub max_share: f64,
+}
+
+/// Provisional (#236, ADR 0018 addendum of 2026-11-28): per container (parallel arrays, the root first, then every node
+/// with children in index order) how well it holds its edges, and the modularity of the partition at each depth.
+///
+/// Edges are the resolved edges of the overview (`edges`; unresolved ones are left out), undirected, each counting its
+/// weight (`Edge::weight`, 1 when left out); parallel edges count each. A container's block is the container node and
+/// everything below it. The partition at depth `d` has the blocks of the nodes at depth `d` (0: top level) and every
+/// node above as a block of its own. With `m = weight`, `in(B)` the weight of the edges with both ends in `B` (a
+/// self-loop once) and `deg(B)` the weight of the edge ends in `B` (a self-loop twice):
+/// `inner = in(B)`, `touching = deg(B) - in(B)`, `share = inner / touching` (0 when `touching` is 0),
+/// `modularity = in(B)/m - (deg(B)/(2m))^2`; `depthModularity[d]` sums the terms of all blocks at depth `d` (leaves
+/// and the nodes above included, so the containers' terms alone need not add up to it). An edge between a container
+/// and a node below it lies inside the container's block. With `m = 0` every share and modularity is 0.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewContainerStats {
+    /// The sum of the weights of all resolved edges (`m`).
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub weight: u64,
+    /// The containers as node indices, -1 for the root (as `parent`).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub container: Vec<i64>,
+    /// Each container's depth: -1 for the root, 0 for a top-level node; the index into `depthModularity`.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub depth: Vec<i64>,
+    /// The weight of the edges with both ends in the container.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub inner: Vec<f64>,
+    /// The weight of the edges with at least one end in the container.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub touching: Vec<f64>,
+    /// `inner / touching`, 0 when no edge touches the container.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub share: Vec<f64>,
+    /// The container's term of the modularity at its depth (0 for the root).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub modularity: Vec<f64>,
+    /// The modularity of the partition at each depth, from 0 to the deepest container's.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub depth_modularity: Vec<f64>,
 }
 
 /// Provisional (#211, ADR 0018 addendum of 2026-11-27): the work of an overview with a work budget (`workBudget`).
@@ -3779,6 +3906,11 @@ pub struct OverviewContinuation {
     /// Ids of entries that name no node of the overview (removed nodes), in id order. Ids of clusters the overview
     /// added (`community:…`) that are gone are not listed.
     pub ignored: Vec<String>,
+    /// Provisional (#239), for a request with `start.carry`: how many of `anew` started from an earlier place all the
+    /// same (their entry, or for a group without one the centre of what it holds). Omitted without `carry`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub carried: Option<u32>,
 }
 
 /// Provisional: a bus of the overview drawn as a line (`Overview::bus_lines`): the bus node's index, the line from
@@ -4059,8 +4191,9 @@ pub struct NeighbourhoodAnswer {
 }
 
 /// Provisional (sessions): the part of an overview that changes while the clusters stay the same, answered for a request
-/// with `positionsOnly` laid out on the clusters of the session's last overview, with the same `edgeData`. The host keeps
-/// ids, labels, parents, kinds, edges (with their data) and links from that answer.
+/// with `positionsOnly` laid out on the clusters of the session's last overview, with the same `edgeData` and
+/// `containerStats`. The host keeps ids, labels, parents, kinds, edges (with their data), links and the containers'
+/// stats from that answer.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -4090,6 +4223,10 @@ pub struct OverviewPositions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub fill: Option<OverviewFill>,
+    /// For a request with `start.carry` (`Overview::movement`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub movement: Option<OverviewMovement>,
 }
 
 impl OverviewPositions {
@@ -4108,6 +4245,7 @@ impl OverviewPositions {
             continuation: overview.continuation,
             work: overview.work,
             fill: overview.fill,
+            movement: overview.movement,
         }
     }
 }
@@ -4194,7 +4332,7 @@ pub struct OverviewRequest {
     #[cfg_attr(feature = "ts", ts(optional))]
     pub start: Option<OverviewStart>,
     /// Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
-    /// last overview and `edgeData` is as it was there; otherwise the whole overview.
+    /// last overview and `edgeData` and `containerStats` are as they were there; otherwise the whole overview.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub positions_only: Option<bool>,
@@ -4203,6 +4341,11 @@ pub struct OverviewRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub edge_data: Option<bool>,
+    /// Provisional (#236): answer per container its inner and touching edges, their share and its modularity term, and
+    /// the modularity at each depth (`Overview::container_stats`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub container_stats: Option<bool>,
     /// Provisional (#211): a deterministic work budget in units (`Overview::work`); the answer reports the work. Without
     /// it the overview runs to the end, as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4269,6 +4412,14 @@ pub struct OverviewLayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub hubs: Option<CommunityHubs>,
+    /// Provisional (#237): the algorithm that finds the communities (`louvain`), as `LayoutOptions::community_algorithm`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub community_algorithm: Option<CommunityAlgorithm>,
+    /// Provisional (#237): the resolution of modularity (1; > 0), as `LayoutOptions::community_resolution`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub community_resolution: Option<f64>,
 }
 
 /// Provisional: where an overview continues from. Positions of a previous overview, either `x`, `y`, `r` by node index
@@ -4311,6 +4462,14 @@ pub struct OverviewStart {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub fill_top: Option<bool>,
+    /// Provisional (#239): with `nodes`, nodes whose container changed (a switch between two partitions given as
+    /// `groups`) start from their earlier places instead of being placed anew: a new group from the centre of its
+    /// members' earlier places, the members at theirs, then the forces gather them (`continuation.carried`, and
+    /// `Overview::movement` says how far the nodes moved). In a session without positions it continues by id from the
+    /// last overview, also after the groups or the graph changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub carry: Option<bool>,
 }
 
 /// Provisional (#235): what became of the containers a request named in `start.fill` (and `start.fillTop`). Containers
@@ -4796,6 +4955,19 @@ mod container_sizing_tests {
         assert!(options.size_aware_stress);
         assert_eq!(
             serde_json::to_value(options).unwrap()["sizeAwareStress"],
+            true
+        );
+    }
+
+    #[test]
+    fn octilinear_refine_is_opt_in_and_round_trips() {
+        let defaults = serde_json::to_value(LayoutOptions::default()).unwrap();
+        assert!(defaults.get("octilinearRefine").is_none(), "{defaults}");
+        let options: LayoutOptions =
+            serde_json::from_value(serde_json::json!({"octilinearRefine": true})).unwrap();
+        assert!(options.octilinear_refine);
+        assert_eq!(
+            serde_json::to_value(options).unwrap()["octilinearRefine"],
             true
         );
     }

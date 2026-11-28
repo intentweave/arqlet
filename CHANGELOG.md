@@ -24,6 +24,40 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   engine's `memory` answer adds `heapPeakBytes`, the counted peak since the previous `memory` or `release`. The
   integration guide has a section on a worker pool with admission by memory, and `examples/worker-pool` a runnable Node
   example.
+- `octilinearRefine` (provisional, off by default; strategy `octilinear` only): after the octilinear star placement a
+  deterministic local search on its lattice moves stations and branches so that the links outside the spanning tree are
+  octilinear too, closer to a hand-drawn metro map. The cost is compared in rank order: line–node hits, crossings, links
+  that are not octilinear, bends where a line passes a station, then length. On the made-up city of the example *Metro
+  map* placed as an octilinear star (the example itself is laid out layered; the numbers are from the unit test): 1
+  skewed link, 3 crossings, 1 station on a link and 8 bends become 0, 0, 0 and 3, for 2 lattice steps more. Its cost is
+  bounded by a deterministic work budget per group (groups above 400 nodes are left as placed): about 0.1–0.25 s for
+  400 nodes on one line (indicative, loaded Apple M3, `benchmarks/results/octilinear-refine-20261128.md`).
+- **Leiden beside Louvain** (#237, provisional; ADR 0018 addendum of 2026-11-28): `communityAlgorithm: "leiden"`, in the
+  overview's options and in the layout options (with `communities`, and for the `communities` operation), finds
+  communities with Leiden (Traag, Waltman and van Eck 2019), implemented from the paper with a greedy refinement: every
+  community is connected, where Louvain can leave one whose parts no link joins. `communityResolution` (a number > 0,
+  default 1) sets the resolution of modularity for both algorithms. Deterministic for any thread count and the same in
+  WASM; the work budget counts Leiden in Louvain's units. Louvain stays the default, and requests without the options
+  answer as before. New contract type `CommunityAlgorithm`. Measurements: `benchmarks/results/communities-20261128.md`.
+- **Metro style: stations as ticks** (viewer, provisional): a style's new `glyph: 'tick'` draws a station on one line as a
+  short stub in the line's colour across the line, its name beyond the tip, as metro maps draw stations without changes;
+  `orientGlyphs` turns each tick from the station's routes (explicit buses first; to the right of the line, or up when it
+  runs across). `glyph: 'pill'` draws an interchange as a white pill across its lines (with more than two, across their
+  main axis), its name beyond its end. The `metro` preset: ticks for `leaf[bus]`, pills for `leaf[interchange]`, for a
+  station where its line branches (`leaf[branch]`, new derived field: one bus leads to three or more other nodes) and for
+  `leaf[bus][kind=gateway]`; a plain end station keeps its tick. A glyph and its name take the side where no line leaves
+  (at a crossing the name goes diagonally between the lines); a pill on three or more lines lies at a multiple of 45°.
+  SVG, GPU layer (pills as triangle fans, at any angle) and React Flow (looks `tick` and `pill`, drawn by the example)
+  draw them alike, and from afar the GPU view shows a tick's or pill's name beyond its end; `browser-checks/metro-glyphs.mjs`
+  compares them in Chrome over the canvas and per glyph, checks the names from afar and writes before/after pictures.
+- **Inner-edge share and modularity per container on request** (#236, provisional; ADR 0018 addendum of
+  2026-11-28): `containerStats: true` adds `containerStats` to the `overview` answer: per container (node index, -1 the
+  root) the weight of the edges inside it and of those touching it, their share, and its term of the modularity of the
+  partition at its depth, plus the modularity of each depth, so that a host can mark weak containers of its own
+  partition (`groups`) or of the communities. The same numbers for any thread count, natively and in WASM; typed
+  columns in the columnar answer (`containerStats.*`); not part of `positionsOnly` answers. Without the flag nothing
+  changes. New contract type `OverviewContainerStats`. Formula and usage:
+  [integration guide](docs/integration-guide.md#marking-weak-containers-provisional).
 - **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
   sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
   pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time
@@ -51,6 +85,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   order as long as it lasts, the rest listed in `fill.overBudget` (a round that fills nothing would repeat unchanged: stop or raise the budget). Through `dispatch`, in sessions (`start: {fill}`) and
   `createOverviewSession`, identical for any thread count and natively and in WASM; requests without the fields answer
   as before. New contract type `OverviewFill`.
+- **Switching overview partitions from the old places** (#239, provisional; ADR 0018 addendum of 2026-11-28):
+  `start.carry: true` with `start.nodes` lets the nodes a switch between two partitions (`groups`) would place anew
+  start from their old absolute places instead: a new group at the centre of its members' old places, the members at
+  theirs, then the forces settle and the separation removes overlaps; what both partitions share continues as before.
+  The answer reports `continuation.carried` and `movement` (median and largest distance, absolute and as a share of
+  `rootRadius`), so a host can choose between animating and redrawing. On generated graphs the nodes moved less than
+  with the continuation without it where files moved, were regrouped or merged, every answer valid; with Louvain
+  dividing the new groups the largest moves can exceed today's ([results](benchmarks/results/overview-partition-switch-20261128.md)). In a session `start: {carry: true}` without
+  positions continues by id from the last overview, also after `groups` or the graph changed; `createOverviewSession`
+  does the same. Requests without it are answered as before (byte-identical). New contract type `OverviewMovement`.
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
   a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
   (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every

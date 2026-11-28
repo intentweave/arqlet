@@ -14,6 +14,8 @@ mod change_log;
 mod channels_by_demand;
 #[path = "circle_containers.rs"]
 mod circle_containers;
+#[path = "community_algorithm.rs"]
+mod community_algorithm;
 #[path = "community_groups.rs"]
 mod community_groups;
 #[path = "community_hubs.rs"]
@@ -102,6 +104,8 @@ mod overview;
 mod overview_budget;
 #[path = "overview_fill.rs"]
 mod overview_fill;
+#[path = "overview_stats.rs"]
+mod overview_stats;
 #[path = "pack_components.rs"]
 mod pack_components;
 #[path = "paging.rs"]

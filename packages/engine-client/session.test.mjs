@@ -379,6 +379,36 @@ test('an overview session fills packed containers one by one and reports the fil
   await kept.close();
 });
 
+test('an overview session switches partitions with carry, as a request with the places by id does', {skip: !engine}, async () => {
+  const ids = Array.from({length: 160}, (_, i) => `r${Math.floor(i / 40)}n${i % 40}`);
+  const rings = {nodes: ids.map(id => ({id, kind: 'fn', label: id})), edges: ids.flatMap((id, i) => [1, 2, 3].map(d => (
+    {id: `${id}-${d}`, kind: 'call', source: id, target: ids[i - i % 40 + (i + d) % 40]})))};
+  const by = path => Object.fromEntries(ids.map((id, i) => [id, path(Math.floor(i / 40), i % 40)]));
+  const a = {communities: 0, groups: by(r => [`p${r % 2}`, `ring${r}`])};
+  const c = {communities: 0, groups: by((_, i) => ['all', `mod${i % 4}`])};
+  const kept = createOverviewSession(engine);
+  const sent = createOverviewSession(engine, {resident: false});
+  const both = async step => {
+    const [x, y] = [await step(kept), await step(sent)];
+    assert.equal(x.ok, true, x.error);
+    assert.deepEqual(x, y);
+    return x.overview;
+  };
+  const first = await both(s => s.open(rings, {options: a}));
+  const switched = await both(s => s.layOut({options: c, start: {carry: true}}));
+  const places = Object.fromEntries(first.ids.map((id, i) => [id,
+    {x: first.x[i], y: first.y[i], r: first.r[i], ...(first.parent[i] >= 0 ? {parent: first.ids[first.parent[i]]} : {})}]));
+  const direct = engine({op: 'overview', graph: rings, options: c, start: {nodes: places, carry: true}});
+  assert.deepEqual(switched, direct.overview);
+  assert.equal(switched.continuation.carried, 165);
+  assert.equal(switched.movement.nodes, 160);
+  assert.equal(switched.stats.overlaps, 0);
+  // A later layout without carry has no movement report.
+  const plain = await both(s => s.layOut({options: c, start: {}}));
+  assert.equal(plain.movement, undefined);
+  await kept.close();
+});
+
 test('an overview continued by id keeps its clusters over later layouts, in both kinds of session', {skip: !engine}, async () => {
   // Four dense rings without containers: communities. With the first ring last, clustering anew names them otherwise.
   const ids = Array.from({length: 160}, (_, i) => `r${Math.floor(i / 40)}n${i % 40}`);

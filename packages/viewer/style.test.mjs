@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createStyle, autoColour, themeFromCss, DEFAULT_THEME, PALETTE, STYLE_PRESETS} from './style.js';
+import {createStyle, autoColour, themeFromCss, glyphOf, orientGlyphs, DEFAULT_THEME, PALETTE, STYLE_PRESETS} from './style.js';
 import {sceneBuffers, parseColour, BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE} from './scene-buffers.js';
 import {renderSvg} from './svg.js';
 import {toReactFlow} from './react-flow.js';
@@ -95,12 +95,15 @@ test('a scene\'s buses become data for the rules: a bus per route, stations and 
   assert.equal(style.bind(sc), b, 'bound once per scene');
 });
 
+// The metro sheet with dots for the stations on one line (as before ticks).
+const METRO_DOTS = {...STYLE_PRESETS.metro, rules: STYLE_PRESETS.metro.rules.map(r => (r.selector === 'leaf[bus]' ? {...r, style: {...r.style, glyph: 'dot', glyphSize: 7, strokeWidth: 3}} : r))};
+
 test('metro: no arrowheads, stations as dots with their names outside, lines to the dots, in every renderer', () => {
   const s = scene('bpmn-pools');
   const routes = s.routes.slice(0, 2).map(r => r.id);
   const withBus = {...s, buses: [routes]};
   const host = new El('svg');
-  renderSvg(host, withBus, {document: {createElementNS: (_, t) => new El(t)}, style: STYLE_PRESETS.metro});
+  renderSvg(host, withBus, {document: {createElementNS: (_, t) => new El(t)}, style: METRO_DOTS});
   const lines = [];
   walk(host, e => { if (e.tag === 'polyline' && routes.includes(e.attrs['data-route-id']) && e.attrs.class !== 'route-hit') lines.push(e); });
   assert.ok(lines.length === 2 && lines.every(l => !l.attrs['marker-end'] && l.attrs['stroke-width'] === 5), 'bus routes: thick, no marker');
@@ -115,13 +118,200 @@ test('metro: no arrowheads, stations as dots with their names outside, lines to 
   const r0 = s.routes.find(r => r.id === lines[0].attrs['data-route-id']);
   const ends = [r0.source, r0.target].map(id => s.nodes.find(n => n.id === id).bounds).map(b => [b.x + b.width / 2, b.y + b.height / 2]);
   assert.ok(ends.some(([x, y]) => Math.abs(first[0] - x) < 1e-9 && Math.abs(first[1] - y) < 1e-9), 'a line starts in a dot');
-  const plain = sceneBuffers(s, {style: STYLE_PRESETS.metro}), metro = sceneBuffers(withBus, {style: STYLE_PRESETS.metro});
+  const plain = sceneBuffers(s, {style: METRO_DOTS}), metro = sceneBuffers(withBus, {style: METRO_DOTS});
   assert.equal(plain.layers[2].triangles.length - metro.layers[2].triangles.length, 2 * 3 * TRIANGLE_STRIDE, 'two arrowheads fewer on the GPU');
-  const flow = toReactFlow(withBus, {style: STYLE_PRESETS.metro});
+  const flow = toReactFlow(withBus, {style: METRO_DOTS});
   assert.equal(flow.edges.find(e => e.id === routes[0]).data.look.arrow, 'none');
   assert.equal(flow.nodes.find(n => n.id === station).data.look.glyph, 'dot');
   assert.ok(flow.edges.find(e => e.id === routes[0]).data.look.points, 'React Flow gets the points to the dots');
   // The GPU buffers draw the station as a dot of radius 7 in the middle.
   const leaves = metro.layers[3].boxes, ids = metro.layers[3].ids, k = ids.indexOf(station);
   assert.deepEqual([...leaves.slice(k * BOX_STRIDE, k * BOX_STRIDE + 6)], [cx - 7, cy - 7, 14, 14, 7, 1]);
+});
+
+test('a tick stands across its line, to the right or up, its name beyond the tip', () => {
+  const tick = {glyph: 'tick'};
+  const at = (x, y) => ({x: x - 10, y: y - 10, width: 20, height: 20});
+  const glyphs = new Map(['a', 'b', 'c', 'd', 'e'].map((id, k) => [id, glyphOf(tick, [at(0, 0), at(100, 0), at(200, 0), at(200, 100), at(300, 300)][k])]));
+  // a — b — c across, c — d down; e has no routes.
+  const scene = {routes: [
+    {id: 'ab', source: 'a', target: 'b', points: [{x: 10, y: 0}, {x: 90, y: 0}]},
+    {id: 'bc', source: 'b', target: 'c', points: [{x: 110, y: 0}, {x: 190, y: 0}]},
+    {id: 'cd', source: 'c', target: 'd', points: [{x: 200, y: 10}, {x: 200, y: 90}]},
+  ], buses: [['ab', 'bc', 'cd']]};
+  assert.equal(orientGlyphs(glyphs, scene), glyphs, 'in place');
+  const b = glyphs.get('b');
+  assert.deepEqual([b.nx, b.ny, b.x2, b.y2, b.align, b.baseline], [0, -1, 100, -9, 'center', 'bottom'], 'a line across: the tick points up, the name centred above');
+  assert.ok(b.labelY < b.y2 && b.labelX === 100);
+  const d = glyphs.get('d');
+  assert.deepEqual([d.nx, d.ny, d.x2, d.align, d.baseline], [1, 0, 209, 'left', 'middle'], 'the end of a line down: the tick points right, the name left-aligned beside it');
+  assert.ok(d.labelX > d.x2);
+  // c turns the corner: its tick stands across the diagonal between its neighbours, to the right.
+  const c = glyphs.get('c');
+  assert.ok(Math.abs(Math.hypot(c.nx, c.ny) - 1) < 1e-12 && c.nx > 0 && c.ny < 0);
+  assert.deepEqual([glyphs.get('e').nx, glyphs.get('e').ny], [0, -1], 'no routes: up');
+  // A dot stays as it was.
+  assert.deepEqual(glyphOf({glyph: 'dot'}, at(0, 0)), {kind: 'dot', cx: 0, cy: 0, r: 7, labelX: 10, labelY: 18});
+});
+
+test('metro: a station on one line is a tick in its line\'s colour in every renderer', () => {
+  const s = scene('bpmn-pools');
+  const routes = s.routes.slice(0, 2).map(r => r.id);
+  const withBus = {...s, buses: [routes]};
+  const ends = new Map();
+  for (const r of s.routes.filter(r => routes.includes(r.id))) for (const id of [r.source, r.target]) ends.set(id, (ends.get(id) ?? 0) + 1);
+  const station = [...ends.keys()][0];
+  const box = s.nodes.find(n => n.id === station).bounds, cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  const colour = autoColour(0, STYLE_PRESETS.metro.palette);
+  const host = new El('svg');
+  renderSvg(host, withBus, {document: {createElementNS: (_, t) => new El(t)}, style: STYLE_PRESETS.metro});
+  let line = null, label = null;
+  walk(host, e => { if (e.tag === 'g' && e.attrs['data-node-id'] === station) { line = e.children.find(c => c.tag === 'line'); label = e.children.find(c => c.tag === 'text'); } });
+  assert.ok(line, 'a tick, not a dot');
+  assert.deepEqual([line.attrs.x1, line.attrs.y1, line.attrs.stroke, line.attrs['stroke-width']], [cx, cy, colour, 4]);
+  assert.ok(Math.abs(Math.hypot(line.attrs.x2 - cx, line.attrs.y2 - cy) - 9) < 1e-9, 'nine units long');
+  // Across its line: perpendicular to where its route leaves the station.
+  const glyphs = new Map([[station, glyphOf({glyph: 'tick'}, box)]]);
+  orientGlyphs(glyphs, withBus);
+  const g = glyphs.get(station);
+  assert.deepEqual([line.attrs.x2, line.attrs.y2], [g.x2, g.y2]);
+  assert.ok(label.attrs['text-anchor'] && label.attrs.x === g.labelX && label.attrs.y === g.labelY, 'its name beyond the tip');
+  // The GPU layer: a segment from the middle to the tip, an empty box with the id.
+  const metro = sceneBuffers(withBus, {style: STYLE_PRESETS.metro}), leaves = metro.layers[3];
+  const k = leaves.ids.indexOf(station);
+  assert.ok(k >= 0 && leaves.boxes[k * BOX_STRIDE + 6] === 0, 'an empty box carries the id');
+  // The segment is shortened by half its width at both ends: with the shaders' square caps it covers the middle to the
+  // tip, as SVG's butt-capped line does.
+  const round = v => Math.round(v * 1000) / 1000;
+  const want = [cx + g.nx * 2, cy + g.ny * 2, g.x2 - g.nx * 2, g.y2 - g.ny * 2, 4].map(round);
+  let found = false;
+  for (let i = 0; i < leaves.segments.length; i += SEGMENT_STRIDE) {
+    const seg = [...leaves.segments.slice(i, i + 5)].map(round);
+    if (seg[0] === want[0] && seg[1] === want[1]) { found = true; assert.deepEqual(seg, want); }
+  }
+  assert.ok(found, 'the tick as a segment on the GPU');
+  const text = metro.texts.find(t => t.text === s.nodes.find(n => n.id === station).label.slice(0, 32) && t.x === g.labelX);
+  assert.ok(text && text.align === g.align && text.baseline === g.baseline);
+  // React Flow: the tick relative to the node's box.
+  const look = toReactFlow(withBus, {style: STYLE_PRESETS.metro}).nodes.find(n => n.id === station).data.look;
+  assert.equal(look.glyph, 'tick');
+  assert.deepEqual([look.tick.x1, look.tick.y1, look.tick.x2, look.tick.y2], [cx - box.x, cy - box.y, g.x2 - box.x, g.y2 - box.y]);
+});
+
+test('a pill lies across the main axis of its lines; a branching station is marked `branch`', () => {
+  const at = (x, y) => ({x: x - 10, y: y - 10, width: 20, height: 20});
+  const route = (id, a, b, from, to) => ({id, source: a, target: b, points: [from, to]});
+  // g where a line from the left goes on to the right and branches down: a T.
+  const glyphs = new Map([['g', glyphOf({glyph: 'pill'}, at(100, 100))], ['x', glyphOf({glyph: 'pill'}, at(400, 100))]]);
+  assert.deepEqual([glyphs.get('g').thickness, glyphs.get('g').length, glyphs.get('g').width, glyphs.get('g').r], [11, 26.4, 3, 5.5]);
+  const scene = {routes: [
+    route('l', 'a', 'g', {x: 0, y: 100}, {x: 90, y: 100}), route('r', 'g', 'b', {x: 110, y: 100}, {x: 200, y: 100}), route('d', 'g', 'c', {x: 100, y: 110}, {x: 100, y: 200}),
+    // x: a crossing, four ways; balanced, so the first route's line decides.
+    route('x1', 'p', 'x', {x: 300, y: 100}, {x: 390, y: 100}), route('x2', 'x', 'q', {x: 410, y: 100}, {x: 500, y: 100}),
+    route('x3', 's', 'x', {x: 400, y: 0}, {x: 400, y: 90}), route('x4', 'x', 't', {x: 400, y: 110}, {x: 400, y: 200}),
+  ], buses: [['l', 'r', 'd'], ['x1', 'x2', 'x3', 'x4']]};
+  orientGlyphs(glyphs, scene);
+  const g = glyphs.get('g');
+  assert.deepEqual([g.nx, g.ny, g.x2, g.y2, g.align, g.baseline], [0, -1, 100, 100 - 13.2, 'center', 'bottom'], 'the through line runs across: the pill stands up, its name above');
+  const x = glyphs.get('x');
+  assert.deepEqual([x.nx, x.ny], [0, -1]);
+  // Lines leave the crossing up and down too: its name goes between them, to the upper right, beyond the pill's corner.
+  assert.deepEqual([x.align, x.baseline], ['left', 'bottom']);
+  assert.ok(x.labelX > 400 && x.labelY < 100);
+  // A branch whose lines leave up, down and diagonally: the main axis turns to the nearest 45° (down), the pill lies flat, its name to the left, where no line leaves.
+  const branch = new Map([['y', glyphOf({glyph: 'pill'}, at(100, 400))]]);
+  orientGlyphs(branch, {routes: [route('u', 'n', 'y', {x: 100, y: 300}, {x: 100, y: 390}), route('v', 'y', 's', {x: 100, y: 410}, {x: 100, y: 500}), route('w', 'y', 'e', {x: 107, y: 407}, {x: 200, y: 500})]});
+  assert.deepEqual([branch.get('y').nx, branch.get('y').ny, branch.get('y').align], [-1, 0, 'right']);
+  // The derived data: g has three routes of one bus.
+  const looks = createStyle({rules: [{selector: 'leaf[branch]', style: {glyph: 'pill'}}]}).bind({...scene, nodes: []});
+  assert.equal(looks.node({id: 'g'}).glyph, 'pill');
+  assert.equal(looks.node({id: 'a'}).glyph, undefined);
+});
+
+test('metro: an interchange is a white pill across its lines in every renderer', () => {
+  const s = scene('bpmn-pools');
+  // Two routes that share a node, on two buses: that node is an interchange.
+  let pair = null;
+  for (const a of s.routes) { for (const b of s.routes) { if (a !== b && !pair && [b.source, b.target].includes(a.source)) pair = [a, b]; } }
+  assert.ok(pair, 'two routes meeting at a node');
+  const station = pair[0].source, withBus = {...s, buses: [[pair[0].id], [pair[1].id]]};
+  const box = s.nodes.find(n => n.id === station).bounds, cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  const glyphs = new Map([[station, glyphOf({glyph: 'pill'}, box)]]);
+  orientGlyphs(glyphs, withBus);
+  const g = glyphs.get(station);
+  const host = new El('svg');
+  renderSvg(host, withBus, {document: {createElementNS: (_, t) => new El(t)}, style: STYLE_PRESETS.metro});
+  let pill = null;
+  walk(host, e => { if (e.tag === 'g' && e.attrs['data-node-id'] === station) pill = e.children.find(c => c.tag === 'rect' && c.attrs.rx); });
+  assert.ok(pill, 'a pill');
+  assert.deepEqual([pill.attrs.width, pill.attrs.height, pill.attrs.rx, pill.attrs.fill, pill.attrs.stroke, pill.attrs['stroke-width']], [26.4, 11, 5.5, '#ffffff', '#1b1b1b', 3]);
+  assert.ok(pill.attrs.transform.startsWith('rotate(') && pill.attrs.transform.endsWith(` ${cx} ${cy})`));
+  // The GPU layer: triangles around the middle in the border's colour, then in white; an empty box with the id.
+  const leaves = sceneBuffers(withBus, {style: STYLE_PRESETS.metro}).layers[3];
+  const k = leaves.ids.indexOf(station);
+  assert.ok(k >= 0 && leaves.boxes[k * BOX_STRIDE + 6] === 0);
+  const fans = [];
+  for (let i = 0; i < leaves.triangles.length; i += TRIANGLE_STRIDE) if (leaves.triangles[i] === Math.fround(cx) && leaves.triangles[i + 1] === Math.fround(cy)) fans.push([...leaves.triangles.slice(i + 3, i + 7)].map(v => Math.round(v * 100) / 100));
+  assert.equal(fans.length, 2 * 26, 'two fans of 26 triangles');
+  assert.deepEqual(fans[0], [0.11, 0.11, 0.11, 1]);
+  assert.deepEqual(fans.at(-1), [1, 1, 1, 1]);
+  // The border lies centred on the outline as SVG strokes it: the dark fan reaches half the length plus half the border
+  // along the normal, the white one half the length minus half the border.
+  const reach = dark => {
+    let far = 0;
+    for (let i = 0; i < leaves.triangles.length; i += TRIANGLE_STRIDE) if ((leaves.triangles[i + 3] < 0.5) === dark) far = Math.max(far, (leaves.triangles[i] - cx) * g.nx + (leaves.triangles[i + 1] - cy) * g.ny);
+    return far;
+  };
+  assert.ok(Math.abs(reach(true) - 14.7) < 1e-3, String(reach(true)));
+  assert.ok(Math.abs(reach(false) - 11.7) < 1e-3, String(reach(false)));
+  const look = toReactFlow(withBus, {style: STYLE_PRESETS.metro}).nodes.find(n => n.id === station).data.look;
+  assert.equal(look.glyph, 'pill');
+  assert.deepEqual([look.pill.cx, look.pill.cy, look.pill.length, look.pill.thickness], [cx - box.x, cy - box.y, 26.4, 11]);
+});
+
+test('a pill on a vertical through line lies across it, also with a branch to the right or parallel routes', () => {
+  const at = (x, y) => ({x: x - 10, y: y - 10, width: 20, height: 20});
+  const route = (id, a, b, from, to) => ({id, source: a, target: b, points: [from, to]});
+  // The mirrored T: a line down through t, a branch to the right; and v on a line down with two parallel routes below it.
+  const glyphs = new Map([['t', glyphOf({glyph: 'pill'}, at(100, 100))], ['v', glyphOf({glyph: 'pill'}, at(400, 100))]]);
+  orientGlyphs(glyphs, {routes: [
+    route('u', 'n', 't', {x: 100, y: 0}, {x: 100, y: 90}), route('d', 't', 's', {x: 100, y: 110}, {x: 100, y: 200}), route('r', 't', 'e', {x: 110, y: 100}, {x: 200, y: 100}),
+    route('vu', 'p', 'v', {x: 400, y: 0}, {x: 400, y: 90}), route('vd', 'v', 'q', {x: 400, y: 110}, {x: 400, y: 200}), route('vd2', 'v', 'q', {x: 400, y: 110}, {x: 400, y: 200}),
+  ]});
+  // The main axis is vertical: the pill's long axis runs across, to the side where no line leaves.
+  const t = glyphs.get('t'), v = glyphs.get('v');
+  assert.deepEqual([t.nx, t.ny], [-1, 0], 'the branch leaves to the right: the pill and its name to the left');
+  assert.deepEqual([Math.abs(v.nx), v.ny], [1, 0]);
+});
+
+test('`branch` counts the other nodes a bus leads to, not its routes: parallel routes and loops count once', () => {
+  const route = (id, source, target) => ({id, source, target, points: [{x: 0, y: 0}, {x: 1, y: 1}]});
+  const scene = {nodes: [], routes: [route('a', 'p', 's'), route('b', 's', 'q'), route('c', 's', 'q'), route('l', 's', 's'), route('x', 'g', 'p'), route('y', 'g', 'q'), route('z', 'g', 'r')],
+    buses: [['a', 'b', 'c', 'l', 'x', 'y', 'z']]};
+  const looks = createStyle({rules: [{selector: 'leaf[branch]', style: {glyph: 'pill'}}]}).bind(scene);
+  assert.equal(looks.node({id: 's'}).glyph, undefined, 'a through station with a parallel route and a loop');
+  assert.equal(looks.node({id: 'g'}).glyph, 'pill', 'three neighbours on one bus');
+});
+
+test('a tick\'s name shows from afar beyond its tip, aligned as its own name', async () => {
+  const {drawLodLabels} = await import('./scene-renderer.js');
+  const drawn = [];
+  const ctx = {measureText: t => ({width: t.length * 5}), fillText: (text, x, y) => drawn.push([text, x, y]), strokeText() {}};
+  const text = {x: 13, y: 0, text: 'Uni', size: 12, colour: '#1b1b1b', align: 'left', baseline: 'middle',
+    lod: {kind: 'leaf', box: {x: -12, y: -12, width: 24, height: 24}, dot: {cx: 0, cy: 0, r: 9, end: {x: 9, y: 0}, align: 'left', baseline: 'middle'}}};
+  const draw = scale => {
+    drawn.length = 0;
+    const w = 400, h = 300;
+    drawLodLabels(ctx, [text], {centreX: 0, centreY: 0, scale}, w, h, {x: -w / 2 / scale, y: -h / 2 / scale, width: w / scale, height: h / scale}, {minTextPixels: 6, font: 'system-ui'});
+    return [...drawn];
+  };
+  // At 0.3 (the name would be 3.6 pixels high): a label beside the tip, 3 pixels right of it, on its middle.
+  assert.deepEqual(draw(0.3), [['Uni', 200 + 9 * 0.3 + 3, 150]]);
+  // It shows while the tick is 1.5 pixels long or more.
+  assert.equal(draw(0.17).length, 1);
+  assert.equal(draw(0.16).length, 0);
+  // Right-aligned and above: it ends 3 pixels left of the tip, its middle above the tip.
+  Object.assign(text.lod.dot, {end: {x: -9, y: 0}, align: 'right', baseline: 'bottom'});
+  const [[, x, y]] = draw(0.3);
+  assert.deepEqual([x, y], [200 - 9 * 0.3 - 3 - 15, 150 - 3 - 10 * 0.6]);
 });

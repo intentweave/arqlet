@@ -257,6 +257,28 @@ with the ids maps `edge:k` back through them (`resolvedEdgeIds(graph)[k]`).
 `weight` is the sum of theirs, for a cluster with many leaving edges: fewer routes, each weighted. The graph then differs
 from `structuredExcerpt`'s. Provisional, as the overview.
 
+### Choosing the community algorithm (provisional)
+
+The engine finds communities with Louvain by default. `communityAlgorithm: 'leiden'` finds them with Leiden (Traag,
+Waltman and van Eck 2019) instead, whose communities are always connected: Louvain can leave a community whose parts no
+link joins. `communityResolution` (a number > 0, default 1) is the resolution of modularity for both: larger values give
+smaller communities. The same two options exist in the overview's `options` and in the layout options (with
+`communities`, also for the `communities` operation):
+
+```js
+run({op: 'overview', graph, options: {communityAlgorithm: 'leiden'}});
+run({op: 'import', graph, options: {communities: 40, communityAlgorithm: 'leiden', communityResolution: 1.5}});
+```
+
+- Both are deterministic: the same answer for any thread count, natively and in WASM. Leiden here refines greedily
+  instead of at random, so it needs no seed.
+- Hubs, satellites, `groups`, labels, cluster ids (`community:<container>:<level>.<k>`) and the work budget work as with
+  Louvain; Leiden's work is counted in the same units. A session builds its hierarchy again when either option changes.
+- A continuation by id (`start.nodes`) keeps the earlier clusters whatever algorithm made them; only containers without
+  earlier clusters are clustered with the request's algorithm.
+- Defaults are omitted from snapshots and change no answer. ADR 0018 (addendum of 2026-11-28) has the design;
+  `benchmarks/results/communities-20261128.md` the measurements.
+
 ### Showing your own partition (provisional)
 
 A host that computes communities itself (for example with Leiden on a server) gives the overview that partition as the
@@ -284,7 +306,7 @@ const leiden = run({op: 'overview', graph, options: {communities: 0, groups: {
   included, inside it: in a group of 500 modules the communities are clusters `community:group:#:core:<level>.<k>`
   (kind `community`, labelled after their most connected member, `≈ <name>`). Groups with fewer children are shown as
   given. Use `communities: 0` when the partition is to be shown as it is.
-- `edgeData`, `columns`, `positionsOnly`, the work per container (`ticks`, the force steps of each container's
+- `edgeData`, `containerStats`, `columns`, `positionsOnly`, the work per container (`ticks`, the force steps of each container's
   simulation), `radii`, `intent` and the level of detail of a `configSet` work as without `groups`. A session lays out
   again on the clusters it has while `groups` (with `communities`, `satellites`, `hubs`) stays the same.
 
@@ -292,7 +314,7 @@ const leiden = run({op: 'overview', graph, options: {communities: 0, groups: {
 answer, with their parents, as `start.nodes` (the `places` function above). A session needs `start.nodes` too: a
 `start` without positions after a change of `groups` is refused (`clusters changed`). What happens
 (`a_partition_of_the_host_is_shown_as_given_and_a_switch_keeps_the_groups_both_have` in
-`crates/runtime/tests/overview.rs`):
+`crates/runtime/tests/overview.rs`), without `carry`:
 
 - A group whose id is in both partitions (the same container and the same path) **continues with its inner
   arrangement**: its members keep their places relative to it. The group itself may move, since its container changed
@@ -301,12 +323,100 @@ answer, with their parents, as `start.nodes` (the `places` function above). A se
   group; so is a group that is new. They count as `anew` in `continuation`; groups count like nodes.
 - The groups of the old partition that the new one lacks are **listed in `continuation.ignored`** (unlike the clusters
   the overview adds itself, which are not listed).
-- Two partitions that share no path: every node is placed anew, and the answer is the same as without `start`.
+- Two partitions that share no path: every node is placed anew, and the answer is the same as without `start` (unless
+  `carry`, below).
 - The answer is valid in every case: no overlaps, every disc inside its parent.
 
 To switch back without moving anything, keep the places of each partition's last answer and send those: partition A
 with the places of A's answer continues all of it (`anew: 0`) and nothing moves. Sent with the places of B's answer
 instead, what B shares with A continues and the rest is placed anew again.
+
+**Switching from the old places** (`start.carry: true`, provisional, #239). For a switch the host animates, add
+`carry: true` to `start.nodes`: what both partitions share continues as above, and every node placed anew starts from
+its old absolute place instead of beside its linked nodes. A new group starts at the centre of its members' old places
+(weighted by the area of their discs), its members at their old places in it; then the forces gather them and the
+separation removes any overlap (`a_switch_of_partitions_with_carry_starts_from_the_old_places` in
+`crates/runtime/tests/overview.rs`):
+
+```js
+const b = run({op: 'overview', graph, options: {communities: 0, groups: byFeature},
+  start: {nodes: places(a), carry: true}}).overview;
+b.continuation;   // {continued, anew, ignored, carried}: carried of anew started from an old place
+b.movement;       // {nodes, median, max, medianShare, maxShare}
+// Animate when the change is small enough to follow, else draw the new overview at once.
+if (b.movement.maxShare < 0.5) morph(a, b); else show(b);
+```
+
+| Field | Meaning |
+|---|---|
+| `start.carry` | `true` with `start.nodes`; refused with `start.x`, `y`, `r`. Without it, nothing changes (byte-identical) |
+| `continuation.carried` | of `anew`, how many started from an old place (groups count like nodes); a new leaf without an entry is still placed anew |
+| `movement.nodes` | the graph's own nodes with an entry (not the groups, whose ids change with the partition, nor added clusters) |
+| `movement.median`, `max` | how far they moved from their entries, in the overview's units (hundredths) |
+| `movement.medianShare`, `maxShare` | the same divided by the answer's `rootRadius` |
+
+- A container that holds a carried node settles from those places (as with `settle`) and is centred again; what it
+  holds keeps its absolute place as far as the forces allow. Containers above it make room (or settle with `settle`).
+  A group both partitions have keeps its inner arrangement, as without `carry`.
+- With `communities` > 0 the clusters Louvain makes in a new group start from their members' old places too.
+- `workBudget`: a container with carried nodes has changed, so one the budget does not reach is packed, as always.
+  `start.fill` arranges a container as without a start, carried or not; `moved` naming a node placed anew is refused.
+- **Sessions:** `start: {carry: true}` without positions continues by id from the session's last overview, also after
+  `groups` or the graph changed, and gives what `dispatch` gives with that answer's places (and parents) as
+  `start.nodes`. `createOverviewSession(...).layOut({options: {groups: byFeature}, start: {carry: true}})` does the same.
+  A switch has other clusters, so `positionsOnly` answers the whole overview; `movement` comes with positions-only and
+  columnar answers too.
+- How far nodes move depends on how much the partitions share. On generated graphs carrying moved them less than the
+  continuation without it where files moved, were regrouped or merged; with Louvain dividing the new groups
+  (`communities` > 0) the largest moves and the root disc can grow beyond a fresh layout's, so prefer `communities: 0`
+  for a carried switch; and a partition with the same members under other names is drawn exactly as before by a fresh
+  layout, so keep the old answer there ([results](../benchmarks/results/overview-partition-switch-20261128.md)).
+
+### Marking weak containers (provisional)
+
+A container is weak when its children are not much more connected among themselves than to the outside: a group of
+your partition that holds little, or a community that is a remnant. Ask for `containerStats: true` and the answer holds,
+per container, how much of its edges it keeps inside and its term of the modularity at its depth (#236):
+
+```js
+const {overview: o} = run({op: 'overview', graph, containerStats: true,
+  options: {communities: 0, groups}});
+const s = o.containerStats;
+// Parallel arrays: s.container[k] is a node index (-1: the root), s.depth[k] its depth (0: top level).
+const weak = [];
+for (let k = 0; k < s.container.length; k++) {
+  if (s.container[k] < 0 || s.touching[k] === 0) continue;
+  // Less than half of the edges that touch it stay inside, or it adds nothing to the modularity of its depth.
+  if (s.share[k] < 0.5 || s.modularity[k] <= 0) weak.push(o.ids[s.container[k]]);
+}
+// The modularity of the partition at each depth: s.depthModularity[d].
+```
+
+| Field | Per container `B` (its node and everything below it) |
+| --- | --- |
+| `container`, `depth` | node index (-1 the root) and depth (-1 the root, 0 top level); the root first, then every node with children in index order |
+| `inner` | weight of the edges with both ends in `B` |
+| `touching` | weight of the edges with at least one end in `B` (`inner` plus those that leave it) |
+| `share` | `inner / touching`; 0 when nothing touches `B` |
+| `modularity` | `in(B)/m − (deg(B)/2m)²`, `B`'s term of the modularity at its depth; 0 for the root |
+| `depthModularity[d]` | `Q` of the partition at depth `d`: the blocks of the nodes at depth `d`, every node above as a block of its own |
+| `weight` | `m`, the weight of all resolved edges |
+
+How edges count: undirected; each with its `weight` (1 when left out), so parallel edges add up; unresolved edges are
+left out (as from `edges`). `deg(B)` adds each end in `B`, so a self-loop counts once in `in(B)` and twice in `deg(B)`.
+An edge between a container and a node below it lies inside the container (not inside the child holding the node); an
+edge of a container node to a node outside counts as touching it. The terms of a depth's containers need not add up to
+`depthModularity[d]`: leaves at that depth and the nodes above it are blocks too. With no edge every number is 0.
+
+- Without `containerStats` the answer is exactly as before. The stats depend only on the clusters and the edges, not on
+  the positions, and are the same for any thread count, natively and in WASM.
+- **Columns:** with `columns: true` the arrays come as typed columns `containerStats.container` and
+  `containerStats.depth` (`i32`) and `containerStats.inner`, `.touching`, `.share`, `.modularity`,
+  `.depthModularity` (`f64`); `weight` stays in the JSON. The engine client's `overview()` (and that of `@arqlet/node`) puts them back into
+  `overview.containerStats`, so the answer is shaped like the JSON one.
+- **Positions only:** a `positionsOnly` answer does not carry them. A session answers one only while `containerStats`
+  is the same as in its last answer (the host keeps the stats from there, as the engine client's overview session does);
+  otherwise it answers the whole overview.
 
 ### Bounding an overview's work (provisional)
 

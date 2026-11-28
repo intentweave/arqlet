@@ -28,7 +28,9 @@ const LEAF_ROOM = 140;
 const LOD_PIXELS = {container: 11, leaf: 10};
 const MAX_LOD_LABELS = 3000;
 
-function drawLodLabels(ctx, texts, view, w, h, rect, {minTextPixels, font}) {
+/** Provisional, exported for tests: the labels of a fixed screen size (see above) on `ctx`, for the view `view` of w×h CSS
+ * pixels showing `rect`. */
+export function drawLodLabels(ctx, texts, view, w, h, rect, {minTextPixels, font}) {
   const s = view.scale, toScreen = (x, y) => [w / 2 + (x - view.centreX) * s, h / 2 + (y - view.centreY) * s];
   const taken = new Map(), CELL = 48;
   const free = (x0, y0, x1, y1) => {
@@ -68,10 +70,14 @@ function drawLodLabels(ctx, texts, view, w, h, rect, {minTextPixels, font}) {
     // large container), a leaf's name in its middle.
     const vx = Math.max(x0, 0), vy = Math.max(y0, 0);
     if (container && (vx + width + 8 > x0 + bw || vy + px + 4 > y0 + bh)) continue;
-    // A glyph's name right of and below its dot.
+    // A dot's name right of and below it; a tick's or a pill's beyond its end, aligned as its own name (`dot.align`,
+    // `dot.baseline`: canvas values).
     const [dx, dy] = dot ? toScreen(dot.cx, dot.cy) : [0, 0];
-    const lx = dot ? dx + dot.r * s + 3 : container ? vx + 4 : x0 + bw / 2 - width / 2;
-    const ly = dot ? dy + dot.r * s + px * 0.7 : container ? vy + px * 0.5 + 3 : y0 + bh / 2;
+    const [ex, ey] = dot?.end ? toScreen(dot.end.x, dot.end.y) : [0, 0];
+    const lx = dot?.end ? (dot.align === 'left' ? ex + 3 : dot.align === 'right' ? ex - 3 - width : ex - width / 2)
+      : dot ? dx + dot.r * s + 3 : container ? vx + 4 : x0 + bw / 2 - width / 2;
+    const ly = dot?.end ? (dot.baseline === 'bottom' ? ey - 3 - px * 0.6 : dot.baseline === 'top' ? ey + 3 + px * 0.6 : ey)
+      : dot ? dy + dot.r * s + px * 0.7 : container ? vy + px * 0.5 + 3 : y0 + bh / 2;
     const r = [lx - 1, ly - px * 0.6, lx + width + 1, ly + px * 0.6];
     if (!free(...r)) continue;
     take(r);

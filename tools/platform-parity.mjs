@@ -66,9 +66,17 @@ const requests = [
   ['import organic-100', {op: 'import', graph: graph('benchmarks/datasets/organic-100.json'), limit: 200}],
   ['import tree-100', {op: 'import', graph: graph('benchmarks/datasets/tree-100.json'), limit: 200}],
   ['import mixed-layouts', {op: 'import', graph: graph('benchmarks/datasets/mixed-layouts.json'), limit: 200}],
+  // The octilinear star with its refinement (octilinearRefine): the made-up city's metro (cycles between its lines) placed
+  // as an octilinear area, and the vehicle's buses as metro lines.
+  ['import metro-map octilinear refined', {op: 'import', graph: {...graph('benchmarks/datasets/metro-map.json'), defaultDirection: 'auto', defaultStrategy: 'octilinear', defaultRouting: 'straight'}, limit: 100, options: {octilinearRefine: true}}],
+  ['import vehicle-metro refined', {op: 'import', graph: graph('benchmarks/datasets/vehicle-metro.json'), limit: 100, options: {octilinearRefine: true}}],
   ['elkLayout', {op: 'elkLayout', graph: elk}],
   ['elkLayout refined', {op: 'elkLayout', graph: elk, refine: true}],
   ['overview 10 000', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json')}],
+  // Leiden beside Louvain (#237): the overview and the layout's communities, at the default and another resolution.
+  ['overview 10 000, Leiden', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json'), options: {communityAlgorithm: 'leiden'}}],
+  ['overview 10 000, Leiden at resolution 2', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json'), options: {communityAlgorithm: 'leiden', communityResolution: 2}, threads: 4}],
+  ['import organic-100, Leiden communities', {op: 'import', graph: graph('benchmarks/datasets/organic-100.json'), limit: 200, options: {communities: 8, communityAlgorithm: 'leiden'}}],
 ];
 // A view whose repair grid is over its bound, with the sparse grid (#203).
 const mesh = JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '100', '0', 'organic', 'lines', '120', '500'], {maxBuffer: 1 << 30}).toString());
@@ -122,6 +130,8 @@ const changed = {
   ],
 };
 requests.push(['overview with edge data', {op: 'overview', graph: changed, edgeData: true}]);
+// The containers' inner-edge share and modularity (#236): sums of f64 in a fixed order, the same natively and in WASM.
+requests.push(['overview with container stats', {op: 'overview', graph: changed, containerStats: true}]);
 for (const settle of [false, true]) {
   requests.push([`overview continued by id${settle ? ', settling' : ''}`, {op: 'overview', graph: changed, edgeData: true, start: {nodes: places, settle}}]);
 }
@@ -150,6 +160,17 @@ requests.push(
   ['overview filling all within a budget, 4 threads', {op: 'overview', graph: large, start: {...cutStart, fill: packedIds}, workBudget: 3000000, threads: 4}],
   ['overview filling the top level', {op: 'overview', graph: large, start: {...cutStart, fillTop: true}}],
   ['overview filling by id', {op: 'overview', graph: large, start: {nodes: cutPlaces, fill: packedIds.slice(0, 5)}}],
+);
+// Switching between two partitions from the old places (#239): the leaves of every container in groups of the host,
+// then dealt otherwise and carried (4 threads, and within a budget that runs out; Louvain divides the large groups).
+const leaves = large.nodes.filter(n => !containers.has(n.id));
+const dealt = k => Object.fromEntries(leaves.map((n, i) => [n.id, [`k${i % k}`]]));
+const partitionA = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overview', graph: large, options: {groups: dealt(3)}}), maxBuffer: 1 << 30}).toString()).overview;
+const fromA = Object.fromEntries(partitionA.ids.map((id, i) => [id, {x: partitionA.x[i], y: partitionA.y[i], r: partitionA.r[i],
+  ...(partitionA.parent[i] >= 0 ? {parent: partitionA.ids[partitionA.parent[i]]} : {})}]));
+requests.push(
+  ['overview switching partitions, carried, 4 threads', {op: 'overview', graph: large, options: {groups: dealt(2)}, start: {nodes: fromA, carry: true}, threads: 4}],
+  ['overview switching partitions, carried over its budget', {op: 'overview', graph: large, options: {groups: dealt(2)}, start: {nodes: fromA, carry: true}, workBudget: 3000000}],
 );
 // The long form of a view that changed its source graph (#195), read against the view as imported: its digest is found
 // again by writing the bookmark's decisions into that graph, with the same answer natively and in WASM.

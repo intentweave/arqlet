@@ -15,7 +15,41 @@ use arqlet_model::{Edge, Graph};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod continuation;
-pub use continuation::{clusters_by_id, clusters_by_id_within, continue_by_id};
+mod leiden;
+pub use arqlet_model::CommunityAlgorithm;
+pub use continuation::{carry, clusters_by_id, clusters_by_id_within, continue_by_id};
+
+/// Provisional (#237, ADR 0018 addendum of 2026-11-28): how communities are found: the algorithm (Louvain, the default,
+/// or Leiden) and the resolution γ of modularity (1, the default: larger values give smaller communities).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Detection {
+    pub algorithm: CommunityAlgorithm,
+    pub resolution: f64,
+}
+
+impl Default for Detection {
+    fn default() -> Self {
+        Self {
+            algorithm: CommunityAlgorithm::Louvain,
+            resolution: 1.,
+        }
+    }
+}
+
+/// Provisional (#237): the communities of `k` nodes with weighted links, level by level, as `detection` finds them
+/// (`result[l][c]`: the community at level l + 1 of community c at level l; numbered by their first node). The
+/// clustering of `with_communities` runs this per container; public for measurements. `None` when the meter stops it.
+pub fn community_levels(
+    k: usize,
+    links: &[(usize, usize, f64)],
+    detection: &Detection,
+    meter: &mut dyn Meter,
+) -> Option<Vec<Vec<usize>>> {
+    match detection.algorithm {
+        CommunityAlgorithm::Louvain => louvain(k, links, detection.resolution, meter),
+        CommunityAlgorithm::Leiden => leiden::leiden(k, links, detection.resolution, meter),
+    }
+}
 
 /// Provisional (#211, ADR 0018 addendum): counts deterministic units of work at the safe points of the overview's
 /// iterative phases (a Louvain sweep, a force tick, a separation round). `false` means the work must stop there; the
@@ -160,6 +194,8 @@ pub struct OverviewOptions {
     pub gravity: f64,
     /// Containers with more children than this are split into communities (`with_communities`); 0 never.
     pub communities: usize,
+    /// Provisional (#237): how the communities are found (Louvain at resolution 1 by default).
+    pub detection: Detection,
     /// Satellites are gathered with their hub (`with_satellites`) when at least this share of their edges goes to it;
     /// 0 (the default) never.
     pub satellites: f64,
@@ -182,6 +218,7 @@ impl Default for OverviewOptions {
             charge: 0.05,
             gravity: 0.1,
             communities: 120,
+            detection: Detection::default(),
             satellites: 0.,
             chains: false,
             rows: BTreeMap::new(),
@@ -236,6 +273,12 @@ pub struct Previous {
     /// outside the filled containers is answered as it was given; such a kept container also costs no work
     /// (`arrange_metered`), so that the budget of a fill goes to the fills.
     pub keep_radii: bool,
+    /// Provisional (#239): nodes of `anew` that start from an earlier place all the same (`continuation::carry`): their
+    /// entry's absolute centre, or for a container without an entry the weighted centre of what it holds. A container
+    /// with such a child arranges its children from those places with the forces (`CARRY_ALPHA`), separates them and is
+    /// centred again, its shift carried to its parent, so that what it holds keeps its absolute place as far as the
+    /// forces allow. Empty: every node of `anew` is placed anew (`place_anew`), as before.
+    pub carried: BTreeSet<usize>,
 }
 
 /// Provisional (#235): what became of a container named in `Previous::fill`.
@@ -281,6 +324,20 @@ fn anchored(
         p.0 += dx;
         p.1 += dy;
     }
+    in_place(x, r, options, overlaps, recentre, meter)
+}
+
+/// An arrangement whose children keep their places in the container's previous frame: with `recentre` the container is
+/// centred on them again and reports how far its centre moved (`shift`), which its parent adds; without it the disc
+/// stays centred where it was and holds them.
+fn in_place(
+    mut x: Vec<(f64, f64)>,
+    r: &[f64],
+    options: &OverviewOptions,
+    overlaps: usize,
+    recentre: bool,
+    meter: &mut dyn Meter,
+) -> Option<Arrangement> {
     let (cx, cy) = if recentre {
         enclosing_centre(&x, r, meter)?
     } else {
@@ -330,6 +387,12 @@ const SETTLE_ALPHA: f64 = 0.3;
 /// The starting temperature after the user moved a node (`Previous::moved`): cooler than a settling, so that the others
 /// follow the moved one and make room without arranging themselves anew.
 const DRAG_ALPHA: f64 = 0.1;
+
+/// The starting temperature of a container that holds carried children (`Previous::carried`, #239): that of a settling.
+/// Measured against a full start (1, as a fresh layout) on generated switches (`benchmarks/overview/partition-switch.mjs`,
+/// results of 2026-11-28): the nodes moved less in five of six kinds of switch, more only where Louvain divides a new
+/// group anew.
+const CARRY_ALPHA: f64 = SETTLE_ALPHA;
 
 /// Two radii are the same when they differ by at most this much. A host passes back a previous response, whose numbers are
 /// rounded to hundredths, and an unchanged container measures its radius again from rounded places.
@@ -513,7 +576,7 @@ pub const COMMUNITY_PREFIX: &str = "community:";
 /// Splits every container with more than `threshold` children (the root included; a flat graph is one such container)
 /// into communities of its children, found by Louvain on the links between them (Blondel, Guillaume, Lambiotte and
 /// Lefebvre, "Fast unfolding of communities in large networks", 2008; reimplemented, deterministic: nodes in index order,
-/// ties to the smaller community). Every level of the Louvain hierarchy becomes a level of clusters, so a flat graph gets
+/// ties to the smaller community number). Every level of the Louvain hierarchy becomes a level of clusters, so a flat graph gets
 /// the nested clusters the overview and the drill-down need. A community of fewer than `MIN_COMMUNITY` nodes is no
 /// cluster; children without links are gathered in one cluster. Added clusters come after the graph's nodes, with ids `community:<container>:<level>.<k>`.
 /// `threshold` 0 leaves the hierarchy as it is.
@@ -545,26 +608,36 @@ pub fn with_communities_except(
     threshold: usize,
     hubs: &Hubs,
 ) -> Result<Hierarchy, String> {
-    with_communities_where(h, threshold, hubs, &|_| true, &mut Budget::unlimited())
+    with_communities_where(
+        h,
+        threshold,
+        hubs,
+        &Detection::default(),
+        &|_| true,
+        &mut Budget::unlimited(),
+    )
 }
 
 /// Provisional (#211): `with_communities_except` within a work budget. Each container's Louvain is one piece: one that
 /// does not fit into what is left is discarded and its container, and every container after it, stays unsplit
-/// (`Budget::unclustered`). Within budget the same as `with_communities_except`.
+/// (`Budget::unclustered`). Within budget the same as `with_communities_except`. `detection` chooses the algorithm and
+/// the resolution (#237); its default is Louvain at resolution 1, as `with_communities_except`.
 pub fn with_communities_within(
     h: Hierarchy,
     threshold: usize,
     hubs: &Hubs,
+    detection: &Detection,
     budget: &mut Budget,
 ) -> Result<Hierarchy, String> {
-    with_communities_where(h, threshold, hubs, &|_| true, budget)
+    with_communities_where(h, threshold, hubs, detection, &|_| true, budget)
 }
 
-/// `with_communities_except`, splitting only the containers `split` names, within `budget`.
+/// `with_communities_except`, splitting only the containers `split` names, with `detection`, within `budget`.
 fn with_communities_where(
     h: Hierarchy,
     threshold: usize,
     hubs: &Hubs,
+    detection: &Detection,
     split: &dyn Fn(Container) -> bool,
     budget: &mut Budget,
 ) -> Result<Hierarchy, String> {
@@ -635,10 +708,10 @@ fn with_communities_where(
         if linked.iter().filter(|l| **l).count() * 2 < others {
             continue;
         }
-        // The levels of Louvain, from the members up: `levels[l][c]` is the community at level l + 1 of community c at
-        // level l (level 0: the members).
+        // The levels of Louvain (or Leiden), from the members up: `levels[l][c]` is the community at level l + 1 of
+        // community c at level l (level 0: the members).
         let Some(levels) = budget.piece("clustering", container, |meter| {
-            louvain(members.len(), &links, meter)
+            community_levels(members.len(), &links, detection, meter)
         }) else {
             // Over budget: the container stays as it is, its hubs included.
             budget.unclustered.push(container);
@@ -965,10 +1038,12 @@ fn add_cluster(
 /// Louvain on `k` nodes with weighted links: the community of every node, level by level (`result[l][c]`: the community
 /// at level l + 1 of community c at level l), until a level merges nothing. Communities are numbered in order of their
 /// first node, so the result depends only on the input. Nodes without links stay alone. `None` when the meter stops it
-/// (units: per level the links read and aggregated, per sweep the nodes and the links visited).
+/// (units: per level the links read and aggregated, per sweep the nodes and the links visited). `resolution` is the γ of
+/// modularity; at 1 the gain is multiplied by exactly 1, so the default results are those before it existed.
 fn louvain(
     k: usize,
     links: &[(usize, usize, f64)],
+    resolution: f64,
     meter: &mut dyn Meter,
 ) -> Option<Vec<Vec<usize>>> {
     let mut result = Vec::new();
@@ -1023,8 +1098,8 @@ fn louvain(
                     }
                     weight_to[c] += w;
                 }
-                // The gain of joining c, less what is common to all choices: k_i,in(c) - tot(c) k_i / 2m.
-                let gain = |c: usize, w: f64| w - tot[c] * degree[i] / total;
+                // The gain of joining c, less what is common to all choices: k_i,in(c) - γ tot(c) k_i / 2m.
+                let gain = |c: usize, w: f64| w - resolution * tot[c] * degree[i] / total;
                 let mut best = own;
                 let mut best_gain = gain(own, weight_to[own]);
                 touched.sort_unstable();
@@ -1320,8 +1395,12 @@ fn arrange_core(
     if !free && !meter.spend(k as u64 + links.len() as u64) {
         return None;
     }
-    // Whether anything of a previous arrangement is there to continue from.
-    let start = start.filter(|p| members.iter().any(|m| !p.anew.contains(m)));
+    // Whether anything of a previous arrangement is there to continue from (a carried child's place counts, #239).
+    let start = start.filter(|p| {
+        members
+            .iter()
+            .any(|m| !p.anew.contains(m) || p.carried.contains(m))
+    });
     let mut x = match start {
         Some(previous) => {
             let origin = match container {
@@ -1337,7 +1416,11 @@ fn arrange_core(
                     )
                 })
                 .collect();
-            let placed: Vec<bool> = members.iter().map(|m| !previous.anew.contains(m)).collect();
+            let placed: Vec<bool> = members
+                .iter()
+                .map(|m| !previous.anew.contains(m) || previous.carried.contains(m))
+                .collect();
+            let carrying = members.iter().any(|m| previous.carried.contains(m));
             let changed = changed_in(previous, container, members, radius);
             place_anew(&mut x, &placed, &r, &links, options.gap);
             let x = x;
@@ -1386,6 +1469,23 @@ fn arrange_core(
                     0
                 };
                 return anchored(x, &r, options, overlaps, (j, at), recentre, meter);
+            }
+            if carrying {
+                // Children carried from another partition (#239): the forces gather them from their places, then the
+                // separation; the container is centred again and its parent places it by the shift, so that they keep
+                // their absolute places as far as the forces let them (the top level stays centred on the origin).
+                let mut x = x;
+                if !simulate_held(&mut x, &r, &links, options, CARRY_ALPHA, None, meter) {
+                    return None;
+                }
+                let mut overlaps = separate(&mut x, &r, options.gap, meter)?;
+                if in_rows(members, &local, &mut x, &r, options) {
+                    if !meter.spend(k as u64) {
+                        return None;
+                    }
+                    overlaps = separate(&mut x, &r, options.gap, meter)?;
+                }
+                return in_place(x, &r, options, overlaps, recentre, meter);
             }
             if !changed {
                 // Kept as it was: only the radius is measured again (it may have been set by a host before).
@@ -2029,8 +2129,15 @@ pub fn overview(
     options: &OverviewOptions,
     hints: &OverviewHints,
 ) -> (Hierarchy, Overview) {
-    let h = with_communities(hierarchy(graph), options.communities)
-        .unwrap_or_else(|_| hierarchy(graph));
+    let h = with_communities_where(
+        hierarchy(graph),
+        options.communities,
+        &Hubs::default(),
+        &options.detection,
+        &|_| true,
+        &mut Budget::unlimited(),
+    )
+    .unwrap_or_else(|_| hierarchy(graph));
     let mut arrangements = BTreeMap::new();
     let mut hints = hints.clone();
     for level in levels(&h) {
@@ -2044,6 +2151,161 @@ pub fn overview(
     let hints = &hints;
     let result = assemble(&h, &arrangements, options, hints);
     (h, result)
+}
+
+/// Provisional (#236, ADR 0018 addendum of 2026-11-28): how well each container of a hierarchy holds its edges, and the
+/// modularity of the partition at each depth.
+///
+/// The edges are the hierarchy's resolved edges (`Hierarchy::edges`: unresolved edges are not in it), undirected, each
+/// counting its weight (`Hierarchy::weights`, `Edge::weight`, 1 when left out); parallel edges count each. A container's
+/// *block* is the container node itself and everything below it. At depth `d` the nodes form the partition whose blocks
+/// are the blocks of the nodes at depth `d` (top-level nodes have depth 0), with every node above depth `d` a block of
+/// its own; the root (all nodes, one block) is depth -1.
+///
+/// With `m` the sum of all weights, `in(B)` the weight of the edges with both ends in block `B` (a self-loop counts once)
+/// and `deg(B)` the sum of the weights of the edge ends in `B` (a self-loop counts twice, so `deg(B) = 2 in(B) + cut(B)`):
+///
+/// - `inner = in(B)`, `touching = deg(B) - in(B)` (edges with at least one end in `B`), `share = inner / touching` (0
+///   when no edge touches the block),
+/// - `modularity = in(B) / m - (deg(B) / 2m)^2`, the block's term of the modularity at its depth (Newman and Girvan),
+/// - per depth `d`: `Q_d`, the sum of the terms of all blocks of its partition (containers, leaves at depth `d` and the
+///   nodes above it as their own blocks), summed in node index order.
+///
+/// An edge between a container and a node below it lies inside the container's block (not inside the child's). With
+/// `m = 0` every share and modularity is 0. The counts are exact (`u64`); the quotients are computed in the same order
+/// on every target, so the numbers are the same natively and in WASM.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ContainerStats {
+    /// The sum of the weights of all edges (`m`).
+    pub weight: u64,
+    /// The root first, then every node with children in index order.
+    pub containers: Vec<Container>,
+    /// Each container's depth: -1 for the root, 0 for a top-level node.
+    pub depth: Vec<i64>,
+    pub inner: Vec<u64>,
+    pub touching: Vec<u64>,
+    pub share: Vec<f64>,
+    pub modularity: Vec<f64>,
+    /// `Q_d` for every depth from 0 to the deepest container's (empty without containers below the root).
+    pub depth_modularity: Vec<f64>,
+}
+
+/// The `ContainerStats` of a hierarchy.
+pub fn container_stats(h: &Hierarchy) -> ContainerStats {
+    let n = h.ids.len();
+    let depth: Vec<usize> = (0..n)
+        .map(|i| {
+            let (mut d, mut at) = (0usize, h.parent[i]);
+            while let Some(p) = at {
+                d += 1;
+                at = h.parent[p];
+            }
+            d
+        })
+        .collect();
+    // Per node: its block's inner weight and degree, and its own self-loops and degree (as a block of its own).
+    let (mut inner, mut deg) = (vec![0u64; n], vec![0u64; n]);
+    let (mut loops, mut own) = (vec![0u64; n], vec![0u64; n]);
+    let mut m = 0u64;
+    for (&(a, b), &w) in h.edges.iter().zip(&h.weights) {
+        // The weights are `Edge::count()` (a `u32` at most) as `f64`, so whole numbers: the cast is exact.
+        debug_assert!(
+            w.fract() == 0.0 && w >= 0.0,
+            "edge weight {w} is not a count"
+        );
+        let w = w as u64;
+        m += w;
+        own[a] += w;
+        own[b] += w;
+        if a == b {
+            loops[a] += w;
+        }
+        for end in [a, b] {
+            let mut at = Some(end);
+            while let Some(x) = at {
+                deg[x] += w;
+                at = h.parent[x];
+            }
+        }
+        // The lowest block holding both ends (a node is its own ancestor), if any below the root.
+        let (mut u, mut v) = (a, b);
+        while depth[u] > depth[v] {
+            u = h.parent[u].unwrap();
+        }
+        while depth[v] > depth[u] {
+            v = h.parent[v].unwrap();
+        }
+        let mut common = Some(u);
+        while u != v {
+            match (h.parent[u], h.parent[v]) {
+                (Some(p), Some(q)) => {
+                    u = p;
+                    v = q;
+                    common = Some(p);
+                }
+                _ => {
+                    common = None;
+                    break;
+                }
+            }
+        }
+        while let Some(x) = common {
+            inner[x] += w;
+            common = h.parent[x];
+        }
+    }
+    let term = |i: u64, d: u64| -> f64 {
+        if m == 0 {
+            return 0.;
+        }
+        let mf = m as f64;
+        let q = d as f64 / (2. * mf);
+        i as f64 / mf - q * q
+    };
+    let share = |i: u64, t: u64| if t == 0 { 0. } else { i as f64 / t as f64 };
+    let mut s = ContainerStats {
+        weight: m,
+        ..ContainerStats::default()
+    };
+    let push = |s: &mut ContainerStats, c: Container, d: i64, i: u64, dg: u64| {
+        let t = dg - i;
+        s.containers.push(c);
+        s.depth.push(d);
+        s.inner.push(i);
+        s.touching.push(t);
+        s.share.push(share(i, t));
+        s.modularity.push(term(i, dg));
+    };
+    push(&mut s, Container::Root, -1, m, 2 * m);
+    let mut deepest: Option<usize> = None;
+    for i in 0..n {
+        if !h.children[i].is_empty() {
+            push(
+                &mut s,
+                Container::Node(i),
+                depth[i] as i64,
+                inner[i],
+                deg[i],
+            );
+            deepest = Some(deepest.map_or(depth[i], |d| d.max(depth[i])));
+        }
+    }
+    if let Some(deepest) = deepest {
+        s.depth_modularity = (0..=deepest)
+            .map(|k| {
+                let mut q = 0.;
+                for i in 0..n {
+                    if depth[i] == k {
+                        q += term(inner[i], deg[i]);
+                    } else if depth[i] < k {
+                        q += term(loops[i], own[i]);
+                    }
+                }
+                q
+            })
+            .collect();
+    }
+    s
 }
 
 #[cfg(test)]
@@ -2596,14 +2858,27 @@ mod tests {
         let g = rings(4, 50);
         let full = with_communities(hierarchy(&g), 20).unwrap();
         let mut counted = Budget::unlimited();
-        let within =
-            with_communities_within(hierarchy(&g), 20, &Hubs::default(), &mut counted).unwrap();
+        let within = with_communities_within(
+            hierarchy(&g),
+            20,
+            &Hubs::default(),
+            &Detection::default(),
+            &mut counted,
+        )
+        .unwrap();
         assert_eq!(within.ids, full.ids);
         assert_eq!(within.parent, full.parent);
         assert!(counted.clustering > 0 && counted.used == counted.clustering);
         assert!(!counted.exhausted && counted.unclustered.is_empty());
         let mut short = Budget::new(counted.clustering - 1);
-        let cut = with_communities_within(hierarchy(&g), 20, &Hubs::default(), &mut short).unwrap();
+        let cut = with_communities_within(
+            hierarchy(&g),
+            20,
+            &Hubs::default(),
+            &Detection::default(),
+            &mut short,
+        )
+        .unwrap();
         assert_eq!(cut.ids.len(), 200, "the top level stays unsplit");
         assert_eq!(short.used, 0);
         assert!(short.exhausted);

@@ -3,6 +3,7 @@ import type { AggregateWeight } from "./AggregateWeight";
 import type { AppearanceConfig } from "./AppearanceConfig";
 import type { Bundling } from "./Bundling";
 import type { BusStyle } from "./BusStyle";
+import type { CommunityAlgorithm } from "./CommunityAlgorithm";
 import type { CommunityHubs } from "./CommunityHubs";
 import type { ContainerSizing } from "./ContainerSizing";
 import type { EdgeRouting } from "./EdgeRouting";
@@ -319,6 +320,14 @@ scalableStress?: boolean,
  */
 sizeAwareStress?: boolean,
 /**
+ * Provisional: after the octilinear star placement (strategy `octilinear`), a local search on its lattice moves nodes
+ * and branches so that the links outside the spanning tree are octilinear too and the lines run straighter and
+ * shorter, as a hand-drawn metro map (`tree::octilinear_arrange`). Its cost is bounded by a deterministic work
+ * budget per group; groups above 400 nodes are left as placed. Only the `octilinear` strategy reads it. Off by
+ * default and omitted when off.
+ */
+octilinearRefine?: boolean,
+/**
  * Use the hierarchical layered pipeline where the graph's area modes support it. Set false to use the previous
  * layered layout for comparison. The pipeline does not change explicit tree, radial or organic area strategies.
  */
@@ -399,6 +408,16 @@ hidden?: Hidden,
  * Provisional: the children `communities` leaves out of Louvain (hubs). Omitted when empty.
  */
 communityHubs?: CommunityHubs,
+/**
+ * Provisional (#237): the algorithm `communities` finds them with: `louvain` (the default, omitted) or `leiden`,
+ * whose communities are always connected.
+ */
+communityAlgorithm?: CommunityAlgorithm,
+/**
+ * Provisional (#237): the resolution γ of the modularity `communities` optimises, a number > 0: larger gives smaller
+ * communities. Unset (the default, omitted): 1. Another value is refused when the view is structured.
+ */
+communityResolution?: number,
 /**
  * Provisional (view state, set by `reveal`): containers shown in part. The children listed for a container are shown;
  * the others are gathered in a collapsed container `rest:<id>` of kind `rest` ("+N more"), which a `toggle` dissolves.

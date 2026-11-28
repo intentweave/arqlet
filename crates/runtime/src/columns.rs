@@ -465,6 +465,9 @@ pub struct OverviewColumns {
     /// With `edgeData`; the weights only when the answer has them.
     edge_kind: Option<Vec<u32>>,
     edge_weight: Option<Vec<u32>>,
+    /// With `containerStats` (#236): its arrays, named `containerStats.<field>` (container and depth as `i32`, as
+    /// `parent`); its `weight` stays in the JSON.
+    container_stats: Option<(Vec<i32>, Vec<i32>, arqlet_model::OverviewContainerStats)>,
     positions_only: bool,
     meta: serde_json::Value,
 }
@@ -492,6 +495,9 @@ impl OverviewColumns {
             if let Some(fill) = &overview.fill {
                 meta["fill"] = serde_json::to_value(fill).unwrap_or_default();
             }
+            if let Some(movement) = &overview.movement {
+                meta["movement"] = serde_json::to_value(movement).unwrap_or_default();
+            }
             meta
         } else {
             let mut whole = serde_json::to_value(&overview).unwrap_or_default();
@@ -508,6 +514,9 @@ impl OverviewColumns {
                     "edgeWeight",
                 ] {
                     o.remove(key);
+                }
+                if let Some(stats) = o.get_mut("containerStats").and_then(|s| s.as_object_mut()) {
+                    stats.retain(|key, _| key == "weight");
                 }
             }
             whole
@@ -526,6 +535,10 @@ impl OverviewColumns {
             c.links = overview.links;
             c.edge_kind = overview.edge_kind;
             c.edge_weight = overview.edge_weight;
+            c.container_stats = overview.container_stats.map(|s| {
+                let narrow = |v: &[i64]| v.iter().map(|&x| x as i32).collect();
+                (narrow(&s.container), narrow(&s.depth), s)
+            });
         }
         let listed: Vec<_> = c
             .columns()
@@ -537,8 +550,8 @@ impl OverviewColumns {
         c
     }
 
-    /// The columns in a fixed order; a positions-only set has the first three, and `edgeKind` and `edgeWeight` come last,
-    /// when the answer has them.
+    /// The columns in a fixed order; a positions-only set has the first three, and `edgeKind`, `edgeWeight` and the
+    /// arrays of `containerStats` (as `containerStats.container`, …) come last, when the answer has them.
     pub fn columns(&self) -> Vec<(&'static str, Column<'_>)> {
         let mut all = vec![
             ("x", Column::F64(&self.x)),
@@ -555,6 +568,18 @@ impl OverviewColumns {
             }
             if let Some(c) = &self.edge_weight {
                 all.push(("edgeWeight", Column::U32(c)));
+            }
+            if let Some((container, depth, s)) = &self.container_stats {
+                all.push(("containerStats.container", Column::I32(container)));
+                all.push(("containerStats.depth", Column::I32(depth)));
+                all.push(("containerStats.inner", Column::F64(&s.inner)));
+                all.push(("containerStats.touching", Column::F64(&s.touching)));
+                all.push(("containerStats.share", Column::F64(&s.share)));
+                all.push(("containerStats.modularity", Column::F64(&s.modularity)));
+                all.push((
+                    "containerStats.depthModularity",
+                    Column::F64(&s.depth_modularity),
+                ));
             }
         }
         all
