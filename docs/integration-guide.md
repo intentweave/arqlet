@@ -313,7 +313,7 @@ const leiden = run({op: 'overview', graph, options: {communities: 0, groups: {
 answer, with their parents, as `start.nodes` (the `places` function above). A session needs `start.nodes` too: a
 `start` without positions after a change of `groups` is refused (`clusters changed`). What happens
 (`a_partition_of_the_host_is_shown_as_given_and_a_switch_keeps_the_groups_both_have` in
-`crates/runtime/tests/overview.rs`):
+`crates/runtime/tests/overview.rs`), without `carry`:
 
 - A group whose id is in both partitions (the same container and the same path) **continues with its inner
   arrangement**: its members keep their places relative to it. The group itself may move, since its container changed
@@ -322,12 +322,54 @@ answer, with their parents, as `start.nodes` (the `places` function above). A se
   group; so is a group that is new. They count as `anew` in `continuation`; groups count like nodes.
 - The groups of the old partition that the new one lacks are **listed in `continuation.ignored`** (unlike the clusters
   the overview adds itself, which are not listed).
-- Two partitions that share no path: every node is placed anew, and the answer is the same as without `start`.
+- Two partitions that share no path: every node is placed anew, and the answer is the same as without `start` (unless
+  `carry`, below).
 - The answer is valid in every case: no overlaps, every disc inside its parent.
 
 To switch back without moving anything, keep the places of each partition's last answer and send those: partition A
 with the places of A's answer continues all of it (`anew: 0`) and nothing moves. Sent with the places of B's answer
 instead, what B shares with A continues and the rest is placed anew again.
+
+**Switching from the old places** (`start.carry: true`, provisional, #239). For a switch the host animates, add
+`carry: true` to `start.nodes`: what both partitions share continues as above, and every node placed anew starts from
+its old absolute place instead of beside its linked nodes. A new group starts at the centre of its members' old places
+(weighted by the area of their discs), its members at their old places in it; then the forces gather them and the
+separation removes any overlap (`a_switch_of_partitions_with_carry_starts_from_the_old_places` in
+`crates/runtime/tests/overview.rs`):
+
+```js
+const b = run({op: 'overview', graph, options: {communities: 0, groups: byFeature},
+  start: {nodes: places(a), carry: true}}).overview;
+b.continuation;   // {continued, anew, ignored, carried}: carried of anew started from an old place
+b.movement;       // {nodes, median, max, medianShare, maxShare}
+// Animate when the change is small enough to follow, else draw the new overview at once.
+if (b.movement.maxShare < 0.5) morph(a, b); else show(b);
+```
+
+| Field | Meaning |
+|---|---|
+| `start.carry` | `true` with `start.nodes`; refused with `start.x`, `y`, `r`. Without it, nothing changes (byte-identical) |
+| `continuation.carried` | of `anew`, how many started from an old place (groups count like nodes); a new leaf without an entry is still placed anew |
+| `movement.nodes` | the graph's own nodes with an entry (not the groups, whose ids change with the partition, nor added clusters) |
+| `movement.median`, `max` | how far they moved from their entries, in the overview's units (hundredths) |
+| `movement.medianShare`, `maxShare` | the same divided by the answer's `rootRadius` |
+
+- A container that holds a carried node settles from those places (as with `settle`) and is centred again; what it
+  holds keeps its absolute place as far as the forces allow. Containers above it make room (or settle with `settle`).
+  A group both partitions have keeps its inner arrangement, as without `carry`.
+- With `communities` > 0 the clusters Louvain makes in a new group start from their members' old places too.
+- `workBudget`: a container with carried nodes has changed, so one the budget does not reach is packed, as always.
+  `start.fill` arranges a container as without a start, carried or not; `moved` naming a node placed anew is refused.
+- **Sessions:** `start: {carry: true}` without positions continues by id from the session's last overview, also after
+  `groups` or the graph changed, and gives what `dispatch` gives with that answer's places (and parents) as
+  `start.nodes`. `createOverviewSession(...).layOut({options: {groups: byFeature}, start: {carry: true}})` does the same.
+  A switch has other clusters, so `positionsOnly` answers the whole overview; `movement` comes with positions-only and
+  columnar answers too.
+- How far nodes move depends on how much the partitions share. On generated graphs carrying moved them less than the
+  continuation without it where files moved, were regrouped or merged; with Louvain dividing the new groups
+  (`communities` > 0) the largest moves and the root disc can grow beyond a fresh layout's, so prefer `communities: 0`
+  for a carried switch; and a partition with the same members under other names is drawn exactly as before by a fresh
+  layout, so keep the old answer there ([results](../benchmarks/results/overview-partition-switch-20261128.md)).
 
 ### Marking weak containers (provisional)
 

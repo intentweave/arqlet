@@ -730,6 +730,95 @@ pub fn continue_by_id(
         continued: continued as u32,
         anew: (h.real - continued) as u32,
         ignored,
+        carried: None,
     };
     (previous, report)
+}
+
+/// Provisional (#239): lets the nodes `continue_by_id` placed anew start from their earlier absolute places instead
+/// (`Previous::carried`), for a switch between two partitions of the same nodes. A node with an entry (a node of the
+/// graph, or a cluster kept by `clusters_by_id`) starts from it; a container without one (a group of the new
+/// partition, a cluster made now) starts from the centre of what it holds, weighted by the area of their discs, from
+/// the innermost out, with the disc that holds them and `padding` as its earlier radius (only a start: its radius is
+/// measured from its arrangement). A new leaf without an entry is still placed anew. Every container above a carried
+/// node counts as changed, since the carried node's container is centred again. Returns how many nodes of the graph
+/// are carried. Nothing changes when nothing was placed anew.
+pub fn carry(
+    h: &Hierarchy,
+    places: &BTreeMap<String, OverviewPlace>,
+    kept: &BTreeSet<usize>,
+    previous: &mut Previous,
+    padding: f64,
+) -> u32 {
+    let n = h.ids.len();
+    if previous.anew.is_empty() {
+        return 0;
+    }
+    // The earlier disc of every node that has an entry, as `continue_by_id` reads them.
+    let mut disc: Vec<Option<Disc>> = (0..n)
+        .map(|i| {
+            (i < h.real || kept.contains(&i))
+                .then(|| places.get(&h.ids[i]).map(Disc::of))
+                .flatten()
+        })
+        .collect();
+    // From the innermost out: a container's members have their discs before it.
+    let depth: Vec<usize> = (0..n)
+        .map(|i| std::iter::successors(h.parent[i], |&p| h.parent[p]).count())
+        .collect();
+    let mut order: Vec<usize> = (0..n).filter(|&i| !h.children[i].is_empty()).collect();
+    order.sort_by(|&a, &b| depth[b].cmp(&depth[a]).then(a.cmp(&b)));
+    for c in order {
+        if disc[c].is_some() {
+            continue;
+        }
+        let held: Vec<Disc> = h.children[c].iter().filter_map(|&m| disc[m]).collect();
+        if held.is_empty() {
+            continue;
+        }
+        let mass: f64 = held.iter().map(|d| d.r * d.r).sum();
+        let (x, y) = if mass > 0. {
+            (
+                held.iter().map(|d| d.x * d.r * d.r).sum::<f64>() / mass,
+                held.iter().map(|d| d.y * d.r * d.r).sum::<f64>() / mass,
+            )
+        } else {
+            let count = held.len() as f64;
+            (
+                held.iter().map(|d| d.x).sum::<f64>() / count,
+                held.iter().map(|d| d.y).sum::<f64>() / count,
+            )
+        };
+        let centre = Disc { x, y, r: 0. };
+        let reach = held
+            .iter()
+            .map(|d| centre.distance((d.x, d.y)) + d.r)
+            .fold(0., f64::max);
+        disc[c] = Some(Disc {
+            x,
+            y,
+            r: reach + padding,
+        });
+    }
+    let mut carried = 0u32;
+    let anew: Vec<usize> = previous.anew.iter().copied().collect();
+    for i in anew {
+        let Some(d) = disc[i] else {
+            continue;
+        };
+        previous.centre[i] = (d.x, d.y);
+        previous.radius[i] = d.r;
+        previous.carried.insert(i);
+        if i < h.real {
+            carried += 1;
+        }
+        // Its container is centred again; every container above it changed.
+        let mut at = h.parent[i];
+        while let Some(p) = at {
+            previous.changed.insert(Container::Node(p));
+            at = h.parent[p];
+        }
+        previous.changed.insert(Container::Root);
+    }
+    carried
 }

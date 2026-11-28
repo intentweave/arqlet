@@ -3,6 +3,7 @@ import type { OverviewBusLine } from "./OverviewBusLine";
 import type { OverviewContainerStats } from "./OverviewContainerStats";
 import type { OverviewContinuation } from "./OverviewContinuation";
 import type { OverviewFill } from "./OverviewFill";
+import type { OverviewMovement } from "./OverviewMovement";
 import type { OverviewRepresentation } from "./OverviewRepresentation";
 import type { OverviewStats } from "./OverviewStats";
 import type { OverviewWork } from "./OverviewWork";
@@ -84,4 +85,8 @@ work?: OverviewWork,
 /**
  * Provisional (#235), for a request with `start.fill` or `start.fillTop`: what became of those containers.
  */
-fill?: OverviewFill, };
+fill?: OverviewFill,
+/**
+ * Provisional (#239), for a request with `start.carry`: how far the graph's nodes moved from their entries.
+ */
+movement?: OverviewMovement, };

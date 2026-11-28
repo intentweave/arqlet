@@ -7,8 +7,8 @@ use arqlet_layout::overview::{
 };
 use arqlet_model::{
     validate, ConfigSet, Graph, OverBudget, Overview, OverviewConfig, OverviewContainerStats,
-    OverviewContinuation, OverviewFill, OverviewIntent, OverviewPlace, OverviewPositions,
-    OverviewRepresentation, OverviewStats, OverviewWork,
+    OverviewContinuation, OverviewFill, OverviewIntent, OverviewMovement, OverviewPlace,
+    OverviewPositions, OverviewRepresentation, OverviewStats, OverviewWork,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -230,8 +230,9 @@ fn arrange_level(
         .collect()
 }
 
-/// The places of a request with `start.nodes`, and the clusters of the hierarchy that were kept from them.
-type FromPlaces = (BTreeMap<String, OverviewPlace>, BTreeSet<usize>);
+/// The places of a request with `start.nodes`, the clusters of the hierarchy that were kept from them, and how many
+/// nodes the graph had before the groups of `groups` were added (#239: only those are measured in `movement`).
+type FromPlaces = (BTreeMap<String, OverviewPlace>, BTreeSet<usize>, usize);
 
 /// The hints of a request: `radii` (node id → radius, for clusters a host shows structured) and `start` to continue
 /// from: `{x, y, r}` of a previous overview of the same graph, in its node order, or `{nodes}`, its places by node id,
@@ -246,6 +247,7 @@ fn hints_of(
     h: &overview::Hierarchy,
     from_places: Option<&FromPlaces>,
     cut: bool,
+    options: &OverviewOptions,
 ) -> Result<(OverviewHints, Option<OverviewContinuation>, Ignored), String> {
     let mut hints = OverviewHints::default();
     let mut continuation = None;
@@ -299,9 +301,23 @@ fn hints_of(
         }
     }
     if let Some(start) = start {
+        // `carry` (#239): nodes placed anew start from their earlier places; only with places by id.
+        let carry = carry_of(start)?;
+        if carry && from_places.is_none() {
+            return Err("Overview start carry needs places by id (start.nodes)".into());
+        }
         let mut previous = match from_places {
-            Some((places, kept)) => {
-                let (previous, report) = overview::continue_by_id(h, places, kept);
+            Some((places, kept, _)) => {
+                let (mut previous, mut report) = overview::continue_by_id(h, places, kept);
+                if carry {
+                    report.carried = Some(overview::carry(
+                        h,
+                        places,
+                        kept,
+                        &mut previous,
+                        options.padding,
+                    ));
+                }
                 continuation = Some(report);
                 previous
             }
@@ -387,6 +403,56 @@ fn hints_of(
         hints.start = Some(previous);
     }
     Ok((hints, continuation, ignored))
+}
+
+/// `start.carry` of a request (#239).
+fn carry_of(start: &Value) -> Result<bool, String> {
+    match start.get("carry") {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Bool(b)) => Ok(*b),
+        Some(_) => Err("Overview start carry must be true or false".into()),
+    }
+}
+
+/// How far the graph's own nodes (`given` of them, before the groups) moved from their entries (#239), measured on the
+/// answered (rounded) centres.
+fn movement_of(
+    h: &overview::Hierarchy,
+    places: &BTreeMap<String, OverviewPlace>,
+    given: usize,
+    x: &[f64],
+    y: &[f64],
+    root_radius: f64,
+) -> OverviewMovement {
+    let mut moves: Vec<f64> = (0..given.min(h.real))
+        .filter_map(|i| {
+            let p = places.get(&h.ids[i])?;
+            Some((x[i] - p.x).hypot(y[i] - p.y))
+        })
+        .collect();
+    moves.sort_by(f64::total_cmp);
+    let median = if moves.is_empty() {
+        0.
+    } else if moves.len() % 2 == 1 {
+        moves[moves.len() / 2]
+    } else {
+        (moves[moves.len() / 2 - 1] + moves[moves.len() / 2]) / 2.
+    };
+    let max = moves.last().copied().unwrap_or(0.);
+    let share = |d: f64| {
+        if root_radius > 0. {
+            (d / root_radius * 10_000.).round() / 10_000.
+        } else {
+            0.
+        }
+    };
+    OverviewMovement {
+        nodes: moves.len() as u32,
+        median: round(median),
+        max: round(max),
+        median_share: share(median),
+        max_share: share(max),
+    }
 }
 
 /// `start.fill` and `start.fillTop` of a request (#235): the containers named, or `None` when it names none of the two.
@@ -607,6 +673,7 @@ fn hierarchy_of(
     // #147: buses given as data (`Graph.buses` with taps) are nodes of shape `busLine` with one edge per tap, as the
     // layout and `trace` see them, so the overview draws their bus lines too.
     let expanded = arqlet_layout::with_bus_nodes(graph);
+    let given = expanded.as_ref().unwrap_or(graph).nodes.len();
     let graph =
         arqlet_layout::communities::with_given_groups(expanded.as_ref().unwrap_or(graph), &groups)?;
     let base = overview::hierarchy(&graph);
@@ -621,7 +688,7 @@ fn hierarchy_of(
             options.satellites,
             budget,
         )?;
-        return Ok((graph, h, Some((places, kept))));
+        return Ok((graph, h, Some((places, kept, given))));
     }
     let h = overview::with_satellites(
         overview::with_communities_within(
@@ -657,7 +724,8 @@ fn lay_out(
         return Err(refusal(h, budget.as_ref().unwrap()));
     }
     let cut = budget.as_ref().is_some_and(|b| !b.unclustered.is_empty());
-    let (mut hints, continuation, ignored) = hints_of(v, h, from_places, cut)?;
+    let (mut hints, continuation, ignored) = hints_of(v, h, from_places, cut, options)?;
+    let carried = continuation.as_ref().is_some_and(|c| c.carried.is_some());
     let mut packed: Vec<i64> = Vec::new();
     // What became of the containers to fill (#235).
     let (mut filled, mut unfit): (Vec<i64>, Vec<(i64, f64)>) = (Vec::new(), Vec::new());
@@ -829,6 +897,17 @@ fn lay_out(
             .then(|| resolved.iter().map(|e| e.count() as u32).collect());
     }
     let count = |n: usize| n as u32;
+    let (x, y) = (
+        o.x.iter().map(|&x| round(x)).collect::<Vec<f64>>(),
+        o.y.iter().map(|&y| round(y)).collect::<Vec<f64>>(),
+    );
+    let root_radius = round(o.root_radius);
+    let movement = match from_places {
+        Some((places, _, given)) if carried => {
+            Some(movement_of(h, places, *given, &x, &y, root_radius))
+        }
+        _ => None,
+    };
     Ok(Overview {
         schema_version: 1,
         representation,
@@ -841,10 +920,10 @@ fn lay_out(
             .chain(overview::cluster_labels(h, &labels))
             .collect(),
         parent,
-        x: o.x.iter().map(|&x| round(x)).collect(),
-        y: o.y.iter().map(|&y| round(y)).collect(),
+        x,
+        y,
         r: o.radius.iter().map(|&r| round(r)).collect(),
-        root_radius: round(o.root_radius),
+        root_radius,
         kinds: kinds.iter().map(|k| k.to_string()).collect(),
         kind,
         bus_lines: overview::bus_lines(graph, &h.parent, &h.edges, &o.x, &o.y, options.node_radius)
@@ -875,6 +954,7 @@ fn lay_out(
         continuation,
         work,
         fill,
+        movement,
     })
 }
 
@@ -983,6 +1063,33 @@ impl OverviewSession {
         }
     }
 
+    /// The places by id of the last overview, with each node's parent, for a request whose `start` asks to `carry` and
+    /// gives no positions (#239); `None` for any other request.
+    fn places_to_carry(&self, v: &Value) -> Result<Option<Value>, String> {
+        let Some(start) = v.get("start").filter(|s| s.is_object()) else {
+            return Ok(None);
+        };
+        if !carry_of(start)? || start.get("x").is_some() || start.get("nodes").is_some() {
+            return Ok(None);
+        }
+        let (Some((_, _, h, _)), Some((_, last, _))) = (&self.hierarchy, &self.last) else {
+            return Err("No overview to continue from: lay out without start first.".into());
+        };
+        let nodes: serde_json::Map<String, Value> = h
+            .ids
+            .iter()
+            .enumerate()
+            .map(|(i, id)| {
+                let mut place = json!({"x": last["x"][i], "y": last["y"][i], "r": last["r"][i]});
+                if let Some(p) = h.parent[i] {
+                    place["parent"] = json!(h.ids[p]);
+                }
+                (id.clone(), place)
+            })
+            .collect();
+        Ok(Some(Value::Object(nodes)))
+    }
+
     /// The overview, and whether it was laid out on the clusters of the session's last overview, with the same
     /// `edgeData` (so that a positions-only answer is enough).
     fn overview(&mut self, v: &Value, threads: usize) -> Result<(Overview, bool), String> {
@@ -1000,6 +1107,18 @@ impl OverviewSession {
                         .into(),
                 )
             }
+        };
+        // `start: {carry: true}` without positions (#239): continue by id from the last overview, with each node's
+        // parent, as a host sends `start.nodes` from that answer; also after the groups or the graph changed.
+        let carried;
+        let v = match self.places_to_carry(v)? {
+            Some(nodes) => {
+                let mut request = v.clone();
+                request["start"]["nodes"] = nodes;
+                carried = request;
+                &carried
+            }
+            None => v,
         };
         // The hierarchy the session has, while the graph and the options it depends on stay the same; places by id bring
         // their own clusters, and a request without `start` does not build on those of earlier places.

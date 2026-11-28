@@ -587,6 +587,8 @@ const clustersOf = options => JSON.stringify([options?.communities ?? 120, optio
  * in the engine where it can keep a session (`run.openSession`). `open(graph, request)` lays out a graph; `layOut(request)`
  * lays it out again (other options, `radii`, `intent`, `configSet`); a `start` without positions (`{settle}` or `{}`)
  * continues from the last overview, and `{nodes}` (places by node id) from those places, also on a new graph (`open`).
+ * `{carry: true}` (#239) continues by id from the last overview, and nodes whose container changed (other `groups`)
+ * start from their earlier places.
  * Without a resident session the graph and the last positions stay here and are sent
  * along; the answers are the same. A new `open` overtakes what is still under way (`{ok: false, stale: true}`).
  */
@@ -614,7 +616,8 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
         const {positionsOnly: _moved, ...moved} = answer.overview;
         // What became of places by id, the work report (`workBudget`) and the fill report (`start.fill`) belong to the answer
         // that was asked with them.
-        const {continuation: _earlier, work: _work, fill: _fill, ...kept} = last;
+        // and so does the movement of a carried switch (`start.carry`).
+        const {continuation: _earlier, work: _work, fill: _fill, movement: _movement, ...kept} = last;
         return {...answer, overview: {...kept, ...moved}};
       }
       return answer;
@@ -622,6 +625,11 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
     const sent = {...request, graph: request.graph ?? graph};
     const start = request.start;
     if (start && start.x === undefined && start.nodes === undefined) {
+      // `carry` (#239): continue by id from the last overview, also after the groups or the graph changed.
+      if (start.carry) {
+        if (!last) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
+        return run({...sent, start: {...start, nodes: placesOf(last)}});
+      }
       if (!last || request.graph) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
       if (clustersOf(request.options) !== clusters) return {ok: false, error: 'The clusters changed since the last overview; lay out without start.'};
       if (byPlaces) {
@@ -655,7 +663,7 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
       if (answer.ok) {
         last = answer.overview;
         clusters = clustersOf(request.options);
-        byPlaces = !!request.start && (request.start.nodes !== undefined || (byPlaces && request.start.x === undefined));
+        byPlaces = !!request.start && (request.start.nodes !== undefined || (request.start.x === undefined && (byPlaces || !!request.start.carry)));
         if (fresh && !resident) graph = request.graph;
       }
       return answer;

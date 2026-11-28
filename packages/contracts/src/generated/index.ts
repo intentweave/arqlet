@@ -74,6 +74,7 @@ export * from './OverviewContinuation';
 export * from './OverviewFill';
 export * from './OverviewIntent';
 export * from './OverviewLayoutOptions';
+export * from './OverviewMovement';
 export * from './OverviewPlace';
 export * from './OverviewPositions';
 export * from './OverviewRepresentation';

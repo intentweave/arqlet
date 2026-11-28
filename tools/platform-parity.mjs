@@ -157,6 +157,17 @@ requests.push(
   ['overview filling the top level', {op: 'overview', graph: large, start: {...cutStart, fillTop: true}}],
   ['overview filling by id', {op: 'overview', graph: large, start: {nodes: cutPlaces, fill: packedIds.slice(0, 5)}}],
 );
+// Switching between two partitions from the old places (#239): the leaves of every container in groups of the host,
+// then dealt otherwise and carried (4 threads, and within a budget that runs out; Louvain divides the large groups).
+const leaves = large.nodes.filter(n => !containers.has(n.id));
+const dealt = k => Object.fromEntries(leaves.map((n, i) => [n.id, [`k${i % k}`]]));
+const partitionA = JSON.parse(execFileSync(native, {input: JSON.stringify({op: 'overview', graph: large, options: {groups: dealt(3)}}), maxBuffer: 1 << 30}).toString()).overview;
+const fromA = Object.fromEntries(partitionA.ids.map((id, i) => [id, {x: partitionA.x[i], y: partitionA.y[i], r: partitionA.r[i],
+  ...(partitionA.parent[i] >= 0 ? {parent: partitionA.ids[partitionA.parent[i]]} : {})}]));
+requests.push(
+  ['overview switching partitions, carried, 4 threads', {op: 'overview', graph: large, options: {groups: dealt(2)}, start: {nodes: fromA, carry: true}, threads: 4}],
+  ['overview switching partitions, carried over its budget', {op: 'overview', graph: large, options: {groups: dealt(2)}, start: {nodes: fromA, carry: true}, workBudget: 3000000}],
+);
 // The long form of a view that changed its source graph (#195), read against the view as imported: its digest is found
 // again by writing the bookmark's decisions into that graph, with the same answer natively and in WASM.
 const ask = request => JSON.parse(execFileSync(native, {input: JSON.stringify(request), maxBuffer: 1 << 30}).toString());

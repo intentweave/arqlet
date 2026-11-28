@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod continuation;
 mod leiden;
 pub use arqlet_model::CommunityAlgorithm;
-pub use continuation::{clusters_by_id, clusters_by_id_within, continue_by_id};
+pub use continuation::{carry, clusters_by_id, clusters_by_id_within, continue_by_id};
 
 /// Provisional (#237, ADR 0018 addendum of 2026-11-28): how communities are found: the algorithm (Louvain, the default,
 /// or Leiden) and the resolution γ of modularity (1, the default: larger values give smaller communities).
@@ -273,6 +273,12 @@ pub struct Previous {
     /// outside the filled containers is answered as it was given; such a kept container also costs no work
     /// (`arrange_metered`), so that the budget of a fill goes to the fills.
     pub keep_radii: bool,
+    /// Provisional (#239): nodes of `anew` that start from an earlier place all the same (`continuation::carry`): their
+    /// entry's absolute centre, or for a container without an entry the weighted centre of what it holds. A container
+    /// with such a child arranges its children from those places with the forces (`CARRY_ALPHA`), separates them and is
+    /// centred again, its shift carried to its parent, so that what it holds keeps its absolute place as far as the
+    /// forces allow. Empty: every node of `anew` is placed anew (`place_anew`), as before.
+    pub carried: BTreeSet<usize>,
 }
 
 /// Provisional (#235): what became of a container named in `Previous::fill`.
@@ -318,6 +324,20 @@ fn anchored(
         p.0 += dx;
         p.1 += dy;
     }
+    in_place(x, r, options, overlaps, recentre, meter)
+}
+
+/// An arrangement whose children keep their places in the container's previous frame: with `recentre` the container is
+/// centred on them again and reports how far its centre moved (`shift`), which its parent adds; without it the disc
+/// stays centred where it was and holds them.
+fn in_place(
+    mut x: Vec<(f64, f64)>,
+    r: &[f64],
+    options: &OverviewOptions,
+    overlaps: usize,
+    recentre: bool,
+    meter: &mut dyn Meter,
+) -> Option<Arrangement> {
     let (cx, cy) = if recentre {
         enclosing_centre(&x, r, meter)?
     } else {
@@ -367,6 +387,12 @@ const SETTLE_ALPHA: f64 = 0.3;
 /// The starting temperature after the user moved a node (`Previous::moved`): cooler than a settling, so that the others
 /// follow the moved one and make room without arranging themselves anew.
 const DRAG_ALPHA: f64 = 0.1;
+
+/// The starting temperature of a container that holds carried children (`Previous::carried`, #239): that of a settling.
+/// Measured against a full start (1, as a fresh layout) on generated switches (`benchmarks/overview/partition-switch.mjs`,
+/// results of 2026-11-28): the nodes moved less in five of six kinds of switch, more only where Louvain divides a new
+/// group anew.
+const CARRY_ALPHA: f64 = SETTLE_ALPHA;
 
 /// Two radii are the same when they differ by at most this much. A host passes back a previous response, whose numbers are
 /// rounded to hundredths, and an unchanged container measures its radius again from rounded places.
@@ -1369,8 +1395,12 @@ fn arrange_core(
     if !free && !meter.spend(k as u64 + links.len() as u64) {
         return None;
     }
-    // Whether anything of a previous arrangement is there to continue from.
-    let start = start.filter(|p| members.iter().any(|m| !p.anew.contains(m)));
+    // Whether anything of a previous arrangement is there to continue from (a carried child's place counts, #239).
+    let start = start.filter(|p| {
+        members
+            .iter()
+            .any(|m| !p.anew.contains(m) || p.carried.contains(m))
+    });
     let mut x = match start {
         Some(previous) => {
             let origin = match container {
@@ -1386,7 +1416,11 @@ fn arrange_core(
                     )
                 })
                 .collect();
-            let placed: Vec<bool> = members.iter().map(|m| !previous.anew.contains(m)).collect();
+            let placed: Vec<bool> = members
+                .iter()
+                .map(|m| !previous.anew.contains(m) || previous.carried.contains(m))
+                .collect();
+            let carrying = members.iter().any(|m| previous.carried.contains(m));
             let changed = changed_in(previous, container, members, radius);
             place_anew(&mut x, &placed, &r, &links, options.gap);
             let x = x;
@@ -1435,6 +1469,23 @@ fn arrange_core(
                     0
                 };
                 return anchored(x, &r, options, overlaps, (j, at), recentre, meter);
+            }
+            if carrying {
+                // Children carried from another partition (#239): the forces gather them from their places, then the
+                // separation; the container is centred again and its parent places it by the shift, so that they keep
+                // their absolute places as far as the forces let them (the top level stays centred on the origin).
+                let mut x = x;
+                if !simulate_held(&mut x, &r, &links, options, CARRY_ALPHA, None, meter) {
+                    return None;
+                }
+                let mut overlaps = separate(&mut x, &r, options.gap, meter)?;
+                if in_rows(members, &local, &mut x, &r, options) {
+                    if !meter.spend(k as u64) {
+                        return None;
+                    }
+                    overlaps = separate(&mut x, &r, options.gap, meter)?;
+                }
+                return in_place(x, &r, options, overlaps, recentre, meter);
             }
             if !changed {
                 // Kept as it was: only the radius is measured again (it may have been set by a host before).

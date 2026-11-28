@@ -3770,6 +3770,28 @@ pub struct Overview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub fill: Option<OverviewFill>,
+    /// Provisional (#239), for a request with `start.carry`: how far the graph's nodes moved from their entries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub movement: Option<OverviewMovement>,
+}
+
+/// Provisional (#239): how far the nodes of the graph moved from their entries in `start.nodes`, for a host that
+/// chooses between animating a change and drawing it anew. Measured are the graph's own nodes that have an entry and
+/// are in the overview (not the groups of `groups`, whose ids change with the partition, nor added clusters), between
+/// the entry's centre and the answered centre, in the frame both share.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewMovement {
+    /// How many nodes were measured.
+    pub nodes: u32,
+    /// The median and the largest distance (0 without nodes), rounded to hundredths.
+    pub median: f64,
+    pub max: f64,
+    /// `median` and `max` divided by the answer's `rootRadius`, rounded to ten-thousandths.
+    pub median_share: f64,
+    pub max_share: f64,
 }
 
 /// Provisional (#236, ADR 0018 addendum of 2026-11-28): per container (parallel arrays, the root first, then every node
@@ -3876,6 +3898,11 @@ pub struct OverviewContinuation {
     /// Ids of entries that name no node of the overview (removed nodes), in id order. Ids of clusters the overview
     /// added (`community:…`) that are gone are not listed.
     pub ignored: Vec<String>,
+    /// Provisional (#239), for a request with `start.carry`: how many of `anew` started from an earlier place all the
+    /// same (their entry, or for a group without one the centre of what it holds). Omitted without `carry`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub carried: Option<u32>,
 }
 
 /// Provisional: a bus of the overview drawn as a line (`Overview::bus_lines`): the bus node's index, the line from
@@ -4188,6 +4215,10 @@ pub struct OverviewPositions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub fill: Option<OverviewFill>,
+    /// For a request with `start.carry` (`Overview::movement`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub movement: Option<OverviewMovement>,
 }
 
 impl OverviewPositions {
@@ -4206,6 +4237,7 @@ impl OverviewPositions {
             continuation: overview.continuation,
             work: overview.work,
             fill: overview.fill,
+            movement: overview.movement,
         }
     }
 }
@@ -4422,6 +4454,14 @@ pub struct OverviewStart {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub fill_top: Option<bool>,
+    /// Provisional (#239): with `nodes`, nodes whose container changed (a switch between two partitions given as
+    /// `groups`) start from their earlier places instead of being placed anew: a new group from the centre of its
+    /// members' earlier places, the members at theirs, then the forces gather them (`continuation.carried`, and
+    /// `Overview::movement` says how far the nodes moved). In a session without positions it continues by id from the
+    /// last overview, also after the groups or the graph changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub carry: Option<bool>,
 }
 
 /// Provisional (#235): what became of the containers a request named in `start.fill` (and `start.fillTop`). Containers
