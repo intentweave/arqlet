@@ -593,6 +593,19 @@ const plain = request => {
 const placesOf = o => Object.fromEntries(Array.from(o.ids, (id, i) => [id,
   {x: o.x[i], y: o.y[i], r: o.r[i], ...(o.parent[i] >= 0 ? {parent: o.ids[o.parent[i]]} : {})}]));
 
+// Positions by index (`start.x`, `y`, `r`) as places by id, for the clusters of the overview `o` they were given for: the
+// ids and parents are its own. Refused with the engine's error where the lengths do not fit (#241).
+function placesAtIndex(o, start) {
+  for (const k of ['x', 'y', 'r']) {
+    if (start[k] === undefined || start[k] === null) return {error: `Overview start needs ${k}`};
+    if (start[k].length !== o.ids.length) {
+      return {error: `Overview start ${k} has ${start[k].length} values for ${o.ids.length} nodes; it must come from the same graph`};
+    }
+  }
+  return {nodes: Object.fromEntries(Array.from(o.ids, (id, i) => [id,
+    {x: start.x[i], y: start.y[i], r: start.r[i], ...(o.parent[i] >= 0 ? {parent: o.ids[o.parent[i]]} : {})}]))};
+}
+
 // The options the overview's clusters depend on; a continuation needs the same ones (as the engine's session checks).
 // Defaults as the engine's (`communities` 120, `satellites` 0); `groups` and `hubs` compared as given.
 const clustersOf = options => JSON.stringify([options?.communities ?? 120, options?.satellites ?? 0, options?.groups ?? null, options?.hubs ?? null]);
@@ -645,7 +658,9 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
         if (!last) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
         return run({...sent, start: {...start, nodes: placesOf(last)}});
       }
-      if (!last || request.graph) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
+      if (!last) return {ok: false, error: 'No overview to continue from: lay out without start first.'};
+      // A new graph with `start: {}` continues from the last places by id, as the engine's session does (#241).
+      if (request.graph) return run({...sent, start: {...start, nodes: placesOf(last)}});
       if (clustersOf(request.options) !== clusters) return {ok: false, error: 'The clusters changed since the last overview; lay out without start.'};
       if (byPlaces) {
         const answer = await run({...sent, start: {...start, nodes: placesOf(last)}});
@@ -654,6 +669,18 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
         return {...answer, overview};
       }
       sent.start = {...start, x: last.x, y: last.y, r: last.r};
+    } else if (start && start.x !== undefined && start.nodes === undefined && byPlaces && !request.graph && last &&
+        clustersOf(request.options) === clusters) {
+      // Positions by index after a continuation by id belong to the clusters of that answer (the engine's session lays
+      // out on the hierarchy it has); an engine given the graph again would cluster it anew and apply them to other
+      // clusters. They are sent as places by id, or refused where they do not fit, as the resident session does (#241).
+      const converted = placesAtIndex(last, start);
+      if (converted.error) return {ok: false, error: converted.error};
+      const {x: _x, y: _y, r: _r, ...rest} = start;
+      const answer = await run({...sent, start: {...rest, nodes: converted.nodes}});
+      if (!answer.ok) return answer;
+      const {continuation: _own, ...overview} = answer.overview;
+      return {...answer, overview};
     }
     return run(sent);
   };
@@ -677,8 +704,12 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
       if (mine !== generation) return {ok: false, stale: true, error: 'A new graph overtook this overview.'};
       if (answer.ok) {
         last = answer.overview;
+        const sameClusters = clustersOf(request.options) === clusters;
         clusters = clustersOf(request.options);
-        byPlaces = !!request.start && (request.start.nodes !== undefined || (request.start.x === undefined && (byPlaces || !!request.start.carry)));
+        // An explicit start by index after a continuation by id stays on those clusters (converted in `send`) while the
+        // graph stays; a new graph with `start: {}` continues by id.
+        const start = request.start;
+        byPlaces = !!start && (start.nodes !== undefined || (start.x === undefined ? (byPlaces || !!start.carry || !!request.graph) : byPlaces && !request.graph && sameClusters));
         if (fresh && !resident) graph = request.graph;
       }
       return answer;

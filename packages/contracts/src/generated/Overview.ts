@@ -70,6 +70,12 @@ edgeKind?: number[],
  */
 edgeWeight?: number[],
 /**
+ * Provisional (#241), for a request with `edgeIds`: each edge's id, indexed as `edges` (entry `k` belongs to the edge
+ * `edges[2k]` to `edges[2k + 1]`), so that a host without the graph can name an edge the engine's other answers
+ * (`overviewTrace`) give by id. In a columnar answer it stays in the JSON beside `ids`.
+ */
+edgeIds?: Array<string>,
+/**
  * Provisional (#236), for a request with `containerStats`: how well each container holds its edges, and the
  * modularity at each depth.
  */

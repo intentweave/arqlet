@@ -466,13 +466,12 @@ fn a_session_keeps_the_graph_and_answers_as_dispatch_does() {
     // The refused request changed nothing: continuing on the regrouped clusters works.
     let next = session.run_value(&json!({"op": "overview", "options": other, "start": {}}));
     assert_eq!(next["ok"], true, "{next}");
-    // A new graph replaces the old one; a start then needs a layout of the new graph first.
+    // A new graph replaces the old one; with `start: {}` it continues from the session's last places by id (#241), which
+    // a session that never laid out refuses (`overview_leftovers::`).
     let small = hierarchical(2, 2, 3);
     let fresh = session.run_value(&json!({"op": "overview", "graph": small, "start": {}}));
-    assert!(
-        fresh["error"].as_str().unwrap().contains("continue"),
-        "{fresh}"
-    );
+    assert_eq!(fresh["ok"], true, "{fresh}");
+    assert!(fresh["overview"]["continuation"].is_object(), "{fresh}");
     let replaced = session.run_value(&json!({"op": "overview", "graph": small}));
     assert_eq!(replaced["overview"], overview_with(&small, &json!({})));
     // The layered view of the same session is unaffected.

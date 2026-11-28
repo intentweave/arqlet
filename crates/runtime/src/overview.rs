@@ -529,6 +529,18 @@ fn places_of(v: &Value) -> Result<Option<BTreeMap<String, OverviewPlace>>, Strin
         .ok_or("Overview start nodes must be an object: node id -> {x, y, r, parent?}")?
         .iter()
         .map(|(id, p)| {
+            // As the typed `OverviewPlace` (`deny_unknown_fields`): a misspelt key is refused, not ignored (#241).
+            let entry = p.as_object().ok_or_else(|| {
+                format!("Overview start nodes {id} must be an object: {{x, y, r, parent?}}")
+            })?;
+            if let Some(key) = entry
+                .keys()
+                .find(|k| !["x", "y", "r", "parent"].contains(&k.as_str()))
+            {
+                return Err(format!(
+                    "Overview start nodes {id} has an unknown key: {key} (x, y, r and parent only)"
+                ));
+            }
             let at = |k: &str| p[k].as_f64().filter(|v| v.is_finite());
             let parent = match p.get("parent") {
                 None | Some(Value::Null) => None,
@@ -896,6 +908,13 @@ fn lay_out(
             .any(|e| e.count() > 1)
             .then(|| resolved.iter().map(|e| e.count() as u32).collect());
     }
+    // `edgeIds` (#241): the resolved edges' ids, indexed as `edges`.
+    let edge_ids = flag_of(v, "edgeIds")?.then(|| {
+        overview::resolved_edges(graph)
+            .iter()
+            .map(|e| e.id.clone())
+            .collect::<Vec<String>>()
+    });
     let count = |n: usize| n as u32;
     let (x, y) = (
         o.x.iter().map(|&x| round(x)).collect::<Vec<f64>>(),
@@ -950,6 +969,7 @@ fn lay_out(
         edge_kinds,
         edge_kind,
         edge_weight,
+        edge_ids,
         container_stats,
         continuation,
         work,
@@ -1005,7 +1025,7 @@ pub struct OverviewSession {
     clustering: (u64, bool),
     /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout, and whether it was
     /// answered with the edges' data and with the containers' stats (`edgeData`, `containerStats`).
-    last: Option<(Value, Value, (bool, bool))>,
+    last: Option<(Value, Value, (bool, bool, bool))>,
     /// The numbers of the last answer to a request with `columns: true`; dropped by the next request.
     columns: Option<crate::columns::OverviewColumns>,
 }
@@ -1063,13 +1083,16 @@ impl OverviewSession {
         }
     }
 
-    /// The places by id of the last overview, with each node's parent, for a request whose `start` asks to `carry` and
-    /// gives no positions (#239); `None` for any other request.
+    /// The places by id of the last overview, with each node's parent, for a request whose `start` gives no positions and
+    /// asks to `carry` (#239), or comes with a new graph (#241: a session given another graph with `start: {}` continues
+    /// from its own last places by id, as the graph may differ from the one those places belong to); `None` for any other
+    /// request.
     fn places_to_carry(&self, v: &Value) -> Result<Option<Value>, String> {
         let Some(start) = v.get("start").filter(|s| s.is_object()) else {
             return Ok(None);
         };
-        if !carry_of(start)? || start.get("x").is_some() || start.get("nodes").is_some() {
+        let wanted = carry_of(start)? || v.get("graph").is_some();
+        if !wanted || start.get("x").is_some() || start.get("nodes").is_some() {
             return Ok(None);
         }
         let (Some((_, _, h, _)), Some((_, last, _))) = (&self.hierarchy, &self.last) else {
@@ -1184,7 +1207,11 @@ impl OverviewSession {
         // The same clusters as the last overview of this session: its ids, labels, parents, kinds, edges and links hold,
         // and so do the edges' data and the containers' stats (#236, of the hierarchy alone), which the host has when that
         // answer was asked with the same flags.
-        let edge_data = (edge_data_of(v)?, flag_of(v, "containerStats")?);
+        let edge_data = (
+            edge_data_of(v)?,
+            flag_of(v, "containerStats")?,
+            flag_of(v, "edgeIds")?,
+        );
         let same_clusters = new_graph.is_none()
             && self
                 .last
