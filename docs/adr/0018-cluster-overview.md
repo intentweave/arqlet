@@ -267,6 +267,74 @@ request without it is answered exactly as before (byte-identical, the default pa
    limit times that rate, less a margin for the linear part (the time of a request with `workBudget: 0`, which packs
    everything). Measured units per second on generated graphs: [results](../../benchmarks/results/overview-work-budget-20261127.md).
 
+## Addendum (2026-11-28): Leiden beside Louvain, chosen by an option (#237)
+
+Louvain can leave a community badly connected, or not connected at all: a node that held two parts together moves to
+another community, and nothing later splits what it left behind (the first item of *Not done* below). Leiden (V. A.
+Traag, L. Waltman, N. J. van Eck, "From Louvain to Leiden: guaranteeing well-connected communities", *Scientific
+Reports* 9:5233, 2019) adds a refinement phase that guarantees connected communities. It is implemented from the paper's
+description (its Algorithm A.1–A.3 and section "Leiden algorithm"); no code of any implementation was read or copied.
+Provisional; a request or snapshot without the new options is computed exactly as before (byte-identical).
+
+1. **Options.** `communityAlgorithm`: `"louvain"` (the default, omitted) or `"leiden"`; `communityResolution`: a number
+   \> 0 (the default 1, omitted), the resolution γ of modularity, `Q = Σ_c (e_c / m − γ (K_c / 2m)²)`: above 1 smaller
+   communities, below 1 larger ones. Both algorithms take it; Louvain's gain `w − γ·tot·k / 2m` multiplies by exactly
+   1.0 by default, so its results do not change. The same two names in both places that find communities: the overview's
+   `options` and the layout's `LayoutOptions` (with `communities`; also the `communities` operation, which hands the view's communities to a host as groups). Two option
+   sets, not one shared value, because the overview request and the snapshot's options are separate already, as
+   `communities` and `hubs`/`communityHubs` are. A session reuses its overview hierarchy only for the same two values.
+2. **The algorithm** (per container that is split, on the links between its children, as Louvain):
+   - *Fast local moving*: a queue of all nodes in index order (the paper: random order); a node taken from it moves to
+     the community with the largest gain, the empty community included (gain 0), only for a real gain (> 1e-12, as
+     Louvain), ties to the smaller community; the neighbours it left in other communities join the end of the queue.
+   - *Refinement*: within every community `S`, each node starts alone. In index order, a node still alone that is well
+     connected to `S` (`E(v, S − v) ≥ γ·k_v·(K_S − k_v) / 2m`) joins the refined community `C ⊆ S` of a neighbour that
+     is well connected (`E(C, S − C) ≥ γ·K_C·(K_S − K_C) / 2m`) with the largest gain `E(v, C) − γ·k_v·K_C / 2m`, if
+     that gain is real. A refined community is therefore connected.
+   - *Aggregation*: a node per refined community; its initial community is the community of the moving phase. Repeat
+     until the moving phase leaves every community as one node.
+   - **Levels.** The refined partitions, one per iteration, nest (each groups the nodes of the one before), and when the
+     loop ends the last one is the final partition. They are the levels of clusters, as Louvain's levels are, with the
+     same ids (`community:<container>:<level>.<k>`, communities numbered by their first node). Every level's communities
+     are connected in the container's links (test). The loop ends after 32 levels at most (the levels then end at
+     the last refined partition, connected as every one). When a refinement merges nothing (aggregation would not shrink
+     the graph), the last level is the moving phase's partition split into its connected parts, which only raises
+     modularity (no link between the parts) and keeps the guarantee.
+3. **Determinism: a greedy refinement, no seed.** The paper picks the refined community at random, with probability
+   `∝ exp(ΔH / θ)` (θ = 0.01), so that the refinement explores more partitions; greedy is its limit θ → 0, which the
+   paper names. The guarantees (γ-connected refined communities, hence connected communities) do not depend on the
+   randomness, only on merging nodes still alone into well-connected subsets with a non-negative gain. Greedy was chosen
+   over a fixed seed and a deterministic PRNG because: (a) it follows the rule Louvain here follows already (index order,
+   ties to the smaller community), so the comparison measures the algorithm and nothing else; (b) with a random stream
+   every choice depends on how many numbers were drawn before it, so one changed node reshuffles the rest of its
+   container's refinement — the clusters of an incremental engine would change for reasons unrelated to the edit (the
+   continuation by id keeps clusters for the same reason, addendum of 2026-11-26); (c) `exp` is not among the portable
+   functions (`PortableMath`), and a seed would be one more option to keep with snapshots. The price is less
+   exploration, which the measurement below includes. A randomised refinement can be added later behind a seed if
+   measurements ask for it.
+4. **Unchanged around it.** Hubs are left out before (they stay direct children, their links count for no community);
+   satellites are gathered after; groups the data gives come first, and the algorithm divides only what is still
+   larger than `communities`; a container of mostly unlinked children is not split; communities of fewer than 8 nodes
+   and communities holding one community of the level below are no clusters; children without links are gathered.
+   Labels are made the same way (overview: `≈ <most connected member>`; layout: `<best connected member> +N`). A
+   continuation by id keeps the earlier clusters whatever algorithm made them, and clusters a container without
+   earlier clusters with the request's algorithm.
+5. **Work budget** (addendum of 2026-11-27): the same units as Louvain, counted at the same kind of safe points. Per
+   level the nodes plus the links (adjacency and aggregation). The moving phase: per node taken from the queue, 1 plus
+   its links, so a pass over every node costs what a Louvain sweep costs; at most 64 × nodes takes per level (Louvain:
+   at most 64 sweeps). The refinement: two passes (well-connectedness, merging), each the nodes plus the links. The
+   split into connected parts, when it runs: the nodes plus the links. A container's Leiden is one piece, discarded
+   whole when it does not fit, as a container's Louvain.
+6. **Default.** Louvain stays the default; the owner decides. Measured
+   ([results](../../benchmarks/results/communities-20261128.md), generated code index of 10 000 to 100 000 nodes, its
+   flat variant of 2 000 to 50 000, and the reference views): Louvain left no community in parts on any of them (0 of
+   2 991; a search over 20 000 small generated graphs found one case, now a test); modularity is equal within 1 %
+   (Leiden 0.5–0.9 % lower on the flat graphs, slightly higher on two reference views); Leiden's clustering work is
+   7–10 % lower on the hierarchical graphs and 2.4–7× lower on the flat ones, and it makes deeper hierarchies with more
+   clusters (+10 % on the code index, up to +64 % on flat graphs). Recommendation: keep Louvain the default until real
+   exports and the readability of the deeper hierarchy say otherwise; Leiden for large flat graphs and for hosts that
+   need the guarantee.
+
 ## Real data (2026-11-11)
 
 On two real exports (Intentweave, 8 874 nodes; Backstage, 31 758 nodes; `benchmarks/results/overview-real-20261111.md`)
@@ -276,7 +344,8 @@ children is not split into communities.
 
 ## Not done
 
-- Louvain does not guarantee connected communities (Leiden would); a community can hold parts without links between them.
+- Louvain does not guarantee connected communities; a community can hold parts without links between them. Leiden,
+  which does, is available behind `communityAlgorithm: "leiden"` (addendum of 2026-11-28); Louvain is still the default.
 - The decisions are values of a request, not of a stored overview snapshot; saving a session of the overview is open.
 - Level-of-detail rendering of edges beyond the bundling of collapsed clusters.
 - A grid packing of unlinked nodes in the box pipeline: a file without internal edges, structured, is one long row.

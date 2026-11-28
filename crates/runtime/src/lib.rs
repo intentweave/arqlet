@@ -183,6 +183,7 @@ pub fn structured<'a>(
         &given,
         options.communities,
         &hubs_of(&options.community_hubs),
+        &detection_of(options.community_algorithm, options.community_resolution)?,
     )?;
     // Containers shown in part (`reveal`): the children not shown gathered in a rest.
     let view = arqlet_layout::communities::with_partial(&grouped, &options.partial)?;
@@ -209,6 +210,8 @@ pub fn community_groups(
         groups: options.groups.clone(),
         communities: options.communities,
         community_hubs: options.community_hubs.clone(),
+        community_algorithm: options.community_algorithm,
+        community_resolution: options.community_resolution,
         ..LayoutOptions::default()
     };
     let view = structured(graph, &structure_only)?;
@@ -254,6 +257,22 @@ pub fn community_groups(
         }
     }
     Ok(groups)
+}
+
+/// How `communities` finds them (#237): the algorithm and the resolution (1 when unset; else a finite number > 0), for
+/// the layout crate.
+pub(crate) fn detection_of(
+    algorithm: arqlet_model::CommunityAlgorithm,
+    resolution: Option<f64>,
+) -> Result<arqlet_layout::overview::Detection, String> {
+    let resolution = resolution.unwrap_or(1.);
+    if !(resolution.is_finite() && resolution > 0.) {
+        return Err("communityResolution must be a number > 0".into());
+    }
+    Ok(arqlet_layout::overview::Detection {
+        algorithm,
+        resolution,
+    })
 }
 
 /// The hubs `communities` leaves out (`LayoutOptions::community_hubs`), for the layout crate.
@@ -446,6 +465,8 @@ fn structure_key(options: &LayoutOptions) -> String {
         &options.groups,
         options.communities,
         &options.community_hubs,
+        options.community_algorithm,
+        options.community_resolution,
         &options.partial,
         &options.hidden,
         &options.grouping_priority,

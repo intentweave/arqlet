@@ -63,6 +63,17 @@ fn options_of(v: &Value) -> Result<OverviewOptions, String> {
                     .ok_or("Overview option communities must be a number of children (0: never)")?
                     as usize;
             }
+            // Provisional (#237): the algorithm and the resolution the communities are found with.
+            "communityAlgorithm" => {
+                options.detection.algorithm = serde_json::from_value(value.clone())
+                    .map_err(|_| "Overview option communityAlgorithm must be louvain or leiden")?;
+            }
+            "communityResolution" => {
+                options.detection.resolution = value
+                    .as_f64()
+                    .filter(|x| x.is_finite() && *x > 0.)
+                    .ok_or("Overview option communityResolution must be a number > 0")?;
+            }
             "ticks" => {
                 options.ticks = value
                     .as_u64()
@@ -481,6 +492,8 @@ pub(crate) fn graph_of(v: &Value) -> Result<Graph, String> {
 fn hierarchy_key(v: &Value, options: &OverviewOptions) -> Value {
     json!({
         "communities": options.communities,
+        "communityAlgorithm": options.detection.algorithm,
+        "communityResolution": options.detection.resolution,
         "satellites": options.satellites,
         "groups": v["options"].get("groups"),
         "hubs": v["options"].get("hubs"),
@@ -522,13 +535,20 @@ fn hierarchy_of(
             &places,
             options.communities,
             &hubs,
+            &options.detection,
             options.satellites,
             budget,
         )?;
         return Ok((graph, h, Some((places, kept))));
     }
     let h = overview::with_satellites(
-        overview::with_communities_within(base, options.communities, &hubs, budget)?,
+        overview::with_communities_within(
+            base,
+            options.communities,
+            &hubs,
+            &options.detection,
+            budget,
+        )?,
         options.satellites,
     )?;
     Ok((graph, h, None))

@@ -185,6 +185,28 @@ the discs. A `parent` that is not a string is refused. Parents are taken at thei
 
 Limits: other cluster options do not regroup a container that keeps its clusters.
 
+### Choosing the community algorithm (provisional)
+
+The engine finds communities with Louvain by default. `communityAlgorithm: 'leiden'` finds them with Leiden (Traag,
+Waltman and van Eck 2019) instead, whose communities are always connected: Louvain can leave a community whose parts no
+link joins. `communityResolution` (a number > 0, default 1) is the resolution of modularity for both: larger values give
+smaller communities. The same two options exist in the overview's `options` and in the layout options (with
+`communities`, also for the `communities` operation):
+
+```js
+run({op: 'overview', graph, options: {communityAlgorithm: 'leiden'}});
+run({op: 'import', graph, options: {communities: 40, communityAlgorithm: 'leiden', communityResolution: 1.5}});
+```
+
+- Both are deterministic: the same answer for any thread count, natively and in WASM. Leiden here refines greedily
+  instead of at random, so it needs no seed.
+- Hubs, satellites, `groups`, labels, cluster ids (`community:<container>:<level>.<k>`) and the work budget work as with
+  Louvain; Leiden's work is counted in the same units. A session builds its hierarchy again when either option changes.
+- A continuation by id (`start.nodes`) keeps the earlier clusters whatever algorithm made them; only containers without
+  earlier clusters are clustered with the request's algorithm.
+- Defaults are omitted from snapshots and change no answer. ADR 0018 (addendum of 2026-11-28) has the design;
+  `benchmarks/results/communities-20261128.md` the measurements.
+
 ### Showing your own partition (provisional)
 
 A host that computes communities itself (for example with Leiden on a server) gives the overview that partition as the

@@ -7,6 +7,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **Leiden beside Louvain** (#237, provisional; ADR 0018 addendum of 2026-11-28): `communityAlgorithm: "leiden"`, in the
+  overview's options and in the layout options (with `communities`, and for the `communities` operation), finds
+  communities with Leiden (Traag, Waltman and van Eck 2019), implemented from the paper with a greedy refinement: every
+  community is connected, where Louvain can leave one whose parts no link joins. `communityResolution` (a number > 0,
+  default 1) sets the resolution of modularity for both algorithms. Deterministic for any thread count and the same in
+  WASM; the work budget counts Leiden in Louvain's units. Louvain stays the default, and requests without the options
+  answer as before. New contract type `CommunityAlgorithm`. Measurements: `benchmarks/results/communities-20261128.md`.
 - **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
   `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
   out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,
