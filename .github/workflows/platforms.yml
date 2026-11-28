@@ -1,8 +1,8 @@
 name: Platforms
 # The engine must compute the same on every platform: a backend on Linux, a developer's Mac or Windows machine, and the
 # browser (WASM) continue each other's layouts. Each job runs the Rust tests and checks that the native build of that
-# platform gives the same responses as the WASM engine (tools/platform-parity.mjs); the last job compares the response
-# digests of all platforms with each other.
+# platform and the native Node module (crates/node, ADR 0030) give the same responses as the WASM engine
+# (tools/platform-parity.mjs --node); the last job compares the response digests of all platforms with each other.
 #
 # Every platform runs on `main` after a merge, on demand (`workflow_dispatch`), on a pull request labelled
 # `all-platforms`, and on a pull request that changes what makes platforms differ: the portable math
@@ -77,7 +77,8 @@ jobs:
       - run: cargo +stable test --workspace --locked
       - run: cargo +stable build --release -p arqlet-runtime --bin layout-command --features query --locked
       - run: cargo +stable build -p arqlet-wasm --target wasm32-unknown-unknown --release --features query --locked
-      - run: node tools/platform-parity.mjs --digest | tee parity-${{ matrix.name }}.txt
+      - run: cargo +stable build --release -p arqlet-node --features query --locked
+      - run: node tools/platform-parity.mjs --digest --node | tee parity-${{ matrix.name }}.txt
       - uses: actions/upload-artifact@v4
         with:
           name: parity-${{ matrix.name }}

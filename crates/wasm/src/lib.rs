@@ -185,22 +185,10 @@ static ALLOCATOR: Counting = Counting;
 /// The answer to a session's `memory` or `release` with what only the module knows: the live heap of the whole module
 /// (every session and the answer being written) and the size of its linear memory, which WebAssembly never gives back.
 fn with_heap(request: &str, answer: String) -> String {
-    if !(request.contains("\"memory\"") || request.contains("\"release\""))
-        || !answer.contains("\"estimated\":true")
-        || !answer.ends_with('}')
-    {
-        return answer;
-    }
     let live = LIVE.load(std::sync::atomic::Ordering::Relaxed);
     #[cfg(target_arch = "wasm32")]
-    let linear = format!(
-        ",\"linearMemoryBytes\":{}",
-        core::arch::wasm32::memory_size(0) as u64 * 65_536
-    );
+    let linear = Some(core::arch::wasm32::memory_size(0) as u64 * 65_536);
     #[cfg(not(target_arch = "wasm32"))]
-    let linear = String::new();
-    let mut out = answer;
-    out.pop();
-    out.push_str(&format!(",\"heapBytes\":{live}{linear}}}"));
-    out
+    let linear = None;
+    arqlet_runtime::memory::with_adapter_heap(request, answer, live, linear)
 }

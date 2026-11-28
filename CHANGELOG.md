@@ -15,6 +15,18 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   columns in the columnar answer (`containerStats.*`); not part of `positionsOnly` answers. Without the flag nothing
   changes. New contract type `OverviewContainerStats`. Formula and usage:
   [integration guide](docs/integration-guide.md#marking-weak-containers-provisional).
+- **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
+  sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
+  pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time
+  each. `@arqlet/node` (`packages/node`, `private` until publishing is decided) loads it with the interface of the WASM
+  engine: `loadNativeEngine({sessionBytes})` answers an asynchronous `run` with `openSession()` (`run`, `close`,
+  `columns`, `overview`) that `createSession` takes, and `loadEngine({engine})` chooses native, WASM or the first that
+  loads (`ARQLET_ENGINE`). The answers are byte-identical to the WASM engine's (`tools/platform-parity.mjs --node`).
+  Build it with `node packages/node/build.mjs`. Accepted gaps (ADR 0030): no progressive publications, phase timings
+  unreliable under concurrent calls, no musl or Intel macOS binaries; prebuilt binaries and publishing are a separate step.
+- **Sessions usable from several threads (provisional; ADR 0024 C2):** `arqlet_runtime::shared_sessions::SharedSessionStore`,
+  the store of the native adapter: one short lock for its book, one lock per session, a byte limit that never drops a
+  running session.
 - **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
   `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
   out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,

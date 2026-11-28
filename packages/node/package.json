@@ -1,0 +1,49 @@
+{
+  "name": "@arqlet/node",
+  "version": "0.10.0",
+  "private": true,
+  "description": "The Arqlet graph-layout engine as a native Node.js module (Node-API): dispatch and resident sessions, asynchronous on libuv's thread pool, with the interface of the WASM engine and a WASM fallback. Provisional, unpublished.",
+  "keywords": [
+    "graph",
+    "layout",
+    "graph-layout",
+    "node-api",
+    "napi"
+  ],
+  "license": "(MIT OR Apache-2.0)",
+  "author": "Benjamin Becker",
+  "homepage": "https://github.com/intentweave/arqlet#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/intentweave/arqlet.git",
+    "directory": "packages/node"
+  },
+  "bugs": {
+    "url": "https://github.com/intentweave/arqlet/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@arqlet/engine-client": "workspace:^"
+  }
+}
