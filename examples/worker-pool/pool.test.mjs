@@ -39,6 +39,26 @@ test('a worker over its time limit is replaced and the request answers timeout',
   await pool.close();
 });
 
+test('a full queue answers busy; heavy refusals run alone; reads bypass the budget', {skip: !existsSync(wasm)}, async () => {
+  const module = await WebAssembly.compile(readFileSync(wasm));
+  const pool = await createPool({module, workers: 1, budgetBytes: Infinity, maxQueue: 1});
+  const first = pool.run({op: 'import', graph, limit: 100});
+  const second = pool.run({op: 'import', graph, limit: 100});
+  const third = await pool.run({op: 'import', graph, limit: 100});
+  assert.equal(third.busy, true);
+  assert.equal((await first).ok, true);
+  assert.equal((await second).ok, true);
+  // elkLayout is not estimated but lays out: refused as heavy, it still runs (alone).
+  const elk = await pool.run({op: 'elkLayout', graph: {id: 'root', children: [{id: 'a', width: 10, height: 10}]}});
+  assert.equal(elk.ok, true, elk.error);
+  // A read the estimate refuses as light runs without a share of the budget.
+  const s = (await first).snapshot;
+  const scene = await pool.run({op: 'scene', snapshot: s});
+  assert.equal(scene.ok, true, scene.error);
+  assert.equal(pool.stats.rejected, 1);
+  await pool.close();
+});
+
 async function createEngineFor(module) {
   const {createEngine} = await import('../../packages/engine-client/wasm-client.js');
   return createEngine(module);

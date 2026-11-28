@@ -1,7 +1,7 @@
 //! Provisional (ADR 0024, step C3): an estimate of the heap a request will need at its peak, before it runs, for a host that
 //! admits work by memory (a worker pool with a memory budget). `{"op": "estimate", "request": {…}}` takes the request it
 //! estimates as it would be sent (to `dispatch`, or to a resident session without its snapshot) and answers
-//! `{ok, estimate: {op, target, bytes, parts, view, source, jobs, model}}`.
+//! `{ok, estimate: {op, kind, target, bytes, parts, view, source, jobs, model}}`.
 //!
 //! How: the request is read into its types (the graph, the snapshot) as the operation reads it, and the view it will lay
 //! out is found the way the operation finds it, without laying it out: an import runs its selection and projection
@@ -14,12 +14,23 @@
 //! - `input`: reading it (the typed graph or snapshot, the JSON value the protocol reads first) and writing the answer;
 //! - `structure`: the source graph's index and copies an operation makes of it;
 //! - `layout`: laying out the view from scratch, once per concurrent refinement job; an edit that continues the earlier
-//!   layout needs less, so the estimate is an upper bound for it.
+//!   layout needs less;
+//! - `content`: the content a `change` brings with its payload, as the session keeps it;
+//! - `floor`: what the structural floor adds when it is above the rest: the cost of reading the request and handling the
+//!   whole source graph (index, structure, copies), which a large source with a small view has whatever its view.
 //!
-//! The estimate is meant as an upper bound within the factor recorded with the calibration, never far below the counted
-//! peak. Each build estimates for its own target: type sizes differ between 64-bit builds and wasm32 (`target` in the
-//! answer), so a host that admits WASM workers asks a WASM engine. Deterministic, pure and cheap next to the request: no
-//! layout runs, and its own time is recorded with the calibration.
+//! The estimate does not validate the request: a stale revision or an unknown node id is estimated all the same (the
+//! operation refuses it later). Operations it does not know are refused with `heavy`: `true` for those that lay out or
+//! refine (`elkLayout`, `structuredRefine`, the reference operations, …), which a host runs alone, `false` for reads.
+//!
+//! A calibrated estimate, not a guarantee. On the calibration rows it was at or above every measured peak, with a margin
+//! of 1.15 (`MARGIN`); above 4 MB its median was 1.15 to 2.0 times the peak for imports, edits and overviews; on graph
+//! shapes left out of the fit it can fall below (the leave-one-shape-out check in the results file). Natively it estimates
+//! the counted heap: the resident memory of the process can be up to 3 times that on macOS's allocator. Any change of the
+//! layout code changes the peaks: recalibrate with `benchmarks/memory-estimate/fit.py` (README there) and raise
+//! `MODEL_VERSION`. Each build estimates for its own target: type sizes differ between 64-bit builds and wasm32
+//! (`target` in the answer), so a host that admits WASM workers asks a WASM engine. Deterministic and pure: no layout
+//! runs; its own cost is recorded with the calibration.
 use crate::protocol::RevealMore;
 use arqlet_model::{Graph, GraphPatch, Hidden, Intent, LayoutOptions, Snapshot};
 use serde::Deserialize;
@@ -28,7 +39,11 @@ use serde_json::{json, Value};
 /// The version of the model and its coefficients; a recalibration changes it.
 pub const MODEL_VERSION: u32 = 1;
 
-/// The margin on everything but the request text: the coefficients bound the calibration rows exactly, a request of
+/// The heap a session keeps per byte of a payload's JSON text, for a `change`: about 750 B per node with a few properties
+/// against about 50 B of JSON (`benchmarks/results/content-memory-20261122.md`); not calibrated with `change` itself.
+const CONTENT_PER_PAYLOAD_BYTE: f64 = 16.0;
+
+/// The margin on everything but the request text: the coefficients reach the calibration rows exactly, a request of
 /// another shape may need more (`benchmarks/results/memory-estimate-20261127.md`, the graphs left out of a fit).
 pub const MARGIN: f64 = 1.15;
 
@@ -50,7 +65,7 @@ pub(crate) struct Estimated {
     intent: Option<Box<Intent>>,
     threads: Option<u64>,
     work_budget: Option<Value>,
-    scene: Option<Value>,
+    payload: Option<Value>,
 }
 
 #[derive(Deserialize)]
@@ -74,6 +89,8 @@ struct Sizes {
     open: usize,
     /// Layouts held at the same time (a refinement's concurrent jobs).
     jobs: usize,
+    /// The JSON text of a `change`'s payload, in bytes.
+    payload: usize,
 }
 
 /// What a class of requests costs: per byte of its text, per byte of its source graph, and per byte of the layout model.
@@ -87,6 +104,13 @@ struct Class {
     layout: f64,
     /// Fixed bytes.
     base: f64,
+    /// The structural floor: at least this many bytes per byte of the source graph's heap, whatever the view (reading
+    /// the request and handling the whole source: index, structure, copies). Fitted as the lowest such ratio over the
+    /// class's calibration rows above 4 MB, so it raises none of them.
+    floor: f64,
+    /// The same per byte of request text, through `dispatch` (the text is read, a snapshot request into a JSON value
+    /// first); 0 in a session, whose request text is a few bytes.
+    floor_text: f64,
 }
 
 /// The coefficients of one target: a class per kind of operation and place (`kind/place`).
@@ -106,57 +130,134 @@ const TARGET: &str = "native64";
 #[cfg(not(target_pointer_width = "64"))]
 const TARGET: &str = "wasm32";
 
-const fn class(text: f64, source: f64, layout: f64, base: f64) -> Class {
+const fn class(
+    text: f64,
+    source: f64,
+    layout: f64,
+    base: f64,
+    floor: f64,
+    floor_text: f64,
+) -> Class {
     Class {
         text,
         source,
         layout,
         base,
+        floor,
+        floor_text,
     }
 }
 
 // COEFFICIENTS-NATIVE-BEGIN
-// Fitted by `benchmarks/memory-estimate/fit.py report` on the rows of `benchmarks/results/memory-estimate-20261127.md`.
+// Generated by `python3 benchmarks/memory-estimate/fit.py report` (Python 3.13.2) from the rows of
+// `benchmarks/results/memory-estimate-20261127-*.jsonl`; columns: text, source, layout share, base, floor, text floor.
 #[cfg(target_pointer_width = "64")]
 const COEFFICIENTS: Coefficients = Coefficients {
     classes: [
-        ("import/dispatch", class(1.0315, 7.8400, 0.9730, 124162.3)),
-        ("import/session", class(1.2776, 2.0708, 0.9907, 194393.6)),
-        ("open/dispatch", class(2.7335, 1.2601, 0.6582, 0.0)),
-        ("open/session", class(1.0000, 0.3113, 1.1325, 8191.3)),
-        ("keep/dispatch", class(1.0000, 1.6590, 0.9007, 249141.5)),
-        ("keep/session", class(1.0000, 2.9059, 1.0659, 36906.7)),
-        ("patch/dispatch", class(1.1870, 1.9329, 0.6922, 1114332.9)),
-        ("patch/session", class(1.0000, 3.9882, 1.1299, 0.0)),
-        ("refine/dispatch", class(5.5130, 0.0390, 0.9007, 2386260.3)),
-        ("refine/session", class(1.0000, 2.5180, 1.0659, 4190911.6)),
-        ("overview/dispatch", class(1.0000, 0.1327, 0.0000, 507931.7)),
+        (
+            "import/dispatch",
+            class(1.0315, 7.8400, 0.9730, 124162.3, 2.6708, 4.9569),
+        ),
+        (
+            "import/session",
+            class(1.2776, 2.0708, 0.9907, 194393.6, 2.1195, 0.0000),
+        ),
+        (
+            "open/dispatch",
+            class(2.7335, 1.2601, 0.6582, 0.0, 2.0138, 3.0716),
+        ),
+        (
+            "open/session",
+            class(1.0000, 0.3113, 1.1325, 8191.3, 0.5981, 0.0000),
+        ),
+        (
+            "keep/dispatch",
+            class(1.0000, 1.6590, 0.9007, 249141.5, 1.4389, 2.9627),
+        ),
+        (
+            "keep/session",
+            class(1.0000, 2.9059, 1.0659, 36906.7, 2.6385, 0.0000),
+        ),
+        (
+            "patch/dispatch",
+            class(1.1870, 1.9329, 0.6922, 1114332.9, 2.0996, 3.1198),
+        ),
+        (
+            "patch/session",
+            class(1.0000, 3.9882, 1.1299, 0.0, 4.2598, 0.0000),
+        ),
+        (
+            "refine/dispatch",
+            class(5.5130, 0.0390, 0.9007, 2386260.3, 1.7026, 4.0558),
+        ),
+        (
+            "refine/session",
+            class(1.0000, 2.5180, 1.0659, 4190911.6, 0.5142, 0.0000),
+        ),
+        (
+            "overview/dispatch",
+            class(1.0000, 0.1327, 0.0000, 507931.7, 7.6494, 15.2846),
+        ),
     ],
     layout: [0.0, 13576.0, 3581.3, 53.1, 9.9, 5409.6, 3.5, 435.7],
-    overview_nodes: 1398.2,
+    overview_nodes: 1397.8,
     overview_edges: 1417.9,
 };
 // COEFFICIENTS-NATIVE-END
 
 // COEFFICIENTS-WASM-BEGIN
-// Fitted by `benchmarks/memory-estimate/fit.py report` on the rows of `benchmarks/results/memory-estimate-20261127.md`.
+// Generated by `python3 benchmarks/memory-estimate/fit.py report` (Python 3.13.2) from the rows of
+// `benchmarks/results/memory-estimate-20261127-*.jsonl`; columns: text, source, layout share, base, floor, text floor.
 #[cfg(not(target_pointer_width = "64"))]
 const COEFFICIENTS: Coefficients = Coefficients {
     classes: [
-        ("import/dispatch", class(2.1703, 11.4731, 0.8964, 1508.0)),
-        ("import/session", class(1.0226, 2.7846, 0.9127, 576235.4)),
-        ("open/dispatch", class(18.0347, 0.0000, 0.1354, 0.0)),
-        ("open/session", class(1.0000, 0.0000, 0.8392, 4249316.1)),
-        ("keep/dispatch", class(17.7421, 0.0000, 0.1400, 0.0)),
-        ("keep/session", class(1.0000, 2.3270, 0.7894, 419066.9)),
-        ("patch/dispatch", class(16.7993, 0.0270, 0.1348, 45637.2)),
-        ("patch/session", class(1.0000, 3.7750, 0.7867, 765573.4)),
-        ("refine/dispatch", class(10.3952, 3.3412, 0.1400, 556059.9)),
-        ("refine/session", class(1.0000, 0.0000, 0.7894, 8190215.0)),
-        ("overview/dispatch", class(8.3941, 1.6319, 0.0000, 0.0)),
+        (
+            "import/dispatch",
+            class(2.1703, 11.4731, 0.8964, 1508.0, 6.7015, 6.0276),
+        ),
+        (
+            "import/session",
+            class(1.0226, 2.7846, 0.9127, 576235.4, 3.0847, 0.0000),
+        ),
+        (
+            "open/dispatch",
+            class(18.0347, 0.0000, 0.1354, 0.0, 9.5860, 12.4375),
+        ),
+        (
+            "open/session",
+            class(1.0000, 0.0000, 0.8392, 4249316.1, 0.9390, 0.0000),
+        ),
+        (
+            "keep/dispatch",
+            class(17.7421, 0.0000, 0.1400, 0.0, 8.9154, 11.5027),
+        ),
+        (
+            "keep/session",
+            class(1.0000, 2.3270, 0.7894, 419066.9, 2.5296, 0.0000),
+        ),
+        (
+            "patch/dispatch",
+            class(16.7993, 0.0270, 0.1348, 45637.2, 9.2244, 12.3572),
+        ),
+        (
+            "patch/session",
+            class(1.0000, 3.7750, 0.7867, 765573.4, 4.0106, 0.0000),
+        ),
+        (
+            "refine/dispatch",
+            class(10.3952, 3.3412, 0.1400, 556059.9, 8.9154, 9.4187),
+        ),
+        (
+            "refine/session",
+            class(1.0000, 0.0000, 0.7894, 8190215.0, 1.1096, 0.0000),
+        ),
+        (
+            "overview/dispatch",
+            class(8.3941, 1.6319, 0.0000, 0.0, 12.6273, 14.0611),
+        ),
     ],
     layout: [0.0, 13576.0, 3581.3, 53.1, 9.9, 5409.6, 3.5, 435.7],
-    overview_nodes: 1733.0,
+    overview_nodes: 1732.8,
     overview_edges: 15.2,
 };
 // COEFFICIENTS-WASM-END
@@ -208,40 +309,86 @@ pub fn is_estimate(input: &str) -> bool {
         && serde_json::from_str::<Head>(input).is_ok_and(|h| h.op.as_deref() == Some("estimate"))
 }
 
+/// The operations that lay out or refine but that the estimate does not know: refused with `heavy: true`, so that a host
+/// runs them alone instead of taking the refusal for a light request.
+const HEAVY_UNESTIMATED: &[&str] = &[
+    "structuredRefine",
+    "containerRefine",
+    "componentRefine",
+    "elkLayout",
+    "load",
+    "referenceCreate",
+    "referenceRefresh",
+    "referenceReroute",
+    "referenceValidate",
+    "referenceCanonical",
+    "referenceSvg",
+    "referenceFromSvg",
+    "referenceReproduce",
+    "referenceRepair",
+];
+
+/// The estimated request's `op`, read first without the rest (another operation's graph need not be a model graph).
+fn inner_op(input: &str) -> Result<String, String> {
+    #[derive(Deserialize)]
+    struct Inner {
+        op: Option<String>,
+    }
+    #[derive(Deserialize)]
+    struct Outer {
+        request: Inner,
+    }
+    let outer: Outer = serde_json::from_str(input)
+        .map_err(|e| format!("estimate needs {{op: \"estimate\", request}}: {e}"))?;
+    outer
+        .request
+        .op
+        .ok_or_else(|| "estimate: the request has no op".to_string())
+}
+
+/// A refusal: `heavy` says whether the request lays out (run it alone) or is a light read (run it beside the rest).
+fn refusal(error: String, heavy: bool) -> Value {
+    json!({"ok": false, "error": error, "heavy": heavy})
+}
+
+/// Reads and estimates the request, or refuses with whether it is heavy.
+fn estimate_text(input: &str, current: Option<&Snapshot>, place: Place) -> Value {
+    let op = match inner_op(input) {
+        Ok(op) => op,
+        Err(e) => return json!({"ok": false, "error": e}),
+    };
+    if kind_of(&op).is_none() {
+        let heavy = HEAVY_UNESTIMATED.contains(&op.as_str());
+        let reason = if heavy {
+            "it lays out or refines: run it alone"
+        } else {
+            "it reads the view and needs little memory"
+        };
+        return refusal(format!("estimate does not know {op}: {reason}"), heavy);
+    }
+    let request = match serde_json::from_str::<EstimateText>(input) {
+        Ok(outer) if outer.op == "estimate" => outer.request,
+        Ok(_) => return json!({"ok": false, "error": "Unsupported operation"}),
+        Err(e) => {
+            return json!({"ok": false, "error": format!("estimate needs {{op: \"estimate\", request}}: {e}")})
+        }
+    };
+    let text = request_length(input);
+    estimate(request, current, text, place).unwrap_or_else(|e| {
+        // A request the estimate cannot read the way the operation would (a session's overview without its graph):
+        // heavy, since it is one of the operations that lay out.
+        refusal(e, true)
+    })
+}
+
 /// `estimate` through `dispatch`: the request in the text, read in one pass (no JSON value of a large graph).
 pub fn estimate_response(input: &str) -> String {
-    match serde_json::from_str::<EstimateText>(input) {
-        Ok(outer) if outer.op == "estimate" => {
-            let text = request_length(input);
-            answer(estimate(outer.request, None, text, Place::Dispatch))
-        }
-        Ok(_) => answer(Err("Unsupported operation".into())),
-        Err(e) => answer(Err(format!(
-            "estimate needs {{op: \"estimate\", request}}: {e}"
-        ))),
-    }
+    estimate_text(input, None, Place::Dispatch).to_string()
 }
 
 /// `estimate` in a resident session: the request as the session takes it (without a snapshot), on the session's snapshot.
 pub(crate) fn estimate_in_session(input: &str, current: Option<&Snapshot>) -> Value {
-    match serde_json::from_str::<EstimateText>(input) {
-        Ok(outer) if outer.op == "estimate" => {
-            let text = request_length(input);
-            estimate(outer.request, current, text, Place::Session)
-                .unwrap_or_else(|e| json!({"ok": false, "error": e}))
-        }
-        Ok(_) => json!({"ok": false, "error": "Unsupported operation"}),
-        Err(e) => {
-            json!({"ok": false, "error": format!("estimate needs {{op: \"estimate\", request}}: {e}")})
-        }
-    }
-}
-
-fn answer(result: Result<Value, String>) -> String {
-    match result {
-        Ok(v) => v.to_string(),
-        Err(e) => json!({"ok": false, "error": e}).to_string(),
-    }
+    estimate_text(input, current, Place::Session)
 }
 
 /// The length of the estimated request's text: the estimate's whole text (the wrapper's few bytes err on the safe side).
@@ -259,7 +406,7 @@ fn kind_of(op: &str) -> Option<&'static str> {
         "toggle" | "reveal" | "filter" | "configure" | "restore" => "open",
         "direction" | "strategy" | "routing" | "move" | "port" | "settle" | "pin" | "shape"
         | "measure" => "keep",
-        "patch" | "add" => "patch",
+        "patch" | "add" | "change" => "patch",
         "refine" | "refineProgressive" => "refine",
         _ => return None,
     })
@@ -313,14 +460,28 @@ fn estimate(
     } else {
         MARGIN * coefficients.layout * sizes.jobs as f64 * layout_bytes(&sizes)
     };
+    // Content a `change` brings (its payload), as the session keeps it.
+    let content = MARGIN * CONTENT_PER_PAYLOAD_BYTE * sizes.payload as f64;
+    // The structural floor: a large source with a small view costs more than the view alone says.
+    let at_least = MARGIN
+        * (coefficients.floor * sizes.source_heap as f64)
+            .max(coefficients.floor_text * sizes.text as f64);
+    let floor = (at_least - (input + structure + layout + content)).max(0.0);
     let round = |b: f64| b.max(0.0).ceil() as u64;
     let parts = json!({
         "request": round(request_part),
         "input": round(input),
         "structure": round(structure),
         "layout": round(layout),
+        "content": round(content),
+        "floor": round(floor),
     });
-    let bytes = round(request_part) + round(input) + round(structure) + round(layout);
+    let bytes = round(request_part)
+        + round(input)
+        + round(structure)
+        + round(layout)
+        + round(content)
+        + round(floor);
     let mut estimate = json!({
         "op": op,
         "kind": kind,
@@ -373,7 +534,7 @@ fn import_sizes(request: Estimated, sizes: &mut Sizes) -> Result<(), String> {
     Ok(())
 }
 
-/// An edit of a view: the view it lays out, found as the operation finds it (an upper bound where that is cheaper).
+/// An edit of a view: the view it lays out, found as the operation finds it (the larger view where that is simpler to find).
 fn edit_sizes(
     op: &str,
     mut request: Estimated,
@@ -427,7 +588,7 @@ fn edit_sizes(
                 } else {
                     snapshot.collapsed_ids.iter().any(|c| c == id)
                 };
-            // Closing a container shrinks the view: the view before bounds it.
+            // Closing a container shrinks the view: the view before stands for it.
             if opened {
                 let ids: Vec<String> = collapsed().into_iter().filter(|c| c != id).collect();
                 after = Some(project(ids, &options)?);
@@ -451,13 +612,13 @@ fn edit_sizes(
                 }
             }
             if let Some(more) = &request.more {
-                options.partial.remove(&more.container);
                 open.insert(more.container.clone());
-                open.insert(format!(
-                    "{}{}",
-                    arqlet_layout::communities::REST_PREFIX,
-                    more.container
-                ));
+            }
+            // A container shown in part is estimated shown whole (what `partial: false` and paging to the end show).
+            for id in open.clone() {
+                if options.partial.remove(&id).is_some() {
+                    open.insert(format!("{}{}", arqlet_layout::communities::REST_PREFIX, id));
+                }
             }
             drop(structure);
             let ids: Vec<String> = collapsed()
@@ -486,7 +647,10 @@ fn edit_sizes(
                 after = Some(project(intent.collapsed_ids.clone(), &snapshot.options)?);
             }
         }
-        "patch" => {
+        "patch" | "change" => {
+            if let Some(payload) = &request.payload {
+                sizes.payload = serde_json::to_string(payload).map_or(0, |t| t.len());
+            }
             if let Some(patch) = &request.patch {
                 sizes.view_nodes += patch.nodes.len();
                 sizes.view_edges += patch.edges.len();
@@ -513,14 +677,13 @@ fn edit_sizes(
         _ => {}
     }
     if let Some(graph) = after {
-        // The larger of the views before and after: closing part of the view while opening another stays bounded.
+        // The larger of the views before and after: closing part of the view while opening another stays covered.
         let mut grown = Sizes::default();
         view_sizes(&graph, &mut grown);
         sizes.view_nodes = sizes.view_nodes.max(grown.view_nodes);
         sizes.view_edges = sizes.view_edges.max(grown.view_edges);
         sizes.open = sizes.open.max(grown.open);
     }
-    let _ = request.scene;
     Ok(())
 }
 

@@ -4269,6 +4269,7 @@ fn refine_request(
 pub fn dispatch_streaming(input: &str, publish: &mut dyn FnMut(&str)) -> String {
     // Only a request that names the operation is read as a JSON value here: reading every request so (an import's graph
     // as a value takes several times its typed size) raised the WASM engine's peak for nothing (ADR 0024, C3).
+    // A request whose key is written with JSON escapes (`"refine\u0050rogressive"`) is answered as a plain refinement.
     if !input.contains("\"refineProgressive\"") {
         return dispatch(input);
     }

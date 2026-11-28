@@ -276,7 +276,7 @@ def rust_table(classes, lay, overview):
             raise SystemExit(f"no rows for {k}")
         layout = 0.0 if k.startswith("overview") else c.get("layout", 0.0)
         out.append(f'        ("{k}", class({c.get("text", 1.0):.4f}, {c.get("source", 0.0):.4f}, {layout:.4f}, '
-                   f'{c.get("base", 0.0):.1f})),')
+                   f'{c.get("base", 0.0):.1f}, {c.get("floor", 0.0):.4f}, {c.get("floorText", 0.0):.4f})),')
     ov = classes["overview/dispatch"]
     return "\n".join(out), "[" + ", ".join(f"{lay[n]:.1f}" for n in LAYOUT) + "]", \
         (ov.get("nodes", 0.0), ov.get("edges", 0.0))
@@ -296,8 +296,30 @@ def conservative(classes):
 MARGIN = 1.15  # crates/runtime/src/estimate.rs, MARGIN
 
 
-def predict(r, classes, lay, margin=MARGIN):
-    """The estimate model 1 gives for a row, as crates/runtime/src/estimate.rs computes it."""
+def fit_floors(path, classes, big=4 << 20, exclude=()):
+    """The structural floor per class: `k` = the lowest (measured − text) / source heap over the class's rows above
+    `big` bytes. What a request costs at least for reading the request and handling the whole source graph (its index,
+    the structure, the copies an operation makes), whatever the size of its view; the estimate is at least
+    text + MARGIN · k · source heap. Taking the lowest ratio raises no calibration row."""
+    data = [r for r in rows(path) if isinstance(r.get("estimate"), dict) and r["estimate"].get("parts")
+            and r["graph"] not in exclude]
+    if any(r.get("pointer") == 32 for r in data):
+        data = [r for r in data if not (r["mode"] == "session" and r["op"] != "import" and r.get("heapPeak") is None)]
+    for cls in classes:
+        kept = [(measured_for_fit(r, 1) - sizes_of(r)["text"], sizes_of(r)) for r in data
+                if class_of(r) == cls and measured_for_fit(r, 1) > big]
+        ks = [rest / s["source"] for rest, s in kept if s["source"] > 0]
+        classes[cls]["floor"] = max(0.0, min(ks)) if ks else 0.0
+        # Through dispatch the request text is read too (into a JSON value first for a snapshot): a second floor per byte
+        # of text, the lowest ratio again. A session's request text is a few bytes and has none.
+        kt = [rest / s["text"] for rest, s in kept if s["text"] > 0]
+        classes[cls]["floorText"] = max(0.0, min(kt)) if kt and not cls.endswith("/session") else 0.0
+    return classes
+
+
+def predict(r, classes, lay, margin=MARGIN, floor=True):
+    """The estimate model 1 gives for a row, as crates/runtime/src/estimate.rs computes it: the class's model, and at
+    least the structural floor."""
     c = classes[class_of(r)]
     s = sizes_of(r)
     rest = (c.get("text", 1.0) - 1.0) * s["text"] + c.get("base", 0.0) + c.get("source", 0.0) * s["source"]
@@ -305,6 +327,8 @@ def predict(r, classes, lay, margin=MARGIN):
         rest += c.get("nodes", 0.0) * s["nodes"] + c.get("edges", 0.0) * s["edges"]
     else:
         rest += c.get("layout", 0.0) * s["jobs"] * layout_of(s, lay)
+    if floor:
+        rest = max(rest, c.get("floor", 0.0) * s["source"], c.get("floorText", 0.0) * s["text"])
     return s["text"] + margin * rest
 
 
@@ -334,11 +358,46 @@ def report(path, lay, classes, title, big=4 << 20, only=None):
         else:
             print(f"| {mode} | {op} | {len(rs)} | 0 | | | | {every[0]:.2f} | {top:.0f} MB |")
     for r in below:
-        print(f"  below: {r['graph']} {r['limit']} {r['mode']} {r['op']}: {predict(r, classes, lay) / 1e6:.1f} MB "
+        print(f"  below: {r['graph']} {r['limit']} {r['mode']} {r['op']}: "
+              f"{predict(r, classes, lay) / 1e6:.1f} MB "
               f"< {measured_for_fit(r, 1) / 1e6:.1f} MB")
 
 
+FAMILIES = {
+    "reference datasets": lambda g: not g.startswith(("synthetic-", "full-", "code-")),
+    "synthetic graphs": lambda g: g.startswith("synthetic-"),
+    "full layouts": lambda g: g.startswith("full-"),
+    "code indexes": lambda g: g.startswith("code-"),
+}
+
+
+def shapes(native, wasm):
+    """Leave one shape out: for each family of graphs, the layout model, the classes and the floors fitted without it,
+    and the error measured on it, per target (the floor's effect shown beside the model alone)."""
+    all_graphs = {r["graph"] for r in rows(native)} | {r["graph"] for r in rows(wasm)}
+    for family, member in FAMILIES.items():
+        held = sorted(g for g in all_graphs if member(g))
+        lay = fit_layout(native, exclude=held)
+        for name, path in (("native64", native), ("wasm32", wasm)):
+            classes = fit_floors(path, conservative(fit_classes(path, lay, exclude=held)), exclude=held)
+            data = [r for r in rows(path) if r["graph"] in held and isinstance(r.get("estimate"), dict)
+                    and r["estimate"].get("parts") and measured_for_fit(r, 1) > 4 << 20
+                    and not (r.get("pointer") == 32 and r["mode"] == "session" and r["op"] != "import"
+                             and r.get("heapPeak") is None)]
+            if not data:
+                print(f"SHAPE {family} | {name} | no rows above 4 MB")
+                continue
+            plain = sorted(predict(r, classes, lay, floor=False) / measured_for_fit(r, 1) for r in data)
+            floored = sorted(predict(r, classes, lay) / measured_for_fit(r, 1) for r in data)
+            print(f"SHAPE {family} | {name} | {len(data)} | model alone: min {plain[0]:.2f} median "
+                  f"{plain[len(plain) // 2]:.2f} | with the floor: min {floored[0]:.2f} median "
+                  f"{floored[len(floored) // 2]:.2f} max {floored[-1]:.2f}", flush=True)
+
+
 if __name__ == "__main__":
+    if sys.argv[1] == "shapes":
+        shapes(sys.argv[2], sys.argv[3])
+        sys.exit(0)
     if sys.argv[1] == "report":
         # fit.py report NATIVE.jsonl WASM.jsonl [--holdout g1,g2,...]: fits both targets and prints the error tables,
         # the Rust tables and, with --holdout, the error on graphs left out of the fit.
@@ -347,12 +406,13 @@ if __name__ == "__main__":
         lay = fit_layout(native)
         lay_held = fit_layout(native, exclude=hold) if hold else None
         for name, path in (("native64", native), ("wasm32", wasm)):
-            classes = conservative(fit_classes(path, lay))
+            classes = fit_floors(path, conservative(fit_classes(path, lay)))
             report(path, lay, classes, f"{name}: calibrated on every row")
-            table, layout, _ = rust_table(classes, lay, None)
-            print(f"\n// {name}\n{table}\n    layout: {layout},")
+            table, layout, overview = rust_table(classes, lay, None)
+            print(f"\n// {name}\n{table}\n    layout: {layout},\n    overview_nodes: {overview[0]:.1f},\n"
+                  f"    overview_edges: {overview[1]:.1f},")
             if hold:
-                held = conservative(fit_classes(path, lay_held, exclude=hold))
+                held = fit_floors(path, conservative(fit_classes(path, lay_held, exclude=hold)), exclude=hold)
                 report(path, lay_held, held, f"{name}: fitted without {', '.join(hold)}, measured on them", only=hold)
         sys.exit(0)
     cmd, path = sys.argv[1], sys.argv[2]

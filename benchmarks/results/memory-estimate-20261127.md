@@ -6,8 +6,10 @@ target, and what does the estimate itself cost?
 ## Machine, build, load
 
 - Apple M3 (8 cores, 16 GB), macOS 26.0, rustc 1.99.0, Node v24.21.0.
-- Revision: branch `memory-estimate` on `origin/main` 6aee0e3; the measured engine is that change before its
-  coefficients were fitted (the peaks do not depend on them, the sizes the estimate reads neither).
+- Revision: the measured engine is `main` at 6aee0e3 (its layout and runtime code; `git checkout 6aee0e3`) with this
+  change's estimate operation, the split of the import into `prepare_import` and `layout_prepared` (a code move) and,
+  in the WASM rows, the `dispatch_streaming` fix. The peaks do not depend on the estimate's coefficients, which were
+  fitted afterwards (`fit.py` with Python 3.13.2; `check_tables.py` checks that the engine's tables are what it prints).
 - Native: `benchmarks/session-memory`, binary `request-peak`, `--release` (no LTO), with a counting allocator: heap
   bytes requested and not yet freed, counted exactly, so the machine's load does not change them. WASM:
   `arqlet-wasm`, `--release --features query` (the playground's build), in Node, a fresh instance per request.
@@ -59,17 +61,28 @@ they bring, the other edits keep the view. The answer adds four parts:
   and per edge;
 - `layout`: `share · jobs · L(view)`, where `L` is the peak of laying out the view from scratch, fixed plus per node,
   edge, open container, edge squared, edge squared over nodes (many edges gathered between few boxes), node times open
-  container and open container squared (deep and wide hierarchies), and `jobs` the refinement's threads.
+  container and open container squared (deep and wide hierarchies), and `jobs` the refinement's threads;
+- `content`: for a session's `change`, 16 bytes per byte of its payload's JSON (from the content measurement of
+  `content-memory-20261122.md`, not calibrated with `change` itself);
+- `floor`: what the structural floor adds when it is above the rest. Per class, the estimate is at least
+  `text + MARGIN · max(floor · source heap, textFloor · text bytes)`: what a request costs without its layout, reading
+  the request and handling the whole source graph (its index, the structure, the copies an operation makes), whatever the
+  size of its view. `floor` is the lowest (measured − text) / source heap over the class's calibration rows above 4 MB,
+  `textFloor` the lowest (measured − text) / text over them (through dispatch only); taking the lowest ratio raises no
+  calibration row. Added after review: graphs with a large source and a small view, left out of the fit, had come out
+  at a quarter of their peak (below). The floor was proposed by the reviewer and checked here with the same hold-out.
 
 The coefficients are per kind of operation (import, overview, `open` for the edits that change what the view shows,
 `keep` for those that keep it, `patch`, `refine`) and place (dispatch, session), and per target: each build estimates for
 itself (`target`: `native64` or `wasm32`), since type sizes differ. They are fitted by `fit.py` so that the ratio
 estimate / measured is as even as possible over the requests above 4 MB (a seeded random search, deterministic), raised to
-bound every calibration row, and then multiplied by a margin of 1.15 (`MARGIN`, on everything but the text), justified
+reach every calibration row, and then multiplied by a margin of 1.15 (`MARGIN`, on everything but the text), justified
 by the held-out graphs below. A refinement's layout share is set to that of `keep` (the calibration's small work budget
 lays out little; the larger views refuse a refinement anyway, "Prototype refinement size limit exceeded").
 
-## The estimate against the measured peak (calibrated on every row, with the margin)
+## The estimate against the measured peak (calibrated on every row, with the margin and the floor)
+
+A calibrated estimate, not a guarantee: these are the ratios on the rows it was fitted to.
 
 Native (counted heap):
 
@@ -107,7 +120,7 @@ WASM (linear memory growth of a fresh instance; a session's edits: counted heap 
 
 Below 4 MB the estimate is often several times the peak (a fixed part of a few hundred kilobytes to a few megabytes);
 that matters little for admission and is not in the factors. The worst overestimates come from where the from-scratch
-layout bounds an edit that continues the earlier layout (`direction` on the dense 50k and 114k first views: 340 MB
+layout stands for an edit that continues the earlier layout (`direction` on the dense 50k and 114k first views: 340 MB
 measured, about 3.6 GB estimated), from refinements (the work budget lays out little; four threads are counted as four
 layouts, the measurement shows them mostly serial), and from the layout itself: two views of almost the same size
 (synthetic-5k and synthetic-20k at limit 1 000, 1 435 and 1 710 nodes, 435 and 710 open containers) peak at 33 MB and
@@ -115,19 +128,94 @@ layouts, the measurement shows them mostly serial), and from the layout itself: 
 
 ## Graphs left out of the fit
 
-The factors above are in-sample. Two checks fitted without some graphs and measured on them (without the margin; with it,
-multiply the rest of the estimate by 1.15):
+The factors above are in-sample.
+
+### Leave one shape out (with the floor)
+
+Each family of graphs left out in turn; the layout model, the classes and the floor fitted on the others, and the error
+measured on the family left out, on requests above 4 MB (`fit.py shapes`). "Model alone" is the estimate without the
+floor.
+
+| Family left out | Target | Rows | model alone: min | median | with the floor: min | median | max |
+|---|---|---|---|---|---|---|---|
+| reference datasets | native64 | 3 | 1.50 | 2.53 | 1.50 | 2.53 | 15.51 |
+| reference datasets | wasm32 | 7 | 0.99 | 1.52 | 0.99 | 1.52 | 2.92 |
+| synthetic graphs | native64 | 119 | 1.13 | 4.00 | 1.13 | 4.00 | 284.09 |
+| synthetic graphs | wasm32 | 56 | 1.08 | 1.60 | 1.08 | 1.60 | 24.27 |
+| full layouts | native64 | 16 | 0.36 | 0.62 | 0.36 | 0.62 | 1.19 |
+| full layouts | wasm32 | 16 | 0.13 | 0.45 | 0.13 | 0.45 | 0.89 |
+| code indexes | native64 | 32 | 0.30 | 1.08 | 0.98 | 1.25 | 3.37 |
+| code indexes | wasm32 | 19 | 0.67 | 1.06 | 1.03 | 1.27 | 6.27 |
+
+- **Code indexes** (a large source graph and a small view) were the case the first version got wrong: without them in the
+  fit it fell to 0.30 natively and 0.67 in WASM. With the floor the minimum is 0.98 natively (one overview, 37.5 MB
+  estimated against 38.3 MB) and 1.03 in WASM; the medians rise from 1.08 to 1.25 and from 1.06 to 1.27. With the code
+  indexes in the fit, as shipped, every row is covered.
+- **Full layouts** (3 300 nodes laid out whole, many open containers) are a second shape the estimate does not reach
+  from the others: 0.36 natively, 0.13 in WASM. The floor does not help: the cost is the layout of a view larger and
+  more nested than any other calibration view, and the layout model fitted without them underestimates it. With them in
+  the fit every row is covered. A host that lays out large views whole should include such views in its calibration.
+- **Synthetic graphs** and **reference datasets** left out are covered or nearly (minimum 1.13 and 1.08 for the
+  synthetic graphs, 1.50 and 0.99 for the reference datasets), with large overestimates on some rows (up to 284 times
+  natively on small synthetic views when they are not in the fit).
+
+### Code indexes and synthetic-50k left out (the review's hold-out)
+
+Fitted without code-10000, code-50000, code-100000 and synthetic-50k, measured on them (requests above 4 MB), with the
+margin. Before the floor, the reviewer reproduced natively 0.25 (dispatch `patch`), 0.28 (dispatch `direction`), 0.52
+(session `toggle`) and 0.72 (session `import`), and in WASM 0.86 (overview) and 0.63 (session `toggle`). With the floor:
+
+Native:
+
+| Way | Operation | Rows | above 4 MB | estimate / measured above 4 MB: min | median | max | all rows: min | largest measured |
+|---|---|---|---|---|---|---|---|---|
+| dispatch | direction | 5 | 5 | 1.21 | 1.41 | 2.06 | 1.21 | 352 MB |
+| dispatch | import | 5 | 5 | 0.89 | 1.08 | 1.90 | 0.89 | 561 MB |
+| dispatch | overview | 3 | 3 | 0.98 | 1.15 | 1.15 | 0.98 | 378 MB |
+| dispatch | patch | 5 | 5 | 1.04 | 1.29 | 1.32 | 1.04 | 407 MB |
+| dispatch | refine | 3 | 3 | 1.24 | 1.24 | 1.46 | 1.24 | 98 MB |
+| dispatch | refine (4 threads) | 3 | 3 | 1.28 | 1.30 | 1.55 | 1.28 | 98 MB |
+| dispatch | toggle | 5 | 5 | 1.08 | 1.27 | 1.66 | 1.08 | 361 MB |
+| session | direction | 5 | 5 | 1.06 | 1.56 | 1.82 | 1.06 | 562 MB |
+| session | import | 5 | 5 | 1.02 | 1.03 | 1.45 | 1.02 | 561 MB |
+| session | patch | 5 | 5 | 1.08 | 1.26 | 1.52 | 1.08 | 604 MB |
+| session | refine | 3 | 0 | | | | 59.91 | 1 MB |
+| session | refine (4 threads) | 3 | 0 | | | | 84.65 | 1 MB |
+| session | toggle | 5 | 4 | 1.07 | 3.35 | 3.37 | 1.07 | 542 MB |
+
+WASM:
+
+| Way | Operation | Rows | above 4 MB | estimate / measured above 4 MB: min | median | max | all rows: min | largest measured |
+|---|---|---|---|---|---|---|---|---|
+| dispatch | direction | 3 | 3 | 1.21 | 1.21 | 1.75 | 1.21 | 553 MB |
+| dispatch | import | 3 | 3 | 1.03 | 1.14 | 1.80 | 1.03 | 507 MB |
+| dispatch | overview | 2 | 2 | 1.05 | 1.18 | 1.18 | 1.05 | 183 MB |
+| dispatch | patch | 3 | 3 | 1.21 | 1.27 | 1.48 | 1.21 | 610 MB |
+| dispatch | refine | 2 | 2 | 1.23 | 1.30 | 1.30 | 1.23 | 132 MB |
+| dispatch | toggle | 3 | 3 | 1.17 | 1.23 | 1.42 | 1.17 | 600 MB |
+| session | direction | 3 | 3 | 1.30 | 1.32 | 1.51 | 1.30 | 429 MB |
+| session | import | 3 | 3 | 1.15 | 1.18 | 1.51 | 1.15 | 507 MB |
+| session | patch | 3 | 3 | 1.25 | 1.25 | 1.34 | 1.25 | 477 MB |
+| session | refine | 2 | 0 | | | | 42.16 | 0 MB |
+| session | toggle | 3 | 2 | 1.37 | 6.27 | 6.27 | 1.37 | 457 MB |
+
+Natively three rows stay below: the dispatch imports of code-50000 and code-100000 (0.90 and 0.89: 124.1 against 137.8
+MB, 245.8 against 276.6 MB) and the overview of code-10000 (0.98). In WASM every held-out row is covered. The floor
+raises the small session toggles most (median 3.35 natively, 6.27 in WASM, from 1.10 and 1.69).
+
+### Two earlier checks (before the floor)
 
 - **Interpolation** (fitted without code-50000 and synthetic-50k, whose neighbours code-10000, code-100000, synthetic-20k
-  and synthetic-114k stay): natively the lowest ratio is 0.93 (synthetic-50k at depth 1, session edits), median 1.07 to
-  1.56; in WASM 0.88 (code-50000, dispatch toggle) on requests above 4 MB, and 0.55 on a session toggle of 9 MB. With the
-  margin of 1.15 every native row and every WASM row above 10 MB is covered; that is where the margin comes from.
-- **Extrapolation** (fitted without all three code indexes and synthetic-50k): the code indexes have a large source graph
-  and a small view, a shape no other calibration graph has. The estimate then falls to 0.26 to 0.5 of the peak of
-  dispatch edits on them (code-100000 `direction`: 26.6 MB estimated, 99.9 MB measured): it had explained the synthetic
-  graphs' cost through their view, which grows with their source. The estimate is only as good as the shapes it was
-  calibrated on; a host whose graphs have another shape should check it against `heapPeakBytes` (WASM) or its own
-  counts, and recalibrate (`fit.py`) when it falls short.
+  and synthetic-114k stay; without the margin): natively the lowest ratio was 0.93 (synthetic-50k at depth 1, session
+  edits); in WASM 0.88 (code-50000, dispatch toggle) and 0.55 on a session toggle of 9 MB. The margin of 1.15 was chosen
+  from this check. With it, not every row is covered: the WASM dispatch toggle of code-50000 comes to 0.99 (139.6 against
+  140.8 MB).
+- **Extrapolation** (fitted without all three code indexes and synthetic-50k): 0.26 to 0.5 of the peak on dispatch edits
+  of the code indexes (code-100000 `direction`: 26.6 MB estimated, 99.9 MB measured). This led to the floor.
+
+The estimate is only as good as the shapes it was calibrated on. A host whose graphs have another shape should check
+it against `heapPeakBytes` (WASM) or its own counts, and recalibrate (`fit.py`, `benchmarks/memory-estimate/README.md`)
+when it falls short. Recalibration is required whenever the layout code changes.
 
 ## Native and WASM
 
@@ -138,7 +226,7 @@ counted WASM heap (allocator overhead and pages). PR #232 found the native resid
 
 ## Resident memory of the native engine
 
-The estimate bounds counted heap bytes. What the operating system sees is more: one `layout-command` process per request
+The estimate stands for counted heap bytes. What the operating system sees is more: one `layout-command` process per request
 (release build of this change with its coefficients), its peak resident set size from `/usr/bin/time -l`, less that of a
 trivial request (3 MB). Load average about 45 to 50 (`benchmarks/memory-estimate/rss.py`, raw rows
 `memory-estimate-20261127-rss.jsonl`; the edit is a toggle of the first collapsed container, else `direction`):
@@ -157,8 +245,8 @@ trivial request (3 MB). Load average about 45 to 50 (`benchmarks/memory-estimate
 
 On macOS's system allocator the resident memory of a native request is up to 3 times its counted heap (full-3000
 `direction`: 201 MB counted, 808 MB resident): freed blocks are not handed back at once and the many small allocations of
-a layout fragment. The native estimate is therefore not a bound on resident memory; a host that admits native work by
-resident memory multiplies it (3 on this machine) or measures its own allocator. In WASM the estimate bounds the linear
+a layout fragment. The native estimate therefore does not cover resident memory; a host that admits native work by
+resident memory multiplies it (3 on this machine) or measures its own allocator. In WASM the estimate stands for the linear
 memory itself.
 
 The estimates of the final build were also checked against a fresh measurement on synthetic-20k (limit 100, depth 0)
@@ -190,6 +278,16 @@ view of a large graph costs almost as much to estimate as to run (code-100000): 
   only to see whether it was a progressive refinement. Only a request that names `refineProgressive` is read so now
   (answers unchanged). WASM, `dispatch` import at limit 100, depth 0: synthetic-20k 145.4 → 97.2 MB of linear memory
   (counted 115.5 → 75.3 MB), synthetic-2k 13.8 → 8.9 MB (same module built with and without the change; load about 40).
+
+## Open
+
+- A resident-memory (RSS) variant of the estimate per platform (natively the resident memory can be up to 3 times the
+  counted heap on macOS).
+- A text-scan mode: an estimate from counts read off the request text without its types, cheaper for admission
+  front-ends, less accurate.
+- Recalibrating `refine` with real work budgets (calibrated with `workBudget: 4` only; its layout share is pinned to that
+  of the edits that keep the view).
+- Views larger and more nested than the calibration's (the full-layout shape above).
 
 ## Not changed, for later
 

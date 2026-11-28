@@ -10,19 +10,20 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 - **An estimate of a request's peak memory before it runs** (#224, provisional; ADR 0024 step C3): `{op: "estimate",
   request}` through `dispatch` and in a resident session (`session.estimate(request)` in `engine-client`) answers the
   heap an import, an edit (toggle, reveal, filter, configure, restore, direction and the other edits that keep the view,
-  patch, add), a refinement or an overview will need at its peak, with its parts (`request`, `input`, `structure`,
-  `layout`), the view the operation lays out and the target (`native64` or `wasm32`: each build estimates for itself).
-  It reads the request and finds the view the way the operation does (an import's selection and projection, the view
-  after opening a container), without laying out. Calibrated as an upper bound against the counted heap and the WASM
-  linear memory on the reference datasets and generated graphs up to 114k nodes: never below the
-  measured peak on the calibration rows; above 4 MB the median estimate is 1.2 to 2.1 times the peak for imports, edits
-  and overviews, at most 3.2 to 10.7 times (a from-scratch layout bounds an edit that continues the earlier one),
-  refinements higher; on graphs left out of the fit it held with its margin of 1.15 when graphs of the same shape stayed
-  in, and fell to a quarter of the peak when no graph of that shape was calibrated
-  ([results](benchmarks/results/memory-estimate-20261127.md)). The WASM engine's `memory` answer adds `heapPeakBytes`, the
-  counted peak since the previous `memory` or `release`. The integration guide has a section on a worker pool with
-  admission by memory, and `examples/worker-pool` a runnable Node example.
-
+  patch, add, a session's `change`), a refinement or an overview will need at its peak, with its parts (`request`,
+  `input`, `structure`, `layout`, `content`, `floor`), the view the operation lays out and the target (`native64` or
+  `wasm32`: each build estimates for itself). It reads the request and finds the view the way the operation does,
+  without laying out; a structural floor covers reading the request and handling the whole source graph. Operations it
+  does not know are refused with `heavy` (run alone) or as light reads. A calibrated estimate, not a guarantee: on the
+  calibration rows (reference datasets and generated graphs up to 114k nodes) it was at or above every measured peak,
+  with a margin of 1.15; above 4 MB its median for imports, edits and overviews was 1.15 to 2.0 times the peak natively
+  and 1.16 to 1.46 in WASM. On graph shapes left out of the fit it can fall below (0.89 natively with all code indexes
+  left out, 0.13 to 0.36 with the full layouts left out). Natively the resident memory can be up to 3 times the counted
+  heap it estimates (macOS). Recalibrate with `benchmarks/memory-estimate/fit.py` whenever layout code changes
+  ([results](benchmarks/results/memory-estimate-20261127.md), `benchmarks/memory-estimate/README.md`). The WASM
+  engine's `memory` answer adds `heapPeakBytes`, the counted peak since the previous `memory` or `release`. The
+  integration guide has a section on a worker pool with admission by memory, and `examples/worker-pool` a runnable Node
+  example.
 - **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
   sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
   pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time

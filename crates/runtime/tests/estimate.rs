@@ -159,14 +159,54 @@ fn an_overview_is_estimated_from_its_graph() {
 }
 
 #[test]
-fn what_the_estimate_does_not_know_is_refused() {
+fn what_the_estimate_does_not_know_is_refused_and_says_whether_it_is_heavy() {
     let answer = call(json!({"op": "estimate", "request": {"op": "scene"}}));
     assert_eq!(answer["ok"], false);
+    assert_eq!(answer["heavy"], false, "{answer}");
     assert!(
-        answer["error"].as_str().unwrap().contains("not scene"),
+        answer["error"].as_str().unwrap().contains("scene"),
         "{answer}"
     );
+    // An operation that lays out but is not estimated: heavy, so a host runs it alone. An ELK graph is not read as a
+    // model graph.
+    let elk = call(json!({"op": "estimate", "request": {"op": "elkLayout",
+        "graph": {"id": "root", "children": [{"id": "a", "width": 10, "height": 10}]}}}));
+    assert_eq!(elk["ok"], false);
+    assert_eq!(elk["heavy"], true, "{elk}");
+    assert!(
+        elk["error"].as_str().unwrap().contains("elkLayout"),
+        "{elk}"
+    );
+    assert_eq!(
+        call(json!({"op": "estimate", "request": {"op": "structuredRefine"}}))["heavy"],
+        true
+    );
     assert_eq!(call(json!({"op": "estimate"}))["ok"], false);
+    // An edit without its snapshot cannot be read as the operation would: heavy.
     let edit = call(json!({"op": "estimate", "request": {"op": "toggle", "nodeId": "p2"}}));
     assert_eq!(edit["ok"], false);
+    assert_eq!(edit["heavy"], true, "{edit}");
+}
+
+#[test]
+fn a_change_is_estimated_like_a_patch_with_its_content() {
+    let mut session = EngineSession::new();
+    let mut imported = import();
+    imported["scene"] = json!(false);
+    ok(session.run_value(&imported));
+    let change = json!({"op": "change", "patch": {"nodes": [{"id": "x", "kind": "fn", "label": "x", "parentId": "p1"}]},
+        "payload": {"set": {"nodes": {"p1f1": {"owner": "team-a", "rank": 3}}}}});
+    let estimate = ok(session.run_value(&json!({"op": "estimate", "request": change})));
+    assert_eq!(estimate["estimate"]["kind"], "patch");
+    assert!(
+        estimate["estimate"]["parts"]["content"].as_u64().unwrap() > 0,
+        "{estimate}"
+    );
+    let parts: u64 = estimate["estimate"]["parts"]
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|v| v.as_u64().unwrap())
+        .sum();
+    assert_eq!(estimate["estimate"]["bytes"].as_u64().unwrap(), parts);
 }
