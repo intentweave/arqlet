@@ -14,6 +14,17 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   default 1) sets the resolution of modularity for both algorithms. Deterministic for any thread count and the same in
   WASM; the work budget counts Leiden in Louvain's units. Louvain stays the default, and requests without the options
   answer as before. New contract type `CommunityAlgorithm`. Measurements: `benchmarks/results/communities-20261128.md`.
+- **Metro style: stations as ticks** (viewer, provisional): a style's new `glyph: 'tick'` draws a station on one line as a
+  short stub in the line's colour across the line, its name beyond the tip, as metro maps draw stations without changes;
+  `orientGlyphs` turns each tick from the station's routes (explicit buses first; to the right of the line, or up when it
+  runs across). `glyph: 'pill'` draws an interchange as a white pill across its lines (with more than two, across their
+  main axis), its name beyond its end. The `metro` preset: ticks for `leaf[bus]`, pills for `leaf[interchange]`, for a
+  station where its line branches (`leaf[branch]`, new derived field: one bus leads to three or more other nodes) and for
+  `leaf[bus][kind=gateway]`; a plain end station keeps its tick. A glyph and its name take the side where no line leaves
+  (at a crossing the name goes diagonally between the lines); a pill on three or more lines lies at a multiple of 45°.
+  SVG, GPU layer (pills as triangle fans, at any angle) and React Flow (looks `tick` and `pill`, drawn by the example)
+  draw them alike, and from afar the GPU view shows a tick's or pill's name beyond its end; `browser-checks/metro-glyphs.mjs`
+  compares them in Chrome over the canvas and per glyph, checks the names from afar and writes before/after pictures.
 - **Inner-edge share and modularity per container on request** (#236, provisional; ADR 0018 addendum of
   2026-11-28): `containerStats: true` adds `containerStats` to the `overview` answer: per container (node index, -1 the
   root) the weight of the edges inside it and of those touching it, their share, and its term of the modularity of the

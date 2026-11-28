@@ -16,6 +16,16 @@ const sides={left:Position.Left,right:Position.Right,top:Position.Top,bottom:Pos
 // With a style (`toReactFlow(…, {style})`), the node's resolved look (style.js) sets its colours, as in the SVG and GPU views.
 function DiagramNode({data,selected}){
  const look=data.look;
+ // A pill (metro style, an interchange): white across its lines, the name beyond its end.
+ if(look?.glyph==='pill'&&look.pill){const p=look.pill,shift={left:'0',right:'-100%',center:'-50%'}[p.align],lift={middle:'-50%',top:'0',bottom:'-100%'}[p.baseline];return <div style={{width:'100%',height:'100%',position:'relative',pointerEvents:'auto'}}>
+  <svg style={{position:'absolute',left:0,top:0,overflow:'visible'}} width="1" height="1"><rect x={p.cx-p.length/2} y={p.cy-p.thickness/2} width={p.length} height={p.thickness} rx={p.thickness/2} transform={`rotate(${p.angle} ${p.cx} ${p.cy})`} fill={selected?look.selectedFill:look.fill} stroke={selected?look.selectedStroke:look.stroke} strokeWidth={p.width}/></svg>
+  <div style={{position:'absolute',left:p.labelX,top:p.labelY,transform:`translate(${shift},${lift})`,fontSize:12,whiteSpace:'nowrap',color:look.text}}>{data.label}</div>
+  {data.handles.map(hd=><Handle key={hd.id} id={hd.id} type={hd.type} position={sides[hd.side]} isConnectable={false} style={{left:hd.x,top:hd.y,right:'auto',bottom:'auto',transform:'translate(-50%,-50%)',opacity:0}}/>)}</div>;}
+ // A tick (metro style, a station on one line): a stub across its line in the line's colour, the name beyond its tip.
+ if(look?.glyph==='tick'&&look.tick){const t=look.tick,shift={left:'0',right:'-100%',center:'-50%'}[t.align],lift={middle:'-50%',top:'0',bottom:'-100%'}[t.baseline];return <div style={{width:'100%',height:'100%',position:'relative',pointerEvents:'auto'}}>
+  <svg style={{position:'absolute',left:0,top:0,overflow:'visible'}} width="1" height="1"><line x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke={selected?look.selectedStroke:look.stroke} strokeWidth={t.width}/></svg>
+  <div style={{position:'absolute',left:t.labelX,top:t.labelY,transform:`translate(${shift},${lift})`,fontSize:12,whiteSpace:'nowrap',color:look.text}}>{data.label}</div>
+  {data.handles.map(hd=><Handle key={hd.id} id={hd.id} type={hd.type} position={sides[hd.side]} isConnectable={false} style={{left:hd.x,top:hd.y,right:'auto',bottom:'auto',transform:'translate(-50%,-50%)',opacity:0}}/>)}</div>;}
  // A glyph (metro style): a station dot in the middle of the node, its name outside, right of and below it.
  if(look?.glyph==='dot'){const r=look.glyphSize,w=data.bounds.width,h=data.bounds.height;return <div style={{width:'100%',height:'100%',position:'relative',pointerEvents:'auto'}}>
   <div style={{position:'absolute',left:w/2-r,top:h/2-r,width:2*r,height:2*r,borderRadius:'50%',boxSizing:'border-box',background:selected?look.selectedFill:look.fill,border:`${look.strokeWidth}px solid ${selected?look.selectedStroke:look.stroke}`}}/>

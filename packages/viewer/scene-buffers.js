@@ -8,7 +8,7 @@
 //   hysteresis.
 // - `sceneExcerpt`: the part of a scene in a rectangle, which the near layer hands to `renderSvg`.
 import {isSceneColumns, sceneOfColumns} from './scene-columns.js';
-import {createStyle, glyphOf, routeToGlyphs} from './style.js';
+import {createStyle, glyphOf, orientGlyphs, routeToGlyphs} from './style.js';
 
 /** Floats per box instance: x, y, width, height, corner radius, kind (0 rect, 1 circle), stroke width, dash (0/1),
  * fill RGBA, stroke RGBA (premultiplied later in the shader). */
@@ -55,6 +55,24 @@ function hsl(h, s, l, a = 1) {
   return [f(0), f(8), f(4), a];
 }
 const NONE = [0, 0, 0, 0];
+
+// A pill glyph (style.js) as a fan of triangles around its middle, `inset` inside its outline (negative: outside): two
+// half circles joined, its long axis along the glyph's normal. Twelve steps per half circle.
+function pillTriangles(layer, g, inset, colour) {
+  const radius = g.thickness / 2 - inset, straight = Math.max(0, g.length / 2 - g.thickness / 2);
+  if (radius <= 0) return;
+  const ux = g.nx, uy = g.ny, wx = -uy, wy = ux, outline = [];
+  for (const [end, from] of [[straight, -Math.PI / 2], [-straight, Math.PI / 2]]) {
+    for (let k = 0; k <= 12; k++) {
+      const a = from + Math.PI * k / 12, c = Math.cos(a), s = Math.sin(a);
+      outline.push([g.cx + ux * end + radius * (ux * c + wx * s), g.cy + uy * end + radius * (uy * c + wy * s)]);
+    }
+  }
+  for (let k = 0; k < outline.length; k++) {
+    const [ax, ay] = outline[k], [bx, by] = outline[(k + 1) % outline.length];
+    layer.triangles.push(g.cx, g.cy, 0, ...colour, ax, ay, 0, ...colour, bx, by, 0, ...colour);
+  }
+}
 
 // The theme's colours (style.js) as the buffers need them: RGBA for shapes, CSS for the texts. Cached per style.
 const coloursOf = (() => {
@@ -225,6 +243,8 @@ export function sceneBuffers(input, state = {}) {
   // Leaves drawn as glyphs (a style's `glyph: 'dot'`): their routes run on to the dot's middle.
   const glyphs = new Map();
   for (const n of scene.nodes) if (!parents.has(n.id) && n.kind !== 'attribute' && !n.rows?.length) { const g = glyphOf(looks.node(n), n.bounds); if (g) glyphs.set(n.id, g); }
+  // A tick (a station on one line) or a pill (an interchange) stands across its lines.
+  orientGlyphs(glyphs, scene);
   const endpoints = new Set(active ? [active.source, active.target] : []);
   const lines = [];
   for (const route of scene.routes) {
@@ -284,7 +304,23 @@ export function sceneBuffers(input, state = {}) {
     const dash = n.kind === 'rest' || look.dash ? 1 : 0;
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     const glyph = glyphs.get(n.id);
-    if (glyph) box(leafLayer, n.id, {x: glyph.cx - glyph.r, y: glyph.cy - glyph.r, width: 2 * glyph.r, height: 2 * glyph.r}, glyph.r, 1, strokeWidth, fill, stroke, dash);
+    if (glyph?.kind === 'pill') {
+      // A pill at any angle: a fan of triangles in the stroke's colour, the fill's inside it, so that the border lies
+      // centred on the outline as SVG strokes it; an empty box carries the id.
+      pillTriangles(leafLayer, glyph, -glyph.width / 2, stroke);
+      pillTriangles(leafLayer, glyph, glyph.width / 2, fill);
+      const half = glyph.width / 2;
+      const hx = Math.abs(glyph.nx) * (glyph.length / 2 + half) + Math.abs(glyph.ny) * (glyph.thickness / 2 + half), hy = Math.abs(glyph.ny) * (glyph.length / 2 + half) + Math.abs(glyph.nx) * (glyph.thickness / 2 + half);
+      box(leafLayer, n.id, {x: glyph.cx - hx, y: glyph.cy - hy, width: 2 * hx, height: 2 * hy}, 0, 0, 0, NONE, NONE);
+    } else if (glyph?.kind === 'tick') {
+      // A stub in the line's colour, and an empty box over it that carries the node's id (for morphs). The segments get
+      // square caps half their width long, so the segment is shortened by that at both ends: the stub ends where SVG's
+      // butt cap ends. One shorter than its width is drawn as a square of its length.
+      const cap = Math.min(glyph.width, glyph.length) / 2;
+      if (glyph.length > 0) leafLayer.segments.push(glyph.cx + glyph.nx * cap, glyph.cy + glyph.ny * cap, glyph.x2 - glyph.nx * cap, glyph.y2 - glyph.ny * cap, Math.min(glyph.width, glyph.length), 0, 0, 0, 0, ...stroke);
+      const x = Math.min(glyph.cx, glyph.x2), y = Math.min(glyph.cy, glyph.y2);
+      box(leafLayer, n.id, {x, y, width: Math.abs(glyph.x2 - glyph.cx), height: Math.abs(glyph.y2 - glyph.cy)}, 0, 0, 0, NONE, NONE);
+    } else if (glyph) box(leafLayer, n.id, {x: glyph.cx - glyph.r, y: glyph.cy - glyph.r, width: 2 * glyph.r, height: 2 * glyph.r}, glyph.r, 1, strokeWidth, fill, stroke, dash);
     else if (!attribute) {
       if (n.shape === 'circle') { const rad = Math.min(r.width, r.height) / 2; box(leafLayer, n.id, {x: cx - rad, y: cy - rad, width: 2 * rad, height: 2 * rad}, rad, 1, strokeWidth, fill, stroke, dash); }
       else box(leafLayer, n.id, r, radiusOf(look, r, 7), 0, strokeWidth, fill, stroke, dash);
@@ -295,7 +331,10 @@ export function sceneBuffers(input, state = {}) {
       box(leafLayer, 'pin:' + n.id, {x: px - 4, y: py - 4, width: 8, height: 8}, 4, 1, 0, withAlpha(COLOURS.pin, faded), NONE);
     }
     const own = look.text ?? COLOURS.text, colour = faded < 1 ? fadeCss(own, faded) : own;
-    if (glyph) {
+    if (glyph?.kind === 'tick' || glyph?.kind === 'pill') {
+      // A tick's or a pill's name beyond its tip or end; from afar a label of a fixed size beside it.
+      text({x: glyph.labelX, y: glyph.labelY, text: n.label.slice(0, 32), size: 12, colour, align: glyph.align, baseline: glyph.baseline, lod: {kind: 'leaf', box: r, dot: {cx: glyph.cx, cy: glyph.cy, r: glyph.kind === 'pill' ? glyph.length / 2 : glyph.length, end: {x: glyph.x2, y: glyph.y2}, align: glyph.align, baseline: glyph.baseline}}});
+    } else if (glyph) {
       // A glyph's name outside it, right of and below the dot; from afar a label of a fixed size beside the dot.
       text({x: glyph.labelX, y: glyph.labelY, text: n.label.slice(0, 32), size: 12, colour, lod: {kind: 'leaf', box: r, dot: glyph}});
     } else if (!n.rows?.length) {
