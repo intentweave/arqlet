@@ -759,13 +759,19 @@ pub fn octilinear_arrange(
 
 /// Provisional (option `octilinearRefine`): a deterministic local search over one group's lattice cells after the star
 /// placement, as hand-drawn metro maps are schematised. A move puts one node, or a node with its branch of the spanning
-/// tree (`children`), on another free cell within a few steps; a move is taken when it lowers the cost, the best move per
-/// node in id order, round after round until none helps (at most `ROUNDS`). The cost ranks, each far above the next: a
-/// node lying on a link it does not end (a line–node hit), crossings and overlaps of links, links that are not octilinear
-/// (not along a row, a column or a diagonal), bends of a line where it passes a node (45 degrees one unit, 90 two, …),
-/// then the links' lengths in lattice steps (so bends count before length). All in integers but the angle classes, which
-/// compare a cosine from `sqrt` (exactly rounded) with fixed bounds, so the result is the same on every platform. Groups
-/// above `MAX_NODES` nodes are left as placed.
+/// tree (`children`, branches of at most `MAX_BRANCH` nodes), on another free cell within a few steps; a move is taken when
+/// it lowers the cost, the best move per node in id order, round after round until none helps (at most `ROUNDS`).
+///
+/// The cost is compared lexicographically, so each part ranks above all the following ones at any degree: nodes lying on
+/// a link they do not end (line–node hits), crossings and overlaps of links, links that are not octilinear (not along a
+/// row, a column or a diagonal), bends of lines where they pass a node (45 degrees one unit, 90 two, …; only where a line
+/// has exactly two links at the node: with more it branches there and has no straight way on), then the links' lengths in
+/// lattice steps, so bends count before length. All in integers but the angle classes, which compare a cosine from `sqrt`
+/// (exactly rounded) with fixed bounds, so the result is the same on every platform.
+///
+/// Its cost is bounded: every evaluation of a move counts the links it looks at times the links and nodes it compares them
+/// with, and the search stops for good when the group has spent `WORK` of those units (deterministic: the same input
+/// stops at the same move). Groups above `MAX_NODES` nodes are left as placed.
 fn refine_octilinear<'a, 'l>(
     cell: &mut BTreeMap<&'a str, (i64, i64)>,
     neighbours: &BTreeMap<&'a str, BTreeSet<&'a str>>,
@@ -774,12 +780,17 @@ fn refine_octilinear<'a, 'l>(
 ) {
     const ROUNDS: usize = 30;
     const MAX_NODES: usize = 400;
+    const MAX_BRANCH: usize = 32;
+    const WORK: u64 = 40_000_000;
     const RADIUS: i64 = 3;
     const BRANCH_RADIUS: i64 = 2;
-    const HIT: i64 = 1_000_000_000;
-    const CROSS: i64 = 1_000_000;
-    const SKEW: i64 = 10_000;
-    const BEND: i64 = 100;
+    // The parts of the cost, in rank order.
+    const HITS: usize = 0;
+    const CROSSINGS: usize = 1;
+    const SKEWED: usize = 2;
+    const BENDS: usize = 3;
+    const LENGTH: usize = 4;
+    type Cost = [i64; 5];
     let nodes: Vec<&str> = cell.keys().copied().collect();
     let n = nodes.len();
     if !(3..=MAX_NODES).contains(&n) {
@@ -814,14 +825,20 @@ fn refine_octilinear<'a, 'l>(
             edges[e].0
         }
     };
-    // At each node, the pairs of its links on one line: where the line passes through it.
+    // At each node, where a line passes through it: the line's two links there. A line with more links at the node
+    // branches there and is left out (no way on is straight; and a hub of one line would otherwise give quadratically
+    // many pairs).
     let mut passes: Vec<Vec<(usize, usize)>> = vec![Vec::new(); n];
     for (v, list) in incident.iter().enumerate() {
-        for (k, &e) in list.iter().enumerate() {
-            for &f in &list[k + 1..] {
-                if edges[e].2.is_some() && edges[e].2 == edges[f].2 {
-                    passes[v].push((e, f));
-                }
+        let mut by_line: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for &e in list {
+            if let Some(line) = edges[e].2 {
+                by_line.entry(line).or_default().push(e);
+            }
+        }
+        for links in by_line.values() {
+            if let [e, f] = links[..] {
+                passes[v].push((e, f));
             }
         }
     }
@@ -848,8 +865,8 @@ fn refine_octilinear<'a, 'l>(
             && (p.0 - a.0) * (p.0 - b.0) <= 0
             && (p.1 - a.1) * (p.1 - b.1) <= 0
     };
-    // Two links: a proper crossing, or an overlap (collinear and sharing more than an end point).
-    let pair = |pos: &[(i64, i64)], e: usize, f: usize| -> i64 {
+    // Whether two links cross or overlap (collinear and sharing more than an end point).
+    let pair = |pos: &[(i64, i64)], e: usize, f: usize| -> bool {
         let (a, b, _) = edges[e];
         let (c, d, _) = edges[f];
         let (pa, pb, pc, pd) = (pos[a], pos[b], pos[c], pos[d]);
@@ -865,33 +882,15 @@ fn refine_octilinear<'a, 'l>(
                 (pb, pa, pc)
             };
             let (ux, uy, wx, wy) = (x.0 - v.0, x.1 - v.1, y.0 - v.0, y.1 - v.1);
-            return if ux * wy - uy * wx == 0 && ux * wx + uy * wy > 0 {
-                CROSS
-            } else {
-                0
-            };
+            return ux * wy - uy * wx == 0 && ux * wx + uy * wy > 0;
         }
         let (d1, d2) = (cross(pc, pd, pa), cross(pc, pd, pb));
         let (d3, d4) = (cross(pa, pb, pc), cross(pa, pb, pd));
-        if ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
-        {
-            return CROSS;
-        }
-        if inside(pa, pc, pd) || inside(pb, pc, pd) || inside(pc, pa, pb) || inside(pd, pa, pb) {
-            return CROSS;
-        }
-        0
-    };
-    // A link on its own: not octilinear, and its length beyond one step.
-    let own = |pos: &[(i64, i64)], e: usize| -> i64 {
-        let (a, b, _) = edges[e];
-        let (dx, dy) = ((pos[b].0 - pos[a].0).abs(), (pos[b].1 - pos[a].1).abs());
-        let skew = if dx == 0 || dy == 0 || dx == dy {
-            0
-        } else {
-            SKEW
-        };
-        skew + dx.max(dy) - 1
+        ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+            || inside(pa, pc, pd)
+            || inside(pb, pc, pd)
+            || inside(pc, pa, pb)
+            || inside(pd, pa, pb)
     };
     // The bend where a line passes v by links e and f, in 45-degree units (0: straight on).
     let bend = |pos: &[(i64, i64)], v: usize, e: usize, f: usize| -> i64 {
@@ -914,34 +913,41 @@ fn refine_octilinear<'a, 'l>(
         .filter(|&&bound| c > bound)
         .count() as i64
     };
-    // The cost of everything that involves a node of `moved` (sorted): the terms without one cancel when two placements of
-    // the same set are compared.
-    let local = |pos: &[(i64, i64)], moved: &[usize]| -> i64 {
+    // The cost of everything that involves a node of `moved` (sorted): the parts without one cancel when two placements
+    // of the same set are compared. Adds the work it does to `work`.
+    let local = |pos: &[(i64, i64)], moved: &[usize], work: &mut u64| -> Cost {
         let in_moved = |v: usize| moved.binary_search(&v).is_ok();
         let touched: BTreeSet<usize> = moved
             .iter()
             .flat_map(|&v| incident[v].iter().copied())
             .collect();
-        let mut total = 0;
+        *work += (touched.len() as u64 + moved.len() as u64) * (edges.len() as u64 + n as u64) + 1;
+        let mut cost: Cost = [0; 5];
         for &e in &touched {
-            total += own(pos, e);
             let (a, b, _) = edges[e];
+            let (dx, dy) = ((pos[b].0 - pos[a].0).abs(), (pos[b].1 - pos[a].1).abs());
+            if !(dx == 0 || dy == 0 || dx == dy) {
+                cost[SKEWED] += 1;
+            }
+            cost[LENGTH] += dx.max(dy);
             for f in 0..edges.len() {
                 if f == e || (touched.contains(&f) && f < e) {
                     continue;
                 }
-                total += pair(pos, e, f);
+                if pair(pos, e, f) {
+                    cost[CROSSINGS] += 1;
+                }
             }
             for (k, &p) in pos.iter().enumerate() {
                 if k != a && k != b && inside(p, pos[a], pos[b]) {
-                    total += HIT;
+                    cost[HITS] += 1;
                 }
             }
         }
         for &v in moved {
             for (f, &(a, b, _)) in edges.iter().enumerate() {
                 if !touched.contains(&f) && inside(pos[v], pos[a], pos[b]) {
-                    total += HIT;
+                    cost[HITS] += 1;
                 }
             }
         }
@@ -952,11 +958,11 @@ fn refine_octilinear<'a, 'l>(
         for &v in &around {
             for &(e, f) in &passes[v] {
                 if in_moved(v) || in_moved(other(e, v)) || in_moved(other(f, v)) {
-                    total += BEND * bend(pos, v, e, f);
+                    cost[BENDS] += bend(pos, v, e, f);
                 }
             }
         }
-        total
+        cost
     };
     // The moves within r steps, nearest first.
     let offsets = |r: i64| -> Vec<(i64, i64)> {
@@ -968,22 +974,27 @@ fn refine_octilinear<'a, 'l>(
         list
     };
     let (near, far) = (offsets(RADIUS), offsets(BRANCH_RADIUS));
-    for _ in 0..ROUNDS {
+    let mut work: u64 = 0;
+    'search: for _ in 0..ROUNDS {
         let mut improved = false;
         for v in 0..n {
-            // The node alone, then its branch when that holds more than the node and less than the group.
+            // The node alone, then its branch when that holds more than the node, less than the group and at most
+            // MAX_BRANCH nodes.
             let alone = [v];
             let mut sets: Vec<(&[usize], &[(i64, i64)])> = vec![(&alone[..], &near[..])];
-            if branch[v].len() > 1 && branch[v].len() < n {
+            if branch[v].len() > 1 && branch[v].len() < n && branch[v].len() <= MAX_BRANCH {
                 sets.push((&branch[v][..], &far[..]));
             }
             for (moved, moves) in sets {
+                if work > WORK {
+                    break 'search;
+                }
                 let taken: BTreeSet<(i64, i64)> = (0..n)
                     .filter(|k| moved.binary_search(k).is_err())
                     .map(|k| pos[k])
                     .collect();
-                let before = local(&pos, moved);
-                let mut best: Option<(i64, (i64, i64))> = None;
+                let before = local(&pos, moved, &mut work);
+                let mut best: Option<(Cost, (i64, i64))> = None;
                 let mut trial = pos.clone();
                 for &(dx, dy) in moves {
                     if moved
@@ -995,9 +1006,10 @@ fn refine_octilinear<'a, 'l>(
                     for &k in moved {
                         trial[k] = (pos[k].0 + dx, pos[k].1 + dy);
                     }
-                    let delta = local(&trial, moved) - before;
-                    if delta < 0 && best.is_none_or(|(d, _)| delta < d) {
-                        best = Some((delta, (dx, dy)));
+                    let after = local(&trial, moved, &mut work);
+                    // Better than now and than the best so far, part by part in rank order.
+                    if after < before && best.is_none_or(|(b, _)| after < b) {
+                        best = Some((after, (dx, dy)));
                     }
                 }
                 if let Some((_, (dx, dy))) = best {
@@ -1292,12 +1304,15 @@ mod tests {
         links: &BTreeSet<(String, String)>,
         line: &BTreeMap<(String, String), String>,
     ) -> Schematic {
+        // Cells relative to one station: the centres of a group differ by whole steps, whatever its margins.
         let step = 100. + 48.;
+        let origin = placed.values().next().unwrap();
+        let (ox, oy) = (origin.x + origin.width / 2., origin.y + origin.height / 2.);
         let c = |id: &str| {
             let r = &placed[id];
             (
-                ((r.x + r.width / 2.) / step).round() as i64,
-                ((r.y + r.height / 2.) / step).round() as i64,
+                ((r.x + r.width / 2. - ox) / step).round() as i64,
+                ((r.y + r.height / 2. - oy) / step).round() as i64,
             )
         };
         let edges: Vec<(&str, &str)> = links
@@ -1447,6 +1462,158 @@ mod tests {
                 octilinear_arrange(&names, &links, &sizes, 0., &line, true).0
             );
         }
+    }
+
+    /// Not a check: times `octilinear_arrange` with and without the refinement on the shapes that cost it most (one
+    /// line through a hub, a long path, a random graph), all links of one line (the edge kind, as without buses). Run by
+    /// hand: `cargo test -p arqlet-layout --profile fast --lib -- --ignored octilinear_refinement_timing --nocapture`.
+    #[test]
+    #[ignore]
+    fn octilinear_refinement_timing() {
+        fn shape(name: &str, n: usize) -> (Vec<String>, BTreeSet<(String, String)>) {
+            let ids: Vec<String> = (0..n).map(|i| format!("n{i:04}")).collect();
+            let mut links = BTreeSet::new();
+            match name {
+                "star" => (1..n).for_each(|i| {
+                    links.insert((ids[0].clone(), ids[i].clone()));
+                }),
+                "path" => (1..n).for_each(|i| {
+                    links.insert((ids[i - 1].clone(), ids[i].clone()));
+                }),
+                _ => {
+                    // A spanning path plus n/2 random links, from a fixed linear congruential sequence.
+                    let mut x: u64 = 0x2545_f491_4f6c_dd1d;
+                    let mut next = |m: usize| {
+                        x = x
+                            .wrapping_mul(6_364_136_223_846_793_005)
+                            .wrapping_add(1_442_695_040_888_963_407);
+                        ((x >> 33) % m as u64) as usize
+                    };
+                    (1..n).for_each(|i| {
+                        links.insert((ids[next(i)].clone(), ids[i].clone()));
+                    });
+                    for _ in 0..n / 2 {
+                        let (a, b) = (next(n), next(n));
+                        if a != b {
+                            links.insert((ids[a].clone(), ids[b].clone()));
+                        }
+                    }
+                }
+            }
+            (ids, links)
+        }
+        for (name, n) in [
+            ("star", 200),
+            ("star", 400),
+            ("path", 400),
+            ("random", 400),
+            ("random", 1000),
+        ] {
+            let (ids, links) = shape(name, n);
+            let line: BTreeMap<(String, String), String> = links
+                .iter()
+                .map(|(a, b)| {
+                    let key = if a < b {
+                        (a.clone(), b.clone())
+                    } else {
+                        (b.clone(), a.clone())
+                    };
+                    (key, "one".to_string())
+                })
+                .collect();
+            let sizes: BTreeMap<String, (f64, f64)> =
+                ids.iter().map(|n| (n.clone(), (100., 40.))).collect();
+            let start = std::time::Instant::now();
+            octilinear_arrange(&ids, &links, &sizes, 0., &line, false);
+            let star = start.elapsed();
+            let start = std::time::Instant::now();
+            octilinear_arrange(&ids, &links, &sizes, 0., &line, true);
+            let refined = start.elapsed();
+            eprintln!(
+                "{name} n={n}: star {:.3} s, refined {:.3} s",
+                star.as_secs_f64(),
+                refined.as_secs_f64()
+            );
+        }
+    }
+
+    #[test]
+    fn the_octilinear_refinement_takes_groups_loops_and_parallel_links() {
+        // Two groups (a ring of five on one line, a chain of three), a loop and a link given in both directions.
+        let names = ["a", "b", "c", "d", "e", "p", "q", "r"];
+        let links = links_of(&[
+            ("a", "b"),
+            ("b", "c"),
+            ("c", "d"),
+            ("d", "e"),
+            ("e", "a"),
+            ("a", "a"),
+            ("p", "q"),
+            ("q", "p"),
+            ("q", "r"),
+        ]);
+        let line: BTreeMap<(String, String), String> = links
+            .iter()
+            .filter(|(a, b)| a != b)
+            .map(|(a, b)| ((a.min(b).clone(), a.max(b).clone()), "ring".to_string()))
+            .collect();
+        let (refined, size) =
+            octilinear_arrange(&ids(&names), &links, &sizes(&names), 0., &line, true);
+        assert!(size.0 > 0. && size.1 > 0.);
+        assert_eq!(refined.len(), names.len());
+        // No two boxes overlap, the same input gives the same boxes, and nothing is worse than the star.
+        let boxes: Vec<&Rect> = refined.values().collect();
+        for (i, a) in boxes.iter().enumerate() {
+            for b in &boxes[i + 1..] {
+                assert!(
+                    a.x + a.width <= b.x
+                        || b.x + b.width <= a.x
+                        || a.y + a.height <= b.y
+                        || b.y + b.height <= a.y
+                );
+            }
+        }
+        assert_eq!(
+            refined,
+            octilinear_arrange(&ids(&names), &links, &sizes(&names), 0., &line, true).0
+        );
+        let star = octilinear_arrange(&ids(&names), &links, &sizes(&names), 0., &line, false).0;
+        let real: BTreeSet<(String, String)> =
+            links.iter().filter(|(a, b)| a != b).cloned().collect();
+        let (before, after) = (judge(&star, &real, &line), judge(&refined, &real, &line));
+        assert!(
+            (after.hits, after.crossings, after.skewed)
+                <= (before.hits, before.crossings, before.skewed),
+            "not worse in rank order (hits, crossings, skewed links): {before:?} → {after:?}"
+        );
+    }
+
+    #[test]
+    fn the_octilinear_refinement_stops_within_its_work_budget_at_a_hub_of_one_line() {
+        // A hub with 150 links of one line (as without buses, where the line is the edge kind): no pass pairs at the hub,
+        // and the work budget ends the search; the same input still gives the same boxes.
+        let names: Vec<String> = (0..151).map(|i| format!("n{i:03}")).collect();
+        let links: BTreeSet<(String, String)> = (1..151)
+            .map(|i| (names[0].clone(), names[i].clone()))
+            .collect();
+        let line: BTreeMap<(String, String), String> = links
+            .iter()
+            .map(|(a, b)| ((a.clone(), b.clone()), "one".to_string()))
+            .collect();
+        let sizes: BTreeMap<String, (f64, f64)> =
+            names.iter().map(|n| (n.clone(), (100., 40.))).collect();
+        let (refined, _) = octilinear_arrange(&names, &links, &sizes, 0., &line, true);
+        assert_eq!(
+            refined,
+            octilinear_arrange(&names, &links, &sizes, 0., &line, true).0
+        );
+        let star = octilinear_arrange(&names, &links, &sizes, 0., &line, false).0;
+        let (before, after) = (judge(&star, &links, &line), judge(&refined, &links, &line));
+        assert!(
+            (after.hits, after.crossings, after.skewed)
+                <= (before.hits, before.crossings, before.skewed),
+            "not worse in rank order (hits, crossings, skewed links): {before:?} → {after:?}"
+        );
     }
 
     fn links_of(pairs: &[(&str, &str)]) -> BTreeSet<(String, String)> {

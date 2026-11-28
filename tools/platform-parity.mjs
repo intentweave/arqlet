@@ -66,6 +66,10 @@ const requests = [
   ['import organic-100', {op: 'import', graph: graph('benchmarks/datasets/organic-100.json'), limit: 200}],
   ['import tree-100', {op: 'import', graph: graph('benchmarks/datasets/tree-100.json'), limit: 200}],
   ['import mixed-layouts', {op: 'import', graph: graph('benchmarks/datasets/mixed-layouts.json'), limit: 200}],
+  // The octilinear star with its refinement (octilinearRefine): the made-up city's metro (cycles between its lines) placed
+  // as an octilinear area, and the vehicle's buses as metro lines.
+  ['import metro-map octilinear refined', {op: 'import', graph: {...graph('benchmarks/datasets/metro-map.json'), defaultDirection: 'auto', defaultStrategy: 'octilinear', defaultRouting: 'straight'}, limit: 100, options: {octilinearRefine: true}}],
+  ['import vehicle-metro refined', {op: 'import', graph: graph('benchmarks/datasets/vehicle-metro.json'), limit: 100, options: {octilinearRefine: true}}],
   ['elkLayout', {op: 'elkLayout', graph: elk}],
   ['elkLayout refined', {op: 'elkLayout', graph: elk, refine: true}],
   ['overview 10 000', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json')}],

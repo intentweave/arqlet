@@ -9,9 +9,12 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 - `octilinearRefine` (provisional, off by default; strategy `octilinear` only): after the octilinear star placement a
   deterministic local search on its lattice moves stations and branches so that the links outside the spanning tree are
-  octilinear too, without line–node hits or crossings, and the lines bend less (bends rank before length), closer to a
-  hand-drawn metro map. On the example *Metro map*'s city: 1 skewed link, 3 crossings, 1 station on a line and 8 bends
-  become 0, 0, 0 and 3, for 2 lattice steps more. Groups above 400 nodes are left as placed.
+  octilinear too, closer to a hand-drawn metro map. The cost is compared in rank order: line–node hits, crossings, links
+  that are not octilinear, bends where a line passes a station, then length. On the made-up city of the example *Metro
+  map* placed as an octilinear star (the example itself is laid out layered; the numbers are from the unit test): 1
+  skewed link, 3 crossings, 1 station on a link and 8 bends become 0, 0, 0 and 3, for 2 lattice steps more. Its cost is
+  bounded by a deterministic work budget per group (groups above 400 nodes are left as placed): about 0.1–0.25 s for
+  400 nodes on one line (indicative, loaded Apple M3, `benchmarks/results/octilinear-refine-20261128.md`).
 - **Inner-edge share and modularity per container on request** (#236, provisional; ADR 0018 addendum of
   2026-11-28): `containerStats: true` adds `containerStats` to the `overview` answer: per container (node index, -1 the
   root) the weight of the edges inside it and of those touching it, their share, and its term of the modularity of the

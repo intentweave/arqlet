@@ -2441,7 +2441,8 @@ pub struct LayoutOptions {
     pub size_aware_stress: bool,
     /// Provisional: after the octilinear star placement (strategy `octilinear`), a local search on its lattice moves nodes
     /// and branches so that the links outside the spanning tree are octilinear too and the lines run straighter and
-    /// shorter, as a hand-drawn metro map (`tree::octilinear_arrange`). Only the `octilinear` strategy reads it. Off by
+    /// shorter, as a hand-drawn metro map (`tree::octilinear_arrange`). Its cost is bounded by a deterministic work
+    /// budget per group; groups above 400 nodes are left as placed. Only the `octilinear` strategy reads it. Off by
     /// default and omitted when off.
     #[serde(default, skip_serializing_if = "is_false")]
     pub octilinear_refine: bool,
