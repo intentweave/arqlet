@@ -90,7 +90,7 @@ playground's overview page draws them (`apps/playground/overview.html`).
   ([ADR 0018](docs/adr/0018-cluster-overview.md), `apps/playground/overview.html`).
 
 Not yet: full crossing minimization, guaranteed obstacle-free routes in every
-case, a native Node.js adapter, and a stable API. See
+case, a published native Node.js adapter (one exists, provisional and unpublished: `@arqlet/node`), and a stable API. See
 [docs/specification.md](docs/specification.md) section 8 for the detailed status.
 
 ## Quick start: browser demo
@@ -336,6 +336,11 @@ bindOverviewNavigation(canvas, renderer, {
 });
 ```
 
+A host that computes its own communities (for example with Leiden) passes them as
+`options: {groups: {nodeId: ['package', 'community']}, communities: 0}`: the overview shows
+exactly that partition, nested, with stable group ids, and can switch to another partition
+of the same nodes by node id ([integration guide](docs/integration-guide.md#showing-your-own-partition-provisional)).
+
 Paths and neighbourhoods work there too: the overview session traces on its graph, and
 the viewer draws the path over the discs that show it and opens the clusters on the way:
 
@@ -410,11 +415,12 @@ macOS arm64, Windows x64) and WASM give identical responses (checked in CI by
 | `crates/wasm` | browser ABI (`lw_alloc`, `lw_free`, `lw_run` with JSON payloads) |
 | `crates/contracts` | generates the TypeScript contract types (tooling) |
 | `crates/query*` | the read-only openCypher query layer, usable without layout (ADR 0021, provisional) |
-| `crates/node` | placeholder for a native Node.js adapter |
+| `crates/node` | native Node.js adapter (napi-rs): dispatch and sessions on libuv's thread pool (ADR 0030, provisional) |
 | `crates/arqlet` | facade crate: re-exports the engine crates and `dispatch` |
 | `packages/arqlet` | npm entry point: re-exports engine client and viewer |
 | `packages/engine-client` | the WASM engine with loader, worker protocol, presets, ELK-style API |
 | `packages/viewer` | SVG rendering, navigation, React Flow adapter |
+| `packages/node` | `@arqlet/node`: the engine as a native Node.js module with a WASM fallback (provisional, unpublished) |
 | `packages/query` | `@arqlet/query`: the query layer as WASM, without the layout engine (provisional) |
 | `packages/containment-tree` | interactive containment tree of a scene |
 | `packages/contracts` | generated TypeScript types for snapshot, scene and config sets |

@@ -115,6 +115,13 @@ The third step closes the open points of the second:
   to the smaller community). Every Louvain level is a level of clusters (`community:<container>:<level>.<k>`, kind
   `community`, after the graph's nodes); communities under 8 nodes are no clusters, children without links are gathered.
   A structured excerpt keeps the overview's nesting, so communities become containers there.
+- **Groups the data gives** (`groups`, node id → path of group names, as an import's `groups`;
+  `arqlet_layout::communities::with_given_groups`): containers of kind `group` between a node and its container, nested
+  along the path, labelled with their name, with the id `group:<container>:<path>` (`#` for the top level). They are
+  nodes of the graph for the overview, so Louvain then divides only what is still larger than `communities` (0: a host's
+  partition shown as given), and a continuation by node id treats a changed path as a changed container: a group both
+  partitions have keeps its inner arrangement, a node whose path changed is placed anew, groups that are gone are
+  reported as ignored ids ([integration guide](../integration-guide.md)).
 
 The fourth step keeps the drawing still and makes the choices visible:
 
@@ -181,8 +188,15 @@ change no answer that does not ask for them. Usage: [integration guide](../integ
    The price: the clusters of a continuation drift from those of a fresh layout as changes add up (a node whose links
    moved to another community stays where it was). The host decides when to lay out without `start`.
 
-Open, both later: the drill-down from an `OverviewModel` without the input graph (part 2 of #209) builds on 1 and may
-want edge ids, which would be another request field; a session continuing a new graph from its own places on `start: {}`.
+4. **The drill-down without the input graph** (part 2, added 2026-11-27; viewer only, no engine change):
+   `structuredExcerptOf(model, id)` builds a cluster's excerpt from the answer by the rule of `structuredExcerpt`, with
+   kinds and weights from 1. Where both run it gives the same graph, apart from edge names (`edge:k`, the edge's index in
+   the answer), node fields the answer does not carry (only `id`, `kind`, `label`, `parentId`), and kind `''` and
+   weight 1 without edge data. Leaving edges stay one per overview edge by default, as in `structuredExcerpt`, so that
+   the two agree; `bundle: true` merges them per inner node, stand-in, kind and direction into weighted edges.
+
+Open, both later: edge ids on request (another request field), so that `overviewTrace` answers map onto the excerpt's
+edges; a session continuing a new graph from its own places on `start: {}`.
 
 ## Addendum (2026-11-27): a work budget (#211)
 

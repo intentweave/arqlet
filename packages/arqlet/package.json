@@ -36,7 +36,8 @@
     "index.d.ts",
     "README.md",
     "LICENSE-APACHE",
-    "LICENSE-MIT"
+    "LICENSE-MIT",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"

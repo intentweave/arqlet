@@ -7,6 +7,18 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
+  sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
+  pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time
+  each. `@arqlet/node` (`packages/node`, `private` until publishing is decided) loads it with the interface of the WASM
+  engine: `loadNativeEngine({sessionBytes})` answers an asynchronous `run` with `openSession()` (`run`, `close`,
+  `columns`, `overview`) that `createSession` takes, and `loadEngine({engine})` chooses native, WASM or the first that
+  loads (`ARQLET_ENGINE`). The answers are byte-identical to the WASM engine's (`tools/platform-parity.mjs --node`).
+  Build it with `node packages/node/build.mjs`. Accepted gaps (ADR 0030): no progressive publications, phase timings
+  unreliable under concurrent calls, no musl or Intel macOS binaries; prebuilt binaries and publishing are a separate step.
+- **Sessions usable from several threads (provisional; ADR 0024 C2):** `arqlet_runtime::shared_sessions::SharedSessionStore`,
+  the store of the native adapter: one short lock for its book, one lock per session, a byte limit that never drops a
+  running session.
 - **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
   `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
   out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,
@@ -30,6 +42,23 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   which, and it is the same on WebGPU, WebGL 2 and WebGL 1. A `bindOverviewNavigation` binding takes no input while its
   renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
   overview page pauses the overview while the scene view of a cluster covers it.
+- **Opening a cluster of an overview without the graph** (#209 part 2, provisional): `structuredExcerptOf(model, id,
+  {direction, bundle})` in `@arqlet/viewer/overview.js` (also `structuredExcerpt(null, model, id)`, and from `arqlet`)
+  builds the excerpt a drill-down lays out from an overview answer alone, for a host that computes the overview on a
+  server. The same rule as `structuredExcerpt` and, where both run, the same graph (checked on generated graphs and
+  engine answers): the cluster as the one top-level container, its inner edges, and its leaving edges to one stand-in
+  per neighbouring cluster, direction kept. Edge kinds and weights come from the answer's `edgeData` (without it: kind
+  `''`, weight 1, and `edgeData: false` says so); edges are named `edge:k` after their index in the answer
+  (`EXCERPT_EDGE_PREFIX`), so `overviewTrace` answers cannot be mapped onto them without the input edge ids; nodes carry
+  only `id`, `kind`, `label` and `parentId`. `bundle: true` merges the leaving edges of a node to a stand-in per kind and
+  direction into one weighted edge. Flow: [integration guide](docs/integration-guide.md#the-cluster-overview-as-a-server-result-provisional).
+- Integration guide: *Showing your own partition* (overview): a partition the host computed (for example with Leiden)
+  as `groups`, flat or nested, with `communities: 0` shown as given; what Louvain does inside large groups, labels, the
+  stable group ids, and switching between two partitions with `start.nodes` (a group both have keeps its inner
+  arrangement, nodes whose path changed are placed anew, groups that are gone are listed in `continuation.ignored`),
+  pinned by a test in `crates/runtime/tests/overview.rs`. Mentioned in the READMEs and ADR 0018.
+- Every npm package (`arqlet`, `@arqlet/contracts`, `@arqlet/engine-client`, `@arqlet/viewer`, `@arqlet/query`) ships
+  `CHANGELOG.md`, copied by `prepack` (`tools/npm-prepack.mjs`) as the licenses are.
 
 ### Fixed
 
@@ -76,6 +105,11 @@ direction opens again on a new import.
   the graph; an expression that reads a variable without a value; a computed value beyond 16 MiB. A map in content or a
   parameter is a map now, and a map in a JSON answer is `{"map": {…}}`. An `overview` request with an `edgeData` that is
   not a boolean is refused (it was ignored).
+- **Overview texts on a light background:** the overview renderer (`createOverviewRenderer`) takes its tone from its
+  clear colour (`background`, `setBackground`): above one half relative luminance it is `light` (`renderer.tone`) and
+  draws the texts of its `labels` canvas dark itself (cluster and node names, the lens rim; galaxy name tags light with
+  dark text). In 0.9 they were always light. A host that inverted the label canvas for a light background (for example
+  with a CSS `filter: invert(1)`) must stop, or its texts turn light again.
 - **Rust hosts** that build these types field by field have new fields: `Snapshot`, `LayoutOptions`, `Scene`,
   `SceneMark`, `SceneMembershipReport` and `AreaPlan`; `Request` has new variants. In `arqlet-query`: `Value::Map`, the
   `plan::Expr` variants `Call`, `Map`, `Index`, `Slice` and `Comprehension`, `plan::Op::Union` and

@@ -40,7 +40,8 @@
     "dist",
     "README.md",
     "LICENSE-APACHE",
-    "LICENSE-MIT"
+    "LICENSE-MIT",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "generate": "cargo run -q -p arqlet-contracts --bin export-contracts -- src/generated",

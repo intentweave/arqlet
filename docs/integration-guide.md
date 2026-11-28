@@ -56,6 +56,7 @@ The same Rust dispatcher answers every request in three places. A `run` is the f
 | The page | `await loadEngine()` | simplest; long computations block the page |
 | A worker | `workerRun(createEngineWorker())` | the page stays responsive; the usual choice in a browser |
 | A backend | `httpRun('/api')` | the backend runs `layout-command --sessions` (one long-running process, one message per line) or links the Rust crate |
+| A Node server, natively | `loadNativeEngine()` of `@arqlet/node` | provisional, unpublished: the engine in the Node process, every call on libuv's thread pool, sessions in parallel (below) |
 
 Sessions keep their snapshot inside the engine where the engine offers it (`resident: 'auto'`): a request then names the
 change, not the whole state. Without a resident session the snapshot travels with each request.
@@ -70,6 +71,41 @@ The product requirement is that all three **deployment modes** keep working:
 
 The playground (`apps/playground`) implements all three behind one switch; `app.js` routes every operation through one
 `execute()` by kind (edit, refine, import), and its UI tests run each mode.
+
+### A Node server: the native module (provisional)
+
+`@arqlet/node` (ADR 0030; unpublished for now, build the module with `node packages/node/build.mjs`) runs the engine in
+the Node process without WASM and without a child process. Every call that computes is an asynchronous task on libuv's
+thread pool, so the event loop keeps serving requests during a layout; the answers are the same bytes as the WASM
+engine's.
+
+```js
+import {loadEngine} from '@arqlet/node';
+import {createSession} from '@arqlet/engine-client/session.js';
+
+// 'native', 'wasm', or 'auto' (native where a module for this platform loads); default: ARQLET_ENGINE, else 'auto'.
+const run = await loadEngine({engine: 'auto', sessionBytes: 2 ** 30});
+const session = createSession(run);          // resident: the snapshot stays in the module
+await session.import(graph, {limit: 2000});
+await session.toggle('payments');
+run.kind;                                    // 'native' or 'wasm'
+```
+
+- **Sessions in parallel, each in order.** Different sessions run at the same time on the pool's threads; the requests of
+  one session run one after the other, in the order sent (the loader queues them). One `loadNativeEngine()` is one store
+  of sessions; open one per client view and close it when the view goes.
+- **The pool is shared.** libuv's pool has 4 threads unless `UV_THREADPOOL_SIZE` (set before the pool is first used)
+  says otherwise, and `fs`, `dns.lookup`, `crypto` and `zlib` use it too: a layout holds a thread for its duration. Admit
+  heavy operations (import, layout, refinement) by count, and raise the pool size to that count plus what the rest of
+  the server needs (ADR 0024, item 3).
+- **Memory.** `sessionBytes` limits the sessions' estimated weight together: the least recently used idle session is
+  dropped beyond it and answers `Unknown session` afterwards (a running one is never dropped, so the limit is soft while
+  several grow at once). `session.memory()` adds the module's live heap (`heapBytes`). Native memory goes back to the
+  system allocator, so recycling is not needed to shrink, but `session.recycle(otherEngine)` still moves a session to a
+  WASM engine and back.
+- **Not yet:** progressive publications (`refineProgressive` answers with its final result only), prebuilt binaries.
+  A crash in native code ends the process (panics are caught and answered as errors); a host that needs isolation keeps
+  `layout-command --sessions` processes.
 
 ## 3. Revisions: never apply a stale result
 
@@ -184,6 +220,92 @@ go round in a circle, count as left out. A named cluster that is not kept (its s
 the discs. A `parent` that is not a string is refused. Parents are taken at their word: no check against the discs.
 
 Limits: other cluster options do not regroup a container that keeps its clusters.
+
+**Opening a cluster in the browser, without the graph.** The drill-down into a cluster lays out a graph of that cluster:
+`structuredExcerpt(graph, model, id)` builds it from the input graph. A browser that has only the answer builds it with
+`structuredExcerptOf(model, id)` (or `structuredExcerpt(null, model, id)`), from `@arqlet/viewer/overview.js`:
+
+```js
+// Server: the overview with edge data; send the answer only.
+const answer = run({op: 'overview', graph, edgeData: true}).overview;
+
+// Browser: the model of the answer, the excerpt of a cluster, and a view controller on it.
+const model = overviewModel(answer);
+const direction = flowDirectionOf(model, model.index.get(id));   // border ports facing the neighbours
+const excerpt = structuredExcerptOf(model, id, {direction});
+await controller.import(excerpt.graph, {limit: excerpt.graph.nodes.length, options: excerpt.options});
+```
+
+It follows the rule of `structuredExcerpt`: the cluster is the one top-level container with everything below it (the
+overview's nesting, its added clusters as containers), with its inner edges; every edge that leaves it runs to or from
+one stand-in per neighbouring cluster (`border:` + its id: the outer end's ancestor that is a sibling of one of the
+cluster's ancestors), in its own direction. Where both can run they give the same graph, apart from what the answer does
+not carry (checked on generated graphs and on engine answers with communities, `packages/viewer/overview.test.mjs`):
+
+| | From the graph | From the answer alone |
+|---|---|---|
+| edge ids | the input ids | `edge:k`, `k` the edge's index in the answer's `edges` (`EXCERPT_EDGE_PREFIX`) |
+| edge kinds and weights | the input edge's | `edgeKinds[edgeKind[k]]` and `edgeWeight[k]`; without `edgeData`, kind `''` and weight 1 for every edge, and `excerpt.edgeData` is false |
+| nodes | the input nodes, every field | `id`, `kind`, `label` (from `kinds`/`kind` and `labels`) and `parentId`; no `shape` or other field, so a graph that uses them lays out differently |
+
+`overviewTrace` and `overviewNeighbourhood` answer input edge ids, which the excerpt's names cannot be mapped onto without
+the ids; the answer does not carry them yet (open in [#209](https://github.com/intentweave/arqlet/issues/209)). A host
+with the ids maps `edge:k` back through them (`resolvedEdgeIds(graph)[k]`).
+
+`bundle: true` draws the leaving edges of one inner node to one stand-in, of one kind and direction, as one edge whose
+`weight` is the sum of theirs, for a cluster with many leaving edges: fewer routes, each weighted. The graph then differs
+from `structuredExcerpt`'s. Provisional, as the overview.
+
+### Showing your own partition (provisional)
+
+A host that computes communities itself (for example with Leiden on a server) gives the overview that partition as the
+option `groups`: node id → path of group names, outermost first. With `communities: 0` the overview shows exactly
+those groups and runs no Louvain:
+
+```js
+// Flat: one level of groups.
+run({op: 'overview', graph, options: {communities: 0, groups: {
+  'svc/a': ['billing'], 'svc/b': ['billing'], 'svc/c': ['search']}}});
+
+// Nested: package → community → module (the modules are nodes of the graph).
+const leiden = run({op: 'overview', graph, options: {communities: 0, groups: {
+  'mod/parse': ['core', 'c7'], 'mod/lex': ['core', 'c7'], 'mod/http': ['net', 'c2']}}});
+```
+
+- **Groups are nodes of kind `group`**, placed between a node and its container: the path is read inside the node's
+  container (its `parentId`), and a node without a path (or with `[]`) stays a direct child of its container. Each
+  group is **labelled with its name**, the last part of its path (`overview.labels`); there is no separate label.
+- **Ids are stable**: `group:<container>:<path joined by />`, with `#` for the top level (`group:#:core`,
+  `group:#:core/c7`; inside container `pkg`: `group:pkg:core`). The same path gives the same id in every request and
+  every revision of the graph, so `intent`, `radii` and `start` can name a group. Renaming a group changes its id. Ids in
+  `groups` the graph does not have are ignored; a group id that a node of the graph already has is refused.
+- **`communities` > 0** (default 120): Louvain also divides every container with more children than that, the groups
+  included, inside it: in a group of 500 modules the communities are clusters `community:group:#:core:<level>.<k>`
+  (kind `community`, labelled after their most connected member, `≈ <name>`). Groups with fewer children are shown as
+  given. Use `communities: 0` when the partition is to be shown as it is.
+- `edgeData`, `columns`, `positionsOnly`, the work per container (`ticks`, the force steps of each container's
+  simulation), `radii`, `intent` and the level of detail of a `configSet` work as without `groups`. A session lays out
+  again on the clusters it has while `groups` (with `communities`, `satellites`, `hubs`) stays the same.
+
+**Switching between two partitions of the same nodes.** Send the other partition as `groups` and the places of the last
+answer, with their parents, as `start.nodes` (the `places` function above). A session needs `start.nodes` too: a
+`start` without positions after a change of `groups` is refused (`clusters changed`). What happens
+(`a_partition_of_the_host_is_shown_as_given_and_a_switch_keeps_the_groups_both_have` in
+`crates/runtime/tests/overview.rs`):
+
+- A group whose id is in both partitions (the same container and the same path) **continues with its inner
+  arrangement**: its members keep their places relative to it. The group itself may move, since its container changed
+  (another group gained or lost members, so its container is laid out again around it).
+- A node whose path changed has another parent and is **placed anew**, next to the nodes it is linked to, in its new
+  group; so is a group that is new. They count as `anew` in `continuation`; groups count like nodes.
+- The groups of the old partition that the new one lacks are **listed in `continuation.ignored`** (unlike the clusters
+  the overview adds itself, which are not listed).
+- Two partitions that share no path: every node is placed anew, and the answer is the same as without `start`.
+- The answer is valid in every case: no overlaps, every disc inside its parent.
+
+To switch back without moving anything, keep the places of each partition's last answer and send those: partition A
+with the places of A's answer continues all of it (`anew: 0`) and nothing moves. Sent with the places of B's answer
+instead, what B shares with A continues and the rest is placed anew again.
 
 ### Bounding an overview's work (provisional)
 

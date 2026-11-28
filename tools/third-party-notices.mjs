@@ -53,13 +53,33 @@ function licenseFiles(dir) {
     .map(file => ({file, text: readFileSync(join(dir, file), 'utf8').replace(/\r\n/g, '\n').trimEnd()}));
 }
 
-/** Every crate with its license data; `files` is empty for a crate that ships no license file. */
+// License texts for crates that ship none, taken from their upstream repository at the exact revision the crate was
+// published from (its `.cargo_vcs_info.json`), keyed by crate and exact version: a new version needs a new record. Each
+// text is kept in tools/third-party-licenses/ byte for byte as fetched. Used only when the crate itself has no license file.
+const SUPPLIED = {
+  // https://github.com/napi-rs/napi-rs, file LICENSE (MIT), fetched 2026-11-27; identical at both revisions
+  // (SHA-256 3f1ce66533302df3…). Used by crates/node (ADR 0030).
+  'napi@3.16.1': {file: 'napi-rs-LICENSE', source: 'https://github.com/napi-rs/napi-rs/blob/417375ad5ef1d8cb4c49edf13d2cc6c0204bb5b1/LICENSE'},
+  'napi-sys@3.4.1': {file: 'napi-rs-LICENSE', source: 'https://github.com/napi-rs/napi-rs/blob/d9cb526c15e63ba30e06b4d169068c9854180595/LICENSE'},
+};
+
+function supplied(name, version) {
+  const s = SUPPLIED[`${name}@${version}`];
+  if (!s) return [];
+  const text = readFileSync(join(root, 'tools/third-party-licenses', s.file), 'utf8').replace(/\r\n/g, '\n').trimEnd();
+  return [{file: `LICENSE (not in the crate; from ${s.source})`, text}];
+}
+
+/** Every crate with its license data; `files` is empty for a crate that ships no license file and has none supplied. */
 export function collect(pkg = 'arqlet-wasm', target = 'wasm32-unknown-unknown') {
   const byCrate = metadataByCrate();
   return linkedCrates(pkg, target).map(({name, version}) => {
     const p = byCrate.get(`${name}@${version}`);
     if (!p) throw new Error(`cargo metadata does not list ${name} ${version}`);
-    return {name, version, license: p.license ?? '(none declared)', repository: p.repository ?? '', files: licenseFiles(dirname(p.manifest_path))};
+    return {name, version, license: p.license ?? '(none declared)', repository: p.repository ?? '', files: (() => {
+      const own = licenseFiles(dirname(p.manifest_path));
+      return own.length ? own : supplied(name, version);
+    })()};
   });
 }
 
@@ -68,7 +88,7 @@ export function render(crates, pkg = 'arqlet-wasm', target = 'wasm32-unknown-unk
   const out = [
     '# Third-party notices',
     '',
-    `The WebAssembly module in this package contains the Rust crates listed below, each under the license named, and their`,
+    `The ${target.startsWith('wasm32') ? 'WebAssembly' : 'native'} module in this package contains the Rust crates listed below, each under the license named, and their`,
     `copyright and license notices follow. Arqlet itself is licensed under either of the Apache License, Version 2.0`,
     `(LICENSE-APACHE) or the MIT license (LICENSE-MIT), at your option.`,
     '',

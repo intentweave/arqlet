@@ -825,7 +825,9 @@ export function flowDirectionOf(model, i) {
  * its id and direction and runs to or from its stand-in, so the layered layout routes it out of the cluster's box on the
  * side its flow uses; the crossing is its border port (ADR 0017). `direction` (see `flowDirectionOf`) sets that flow.
  */
-export function structuredExcerpt(graph, model, id, {direction = null} = {}) {
+export function structuredExcerpt(graph, model, id, options = {}) {
+  if (graph == null) return structuredExcerptOf(model, id, options);
+  const {direction = null} = options;
   const c = model.index.get(id);
   if (c === undefined) throw Error(`Unknown node: ${id}`);
   const parent = model.overview.parent, ids = model.overview.ids;
@@ -836,13 +838,8 @@ export function structuredExcerpt(graph, model, id, {direction = null} = {}) {
   const stack = [c];
   while (stack.length) { const k = stack.pop(); below.push(k); stack.push(...model.children[k]); }
   below.sort((a, b) => a - b);
-  const above = new Set();
-  for (let p = parent[c]; p >= 0; p = parent[p]) above.add(p);
-  const standIn = outer => {
-    let x = model.index.get(outer);
-    while (parent[x] >= 0 && !above.has(parent[x]) && !above.has(x)) x = parent[x];
-    return BORDER_PREFIX + ids[x];
-  };
+  const standInOf = standInRule(model, c);
+  const standIn = outer => BORDER_PREFIX + ids[standInOf(model.index.get(outer))];
   const nodes = below.map(k => {
     const base = own.get(ids[k]) ?? {id: ids[k], kind: 'community', label: displayName(ids[k])};
     return {...base, parentId: k === c ? null : ids[parent[k]]};
@@ -863,6 +860,82 @@ export function structuredExcerpt(graph, model, id, {direction = null} = {}) {
   const excerpt = {nodes: [...nodes, ...standIns.values()], edges, ...(direction ? {defaultDirection: direction} : {})};
   // The options to import the excerpt with: a file's unrelated functions stand in a grid, not in one long row.
   return {graph: excerpt, options: {isolatedGrid: true}, leaving, inner: edges.length - leaving, standIns: standIns.size};
+}
+
+// The stand-in rule of a structured excerpt of cluster `c`: for a node outside it (by index), the node that stands for it,
+// its ancestor that is a sibling of one of `c`'s ancestors (or the node itself).
+function standInRule(model, c) {
+  const parent = model.overview.parent, above = new Set();
+  for (let p = parent[c]; p >= 0; p = parent[p]) above.add(p);
+  return x => {
+    while (parent[x] >= 0 && !above.has(parent[x]) && !above.has(x)) x = parent[x];
+    return x;
+  };
+}
+
+/** The id prefix of the edges of an excerpt from the overview alone (`structuredExcerptOf`): `edge:` + the edge's index. */
+export const EXCERPT_EDGE_PREFIX = 'edge:';
+
+/**
+ * Provisional (#209): the excerpt of `structuredExcerpt` from the overview alone, for a host that has only the overview
+ * answer (computed on a server) and not the input graph. The same rule: cluster `id` as the one top-level container with
+ * everything below it (the overview's nesting, its added clusters included), its inner edges, and its leaving edges, each
+ * to or from the stand-in (`BORDER_PREFIX` + id) of the cluster outside, direction kept. Where both can run, the graph
+ * is the one `structuredExcerpt` gives, except for what the answer does not carry:
+ *
+ * - Edge ids: edge `k` of the overview (`edges[2k]` → `edges[2k + 1]`) is named `EXCERPT_EDGE_PREFIX + k`, so a host
+ *   that has the ids (`model.edgeIds`) can map it back; an `overviewTrace` or `overviewNeighbourhood` answer, which names
+ *   input edges, cannot be mapped onto them without those ids.
+ * - Edge kinds and weights come from the answer's edge data (a request with `edgeData: true`). Without them every edge has
+ *   the kind `''` and counts once, and the result says so (`edgeData: false`).
+ * - Nodes carry `id`, `kind` and `label` from the answer (`kinds`/`kind`, `labels`) and `parentId`, nothing else
+ *   (no `shape` or other fields of the input). Added clusters and stand-ins are named as `structuredExcerpt` names them.
+ *
+ * `bundle: true` draws the leaving edges of one inner node to one stand-in, of one kind and direction, as one edge whose
+ * `weight` is the sum of theirs (named after the first): fewer routes, each weighted by what it stands for. Then the
+ * graph is no longer `structuredExcerpt`'s.
+ */
+export function structuredExcerptOf(model, id, {direction = null, bundle = false} = {}) {
+  const c = model.index.get(id);
+  if (c === undefined) throw Error(`Unknown node: ${id}`);
+  const o = model.overview, parent = o.parent, ids = o.ids;
+  const below = [];
+  const stack = [c];
+  while (stack.length) { const k = stack.pop(); below.push(k); stack.push(...model.children[k]); }
+  below.sort((a, b) => a - b);
+  const inside = new Uint8Array(model.n);
+  for (const k of below) inside[k] = 1;
+  // The clusters the overview added come after the graph's nodes (`stats.communities` of them); without stats, by id.
+  const added = o.stats ? i => i >= model.n - o.stats.communities : i => ids[i].startsWith(COMMUNITY_PREFIX);
+  const kindOf = i => (o.kinds && o.kind ? o.kinds[o.kind[i]] : 'node');
+  const nodes = below.map(k => ({
+    id: ids[k],
+    ...(added(k) ? {kind: 'community', label: displayName(ids[k])} : {kind: kindOf(k), label: o.labels?.[k] ?? displayName(ids[k])}),
+    parentId: k === c ? null : ids[parent[k]],
+  }));
+  const edgeData = !!(o.edgeKinds && o.edgeKind);
+  const edgeKind = k => (edgeData ? o.edgeKinds[o.edgeKind[k]] : '');
+  const edgeWeight = k => o.edgeWeight?.[k] ?? 1;
+  const edge = (k, source, target, weight) => ({id: EXCERPT_EDGE_PREFIX + k, kind: edgeKind(k), source, target, ...(weight > 1 ? {weight} : {})});
+  const standInOf = standInRule(model, c);
+  const standIns = new Map(), bundles = new Map(), edges = [];
+  let leaving = 0, inner = 0;
+  for (let k = 0; k < o.edges.length / 2; k++) {
+    const a = o.edges[2 * k], b = o.edges[2 * k + 1];
+    if (inside[a] && inside[b]) { edges.push(edge(k, ids[a], ids[b], edgeWeight(k))); inner++; continue; }
+    if (!inside[a] && !inside[b]) continue;
+    leaving++;
+    const stand = BORDER_PREFIX + ids[standInOf(inside[a] ? b : a)];
+    if (!standIns.has(stand)) standIns.set(stand, {id: stand, kind: 'border', label: displayName(stand.slice(BORDER_PREFIX.length)), parentId: null});
+    const [source, target] = inside[a] ? [ids[a], stand] : [stand, ids[b]];
+    if (bundle) {
+      const key = JSON.stringify([source, target, edgeKind(k)]), found = bundles.get(key);
+      if (found) { found.weight = (found.weight ?? 1) + edgeWeight(k); continue; }
+      bundles.set(key, edges[edges.push(edge(k, source, target, edgeWeight(k))) - 1]);
+    } else edges.push(edge(k, source, target, edgeWeight(k)));
+  }
+  const excerpt = {nodes: [...nodes, ...standIns.values()], edges, ...(direction ? {defaultDirection: direction} : {})};
+  return {graph: excerpt, options: {isolatedGrid: true}, leaving, inner, standIns: standIns.size, edgeData};
 }
 
 /**
