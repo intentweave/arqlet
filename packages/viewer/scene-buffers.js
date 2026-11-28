@@ -56,8 +56,8 @@ function hsl(h, s, l, a = 1) {
 }
 const NONE = [0, 0, 0, 0];
 
-// A pill glyph (style.js) as a fan of triangles around its middle, `inset` inside its outline: two half circles joined,
-// its long axis along the glyph's normal. Twelve steps per half circle.
+// A pill glyph (style.js) as a fan of triangles around its middle, `inset` inside its outline (negative: outside): two
+// half circles joined, its long axis along the glyph's normal. Twelve steps per half circle.
 function pillTriangles(layer, g, inset, colour) {
   const radius = g.thickness / 2 - inset, straight = Math.max(0, g.length / 2 - g.thickness / 2);
   if (radius <= 0) return;
@@ -305,14 +305,19 @@ export function sceneBuffers(input, state = {}) {
     const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
     const glyph = glyphs.get(n.id);
     if (glyph?.kind === 'pill') {
-      // A pill at any angle: a fan of triangles in the stroke's colour, the fill's inside it; an empty box carries the id.
-      pillTriangles(leafLayer, glyph, 0, stroke);
-      pillTriangles(leafLayer, glyph, glyph.width, fill);
-      const hx = Math.abs(glyph.nx) * glyph.length / 2 + Math.abs(glyph.ny) * glyph.thickness / 2, hy = Math.abs(glyph.ny) * glyph.length / 2 + Math.abs(glyph.nx) * glyph.thickness / 2;
+      // A pill at any angle: a fan of triangles in the stroke's colour, the fill's inside it, so that the border lies
+      // centred on the outline as SVG strokes it; an empty box carries the id.
+      pillTriangles(leafLayer, glyph, -glyph.width / 2, stroke);
+      pillTriangles(leafLayer, glyph, glyph.width / 2, fill);
+      const half = glyph.width / 2;
+      const hx = Math.abs(glyph.nx) * (glyph.length / 2 + half) + Math.abs(glyph.ny) * (glyph.thickness / 2 + half), hy = Math.abs(glyph.ny) * (glyph.length / 2 + half) + Math.abs(glyph.nx) * (glyph.thickness / 2 + half);
       box(leafLayer, n.id, {x: glyph.cx - hx, y: glyph.cy - hy, width: 2 * hx, height: 2 * hy}, 0, 0, 0, NONE, NONE);
     } else if (glyph?.kind === 'tick') {
-      // A stub in the line's colour, and an empty box over it that carries the node's id (for morphs).
-      leafLayer.segments.push(glyph.cx, glyph.cy, glyph.x2, glyph.y2, glyph.width, 0, 0, 0, 0, ...stroke);
+      // A stub in the line's colour, and an empty box over it that carries the node's id (for morphs). The segments get
+      // square caps half their width long, so the segment is shortened by that at both ends: the stub ends where SVG's
+      // butt cap ends. One shorter than its width is drawn as a square of its length.
+      const cap = Math.min(glyph.width, glyph.length) / 2;
+      if (glyph.length > 0) leafLayer.segments.push(glyph.cx + glyph.nx * cap, glyph.cy + glyph.ny * cap, glyph.x2 - glyph.nx * cap, glyph.y2 - glyph.ny * cap, Math.min(glyph.width, glyph.length), 0, 0, 0, 0, ...stroke);
       const x = Math.min(glyph.cx, glyph.x2), y = Math.min(glyph.cy, glyph.y2);
       box(leafLayer, n.id, {x, y, width: Math.abs(glyph.x2 - glyph.cx), height: Math.abs(glyph.y2 - glyph.cy)}, 0, 0, 0, NONE, NONE);
     } else if (glyph) box(leafLayer, n.id, {x: glyph.cx - glyph.r, y: glyph.cy - glyph.r, width: 2 * glyph.r, height: 2 * glyph.r}, glyph.r, 1, strokeWidth, fill, stroke, dash);
@@ -328,7 +333,7 @@ export function sceneBuffers(input, state = {}) {
     const own = look.text ?? COLOURS.text, colour = faded < 1 ? fadeCss(own, faded) : own;
     if (glyph?.kind === 'tick' || glyph?.kind === 'pill') {
       // A tick's or a pill's name beyond its tip or end; from afar a label of a fixed size beside it.
-      text({x: glyph.labelX, y: glyph.labelY, text: n.label.slice(0, 32), size: 12, colour, align: glyph.align, baseline: glyph.baseline, lod: {kind: 'leaf', box: r, dot: {cx: glyph.x2, cy: glyph.y2, r: glyph.length / 4}}});
+      text({x: glyph.labelX, y: glyph.labelY, text: n.label.slice(0, 32), size: 12, colour, align: glyph.align, baseline: glyph.baseline, lod: {kind: 'leaf', box: r, dot: {cx: glyph.cx, cy: glyph.cy, r: glyph.kind === 'pill' ? glyph.length / 2 : glyph.length, end: {x: glyph.x2, y: glyph.y2}, align: glyph.align, baseline: glyph.baseline}}});
     } else if (glyph) {
       // A glyph's name outside it, right of and below the dot; from afar a label of a fixed size beside the dot.
       text({x: glyph.labelX, y: glyph.labelY, text: n.label.slice(0, 32), size: 12, colour, lod: {kind: 'leaf', box: r, dot: glyph}});

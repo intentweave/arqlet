@@ -57,8 +57,8 @@ export interface Glyph { kind: 'dot' | 'tick' | 'pill'; cx: number; cy: number; 
  * `orientGlyphs`. */
 export function glyphOf(look: NodeStyle | null | undefined, bounds: {x: number; y: number; width: number; height: number}): Glyph | null;
 /** Provisional: turns every tick and pill in `glyphs` (node id → glyph) across the lines of its routes (those of an
- * explicit bus first; with more than two, their main axis), to the right of the line or up when it runs across; in
- * place, returns `glyphs`. */
+ * explicit bus first; with more than two, their main axis), to the side where fewer lines leave (on a tie, right of the
+ * line, or up when it runs across); in place, returns `glyphs`. */
 export function orientGlyphs(glyphs: Map<string, Glyph>, scene: {routes?: {id: string; source: string; target: string; points: {x: number; y: number}[]}[]; buses?: string[][]}): Map<string, Glyph>;
 /** The points a route is drawn with when an end is a glyph (to the dot's middle). */
 export function routeToGlyphs(points: {x: number; y: number}[], sourceGlyph: {cx: number; cy: number} | null | undefined, targetGlyph: {cx: number; cy: number} | null | undefined): {x: number; y: number}[];

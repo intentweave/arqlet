@@ -107,8 +107,9 @@ export function createStyle(sheet = {}) {
         node: n => {
           const b = nodeBuses.get(n.id);
           if (!b) return node(n);
-          // `branch`: a line branches at the node (three or more of one bus's routes end there), as at a gateway.
-          const branch = [...b.values()].some(count => count >= 3);
+          // `branch`: a line branches at the node (one bus's routes lead from it to three or more other nodes; parallel
+          // routes and loops count once), as at a gateway.
+          const branch = [...b.values()].some(others => others.size >= 3);
           return node({...n, bus: b.size === 1 ? [...b.keys()][0] : undefined, buses: b.size, interchange: b.size > 1, ...(branch ? {branch} : {})});
         },
         edge: r => (routeBus.has(r.id) ? edge({...r, bus: routeBus.get(r.id)}) : edge(r)),
@@ -119,15 +120,20 @@ export function createStyle(sheet = {}) {
   };
 }
 
-// The explicit buses of a scene: the bus of each route, and the buses each node is an end of (with how many of each
-// bus's routes end there).
+// The explicit buses of a scene: the bus of each route, and the buses each node is an end of (with the other nodes each
+// bus's routes lead to from it).
 function busData(scene) {
   const routeBus = new Map(), nodeBuses = new Map();
   (scene.buses ?? []).forEach((edges, b) => { for (const id of edges) if (!routeBus.has(id)) routeBus.set(id, b); });
   for (const r of scene.routes ?? []) {
     const b = routeBus.get(r.id);
     if (b === undefined) continue;
-    for (const end of [r.source, r.target]) { if (!nodeBuses.has(end)) nodeBuses.set(end, new Map()); const m = nodeBuses.get(end); m.set(b, (m.get(b) ?? 0) + 1); }
+    for (const [end, far] of [[r.source, r.target], [r.target, r.source]]) {
+      if (!nodeBuses.has(end)) nodeBuses.set(end, new Map());
+      const m = nodeBuses.get(end);
+      if (!m.has(b)) m.set(b, new Set());
+      if (far !== end) m.get(b).add(far);
+    }
   }
   return {routeBus, nodeBuses};
 }
@@ -173,9 +179,10 @@ const OCTANTS = [[1, 0], [R2, R2], [0, 1], [-R2, R2], [-1, 0], [-R2, -R2], [0, -
  * stations without changes) and every pill (`glyph: 'pill'`, an interchange or a branching station lying across its
  * lines) across the lines at the station. Their direction comes from the station's routes as drawn (`routeToGlyphs`),
  * those of an explicit bus first: with two, the direction from one neighbour to the other; with one, that route; with
- * more, their main axis (a line running through counts once, whichever way). The glyph points to the right of the line,
- * or up when the line runs across; a station without routes keeps it pointing up. Replaces them in `glyphs` (a map of
- * node id to glyph) and returns it.
+ * more, their main axis (a line running through counts once, whichever way). The glyph points to the side of the line
+ * where fewer lines leave (on a tie, to the right, or up when the line runs across); a pill's name goes between its
+ * lines when both sides have one. A station without routes keeps its glyph pointing up. Replaces them in `glyphs` (a map
+ * of node id to glyph) and returns it.
  */
 export function orientGlyphs(glyphs, scene) {
   const turned = g => g?.kind === 'tick' || g?.kind === 'pill';
@@ -207,7 +214,7 @@ export function orientGlyphs(glyphs, scene) {
     let [dx, dy] = v.length === 2 ? [v[0][0] - v[1][0], v[0][1] - v[1][1]] : v[0];
     if (v.length > 2) {
       const c = v.reduce((sum, [x, y]) => sum + x * x - y * y, 0), s2 = v.reduce((sum, [x, y]) => sum + 2 * x * y, 0), m = Math.hypot(c, s2);
-      if (m > 1e-6) [dx, dy] = [Math.sqrt(Math.max(0, (1 + c / m) / 2)), Math.sign(s2) * Math.sqrt(Math.max(0, (1 - c / m) / 2))];
+      if (m > 1e-6) [dx, dy] = [Math.sqrt(Math.max(0, (1 + c / m) / 2)), (s2 < 0 ? -1 : 1) * Math.sqrt(Math.max(0, (1 - c / m) / 2))];
       [dx, dy] = OCTANTS[((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8];
     }
     let l = Math.hypot(dx, dy);

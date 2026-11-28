@@ -12,7 +12,12 @@ export const LAYERS: readonly ['hulls', 'containers', 'routes', 'leaves', 'marks
 
 export interface SceneText {
   x: number; y: number; text: string; size: number; colour: string;
-  align?: 'start' | 'center'; baseline?: 'alphabetic' | 'middle'; weight?: number; angle?: number;
+  align?: 'start' | 'center' | 'left' | 'right'; baseline?: 'alphabetic' | 'middle' | 'top' | 'bottom'; weight?: number; angle?: number;
+  /** Where the name goes when it is too small on screen (a label of a fixed size): over the box `box`; for a glyph
+   * `dot`, its middle and the radius from which it shows, and for a tick or pill (provisional) its end and how the name
+   * is aligned there. */
+  lod?: {kind: 'container' | 'leaf'; box: {x: number; y: number; width: number; height: number};
+    dot?: {cx: number; cy: number; r: number; end?: {x: number; y: number}; align?: 'left' | 'right' | 'center'; baseline?: 'middle' | 'top' | 'bottom'}};
 }
 /** `ids`: per box instance the id of what it draws (null for none), for a morph. */
 export interface SceneLayerBuffers { boxes: Float32Array; segments: Float32Array; triangles: Float32Array; ids: (string | null)[] }

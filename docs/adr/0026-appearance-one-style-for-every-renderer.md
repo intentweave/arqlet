@@ -73,6 +73,23 @@ routes run on to the dot's middle (`routeToGlyphs`: a straight route from dot to
 and its ports are not marked. The layout keeps the box, so the name has room. With the octilinear star strategy and
 straight routing this gives octilinear lines through the stations.
 
+Ticks and pills (amended 2026-11-28, provisional): a metro map marks a station by its role, not with one symbol for all.
+`glyph: 'tick'` draws a station on one line as a short stub in the line's colour across the line (`glyphSize` its length,
+default 9; `strokeWidth` its width, default 4), its name beyond the tip; `glyph: 'pill'` draws an interchange as a white
+pill with a border across its lines (`glyphSize` its thickness, default 11, 2.4 times as long). `orientGlyphs(glyphs,
+scene)` turns both from the station's routes as drawn, those of an explicit bus first: with two, across the direction
+from one neighbour to the other; with one, across that route; with more, across their main axis (doubled angles, so
+opposite directions agree), turned to the nearest 45°. Glyph and name take the side where fewer lines leave; a pill's
+name goes between its lines when both sides have one. `bind(scene)` derives one more field, `branch`: one bus leads from
+the node to three or more other nodes (parallel routes and loops count once), as at a gateway. The preset `metro` takes
+ticks for `leaf[bus]` and pills for `leaf[branch]`, `leaf[bus][kind=gateway]` and `leaf[interchange]`; a plain end
+station keeps its tick. `glyph: 'dot'` stays available. All renderers draw them alike: `renderSvg` (a butt-capped line,
+a rotated rounded rectangle with a centred border), the GPU layer (a segment shortened by its square caps, two triangle
+fans for the pill so that it works at any angle) and React Flow (`look.tick`, `look.pill`). From afar the GPU view draws
+a tick's or pill's name as a label of a fixed size beyond its end, aligned as the name itself (the scene text's
+`lod.dot.end`, `align`, `baseline`). `browser-checks/metro-glyphs.mjs` compares the GPU backends with `renderSvg` over the
+canvas and in the box of every glyph, and the names from afar with those of the dots before.
+
 Not yet, and the steps after it: octilinear routing (0°, 45°, 90°, which the engine refuses today), the order of
 parallel lines in a shared corridor (metro-line crossing minimisation), line names in the scene (a bus carries only its
 edges, so lines are numbered, not named) and a legend; and a profile that carries layout options and a style together.
