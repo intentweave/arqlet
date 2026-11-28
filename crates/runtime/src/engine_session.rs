@@ -12,6 +12,8 @@
 //!   other ones is refused as stale;
 //! - `scene`, `trace`, `neighbourhood`, `intent`, `compactBookmark`, `readBookmark`: read the session's snapshot;
 //! - `export`: the whole snapshot;
+//! - `estimate` (provisional, ADR 0024 C3): the heap a request (`request`, as this session takes it) will need at its
+//!   peak, on the session's view (`crate::estimate`);
 //! - `keep` (provisional, #148): keeps the current snapshot under a mark (`{ok, mark}`; the same mark while the snapshot is
 //!   unchanged), at most `limit` (default 32, up to 1000) snapshots, the oldest dropped first; `recall` (`mark`) makes a
 //!   kept snapshot current again, so a step back restores the geometry instead of laying out again. A recall is refused
@@ -145,6 +147,10 @@ impl EngineSession {
         }
         if let Some(answer) = self.load_text(input) {
             return answer.to_string();
+        }
+        // Provisional (ADR 0024, C3): an estimate read in one pass too (it may carry an import's graph).
+        if crate::estimate::is_estimate(input) {
+            return crate::estimate::estimate_in_session(input, self.snapshot.as_ref()).to_string();
         }
         match serde_json::from_str::<Value>(input) {
             Ok(v) => self.run_value(&v).to_string(),
@@ -288,6 +294,11 @@ impl EngineSession {
             }
             // Provisional (ADR 0023, R7): what the session holds, part by part, and giving parts back.
             Some("memory") => Ok(self.memory()),
+            // Provisional (ADR 0024, C3): the peak a request will need, before it runs, on this session's view.
+            Some("estimate") => Ok(crate::estimate::estimate_in_session(
+                &v.to_string(),
+                self.snapshot.as_ref(),
+            )),
             Some("release") => self.release(v),
             // The whole content, for a replica that resyncs.
             Some("content") => Ok(json!({"ok": true, "contentRevision": self.content.revision,

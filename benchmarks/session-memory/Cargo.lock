@@ -19,7 +19,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "arqlet-elk"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "arqlet-model",
  "serde_json",
@@ -27,7 +27,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-layout"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "arqlet-model",
  "arqlet-routing",
@@ -37,7 +37,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-model"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "libm",
  "serde",
@@ -46,7 +46,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-reference"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "arqlet-model",
  "arqlet-routing",
@@ -58,14 +58,14 @@ dependencies = [
 
 [[package]]
 name = "arqlet-routing"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "arqlet-model",
 ]
 
 [[package]]
 name = "arqlet-runtime"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "arqlet-elk",
  "arqlet-layout",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "arqlet-scene"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "arqlet-model",
  "serde",
@@ -87,11 +87,11 @@ dependencies = [
 
 [[package]]
 name = "arqlet-topology"
-version = "0.7.0"
+version = "0.10.0"
 
 [[package]]
 name = "arqlet-view"
-version = "0.7.0"
+version = "0.10.0"
 dependencies = [
  "arqlet-model",
 ]
@@ -376,6 +376,7 @@ dependencies = [
 name = "session-memory"
 version = "0.1.0"
 dependencies = [
+ "arqlet-layout",
  "arqlet-model",
  "arqlet-runtime",
  "dhat",
