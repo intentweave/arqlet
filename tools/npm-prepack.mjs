@@ -4,6 +4,9 @@
 //   --wasm   builds crates/wasm (profile wasm-size, wasm32-unknown-unknown, --locked) and copies it to ./arqlet.wasm, and
 //            writes ./THIRD_PARTY_NOTICES.md: the license notices of the crates linked into that WASM
 //            (tools/third-party-notices.mjs)
+//   --engine-query-wasm  the engine again with its cargo feature `query` (the operation `query`), copied to
+//            ./arqlet-engine-query.wasm, with its notices in ./THIRD_PARTY_NOTICES-query.md (decypher's licenses
+//            included; THIRD_PARTY_NOTICES.md stays that of the default module)
 //   --query-wasm  the same for the query-only module, crates/query-wasm, copied to ./arqlet-query.wasm
 //   --types  bundles the generated contract types (src/generated/*.ts) into ./dist/index.d.ts
 // The copies are git-ignored; they exist only so that the packed tarball contains them.
@@ -20,17 +23,19 @@ for (const name of ['LICENSE-APACHE', 'LICENSE-MIT', 'CHANGELOG.md']) copyFileSy
 
 // The WASM modules the packages ship, by flag: the crate and the file in the package.
 const modules = {
-  '--wasm': {crate: 'arqlet-wasm', file: 'arqlet.wasm'},
-  '--query-wasm': {crate: 'arqlet-query-wasm', file: 'arqlet-query.wasm'},
+  '--wasm': {crate: 'arqlet-wasm', file: 'arqlet.wasm', notices: 'THIRD_PARTY_NOTICES.md'},
+  '--engine-query-wasm': {crate: 'arqlet-wasm', features: 'query', file: 'arqlet-engine-query.wasm', notices: 'THIRD_PARTY_NOTICES-query.md'},
+  '--query-wasm': {crate: 'arqlet-query-wasm', file: 'arqlet-query.wasm', notices: 'THIRD_PARTY_NOTICES.md'},
 };
-for (const [flag, {crate, file}] of Object.entries(modules)) {
+for (const [flag, {crate, features = '', file, notices: noticesFile}] of Object.entries(modules)) {
   if (!flags.has(flag)) continue;
-  // The size profile of Cargo.toml: the same output as `release`, about half the download.
-  execFileSync('cargo', ['build', '-p', crate, '--target', 'wasm32-unknown-unknown', '--profile', 'wasm-size', '--locked'],
-    {cwd: root, stdio: 'inherit'});
+  // The size profile of Cargo.toml: the same output as `release`, about half the download. Both engine modules come out
+  // under the same file name in the target directory, so each is copied before the next build.
+  execFileSync('cargo', ['build', '-p', crate, '--target', 'wasm32-unknown-unknown', '--profile', 'wasm-size', '--locked',
+    ...(features ? ['--features', features] : [])], {cwd: root, stdio: 'inherit'});
   copyFileSync(join(root, 'target/wasm32-unknown-unknown/wasm-size', `${crate.replaceAll('-', '_')}.wasm`), join(pkg, file));
   // The WASM contains the crates it links; the MIT and Apache-2.0 licenses ask for their notices to travel with it.
-  writeFileSync(join(pkg, 'THIRD_PARTY_NOTICES.md'), notices(crate, 'wasm32-unknown-unknown') + '\n');
+  writeFileSync(join(pkg, noticesFile), notices(crate, 'wasm32-unknown-unknown', features) + '\n');
 }
 
 if (flags.has('--types')) {

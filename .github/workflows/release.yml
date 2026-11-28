@@ -60,10 +60,12 @@ jobs:
           for p in $NPM_PACKAGES; do (cd "packages/$p" && pnpm pack --pack-destination "$RUNNER_TEMP/pack"); done
           node tools/third-party-notices.mjs --check
           node tools/third-party-notices.mjs --check --package arqlet-query-wasm
+          node tools/third-party-notices.mjs --check --features query
           mkdir -p "$RUNNER_TEMP/try" && cd "$RUNNER_TEMP/try" && npm init -y >/dev/null
           npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
           node --input-type=module -e "const m = await import('arqlet'); if (!Object.keys(m).length) throw Error('arqlet exports nothing');"
           node --input-type=module -e "const {loadQueryEngine} = await import('@arqlet/query'); const q = await loadQueryEngine(); q.load({nodes: [{id: 'a', kind: 'k', label: 'a'}], edges: []}); const r = q.query('MATCH (n) RETURN count(*)'); if (r.rows?.[0]?.[0] !== 1) throw Error('@arqlet/query: ' + JSON.stringify(r));"
+          node --input-type=module -e "const {loadEngine, createSession} = await import('arqlet'); const s = createSession(await loadEngine({query: true})); await s.import({nodes: [{id: 'a', kind: 'k', label: 'a'}], edges: []}); const r = await s.query('MATCH (n) RETURN n', {view: true}); if (!r.ok || r.rows.length !== 1 || !r.shown) throw Error('engine query module: ' + JSON.stringify(r)); const d = await createSession(await loadEngine()).query('RETURN 1'); if (d.ok) throw Error('the default module must refuse query');"
         env:
           RUSTUP_TOOLCHAIN: stable
 

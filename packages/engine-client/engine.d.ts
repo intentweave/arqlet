@@ -7,11 +7,22 @@ export type {EngineRequest, EngineResponse, Run} from './wasm-client.js';
 export const defaultWasmUrl: URL;
 
 /**
+ * Provisional: URL of the engine built with the operation `query` (`arqlet-engine-query.wasm` beside this module). Larger
+ * than `defaultWasmUrl` (see the package README); fetched only when a host asks for it.
+ */
+export const queryWasmUrl: URL;
+
+/** Which module to load: a URL, `{query: true}` (the engine with the operation `query`) or `{url}`; none is the default engine. */
+export type EngineModule = string | URL | {query?: boolean; url?: string | URL};
+
+/**
  * Loads the WASM engine, by default the one shipped with this package. In a browser it is fetched; from a `file:` URL
- * (Node) it is read from disk. `fetchBytes` replaces the loader, for example in tests.
+ * (Node) it is read from disk. `{query: true}` loads the engine with the operation `query` instead, so that
+ * `session.query(text, {view: true})` answers; the default engine refuses it. `fetchBytes` replaces the loader, for example
+ * in tests.
  */
 export function loadEngine(
-  url?: string | URL,
+  which?: EngineModule,
   fetchBytes?: (url: string | URL) => Promise<BufferSource>,
 ): Promise<Run>;
 
@@ -46,7 +57,7 @@ export function importGraph(
  * `{requestId, ...response}` and, while a request runs, `{requestId, publication, emittedAt, bytes}` for each
  * progressive publication.
  */
-export function createEngineWorker(wasmUrl?: string | URL): Worker;
+export function createEngineWorker(which?: EngineModule): Worker;
 
 /** A message to the worker of `createEngineWorker`. */
 export interface WorkerRequest {

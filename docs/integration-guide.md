@@ -581,6 +581,35 @@ A resident session can also keep them as **content** (provisional, ADR 0023 step
 `contentRevision`; `details` then answers `properties`, and `find(query, {key: 'owner'})` searches one property. Layout
 never reads content, so it changes no drawing. The query layer of ADR 0021 will read the same content.
 
+### Querying the current view in the browser (provisional)
+
+`session.query(text, {view: true})` runs an openCypher query (ADR 0021) over the session's source graph and its content
+and answers which drawn boxes and lines carry the hits (`shown`). The operation is in a second build of the engine, so
+that the default download stays as it is: a host that wants it loads that module instead of the default one (it is the
+whole engine plus the operation, not an addition to the default module).
+
+```js
+import {loadEngine, createSession, createEngineWorker, workerRun} from 'arqlet';
+
+// In the page:
+const session = createSession(await loadEngine({query: true}));
+// Or in a worker: the worker loads the module its URL names.
+const viaWorker = createSession(workerRun(createEngineWorker({query: true})));
+
+await session.import(graph);
+const hits = await session.query('MATCH (a)-[r:calls]->(b) WHERE b.loc > $min RETURN a, r', {params: {min: 100}, view: true});
+// hits.rows: [[{node: 'a1'}, {edge: 'e7'}], ...]; hits.nodes and hits.edges list the ids once each.
+// hits.shown.nodes[id] is the id of the box that shows the node (a collapsed container's box when the node is inside it),
+// hits.shown.edges[id] the id of the drawn line that carries the edge; null where nothing is drawn.
+```
+
+`{query: true}` is the file `arqlet-engine-query.wasm` (`queryWasmUrl`) beside the default `arqlet.wasm`; `{url}` names a
+module of the host's own. With the default engine `session.query()` still answers `query is not built into this engine`.
+A query sees the source graph the engine kept (for a bounded import the selection, not the whole export). The package
+ships the notices of the query module in `THIRD_PARTY_NOTICES-query.md` (the parser `decypher` and its dependencies). Sizes of
+both modules: `benchmarks/results/engine-query-wasm-20261128.md`. For queries without a layout, `@arqlet/query` is much
+smaller but holds its own graph and does not map hits onto a view.
+
 Every change of the source in a resident session, structure (`patch`) or content (`payload`), is a numbered group in the
 session's change log (provisional, ADR 0023 step R2). `session.change({patch, payload})` applies both as one group, all
 or nothing; `session.changesSince(n)` answers the groups after `n` (or `resync` when they are gone), so a second session

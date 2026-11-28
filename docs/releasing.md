@@ -9,7 +9,7 @@ Provisional. Arqlet is a prototype; releases are `0.x` and may break any API.
 | crates.io | `arqlet` | facade: re-exports the engine crates, `dispatch` and `dispatch_streaming` |
 | crates.io | `arqlet-model`, `arqlet-topology`, `arqlet-routing`, `arqlet-scene`, `arqlet-view`, `arqlet-layout`, `arqlet-reference`, `arqlet-elk`, `arqlet-runtime`, and (provisional, since 0.8.0) `arqlet-query`, `arqlet-query-cypher`, `arqlet-query-model`, `arqlet-query-json` | the engine crates, exact internal versions (`=x.y.z`) |
 | npm | `arqlet` | entry point: re-exports engine client and viewer, types from contracts |
-| npm | `@arqlet/engine-client` | `arqlet.wasm` (built by `prepack`), loader, worker, ELK-style call, presets |
+| npm | `@arqlet/engine-client` | `arqlet.wasm` and `arqlet-engine-query.wasm` (the engine with the operation `query`, loaded on request; both built by `prepack`), loader, worker, ELK-style call, presets |
 | npm | `@arqlet/viewer` | SVG renderer, navigation, route helpers, React Flow mapping |
 | npm | `@arqlet/contracts` | bundled TypeScript types (`dist/index.d.ts`, built by `prepack`) |
 | npm | `@arqlet/query` (provisional) | `arqlet-query.wasm` (built by `prepack`), loader and types: queries without the layout engine |
@@ -49,7 +49,9 @@ for p in contracts engine-client viewer arqlet query; do (cd packages/$p && pnpm
 and `query` (Rust with `wasm32-unknown-unknown`) and bundles the contract types. For those two packages it also writes
 `THIRD_PARTY_NOTICES.md`, the copyright and license notices of the Rust crates linked into their WASM
 (`tools/third-party-notices.mjs`; a crate without a license file fails `node tools/third-party-notices.mjs --check`, for
-the query module with `--package arqlet-query-wasm`, and a release waits for a decision on it).
+the query module with `--package arqlet-query-wasm`, and a release waits for a decision on it). `engine-client` builds
+the engine twice (`arqlet-wasm`, then with `--features query`) and ships both modules, with `THIRD_PARTY_NOTICES.md` for
+the default one and `THIRD_PARTY_NOTICES-query.md` for the other (`node tools/third-party-notices.mjs --check --features query`).
 Check a tarball by installing it into an empty project.
 
 ## Publish with the release workflow

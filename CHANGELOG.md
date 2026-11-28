@@ -24,6 +24,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   engine's `memory` answer adds `heapPeakBytes`, the counted peak since the previous `memory` or `release`. The
   integration guide has a section on a worker pool with admission by memory, and `examples/worker-pool` a runnable Node
   example.
+- **Engine package: a second WASM module with the operation `query`** (#210, provisional): `@arqlet/engine-client` (and
+  so `arqlet`) ships `arqlet-engine-query.wasm` beside `arqlet.wasm`: the same engine built with the runtime's cargo
+  feature `query`. `loadEngine({query: true})` and `createEngineWorker({query: true})` load it (new export `queryWasmUrl`;
+  `{url}` names a module of the host's own); then `session.query(text, {view: true})` answers in a resident session, a
+  plain one and through the worker, with hits mapped onto the drawn boxes and lines. The default module and the default
+  download are unchanged, and the default engine still refuses `query`. The package carries
+  `THIRD_PARTY_NOTICES-query.md` for the second module (the parser `decypher` and its dependencies) beside
+  `THIRD_PARTY_NOTICES.md`. Sizes of both modules: `benchmarks/results/engine-query-wasm-20261128.md`.
 - `octilinearRefine` (provisional, off by default; strategy `octilinear` only): after the octilinear star placement a
   deterministic local search on its lattice moves stations and branches so that the links outside the spanning tree are
   octilinear too, closer to a hand-drawn metro map. The cost is compared in rank order: line–node hits, crossings, links

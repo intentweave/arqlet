@@ -56,7 +56,8 @@
       "default": "./columns.js"
     },
     "./worker.js": "./worker.js",
-    "./arqlet.wasm": "./arqlet.wasm"
+    "./arqlet.wasm": "./arqlet.wasm",
+    "./arqlet-engine-query.wasm": "./arqlet-engine-query.wasm"
   },
   "files": [
     "engine.js",
@@ -75,18 +76,20 @@
     "columns.d.ts",
     "worker.js",
     "arqlet.wasm",
+    "arqlet-engine-query.wasm",
     "README.md",
     "LICENSE-APACHE",
     "LICENSE-MIT",
     "CHANGELOG.md",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "THIRD_PARTY_NOTICES-query.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "test": "node --test",
-    "prepack": "node ../../tools/npm-prepack.mjs --wasm"
+    "prepack": "node ../../tools/npm-prepack.mjs --wasm --engine-query-wasm"
   },
   "dependencies": {
     "@arqlet/contracts": "workspace:^"

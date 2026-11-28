@@ -3,15 +3,20 @@ set -eu
 cd "$(dirname "$0")/../.."
 input=${1:-exports/intentweave-initial/graph.json}
 mkdir -p apps/playground/generated
+# The default engine first, as the npm package ships it (`arqlet.wasm`, without the operation `query`); the package tests
+# load it from there in Node. The build with the feature below replaces the file in `target/` and is built last.
+cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --locked
+cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm packages/engine-client/arqlet.wasm
 # `--features query`: the operation `query` (ADR 0021, M5b) in the browser engine and in the backend's binaries, so that it
-# runs in all three deployment modes. The feature is off by default; the npm artifact is built without it for now.
+# runs in all three deployment modes. The feature is off by default; the npm package ships this build as the second module
+# `arqlet-engine-query.wasm` (`loadEngine({query: true})`, #210).
 cargo build -p arqlet-wasm --target wasm32-unknown-unknown --release --features query --locked
 # The native binaries the backend and the smoke test run: optimised like release, without LTO (`fast` profile), so the
 # backend answers about as fast as a release build and the build stays quick.
 cargo build -p arqlet-runtime --bins --features query --locked --profile fast
 cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm apps/playground/generated/arqlet.wasm
-# The npm package ships the engine beside its loader (git-ignored copy); the package tests load it from there in Node.
-cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm packages/engine-client/arqlet.wasm
+# The second module of the npm package beside its loader (git-ignored copy).
+cp target/wasm32-unknown-unknown/release/arqlet_wasm.wasm packages/engine-client/arqlet-engine-query.wasm
 # Replace only this generated demo artifact, never caller input.
 rm -f apps/playground/generated/snapshot.json
 target/fast/snapshot "$input" apps/playground/generated/snapshot.json 40

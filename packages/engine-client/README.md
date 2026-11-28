@@ -3,6 +3,9 @@
 The Arqlet engine as WebAssembly (`arqlet.wasm`, included) and its JavaScript access:
 
 - `engine.js`: `loadEngine(url?)` (browser via `fetch`, Node from disk), `sceneOf(run, snapshot)`, `createEngineWorker(url?)`;
+  `loadEngine({query: true})` and `createEngineWorker({query: true})` load the second module, `arqlet-engine-query.wasm`
+  (provisional): the same engine plus the operation `query`, so that `session.query(text, {view: true})` answers.
+  It is only fetched when asked for; its notices (the parser `decypher`) are in `THIRD_PARTY_NOTICES-query.md`;
 - `wasm-client.js`: `createEngine(bytes, {onPublish})`, the raw binding;
 - `elk.js`: `createElkLayout(run)`, an `elk.layout(graph)`-style call;
 - `session.js`: `createSession(run)`, a layout session that keeps positions across changes (collapse, expand, …)
@@ -20,6 +23,10 @@ The Arqlet engine as WebAssembly (`arqlet.wasm`, included) and its JavaScript ac
 - `presets.js`: `presetState` and `applyPreset`.
 
 Most users want the [`arqlet`](https://www.npmjs.com/package/arqlet) package, which re-exports these.
+Note for bundlers (Vite, webpack 5, esbuild): `engine.js` names both modules with a top-level `new URL('./…wasm', import.meta.url)`
+(`defaultWasmUrl`, `queryWasmUrl`), and a bundler emits every file it finds that way, so an app that imports `engine.js` gets
+`arqlet-engine-query.wasm` (about 2.2 MB gzip) as an asset too, although nothing downloads it unless the app asks for it.
+Making the URL lazy would not help: bundlers detect the pattern statically. Pass your own URL to `loadEngine` to avoid it.
 Bundlers that understand `new URL('./arqlet.wasm', import.meta.url)` (Vite, webpack 5,
 esbuild with a loader) copy the engine along; otherwise pass its URL to `loadEngine`.
 

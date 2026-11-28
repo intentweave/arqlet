@@ -39,6 +39,19 @@ test('the query module (@arqlet/query) has its own list, with the parser, and no
   assert.deepEqual(query.filter(c => c.files.length === 0).map(c => `${c.name} ${c.version}`), []);
 });
 
+test('the engine with the cargo feature query (arqlet-engine-query.wasm) lists the parser too; the default list does not', () => {
+  const withQuery = collect('arqlet-wasm', 'wasm32-unknown-unknown', 'query');
+  const linked = withQuery.map(c => c.name);
+  for (const expected of ['decypher', 'rowan', 'serde_json', 'libm']) assert.ok(linked.includes(expected), `${expected} must be listed`);
+  assert.ok(!names.includes('decypher'), 'the default module does not link the parser');
+  assert.ok(!linked.some(n => n.startsWith('arqlet')));
+  assert.deepEqual(withQuery.filter(c => c.files.length === 0).map(c => `${c.name} ${c.version}`), []);
+  const text = render(withQuery, 'arqlet-wasm', 'wasm32-unknown-unknown', 'query');
+  assert.match(text, /## decypher /);
+  assert.match(text, /--features query/);
+  assert.equal(notices('arqlet-wasm', 'wasm32-unknown-unknown', 'query'), text);
+});
+
 test('the native Node module (crates/node) has no license file missing; napi-rs texts are supplied', () => {
   for (const target of ['aarch64-apple-darwin', 'x86_64-unknown-linux-gnu', 'aarch64-unknown-linux-gnu', 'x86_64-pc-windows-msvc']) {
     const node = collect('arqlet-node', target);

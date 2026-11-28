@@ -1,5 +1,5 @@
 // One entry point for the Arqlet packages. Provisional: the API may change in any release.
-export {defaultWasmUrl, loadEngine, sceneOf, createEngineWorker} from '@arqlet/engine-client/engine.js';
+export {defaultWasmUrl, queryWasmUrl, loadEngine, sceneOf, createEngineWorker} from '@arqlet/engine-client/engine.js';
 export {createEngine} from '@arqlet/engine-client/wasm-client.js';
 export {createElkLayout} from '@arqlet/engine-client/elk.js';
 export {createSession, createOverviewSession, workerRun, workerRefineRun, httpRun} from '@arqlet/engine-client/session.js';

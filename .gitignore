@@ -23,6 +23,8 @@ __pycache__/
 /packages/*/CHANGELOG.md
 /packages/engine-client/arqlet.wasm
 /packages/engine-client/THIRD_PARTY_NOTICES.md
+/packages/engine-client/arqlet-engine-query.wasm
+/packages/engine-client/THIRD_PARTY_NOTICES-query.md
 /packages/query/arqlet-query.wasm
 /packages/query/THIRD_PARTY_NOTICES.md
 # local builds of the native Node module (packages/node/build.mjs)
