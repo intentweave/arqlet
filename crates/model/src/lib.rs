@@ -2131,6 +2131,26 @@ impl CommunityHubs {
     }
 }
 
+/// Provisional (#237, ADR 0018 addendum of 2026-11-28): the algorithm that finds communities (`communities`, the
+/// overview's clusters). Louvain (the default) may leave a community whose parts no link joins; Leiden (Traag, Waltman
+/// and van Eck 2019) refines every community into well-connected parts, so every community is connected (where a
+/// refinement merges nothing, the last level is the moving partition split into connected parts: connected, not
+/// necessarily well connected).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase")]
+pub enum CommunityAlgorithm {
+    #[default]
+    Louvain,
+    Leiden,
+}
+
+impl CommunityAlgorithm {
+    pub fn is_louvain(&self) -> bool {
+        *self == Self::Louvain
+    }
+}
+
 /// Experimental (`LayoutOptions::pack_components`): how the components of a container are packed.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -2511,6 +2531,16 @@ pub struct LayoutOptions {
     #[serde(default, skip_serializing_if = "CommunityHubs::is_empty")]
     #[cfg_attr(feature = "ts", ts(optional, as = "Option<CommunityHubs>"))]
     pub community_hubs: CommunityHubs,
+    /// Provisional (#237): the algorithm `communities` finds them with: `louvain` (the default, omitted) or `leiden`,
+    /// whose communities are always connected.
+    #[serde(default, skip_serializing_if = "CommunityAlgorithm::is_louvain")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<CommunityAlgorithm>"))]
+    pub community_algorithm: CommunityAlgorithm,
+    /// Provisional (#237): the resolution γ of the modularity `communities` optimises, a number > 0: larger gives smaller
+    /// communities. Unset (the default, omitted): 1. Another value is refused when the view is structured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub community_resolution: Option<f64>,
     /// The name before engine 0.4 (`initialCollapse`), refused with a message that names the new one.
     #[serde(
         default,
@@ -3001,6 +3031,8 @@ impl Default for LayoutOptions {
             lift_edges: None,
             hidden: Hidden::default(),
             community_hubs: CommunityHubs::default(),
+            community_algorithm: CommunityAlgorithm::Louvain,
+            community_resolution: None,
             renamed_initial_collapse: (),
             partial: BTreeMap::new(),
             global_layering: false,
@@ -3035,6 +3067,24 @@ impl Default for LayoutOptions {
 impl LayoutOptions {
     pub fn is_default(&self) -> bool {
         *self == Self::default()
+    }
+
+    /// Provisional (#237): an explicit `communityResolution` of 1 is the default and is not stored, so that the snapshot
+    /// is the same as without it (the overview treats it the same way).
+    pub fn normalize_communities(&mut self) {
+        if self.community_resolution == Some(1.) {
+            self.community_resolution = None;
+        }
+    }
+
+    /// Provisional (#237): `communityResolution` must be a finite number > 0, whether communities are found or not.
+    pub fn validate_communities(&self) -> Result<(), String> {
+        match self.community_resolution {
+            Some(x) if !(x.is_finite() && x > 0.) => {
+                Err("communityResolution must be a number > 0".into())
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Drops container entries that follow their content, so that they are stored only when they differ from content.
@@ -4322,6 +4372,14 @@ pub struct OverviewLayoutOptions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub hubs: Option<CommunityHubs>,
+    /// Provisional (#237): the algorithm that finds the communities (`louvain`), as `LayoutOptions::community_algorithm`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub community_algorithm: Option<CommunityAlgorithm>,
+    /// Provisional (#237): the resolution of modularity (1; > 0), as `LayoutOptions::community_resolution`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub community_resolution: Option<f64>,
 }
 
 /// Provisional: where an overview continues from. Positions of a previous overview, either `x`, `y`, `r` by node index
