@@ -15,6 +15,13 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   skewed link, 3 crossings, 1 station on a link and 8 bends become 0, 0, 0 and 3, for 2 lattice steps more. Its cost is
   bounded by a deterministic work budget per group (groups above 400 nodes are left as placed): about 0.1–0.25 s for
   400 nodes on one line (indicative, loaded Apple M3, `benchmarks/results/octilinear-refine-20261128.md`).
+- **Leiden beside Louvain** (#237, provisional; ADR 0018 addendum of 2026-11-28): `communityAlgorithm: "leiden"`, in the
+  overview's options and in the layout options (with `communities`, and for the `communities` operation), finds
+  communities with Leiden (Traag, Waltman and van Eck 2019), implemented from the paper with a greedy refinement: every
+  community is connected, where Louvain can leave one whose parts no link joins. `communityResolution` (a number > 0,
+  default 1) sets the resolution of modularity for both algorithms. Deterministic for any thread count and the same in
+  WASM; the work budget counts Leiden in Louvain's units. Louvain stays the default, and requests without the options
+  answer as before. New contract type `CommunityAlgorithm`. Measurements: `benchmarks/results/communities-20261128.md`.
 - **Inner-edge share and modularity per container on request** (#236, provisional; ADR 0018 addendum of
   2026-11-28): `containerStats: true` adds `containerStats` to the `overview` answer: per container (node index, -1 the
   root) the weight of the edges inside it and of those touching it, their share, and its term of the modularity of the

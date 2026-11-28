@@ -73,6 +73,10 @@ const requests = [
   ['elkLayout', {op: 'elkLayout', graph: elk}],
   ['elkLayout refined', {op: 'elkLayout', graph: elk, refine: true}],
   ['overview 10 000', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json')}],
+  // Leiden beside Louvain (#237): the overview and the layout's communities, at the default and another resolution.
+  ['overview 10 000, Leiden', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json'), options: {communityAlgorithm: 'leiden'}}],
+  ['overview 10 000, Leiden at resolution 2', {op: 'overview', graph: graph('benchmarks/datasets/overview-10000.json'), options: {communityAlgorithm: 'leiden', communityResolution: 2}, threads: 4}],
+  ['import organic-100, Leiden communities', {op: 'import', graph: graph('benchmarks/datasets/organic-100.json'), limit: 200, options: {communities: 8, communityAlgorithm: 'leiden'}}],
 ];
 // A view whose repair grid is over its bound, with the sparse grid (#203).
 const mesh = JSON.parse(execFileSync(process.execPath, [join(ROOT, 'benchmarks/experiments/bus-mesh.mjs'), '100', '0', 'organic', 'lines', '120', '500'], {maxBuffer: 1 << 30}).toString());

@@ -1136,6 +1136,7 @@ fn handle_request(request: Request) -> Response {
                 } else {
                     typed(&v["options"])?
                 };
+                options.validate_communities()?;
                 crate::community_groups(&graph, &options)
             });
             match answer {
