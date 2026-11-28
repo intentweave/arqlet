@@ -2,8 +2,10 @@
 
 Date: 2026-11-22.
 Status: proposed. C2 is built (provisional, 2026-11-27): `arqlet_runtime::shared_sessions::SharedSessionStore`, used by
-the native Node adapter ([ADR 0030](0030-native-node-adapter.md)). The playground backend still runs one
-`layout-command --sessions` process and feeds it one message at a time (C1 and C3 are open).
+the native Node adapter ([ADR 0030](0030-native-node-adapter.md)). C3's estimate is built (provisional, 2026-11-27):
+`estimate`, `benchmarks/results/memory-estimate-20261127.md`, and the worker pool with admission by memory in the
+integration guide. The playground backend still runs one `layout-command --sessions` process and feeds it one message at
+a time (C1 is open).
 
 Related: [ADR 0019](0019-engine-interface.md) (sessions, the session store belongs to the runtime),
 [ADR 0023](0023-primary-store-replicas-and-change-stream.md) (item 9: sessions as a cache, a native Node adapter; step

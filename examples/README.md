@@ -5,3 +5,6 @@ locally, request a broader refinement, then edit again before that result arrive
 Show accepted updates without losing focus or overwriting the newer edit.
 
 This directory currently documents the scenario; it contains no running demo.
+
+`worker-pool/` is a runnable example of a different kind: a Node pool of WASM engine workers with admission by estimated
+peak memory (ADR 0024, C3), see its README.

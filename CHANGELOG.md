@@ -7,6 +7,23 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **An estimate of a request's peak memory before it runs** (#224, provisional; ADR 0024 step C3): `{op: "estimate",
+  request}` through `dispatch` and in a resident session (`session.estimate(request)` in `engine-client`) answers the
+  heap an import, an edit (toggle, reveal, filter, configure, restore, direction and the other edits that keep the view,
+  patch, add, a session's `change`), a refinement or an overview will need at its peak, with its parts (`request`,
+  `input`, `structure`, `layout`, `content`, `floor`), the view the operation lays out and the target (`native64` or
+  `wasm32`: each build estimates for itself). It reads the request and finds the view the way the operation does,
+  without laying out; a structural floor covers reading the request and handling the whole source graph. Operations it
+  does not know are refused with `heavy` (run alone) or as light reads. A calibrated estimate, not a guarantee: on the
+  calibration rows (reference datasets and generated graphs up to 114k nodes) it was at or above every measured peak,
+  with a margin of 1.15; above 4 MB its median for imports, edits and overviews was 1.15 to 2.0 times the peak natively
+  and 1.16 to 1.46 in WASM. On graph shapes left out of the fit it can fall below (0.89 natively with all code indexes
+  left out, 0.13 to 0.36 with the full layouts left out). Natively the resident memory can be up to 3 times the counted
+  heap it estimates (macOS). Recalibrate with `benchmarks/memory-estimate/fit.py` whenever layout code changes
+  ([results](benchmarks/results/memory-estimate-20261127.md), `benchmarks/memory-estimate/README.md`). The WASM
+  engine's `memory` answer adds `heapPeakBytes`, the counted peak since the previous `memory` or `release`. The
+  integration guide has a section on a worker pool with admission by memory, and `examples/worker-pool` a runnable Node
+  example.
 - **Engine package: a second WASM module with the operation `query`** (#210, provisional): `@arqlet/engine-client` (and
   so `arqlet`) ships `arqlet-engine-query.wasm` beside `arqlet.wasm`: the same engine built with the runtime's cargo
   feature `query`. `loadEngine({query: true})` and `createEngineWorker({query: true})` load it (new export `queryWasmUrl`;
@@ -113,6 +130,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `CHANGELOG.md`, copied by `prepack` (`tools/npm-prepack.mjs`) as the licenses are.
 
 ### Fixed
+
+- **The WASM engine read every request as a JSON value before dispatching it** (`dispatch_streaming`, used by `lw_run`),
+  only to find out whether it was a progressive refinement: an import's graph as a value takes several times its typed
+  size, and in WASM that stays as the worker's linear memory. Only a request that names `refineProgressive` is read so
+  now; answers are unchanged. A WASM `dispatch` import of the 20k synthetic graph: 145.4 → 97.2 MB of linear memory.
 
 - **A `patch` into a view with buses draws what an import of the patched graph draws** (#228, ADR 0029 C). It started
   from the earlier drawing and drew far worse in layered views with bus lines and organic views with bus bars: on the

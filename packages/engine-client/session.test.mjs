@@ -569,3 +569,22 @@ test('query: rows over the source graph and the content, in a resident and a pla
   assert.match(bad.error, /^query syntax:/);
   assert.equal((await createSession(queryEngine).query('RETURN 1')).ok, false, 'nothing imported yet');
 });
+
+test('a session estimates a request before it runs, on its current view, resident or not (ADR 0024, C3)', {skip: !engine}, async () => {
+  for (const resident of [true, false]) {
+    const session = createSession(engine, {resident});
+    const before = await session.estimate({op: 'import', graph, limit: 100});
+    assert.equal(before.ok, true, before.error);
+    assert.ok(before.estimate.bytes > 0);
+    assert.equal(before.estimate.target, 'wasm32');
+    assert.equal((await session.import(graph)).ok, true);
+    const collapse = await session.estimate({op: 'toggle', nodeId: 'root'});
+    assert.equal(collapse.ok, true, collapse.error);
+    assert.equal(collapse.estimate.kind, 'open');
+    assert.ok(collapse.estimate.view.nodes > 0);
+    const refine = await session.estimate({op: 'refine', threads: 4, workBudget: 8});
+    assert.equal(refine.estimate.jobs, 4);
+    // Nothing changed: the next edit applies to the same revision.
+    assert.equal((await session.collapse('root')).ok, true);
+  }
+});

@@ -153,12 +153,20 @@ pub extern "C" fn lw_session_overview_column(id: u32, index: u32) -> u64 {
 /// system allocator (one addition per allocation; it changes no result).
 struct Counting;
 static LIVE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+/// Provisional (ADR 0024, C3): the highest live heap since the last `memory` or `release` answer (which reports it as
+/// `heapPeakBytes` and starts the next interval at the live heap), so a host can read the peak of the requests between.
+static PEAK: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+fn grew(by: usize) {
+    let now = LIVE.fetch_add(by, std::sync::atomic::Ordering::Relaxed) + by;
+    PEAK.fetch_max(now, std::sync::atomic::Ordering::Relaxed);
+}
 
 unsafe impl std::alloc::GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: std::alloc::Layout) -> *mut u8 {
         let p = std::alloc::System.alloc(layout);
         if !p.is_null() {
-            LIVE.fetch_add(layout.size(), std::sync::atomic::Ordering::Relaxed);
+            grew(layout.size());
         }
         p
     }
@@ -170,7 +178,7 @@ unsafe impl std::alloc::GlobalAlloc for Counting {
         let q = std::alloc::System.realloc(p, layout, size);
         if !q.is_null() {
             if size >= layout.size() {
-                LIVE.fetch_add(size - layout.size(), std::sync::atomic::Ordering::Relaxed);
+                grew(size - layout.size());
             } else {
                 LIVE.fetch_sub(layout.size() - size, std::sync::atomic::Ordering::Relaxed);
             }
@@ -183,12 +191,20 @@ unsafe impl std::alloc::GlobalAlloc for Counting {
 static ALLOCATOR: Counting = Counting;
 
 /// The answer to a session's `memory` or `release` with what only the module knows: the live heap of the whole module
-/// (every session and the answer being written) and the size of its linear memory, which WebAssembly never gives back.
+/// (every session and the answer being written), its highest value since the previous such answer (`heapPeakBytes`), and
+/// the size of its linear memory, which WebAssembly never gives back.
 fn with_heap(request: &str, answer: String) -> String {
+    if !arqlet_runtime::memory::is_memory_answer(request, &answer) {
+        return answer;
+    }
     let live = LIVE.load(std::sync::atomic::Ordering::Relaxed);
+    // The peak since the previous `memory` or `release` answer; the next interval starts at the live heap.
+    let peak = PEAK
+        .swap(live, std::sync::atomic::Ordering::Relaxed)
+        .max(live);
     #[cfg(target_arch = "wasm32")]
     let linear = Some(core::arch::wasm32::memory_size(0) as u64 * 65_536);
     #[cfg(not(target_arch = "wasm32"))]
     let linear = None;
-    arqlet_runtime::memory::with_adapter_heap(request, answer, live, linear)
+    arqlet_runtime::memory::with_adapter_heap_peak(request, answer, live, Some(peak), linear)
 }
