@@ -274,6 +274,72 @@ request without it is answered exactly as before (byte-identical, the default pa
    limit times that rate, less a margin for the linear part (the time of a request with `workBudget: 0`, which packs
    everything). Measured units per second on generated graphs: [results](../../benchmarks/results/overview-work-budget-20261127.md).
 
+## Addendum (2026-11-27): filling given containers later (#235)
+
+A host that draws a large overview from a server wants to show the top level first and arrange the clusters one by
+one (the largest last), or when one is opened, without anything else moving. A work budget (item 5 above) leaves
+containers packed in rows, and a continuation keeps them packed. Provisional; a request without the new fields is
+answered exactly as before (byte-identical).
+
+1. **Request.** A continuation names the containers to fill: `start.fill` (node ids, added clusters included) and
+   `start.fillTop: true` for the top level. It needs earlier places as `moved` does: `start.x`, `y`, `r`, `start.nodes`,
+   or a session's last overview (`start: {fill: […]}`). Ids that name no container (no node, or one without children)
+   are left out and listed (`fill.ignored`), as `continuation.ignored` lists entries: a host continuing by id may name
+   a cluster that was dissolved or a container that lost its children. A start left out because the budget cut the
+   clustering (`work.startIgnored`) takes its fill along: every id it names is listed in `fill.ignored`.
+2. **What a fill is.** The container's children are arranged as a layout without `start` arranges them (the spiral,
+   the forces, the separation, the enclosing circle), with the radii they have now; the result is placed on the
+   container's centre. Its own disc keeps its radius, so its parent sees no change and keeps its arrangement, and so do
+   all others: every place outside the filled containers is answered as it was given, bit for bit. To make that hold,
+   a fill request keeps the earlier radius of every container kept as it was whenever that radius still holds its
+   children up to rounding (`Previous::keep_radii`). Without `fill` it is measured again as before: up to a hundredth
+   off on some containers, and a container filled earlier, which has free room, shrinks to its content (its neighbours
+   stay; the gap stays open unless `settle`). That is why it is not the default; see open points.
+   The top level has no disc to keep: it takes the radius its new arrangement needs, and its children move with what
+   they hold.
+3. **Content that does not fit.** First the container's own padding gives way: the arrangement is taken when its
+   children lie inside the disc, even closer to its border than the padding, never beyond it (whatever the padding;
+   a tolerance on the radius let a child stick out by a few thousandths with padding 0, found in review). This matters: forces do not always arrange
+   tighter than rows. On the generated 10 000-node graph (`overview-10000.json`, budget 20 000 000, 474 packed
+   containers) 93 containers, mostly files of 6 to 16 equal leaves that rows fill well, needed 1 to 15 % more radius
+   with their padding; with the padding giving way all fit (measured once on an Apple M3, `tools/platform-parity.mjs`
+   inputs). Only content that reaches beyond the disc (a host may have set it smaller with `radii`) is unfit: nothing
+   else is moved, the container is arranged as without `fill` and listed in `fill.unfit` with the radius it needs with
+   its padding (`fill.needed`). A host that wants it to grow gives that radius in `radii` together with `fill`: the
+   disc grows and its neighbours make room, as for any container whose radius changed (`settle` applies there as
+   always). Rejected: shrinking the gap between the children (an option of the whole overview; a smaller one inside one
+   container reads as another rule), growing on its own (the request asked for nothing else to move), and packing such
+   a container again (it is what the host asked to replace).
+4. **Not recursive.** A container inside a filled one is arranged anew only when it is named too, and then it keeps
+   its own disc as well, so one request naming several nested containers gives what single requests one after another
+   give (inside out). Rejected: a nested filled container taking the radius it needs. It would be tighter, but with a
+   work budget the outer container may not fit and keep its old arrangement, whose child would then have changed size
+   and pack it; the rule "the disc stays" holds in every case.
+5. **Work budget.** A fill is the arrangement of its container (#211 item 3): counted the same, in the same order
+   (level by level from the leaves up, index order within a level; the top level last). The first that does not fit
+   ends the budgeted work as before; a named container left out keeps its places (the fallback keeps an unchanged
+   container; one that changed too is packed and in `work.packed`) and is listed in `fill.overBudget`. An unfit
+   container's work counts both attempts. In a fill request a container kept as it was costs nothing (#211 charged
+   it the start, `k + l`): that work would come back unchanged in every round and eat the budget the fills need.
+   **Stop rule:** each round fills at least the first named container in the order whose fill alone fits the budget,
+   since nothing before it in a fill request costs anything but other fills. A round that fills nothing changes no
+   place, so the same request again gives the same answer: the host stops there or raises the budget. A host
+   therefore asks again with `fill.overBudget` while the last round filled something (found in review: listing the
+   left-out containers in `work.packed` and charging the kept ones, a container whose fill needed more than the
+   budget left after the kept ones was listed again in every round, unchanged, without end).
+6. **Other fields.** `moved` naming a node inside a filled container (anywhere below it; every node with `fillTop`) is
+   refused: it could not stay where it was put. `moved` elsewhere, `radii`, `settle`, places by id, `edgeData`,
+   `positionsOnly` and `columns` work as before; the report `fill` (`filled`, `unfit`, `needed`, `overBudget`, `ignored`; containers
+   as node indices, -1 the top level) comes with the whole answer, the positions-only answer and the columnar metadata.
+   A container without an earlier place (placed anew) has no disc either and takes the radius it needs. Sessions need
+   nothing new: `start: {fill: […]}` continues from the last overview, and the filled answer is the last one for the
+   next request. A fill acts on the earlier places after they are read (`Previous`), so a change of how places by id
+   are read (switching partitions, #239) does not touch it.
+
+Open: whether every continuation should keep earlier radii that still hold their children (it would change existing
+answers by a hundredth on some containers, and stop discs with free room from shrinking); `fill: []` asks for it now; a fill that settles the arrangement from the packed places instead of a
+fresh start (it would keep the reading order of the rows, at the price of a less tidy result).
+
 ## Real data (2026-11-11)
 
 On two real exports (Intentweave, 8 874 nodes; Backstage, 31 758 nodes; `benchmarks/results/overview-real-20261111.md`)
