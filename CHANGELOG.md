@@ -34,6 +34,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   order as long as it lasts, the rest listed in `fill.overBudget` (a round that fills nothing would repeat unchanged: stop or raise the budget). Through `dispatch`, in sessions (`start: {fill}`) and
   `createOverviewSession`, identical for any thread count and natively and in WASM; requests without the fields answer
   as before. New contract type `OverviewFill`.
+- **Switching overview partitions from the old places** (#239, provisional; ADR 0018 addendum of 2026-11-28):
+  `start.carry: true` with `start.nodes` lets the nodes a switch between two partitions (`groups`) would place anew
+  start from their old absolute places instead: a new group at the centre of its members' old places, the members at
+  theirs, then the forces settle and the separation removes overlaps; what both partitions share continues as before.
+  The answer reports `continuation.carried` and `movement` (median and largest distance, absolute and as a share of
+  `rootRadius`), so a host can choose between animating and redrawing. On generated graphs the nodes moved less than
+  with the continuation without it where files moved, were regrouped or merged, every answer valid; with Louvain
+  dividing the new groups the largest moves can exceed today's ([results](benchmarks/results/overview-partition-switch-20261128.md)). In a session `start: {carry: true}` without
+  positions continues by id from the last overview, also after `groups` or the graph changed; `createOverviewSession`
+  does the same. Requests without it are answered as before (byte-identical). New contract type `OverviewMovement`.
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
   a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
   (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every

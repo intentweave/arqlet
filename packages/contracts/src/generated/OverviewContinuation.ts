@@ -17,4 +17,9 @@ anew: number,
  * Ids of entries that name no node of the overview (removed nodes), in id order. Ids of clusters the overview
  * added (`community:…`) that are gone are not listed.
  */
-ignored: Array<string>, };
+ignored: Array<string>,
+/**
+ * Provisional (#239), for a request with `start.carry`: how many of `anew` started from an earlier place all the
+ * same (their entry, or for a group without one the centre of what it holds). Omitted without `carry`.
+ */
+carried?: number, };

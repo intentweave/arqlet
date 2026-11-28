@@ -2346,3 +2346,154 @@ fn a_partition_of_the_host_is_shown_as_given_and_a_switch_keeps_the_groups_both_
         "start": {"nodes": places_with_parents(&a)}}));
     assert_eq!(switched["overview"], b);
 }
+
+/// The median and the largest distance the nodes of `rings()` moved from `before` to `after`.
+fn movement(before: &Value, after: &Value) -> (f64, f64) {
+    let mut moves: Vec<f64> = (0..4)
+        .flat_map(|r| (0..40).map(move |i| format!("r{r}n{i}")))
+        .map(|id| moved_by(before, after, &id))
+        .collect();
+    moves.sort_by(f64::total_cmp);
+    (
+        (moves[79] + moves[80]) / 2.,
+        moves.last().copied().unwrap_or(0.),
+    )
+}
+
+#[test]
+fn a_switch_of_partitions_with_carry_starts_from_the_old_places() {
+    let graph = rings();
+    let request = |groups: &Value, start: Value| {
+        json!({"op": "overview", "graph": graph,
+            "options": {"groups": groups, "communities": 0}, "start": start})
+    };
+    let a_groups = partition(|r, _| json!([format!("p{}", r % 2), format!("ring{r}")]));
+    let a = answer(&json!({"op": "overview", "graph": graph,
+        "options": {"groups": a_groups, "communities": 0}}));
+    let from_a = places_with_parents(&a);
+    // B merges rings 0 and 1 into a new group; C shares no path with A.
+    let b_groups = partition(|r, _| {
+        if r < 2 {
+            json!(["p0", "merged"])
+        } else {
+            json!([format!("p{}", r % 2), format!("ring{r}")])
+        }
+    });
+    let c_groups = partition(|_, i| json!(["all", format!("mod{}", i % 4)]));
+    for (name, groups, anew) in [("B", &b_groups, 81), ("C", &c_groups, 165)] {
+        let today = answer(&request(groups, json!({"nodes": from_a})));
+        let carried = answer(&request(groups, json!({"nodes": from_a, "carry": true})));
+        assert_nested(&carried);
+        let report = &carried["continuation"];
+        assert_eq!(report["anew"], anew, "{name}");
+        // Every node placed anew had a place to carry: the nodes from their entries, the new groups from their members.
+        assert_eq!(report["carried"], anew, "{name}");
+        let (median, max) = movement(&a, &carried);
+        let (median_today, max_today) = movement(&a, &today);
+        assert!(
+            median < median_today && max < max_today,
+            "{name}: carried {median:.1}/{max:.1}, today {median_today:.1}/{max_today:.1}"
+        );
+        // The report measures the same, on the answered centres, against the answer's root radius.
+        let m = &carried["movement"];
+        assert_eq!(m["nodes"], 160);
+        assert!(
+            (m["median"].as_f64().unwrap() - median).abs() < 0.011,
+            "{name} {m}"
+        );
+        assert!(
+            (m["max"].as_f64().unwrap() - max).abs() < 0.011,
+            "{name} {m}"
+        );
+        let share = max / carried["rootRadius"].as_f64().unwrap();
+        assert!(
+            (m["maxShare"].as_f64().unwrap() - share).abs() < 0.0002,
+            "{name} {m}"
+        );
+        // The same for any number of threads, and in a session that continues from its last overview by id.
+        let mut four = request(groups, json!({"nodes": from_a, "carry": true}));
+        four["threads"] = json!(4);
+        assert_eq!(answer(&four), carried, "{name}");
+        use arqlet_runtime::engine_session::EngineSession;
+        let mut session = EngineSession::new();
+        session.run_value(&json!({"op": "overview", "graph": graph,
+            "options": {"groups": a_groups, "communities": 0}}));
+        let switched = session.run_value(&json!({"op": "overview",
+            "options": {"groups": groups, "communities": 0}, "start": {"carry": true}}));
+        assert_eq!(switched["overview"], carried, "{name}");
+    }
+    // B keeps what both partitions share as without carry: the kept groups keep their inner arrangement.
+    let b = answer(&request(&b_groups, json!({"nodes": from_a, "carry": true})));
+    for r in 2..4 {
+        let group = format!("group:#:p{}/ring{r}", r % 2);
+        for i in 0..40 {
+            let id = format!("r{r}n{i}");
+            let rel = |o: &Value, k: &str| {
+                o[k][at(o, &id)].as_f64().unwrap() - o[k][at(o, &group)].as_f64().unwrap()
+            };
+            assert!((rel(&a, "x") - rel(&b, "x")).abs() < 0.02, "{id}");
+            assert!((rel(&a, "y") - rel(&b, "y")).abs() < 0.02, "{id}");
+        }
+    }
+    // Nothing placed anew: carry changes nothing but the reports.
+    let again = answer(&request(&a_groups, json!({"nodes": from_a, "carry": true})));
+    let plain = answer(&request(&a_groups, json!({"nodes": from_a})));
+    assert_eq!(again["continuation"]["carried"], 0);
+    let strip = |mut o: Value| {
+        o.as_object_mut().unwrap().remove("movement");
+        o["continuation"].as_object_mut().unwrap().remove("carried");
+        o
+    };
+    assert_eq!(strip(again), plain);
+    // Carry needs places by id, and is true or false.
+    let index = json!({"x": a["x"], "y": a["y"], "r": a["r"], "carry": true});
+    assert!(refusal(&request(&a_groups, index)).contains("carry needs places by id"));
+    assert!(
+        refusal(&request(&a_groups, json!({"nodes": from_a, "carry": 1})))
+            .contains("true or false")
+    );
+    // A session without an overview has nothing to carry from.
+    let mut empty = arqlet_runtime::engine_session::EngineSession::new();
+    let none =
+        empty.run_value(&json!({"op": "overview", "graph": graph, "start": {"carry": true}}));
+    assert_eq!(none["ok"], false);
+}
+
+#[test]
+fn a_carried_switch_works_within_a_work_budget_with_communities_and_positions_only() {
+    let graph = rings();
+    let a_groups = partition(|r, _| json!([format!("p{}", r % 2), format!("ring{r}")]));
+    let a = answer(&json!({"op": "overview", "graph": graph,
+        "options": {"groups": a_groups, "communities": 0}}));
+    // Louvain divides the new group: its clusters are made now and start from their members' places.
+    let one = partition(|_, _| json!(["all"]));
+    let divided = answer(&json!({"op": "overview", "graph": graph,
+        "options": {"groups": one, "communities": 30},
+        "start": {"nodes": places_with_parents(&a), "carry": true}}));
+    assert_nested(&divided);
+    assert!(divided["stats"]["communities"].as_u64().unwrap() >= 2);
+    assert_eq!(divided["continuation"]["carried"], 161);
+    // Within a budget that runs out: valid, the changed containers packed, the reports there.
+    let budget = answer(&json!({"op": "overview", "graph": graph,
+        "options": {"groups": one, "communities": 0}, "workBudget": 2000,
+        "start": {"nodes": places_with_parents(&a), "carry": true}}));
+    assert_nested(&budget);
+    assert_eq!(budget["work"]["limited"], true);
+    assert!(budget["movement"]["nodes"] == 160);
+    // A session: the switch is a whole answer (other clusters); a later carry on the same clusters may answer positions only.
+    use arqlet_runtime::engine_session::EngineSession;
+    let mut session = EngineSession::new();
+    session.run_value(&json!({"op": "overview", "graph": graph,
+        "options": {"groups": a_groups, "communities": 0}}));
+    let switched = session.run_value(&json!({"op": "overview", "positionsOnly": true,
+        "options": {"groups": one, "communities": 0}, "start": {"carry": true}}));
+    assert!(
+        switched["overview"].get("ids").is_some(),
+        "a switch answers the whole overview"
+    );
+    let still = session.run_value(&json!({"op": "overview", "positionsOnly": true,
+        "options": {"groups": one, "communities": 0}, "start": {"carry": true}}));
+    assert_eq!(still["overview"]["positionsOnly"], true);
+    assert_eq!(still["overview"]["continuation"]["carried"], 0);
+    assert_eq!(still["overview"]["movement"]["max"], 0.0);
+}

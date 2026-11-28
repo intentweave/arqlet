@@ -1,0 +1,38 @@
+{"file":"overview-3000.json","symbols":2813,"groups":138,"how":"A, no start","valid":true,"ms":898}
+{"file":"overview-3000.json","switch":"shared","communities":0,"how":"no start","valid":true,"median":65.4,"p90":91.7,"max":153.9,"rootRadius":0.989,"ms":306}
+{"file":"overview-3000.json","switch":"shared","communities":0,"how":"start.nodes","valid":true,"anew":308,"median":6,"p90":36.8,"max":174.1,"rootRadius":1.232,"ms":59}
+{"file":"overview-3000.json","switch":"shared","communities":0,"how":"start.nodes, carry","valid":true,"anew":308,"carried":308,"median":1.9,"p90":25.7,"max":128.5,"rootRadius":1.073,"movement":{"max":904.3,"maxShare":1.1966,"median":13.41,"medianShare":0.0177,"nodes":2813},"ms":64}
+{"file":"overview-3000.json","switch":"renamed","communities":0,"how":"no start","valid":true,"median":0,"p90":0,"max":0,"rootRadius":1,"ms":327}
+{"file":"overview-3000.json","switch":"renamed","communities":0,"how":"start.nodes","valid":true,"anew":2951,"median":0,"p90":0,"max":0,"rootRadius":1,"ms":302}
+{"file":"overview-3000.json","switch":"renamed","communities":0,"how":"start.nodes, carry","valid":true,"anew":2951,"carried":2951,"median":7.8,"p90":11.2,"max":24.3,"rootRadius":1.073,"movement":{"max":170.79,"maxShare":0.226,"median":55.04,"medianShare":0.0728,"nodes":2813},"ms":284}
+{"file":"overview-3000.json","switch":"regrouped","communities":0,"how":"no start","valid":true,"median":60.5,"p90":103,"max":144.5,"rootRadius":0.614,"ms":569}
+{"file":"overview-3000.json","switch":"regrouped","communities":0,"how":"start.nodes","valid":true,"anew":2816,"median":60.5,"p90":103,"max":144.5,"rootRadius":0.614,"ms":571}
+{"file":"overview-3000.json","switch":"regrouped","communities":0,"how":"start.nodes, carry","valid":true,"anew":2816,"carried":2816,"median":43.1,"p90":72.3,"max":115.1,"rootRadius":0.678,"movement":{"max":810.57,"maxShare":1.6971,"median":303.7,"medianShare":0.6359,"nodes":2813},"ms":572}
+{"file":"overview-3000.json","switch":"regrouped","communities":40,"how":"no start","valid":true,"median":95.8,"p90":157.4,"max":208.4,"rootRadius":1.454,"ms":272}
+{"file":"overview-3000.json","switch":"regrouped","communities":40,"how":"start.nodes","valid":true,"anew":2816,"median":95.8,"p90":157.4,"max":208.4,"rootRadius":1.454,"ms":271}
+{"file":"overview-3000.json","switch":"regrouped","communities":40,"how":"start.nodes, carry","valid":true,"anew":2816,"carried":2816,"median":88.6,"p90":124.7,"max":196.8,"rootRadius":1.688,"movement":{"max":1385.36,"maxShare":1.1657,"median":623.43,"medianShare":0.5246,"nodes":2813},"ms":274}
+{"file":"overview-3000.json","switch":"merge","communities":0,"how":"no start","valid":true,"median":68.4,"p90":101.6,"max":164,"rootRadius":0.83,"ms":300}
+{"file":"overview-3000.json","switch":"merge","communities":0,"how":"start.nodes","valid":true,"anew":2913,"median":83.9,"p90":127,"max":148.5,"rootRadius":1.273,"ms":312}
+{"file":"overview-3000.json","switch":"merge","communities":0,"how":"start.nodes, carry","valid":true,"anew":2913,"carried":2913,"median":20.6,"p90":37.9,"max":80.3,"rootRadius":0.86,"movement":{"max":565.04,"maxShare":0.9332,"median":144.71,"medianShare":0.239,"nodes":2813},"ms":285}
+{"file":"overview-3000.json","switch":"split","communities":0,"how":"no start","valid":true,"median":27.2,"p90":93.6,"max":122.3,"rootRadius":0.99,"ms":298}
+{"file":"overview-3000.json","switch":"split","communities":0,"how":"start.nodes","valid":true,"anew":2291,"median":96.8,"p90":163.7,"max":181,"rootRadius":1.852,"ms":251}
+{"file":"overview-3000.json","switch":"split","communities":0,"how":"start.nodes, carry","valid":true,"anew":2291,"carried":2291,"median":30.2,"p90":51,"max":108.9,"rootRadius":0.996,"movement":{"max":766.49,"maxShare":1.0932,"median":212.74,"medianShare":0.3034,"nodes":2813},"ms":247}
+{"file":"overview-10000.json","symbols":9445,"groups":452,"how":"A, no start","valid":true,"ms":1043}
+{"file":"overview-10000.json","switch":"shared","communities":0,"how":"no start","valid":true,"median":27.8,"p90":64.8,"max":182.6,"rootRadius":1.014,"ms":1025}
+{"file":"overview-10000.json","switch":"shared","communities":0,"how":"start.nodes","valid":true,"anew":1021,"median":19.5,"p90":59.2,"max":187.5,"rootRadius":1.316,"ms":182}
+{"file":"overview-10000.json","switch":"shared","communities":0,"how":"start.nodes, carry","valid":true,"anew":1021,"carried":1021,"median":7.2,"p90":30,"max":164.2,"rootRadius":1.043,"movement":{"max":1917.43,"maxShare":1.5752,"median":84.46,"medianShare":0.0694,"nodes":9445},"ms":227}
+{"file":"overview-10000.json","switch":"renamed","communities":0,"how":"no start","valid":true,"median":0,"p90":0,"max":0,"rootRadius":1,"ms":1089}
+{"file":"overview-10000.json","switch":"renamed","communities":0,"how":"start.nodes","valid":true,"anew":9897,"median":0,"p90":0,"max":0,"rootRadius":1,"ms":1060}
+{"file":"overview-10000.json","switch":"renamed","communities":0,"how":"start.nodes, carry","valid":true,"anew":9897,"carried":9897,"median":5.3,"p90":9.5,"max":19.1,"rootRadius":1.048,"movement":{"max":222.72,"maxShare":0.1821,"median":62.39,"medianShare":0.051,"nodes":9445},"ms":967}
+{"file":"overview-10000.json","switch":"regrouped","communities":0,"how":"no start","valid":true,"median":69.3,"p90":112.6,"max":159.7,"rootRadius":0.689,"ms":2246}
+{"file":"overview-10000.json","switch":"regrouped","communities":0,"how":"start.nodes","valid":true,"anew":9450,"median":69.3,"p90":112.6,"max":159.7,"rootRadius":0.689,"ms":2365}
+{"file":"overview-10000.json","switch":"regrouped","communities":0,"how":"start.nodes, carry","valid":true,"anew":9450,"carried":9450,"median":49.3,"p90":88.5,"max":137.9,"rootRadius":0.768,"movement":{"max":1610.08,"maxShare":1.7967,"median":575.88,"medianShare":0.6426,"nodes":9445},"ms":2058}
+{"file":"overview-10000.json","switch":"regrouped","communities":40,"how":"no start","valid":true,"median":116.2,"p90":175.3,"max":234.9,"rootRadius":1.622,"ms":921}
+{"file":"overview-10000.json","switch":"regrouped","communities":40,"how":"start.nodes","valid":true,"anew":9450,"median":116.2,"p90":175.3,"max":234.9,"rootRadius":1.622,"ms":943}
+{"file":"overview-10000.json","switch":"regrouped","communities":40,"how":"start.nodes, carry","valid":true,"anew":9450,"carried":9450,"median":113.9,"p90":177.9,"max":255.5,"rootRadius":2.241,"movement":{"max":2983.15,"maxShare":1.14,"median":1329.72,"medianShare":0.5081,"nodes":9445},"ms":924}
+{"file":"overview-10000.json","switch":"merge","communities":0,"how":"no start","valid":true,"median":65.3,"p90":127.7,"max":170.4,"rootRadius":1.016,"ms":1047}
+{"file":"overview-10000.json","switch":"merge","communities":0,"how":"start.nodes","valid":true,"anew":5522,"median":57.5,"p90":125,"max":173.8,"rootRadius":1.51,"ms":610}
+{"file":"overview-10000.json","switch":"merge","communities":0,"how":"start.nodes, carry","valid":true,"anew":5522,"carried":5522,"median":18.1,"p90":43.6,"max":92.3,"rootRadius":1.092,"movement":{"max":1077.39,"maxShare":0.8453,"median":211.8,"medianShare":0.1662,"nodes":9445},"ms":570}
+{"file":"overview-10000.json","switch":"split","communities":0,"how":"no start","valid":true,"median":12.4,"p90":50.8,"max":103.7,"rootRadius":0.975,"ms":986}
+{"file":"overview-10000.json","switch":"split","communities":0,"how":"start.nodes","valid":true,"anew":3180,"median":23.8,"p90":109.5,"max":174.7,"rootRadius":1.214,"ms":388}
+{"file":"overview-10000.json","switch":"split","communities":0,"how":"start.nodes, carry","valid":true,"anew":3180,"carried":3180,"median":26.2,"p90":37,"max":54.6,"rootRadius":1.066,"movement":{"max":637.83,"maxShare":0.5124,"median":305.33,"medianShare":0.2453,"nodes":9445},"ms":398}

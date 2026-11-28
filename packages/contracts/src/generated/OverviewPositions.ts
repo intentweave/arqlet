@@ -2,6 +2,7 @@
 import type { OverviewBusLine } from "./OverviewBusLine";
 import type { OverviewContinuation } from "./OverviewContinuation";
 import type { OverviewFill } from "./OverviewFill";
+import type { OverviewMovement } from "./OverviewMovement";
 import type { OverviewRepresentation } from "./OverviewRepresentation";
 import type { OverviewStats } from "./OverviewStats";
 import type { OverviewWork } from "./OverviewWork";
@@ -31,4 +32,8 @@ work?: OverviewWork,
 /**
  * For a request with `start.fill` (`Overview::fill`).
  */
-fill?: OverviewFill, };
+fill?: OverviewFill,
+/**
+ * For a request with `start.carry` (`Overview::movement`).
+ */
+movement?: OverviewMovement, };

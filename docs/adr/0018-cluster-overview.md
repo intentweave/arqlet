@@ -1,7 +1,7 @@
 # ADR 0018: A cluster overview of the whole graph as a separate, light layout path
 
 Date: 2026-11-11.
-Status: proposed; implemented: operation `overview`, WebGL renderer, overview page, the three representations with user decisions, rules and the zoom policy, structured clusters in place with border ports.
+Status: proposed; implemented: operation `overview`, WebGL renderer, overview page, the three representations with user decisions, rules and the zoom policy, structured clusters in place with border ports, a work budget, filling containers later, switching partitions from the old places (`start.carry`).
 
 ## Context
 
@@ -339,6 +339,64 @@ answered exactly as before (byte-identical).
 Open: whether every continuation should keep earlier radii that still hold their children (it would change existing
 answers by a hundredth on some containers, and stop discs with free room from shrinking); `fill: []` asks for it now; a fill that settles the arrangement from the packed places instead of a
 fresh start (it would keep the reading order of the rows, at the price of a less tidy result).
+
+## Addendum (2026-11-28): switching partitions from the old places (#239)
+
+A host that shows its own partitions (`groups`) switches between two of the same nodes (by role, by feature) and wants
+to animate it. A continuation by id keeps only what both partitions share: a node whose path changed is placed anew
+beside the nodes it is linked to, and two partitions without a shared path give a fresh layout, so no node starts from
+where it was. Provisional; a request without the new field is answered exactly as before (byte-identical).
+
+1. **An option, not the behaviour of `start.nodes`:** `start.carry: true`, with `start.nodes`. Placing anew beside the
+   linked nodes is right for an edit of the graph (a node moved by an edit into a container far from its old place),
+   and it is documented and pinned by tests; carrying is right for a switch the host animates. The host knows which
+   one it does. Refused without places by id (`start.x`, `y`, `r` have no node whose container changed). Rejected:
+   carrying whenever parents changed. Every answer by id with changed parents would change, edits included.
+2. **Where nodes start.** `continue_by_id` reads the places as before (what continues is unchanged); then
+   `continuation::carry` gives every node it placed anew a start all the same (`Previous::carried`): a node with an
+   entry (a node of the graph, a group whose id both partitions have, a cluster kept by `clusters_by_id`) its entry's
+   absolute centre; a container without an entry (a group of the new partition, a cluster Louvain makes now) the
+   centre of what it holds, weighted by the area of their discs, from the innermost out. A new leaf without an entry is
+   still placed anew. Linear, not budgeted (part of reading the continuation).
+3. **Radii of new groups** are only a start: the disc that holds the members' old discs, plus the padding. The
+   arrangement runs from the leaves up, so a group's radius is measured from its own arrangement before its parent
+   needs it; the seed only marks the container as changed.
+4. **Settling and overlaps.** A container with a carried child runs the forces from those places at the temperature of
+   `settle` (`CARRY_ALPHA` = `SETTLE_ALPHA`), whether or not `settle` is asked, then the existing separation (no
+   overlap at the end, as always), and is centred again with its shift carried to its parent (`carry_shifts`, as for
+   `moved`), so that what it holds keeps its absolute place as far as the forces allow; the top level is not centred
+   again (its disc stays on the origin and holds everything). Every container above a carried node counts as changed
+   (it makes room, or settles with `settle`). Containers without carried children behave as before: a kept group keeps
+   its inner arrangement. Only making room (no forces) was rejected: a new group's members come from all over the old
+   drawing, so its disc would span it and the groups would be pushed apart until the root disc grew several times (the
+   same failure as clustering anew in the addendum of 2026-11-26). A full temperature (1, as a fresh layout) was
+   measured too: it moved more in five of six kinds of switch.
+5. **Report.** `continuation.carried`: how many of `anew` started from a carried place (groups count like nodes, as in
+   `anew`). `movement` (`{nodes, median, max, medianShare, maxShare}`): how far the graph's own nodes with an entry moved
+   from it, on the answered centres; the shares divide by the answer's `rootRadius`. The groups of `groups` are not
+   measured (their ids change with the partition), nor added clusters. A host animates below a share it chooses and
+   draws anew above it. Per container was considered and left out: one figure per answer is what the choice needs.
+6. **Work budget, fill, moved, radii.** A container with carried children has changed, so a budget that does not reach
+   it packs it (`work.packed`), as any changed container. `start.fill` acts on the places after they are read: a
+   carried container named in it is arranged as without a start (a new group has no earlier disc, so it takes the
+   radius it needs). `moved` naming a carried node is refused, as for any node placed anew. `radii` apply as always.
+7. **Sessions, positions only.** In a session, `start: {carry: true}` without positions continues by id from the last
+   overview (its places with their parents, as a host sends them from that answer), also after `groups` or the graph
+   changed; this closes for carry the open point of a session continuing a new graph from its own places. A switch
+   has other clusters, so `positionsOnly` gives the whole answer; `movement` comes with positions-only and columnar
+   answers like `continuation`. `createOverviewSession` sends the last places by id for `start: {carry: true}`.
+8. **Measured** ([results](../../benchmarks/results/overview-partition-switch-20261128.md)): generated code indexes,
+   flat (3 000 and 10 000 nodes), partition A by top directory and file, switched to six partitions. Every answer was
+   valid (no overlaps, every disc inside its parent). Carrying moved the nodes less than today's continuation (median,
+   90th percentile and largest) where files moved, were regrouped or merged, on both graphs. Exceptions: where Louvain
+   divides the new groups (`communities` > 0) the communities made now start on top of each other, and at 10 000 nodes
+   the largest move exceeded today's (255 % against 235 % of the root radius) and the root disc grew to 2.2 times A's;
+   a split lowered the largest moves to a third but raised the median a little; and the same members under other names,
+   which a fresh layout draws exactly as before, move a little (median 5 %) instead of not at all.
+
+Open: whether carrying should become the behaviour of `start.nodes` for switches only (it needs a way to tell a
+switch from an edit); spreading the seeds of clusters made now inside a new group (they start on one point today),
+or a full temperature for them, which measured better there; a host-given weight per node for the seeds.
 
 ## Real data (2026-11-11)
 

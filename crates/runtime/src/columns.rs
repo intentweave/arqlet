@@ -492,6 +492,9 @@ impl OverviewColumns {
             if let Some(fill) = &overview.fill {
                 meta["fill"] = serde_json::to_value(fill).unwrap_or_default();
             }
+            if let Some(movement) = &overview.movement {
+                meta["movement"] = serde_json::to_value(movement).unwrap_or_default();
+            }
             meta
         } else {
             let mut whole = serde_json::to_value(&overview).unwrap_or_default();

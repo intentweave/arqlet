@@ -346,7 +346,9 @@ export interface OverviewSession {
    * the work deterministically and the answer reports it (`work`); `overBudget: 'refuse'` refuses instead of packing
    * what did not fit, and the session keeps its last overview (ask each time). Provisional (#235): `start: {fill: [id]}`
    * arranges those containers anew inside their discs and keeps every other place (`fill` in the answer, ask each
-   * time). */
+   * time). Provisional (#239): `start: {carry: true}` continues by id from the last overview, also after `groups` (or
+   * the graph, with `open`) changed: nodes whose container changed start from their earlier places, and the answer
+   * says how far the nodes moved (`movement`, ask each time). */
   layOut(request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Provisional: the paths between two nodes of the overview's graph, read only (`GraphTrace`). */
   trace(from: string, to: string, init?: {mode?: 'shortest' | 'all'; edgeKinds?: string[]}): Promise<ReadAnswer<GraphTrace>>;
