@@ -319,6 +319,13 @@ scalableStress?: boolean,
  */
 sizeAwareStress?: boolean,
 /**
+ * Provisional: after the octilinear star placement (strategy `octilinear`), a local search on its lattice moves nodes
+ * and branches so that the links outside the spanning tree are octilinear too and the lines run straighter and
+ * shorter, as a hand-drawn metro map (`tree::octilinear_arrange`). Only the `octilinear` strategy reads it. Off by
+ * default and omitted when off.
+ */
+octilinearRefine?: boolean,
+/**
  * Use the hierarchical layered pipeline where the graph's area modes support it. Set false to use the previous
  * layered layout for comparison. The pipeline does not change explicit tree, radial or organic area strategies.
  */

@@ -7,6 +7,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- `octilinearRefine` (provisional, off by default; strategy `octilinear` only): after the octilinear star placement a
+  deterministic local search on its lattice moves stations and branches so that the links outside the spanning tree are
+  octilinear too, without line–node hits or crossings, and the lines bend less (bends rank before length), closer to a
+  hand-drawn metro map. On the example *Metro map*'s city: 1 skewed link, 3 crossings, 1 station on a line and 8 bends
+  become 0, 0, 0 and 3, for 2 lattice steps more. Groups above 400 nodes are left as placed.
 - **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
   sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
   pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time

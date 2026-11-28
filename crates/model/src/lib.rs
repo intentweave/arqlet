@@ -2439,6 +2439,12 @@ pub struct LayoutOptions {
     /// children, so large nodes are kept apart by the stress itself. Off by default.
     #[serde(default, skip_serializing_if = "is_false")]
     pub size_aware_stress: bool,
+    /// Provisional: after the octilinear star placement (strategy `octilinear`), a local search on its lattice moves nodes
+    /// and branches so that the links outside the spanning tree are octilinear too and the lines run straighter and
+    /// shorter, as a hand-drawn metro map (`tree::octilinear_arrange`). Only the `octilinear` strategy reads it. Off by
+    /// default and omitted when off.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub octilinear_refine: bool,
     /// Use the hierarchical layered pipeline where the graph's area modes support it. Set false to use the previous
     /// layered layout for comparison. The pipeline does not change explicit tree, radial or organic area strategies.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
@@ -2989,6 +2995,7 @@ impl Default for LayoutOptions {
             sparse_stress: false,
             scalable_stress: false,
             size_aware_stress: false,
+            octilinear_refine: false,
             layered_construction: true,
             abstract_routing: true,
             single_pass: true,
@@ -4796,6 +4803,19 @@ mod container_sizing_tests {
         assert!(options.size_aware_stress);
         assert_eq!(
             serde_json::to_value(options).unwrap()["sizeAwareStress"],
+            true
+        );
+    }
+
+    #[test]
+    fn octilinear_refine_is_opt_in_and_round_trips() {
+        let defaults = serde_json::to_value(LayoutOptions::default()).unwrap();
+        assert!(defaults.get("octilinearRefine").is_none(), "{defaults}");
+        let options: LayoutOptions =
+            serde_json::from_value(serde_json::json!({"octilinearRefine": true})).unwrap();
+        assert!(options.octilinear_refine);
+        assert_eq!(
+            serde_json::to_value(options).unwrap()["octilinearRefine"],
             true
         );
     }
