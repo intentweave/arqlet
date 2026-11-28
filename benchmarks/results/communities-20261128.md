@@ -1,10 +1,11 @@
 # Louvain against Leiden (#237, 2026-11-28)
 
-Apple M3 (8 cores), macOS 26.0, rustc 1.99.0, `--release` (lto thin), branch `leiden` from `origin/main` `2cfefcd`
-(working tree with the change, not yet committed). **The machine was shared and heavily loaded**: load average
-`28 / 54 / 57` before and `45 / 47 / 53` after the run (1, 5, 15 minutes). Modularity, communities, levels and work
+Apple M3 (8 cores, arm64), macOS 26.0, rustc 1.99.0, `--release` (lto thin), branch `leiden` at commit `ef16297`
+(clean tree; the results file is the only untracked change). The Python driver happened to run translated (Rosetta),
+which the machine line says; the engine and the measured test are native arm64 builds. **The machine was shared and
+loaded**: load average `11.5 / 31.5 / 39.3` before and `13.6 / 21.6 / 32.0` after the run (1, 5, 15 minutes). Modularity, communities, levels and work
 units are deterministic and do not depend on the load; **the times do**, and are not measurements of speed. Raw rows:
-[`communities-20261128T040936Z.jsonl`](communities-20261128T040936Z.jsonl) (first line: machine). Reproduce with
+[`communities-20261128T101504Z.jsonl`](communities-20261128T101504Z.jsonl) (first line: machine). Reproduce with
 `python3 benchmarks/overview/communities.py --reps 5` (it builds and runs the ignored test
 `crates/layout/tests/community_eval.rs` and times the `overview` operation through `layout-command`).
 
@@ -37,8 +38,8 @@ level of the hierarchy; work in the units of the work budget (ADR 0018, addendum
 | | | | Leiden | 0.8368 | 0 / 0 | 164 | 121 | 1 033 | 7 | 2 522 872 |
 | organic-300 | 120, 40 | 1 | Louvain | 0.8834 | 0 / 0 | 17 | 17 | 25 | 3 | 9 770 |
 | | | | Leiden | 0.8870 | 0 / 0 | 18 | 18 | 26 | 4 | 9 022 |
-| layerweave-code | 40 | 6 | Louvain | 0.4344 | 0 / 0 | 35 | 21 | 18 | 2 | 11 446 |
-| | | | Leiden | 0.4366 | 0 / 0 | 38 | 21 | 17 | 3 | 11 545 |
+| layerweave-code | 40 | 6 | Louvain | 0.4366 | 0 / 0 | 35 | 22 | 18 | 2 | 11 539 |
+| | | | Leiden | 0.4367 | 0 / 0 | 37 | 23 | 17 | 3 | 11 608 |
 
 ## The whole clustering, and the overview end to end
 
@@ -48,21 +49,21 @@ clustering work, and the median time of the clustering alone (5 runs) and of the
 
 | dataset | algorithm | clusters added | clustering work | clustering ms | overview s (median, min–max) |
 |---|---|---|---|---|---|
-| overview-10000 | Louvain | 227 | 84 684 | 2.7 | 0.79 (0.77–0.92) |
-| | Leiden | 249 | 78 710 | 2.9 | 0.77 (0.72–0.85) |
-| overview-50000 | Louvain | 1 088 | 448 952 | 14.2 | 3.66 (3.61–3.85) |
-| | Leiden | 1 238 | 411 973 | 15.0 | 3.85 (3.80–4.12) |
-| overview-100000 | Louvain | 2 252 | 868 521 | 29.0 | 9.67 (8.15–11.61) |
-| | Leiden | 2 534 | 804 771 | 30.9 | 13.20 (10.19–14.35) |
-| overview-flat-2000 | Louvain | 128 | 207 811 | 1.9 | 0.31 (0.30–0.32) |
-| | Leiden | 210 | 85 991 | 1.7 | 0.26 (0.25–0.27) |
-| overview-flat-10000 | Louvain | 707 | 2 264 353 | 16.1 | 1.57 (1.15–1.62) |
-| | Leiden | 1 126 | 484 698 | 10.3 | 0.91 (0.86–1.37) |
-| overview-flat-50000 | Louvain | 3 944 | 17 599 472 | 139.8 | 7.73 (6.28–8.04) |
-| | Leiden | 5 765 | 2 522 872 | 59.3 | 5.70 (5.46–5.95) |
-| layerweave-code (thr. 40) | Louvain | 32 | 11 446 | 0.5 | – |
-| | Leiden | 31 | 11 545 | 0.5 | – |
-| organic-300 | Louvain | 24 | 9 770 | 0.1 | – |
+| overview-10000 | Louvain | 227 | 84 684 | 3.8 | 0.96 (0.94–0.98) |
+| | Leiden | 249 | 78 710 | 4.0 | 0.96 (0.95–0.97) |
+| overview-50000 | Louvain | 1 088 | 448 952 | 19.5 | 4.37 (4.29–4.87) |
+| | Leiden | 1 238 | 411 973 | 20.3 | 4.22 (4.17–4.38) |
+| overview-100000 | Louvain | 2 252 | 868 521 | 39.6 | 9.24 (9.01–9.85) |
+| | Leiden | 2 534 | 804 771 | 41.7 | 10.01 (9.51–10.27) |
+| overview-flat-2000 | Louvain | 128 | 207 811 | 2.5 | 0.28 (0.23–0.29) |
+| | Leiden | 210 | 85 991 | 2.1 | 0.19 (0.19–0.20) |
+| overview-flat-10000 | Louvain | 707 | 2 264 353 | 20.3 | 1.14 (1.05–1.16) |
+| | Leiden | 1 126 | 484 698 | 12.8 | 0.88 (0.84–0.92) |
+| overview-flat-50000 | Louvain | 3 944 | 17 599 472 | 171.6 | 6.43 (6.37–7.06) |
+| | Leiden | 5 765 | 2 522 872 | 72.5 | 5.57 (5.46–5.90) |
+| layerweave-code (thr. 40) | Louvain | 33 | 11 539 | 0.5 | – |
+| | Leiden | 33 | 11 608 | 0.6 | – |
+| organic-300 | Louvain | 24 | 9 770 | 0.2 | – |
 | | Leiden | 26 | 9 022 | 0.1 | – |
 
 ## Findings
@@ -73,7 +74,7 @@ clustering work, and the median time of the clustering alone (5 runs) and of the
    (`leiden_keeps_connected_what_louvain_leaves_in_parts` in `crates/layout/src/overview/leiden.rs`), so it is rare
    here, not absent.
 2. **Modularity:** about equal. Leiden (greedy refinement) is within 0.1 % of Louvain on the hierarchical code index,
-   0.5–0.9 % lower on the flat graphs, 0.4–0.5 % higher on `organic-300` and `layerweave-code`.
+   0.5–0.9 % lower on the flat graphs, 0.4 % higher on `organic-300`, equal on `layerweave-code`.
 3. **Work:** about equal on the hierarchical graphs (Leiden 7–10 % less); on the flat graphs far less (2.4× at 2 000,
    4.7× at 10 000, 7.0× at 50 000 nodes): Louvain's sweeps run over every node while the queue of the moving phase only
    revisits nodes whose neighbourhood changed. The clustering time follows (2.4× faster at 50 000 flat, under load).
@@ -91,3 +92,9 @@ communities — on these graphs, its modularity is equal or slightly lower, and 
 large flat graphs by work (up to 7× less clustering work) and for hosts that need the guarantee. Before a default
 switch: measure on real exports (not in the repository), and decide whether the deeper hierarchy reads better; a
 randomised refinement with a seed would be the next lever on modularity.
+
+## Note on the inputs
+
+`layerweave-code` is generated from the repository's own source, so it changes with every commit; its rows belong to
+the graph generated at `ef16297` (an earlier run on the uncommitted tree gave slightly different values for it). All
+other inputs are generated deterministically (seed 1) and gave identical modularity, counts and work in both runs.

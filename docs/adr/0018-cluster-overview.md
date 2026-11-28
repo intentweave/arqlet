@@ -404,11 +404,11 @@ Provisional; a request or snapshot without the new options is computed exactly a
    ([results](../../benchmarks/results/communities-20261128.md), generated code index of 10 000 to 100 000 nodes, its
    flat variant of 2 000 to 50 000, and the reference views): Louvain left no community in parts on any of them (0 of
    2 991; a search over 20 000 small generated graphs found one case, now a test); modularity is equal within 1 %
-   (Leiden 0.5–0.9 % lower on the flat graphs, slightly higher on two reference views); Leiden's clustering work is
-   7–10 % lower on the hierarchical graphs and 2.4–7× lower on the flat ones, and it makes deeper hierarchies with more
-   clusters (+10 % on the code index, up to +64 % on flat graphs). Recommendation: keep Louvain the default until real
-   exports and the readability of the deeper hierarchy say otherwise; Leiden for large flat graphs and for hosts that
-   need the guarantee.
+   (Leiden 0.5–0.9 % lower on the flat graphs, 0.4 % higher on organic-300, equal on layerweave-code); Leiden's
+   clustering work is 7–10 % lower on the hierarchical graphs and 2.4–7× lower on the flat ones, and it makes deeper
+   hierarchies with more clusters (+10 % on the code index, up to +64 % on flat graphs). Recommendation: keep Louvain
+   the default until real exports and the readability of the deeper hierarchy say otherwise; Leiden for large flat
+   graphs and for hosts that need the guarantee. The owner approved Louvain as the default (2026-11-28).
 
 ## Real data (2026-11-11)
 

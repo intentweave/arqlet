@@ -3,6 +3,8 @@
 /**
  * Provisional (#237, ADR 0018 addendum of 2026-11-28): the algorithm that finds communities (`communities`, the
  * overview's clusters). Louvain (the default) may leave a community whose parts no link joins; Leiden (Traag, Waltman
- * and van Eck 2019) refines every community into well-connected parts, so every community is connected.
+ * and van Eck 2019) refines every community into well-connected parts, so every community is connected (where a
+ * refinement merges nothing, the last level is the moving partition split into connected parts: connected, not
+ * necessarily well connected).
  */
 export type CommunityAlgorithm = "louvain" | "leiden";
