@@ -100,6 +100,8 @@ mod overlaps;
 mod overview;
 #[path = "overview_budget.rs"]
 mod overview_budget;
+#[path = "overview_fill.rs"]
+mod overview_fill;
 #[path = "pack_components.rs"]
 mod pack_components;
 #[path = "paging.rs"]

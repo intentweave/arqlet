@@ -14,12 +14,33 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   default 1) sets the resolution of modularity for both algorithms. Deterministic for any thread count and the same in
   WASM; the work budget counts Leiden in Louvain's units. Louvain stays the default, and requests without the options
   answer as before. New contract type `CommunityAlgorithm`. Measurements: `benchmarks/results/communities-20261128.md`.
+- **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
+  sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
+  pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time
+  each. `@arqlet/node` (`packages/node`, `private` until publishing is decided) loads it with the interface of the WASM
+  engine: `loadNativeEngine({sessionBytes})` answers an asynchronous `run` with `openSession()` (`run`, `close`,
+  `columns`, `overview`) that `createSession` takes, and `loadEngine({engine})` chooses native, WASM or the first that
+  loads (`ARQLET_ENGINE`). The answers are byte-identical to the WASM engine's (`tools/platform-parity.mjs --node`).
+  Build it with `node packages/node/build.mjs`. Accepted gaps (ADR 0030): no progressive publications, phase timings
+  unreliable under concurrent calls, no musl or Intel macOS binaries; prebuilt binaries and publishing are a separate step.
+- **Sessions usable from several threads (provisional; ADR 0024 C2):** `arqlet_runtime::shared_sessions::SharedSessionStore`,
+  the store of the native adapter: one short lock for its book, one lock per session, a byte limit that never drops a
+  running session.
 - **A work budget for the overview** (#211, provisional; ADR 0018 addendum of 2026-11-27): `workBudget` bounds the
   `overview` operation deterministically, so a host can bound a request without terminating its worker. When it runs
   out, the answer is valid with the rest packed in rows and says what was left out (`work`: `used`, `limited`,
   `unclustered`, `packed`); `overBudget: "refuse"` fails cleanly instead. The same answer for any thread count, natively
   and in WASM; without `workBudget` nothing changes. New contract types `OverviewWork` and `OverBudget`. How to choose
   a budget: [integration guide](docs/integration-guide.md#bounding-an-overviews-work-provisional).
+- **Filling given clusters of an overview later** (#235, provisional; ADR 0018 addendum "filling given containers
+  later"): a continuation with `start.fill` (container ids) and `start.fillTop` arranges the interior of those containers
+  anew inside their discs, as a layout without `start` would, and keeps every other place as given, bit for bit. A host
+  draws the top level first (for example with a small `workBudget`) and fills the packed clusters one by one or on
+  demand. The container's padding gives way first; content that reaches beyond the disc is left as it was and reported with the radius it needs (`fill.unfit`,
+  `fill.needed`; give that in `radii` to let it grow); with a work budget the named containers are filled in a fixed
+  order as long as it lasts, the rest listed in `fill.overBudget` (a round that fills nothing would repeat unchanged: stop or raise the budget). Through `dispatch`, in sessions (`start: {fill}`) and
+  `createOverviewSession`, identical for any thread count and natively and in WASM; requests without the fields answer
+  as before. New contract type `OverviewFill`.
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
   a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
   (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every
@@ -28,6 +49,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   which, and it is the same on WebGPU, WebGL 2 and WebGL 1. A `bindOverviewNavigation` binding takes no input while its
   renderer is paused (a node drag in progress ends at its last point) and holds its idle wait until `resume`. The
   overview page pauses the overview while the scene view of a cluster covers it.
+- **Opening a cluster of an overview without the graph** (#209 part 2, provisional): `structuredExcerptOf(model, id,
+  {direction, bundle})` in `@arqlet/viewer/overview.js` (also `structuredExcerpt(null, model, id)`, and from `arqlet`)
+  builds the excerpt a drill-down lays out from an overview answer alone, for a host that computes the overview on a
+  server. The same rule as `structuredExcerpt` and, where both run, the same graph (checked on generated graphs and
+  engine answers): the cluster as the one top-level container, its inner edges, and its leaving edges to one stand-in
+  per neighbouring cluster, direction kept. Edge kinds and weights come from the answer's `edgeData` (without it: kind
+  `''`, weight 1, and `edgeData: false` says so); edges are named `edge:k` after their index in the answer
+  (`EXCERPT_EDGE_PREFIX`), so `overviewTrace` answers cannot be mapped onto them without the input edge ids; nodes carry
+  only `id`, `kind`, `label` and `parentId`. `bundle: true` merges the leaving edges of a node to a stand-in per kind and
+  direction into one weighted edge. Flow: [integration guide](docs/integration-guide.md#the-cluster-overview-as-a-server-result-provisional).
 - Integration guide: *Showing your own partition* (overview): a partition the host computed (for example with Leiden)
   as `groups`, flat or nested, with `communities: 0` shown as given; what Louvain does inside large groups, labels, the
   stable group ids, and switching between two partitions with `start.nodes` (a group both have keeps its inner

@@ -50,6 +50,11 @@ jobs:
       - run: corepack enable
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: sh apps/playground/build.sh examples/fixtures/small.json
+      # The native Node adapter (ADR 0030): its module, and its tests against the WASM engine that build.sh built.
+      - run: node packages/node/build.mjs --profile fast --features query
+        env:
+          RUSTUP_TOOLCHAIN: stable
+      - run: node --test packages/node/index.test.mjs
       - run: pnpm --filter @arqlet/contracts run typecheck
       - run: pnpm --filter @arqlet/playground run typecheck
       # The hand-written declarations of the published npm packages.

@@ -612,8 +612,9 @@ export function createOverviewSession(run, {resident: wanted = 'auto', columns =
       const answer = await (columns ? kept.overview(plain(asked), {copy: true}) : kept.run(asked));
       if (answer.ok && answer.overview?.positionsOnly) {
         const {positionsOnly: _moved, ...moved} = answer.overview;
-        // What became of places by id, and the work report (`workBudget`), belong to the answer that was asked with them.
-        const {continuation: _earlier, work: _work, ...kept} = last;
+        // What became of places by id, the work report (`workBudget`) and the fill report (`start.fill`) belong to the answer
+        // that was asked with them.
+        const {continuation: _earlier, work: _work, fill: _fill, ...kept} = last;
         return {...answer, overview: {...kept, ...moved}};
       }
       return answer;

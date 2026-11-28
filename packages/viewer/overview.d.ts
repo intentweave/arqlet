@@ -228,21 +228,79 @@ export interface InputGraph {
 /**
  * The excerpt a structured cluster lays out: the cluster as a top-level container with everything below it, its inner
  * edges, and its leaving edges (id and direction kept) to stand-ins for the clusters outside, so that they cross its box
- * at border ports.
+ * at border ports. With `graph` null, the excerpt from the overview alone (`structuredExcerptOf`).
  */
 export function structuredExcerpt(
   graph: InputGraph,
   model: OverviewModel,
   id: string,
   options?: {direction?: FlowDirection | null},
-): {
+): StructuredExcerpt;
+export function structuredExcerpt(
+  graph: null | undefined,
+  model: OverviewModel,
+  id: string,
+  options?: ExcerptOfOptions,
+): StructuredExcerptOf;
+
+export interface StructuredExcerpt {
   graph: InputGraph;
   /** The layout options to import the excerpt with (`isolatedGrid`: unconnected children in a grid, not one row). */
   options: {isolatedGrid: boolean};
+  /** The edges that leave the cluster (before any bundling). */
   leaving: number;
+  /** The edges inside the cluster. */
   inner: number;
   standIns: number;
+}
+
+/** The id prefix of the edges of an excerpt from the overview alone: `edge:` + the edge's index `k` in `overview.edges`. */
+export const EXCERPT_EDGE_PREFIX: 'edge:';
+
+export interface ExcerptOfOptions {
+  direction?: FlowDirection | null;
+  /** One edge per inner node, stand-in, direction and kind, weighted by the edges it stands for. Default false. */
+  bundle?: boolean;
+}
+
+/** A node of an excerpt from the overview alone: only what the answer carries. */
+export type ExcerptNode = {
+  id: string;
+  /** From the answer's `kinds`/`kind` (`node` without them); `community` for a cluster the overview added, `border`
+   * for a stand-in. */
+  kind: string;
+  /** From the answer's `labels` (without them `displayName` of the id); for added clusters and stand-ins `displayName`
+   * of the id, as `structuredExcerpt` names them. */
+  label: string;
+  parentId: string | null;
 };
+
+/** An edge of an excerpt from the overview alone. */
+export type ExcerptEdge = {
+  /** `EXCERPT_EDGE_PREFIX` + the index of the overview edge (of the first one, bundled). Not an input edge id: an
+   * `overviewTrace` answer cannot be mapped onto it without the input edge ids (`model.edgeIds`). */
+  id: string;
+  /** From the answer's edge data (`edgeKinds[edgeKind[k]]`); `''` without it. */
+  kind: string;
+  source: string;
+  target: string;
+  /** How many edges it stands for, when more than one (`edgeWeight`, summed when bundled). */
+  weight?: number;
+};
+
+export interface StructuredExcerptOf extends StructuredExcerpt {
+  graph: {nodes: ExcerptNode[]; edges: ExcerptEdge[]; defaultDirection?: FlowDirection};
+  /** Whether the answer had edge data (`edgeData: true`); without it every edge has the kind `''` and counts once. */
+  edgeData: boolean;
+}
+
+/**
+ * Provisional (#209): the excerpt of `structuredExcerpt` from the overview answer alone, without the input graph (the
+ * overview computed on a server). The same rule and, where both run, the same graph, except: edges are named
+ * `EXCERPT_EDGE_PREFIX` + their overview index, their kinds and weights come from the answer's edge data, and nodes
+ * carry only `id`, `kind`, `label` and `parentId`.
+ */
+export function structuredExcerptOf(model: OverviewModel, id: string, options?: ExcerptOfOptions): StructuredExcerptOf;
 
 export type FlowDirection = 'lr' | 'rl' | 'tb' | 'bt';
 /** The flow for a structured cluster that faces its neighbours, or null when there is no clear side. */

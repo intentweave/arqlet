@@ -350,6 +350,35 @@ test('an overview session passes a work budget on and reports the work only to t
   await kept.close();
 });
 
+test('an overview session fills packed containers one by one and reports the fill only to the request that asked', {skip: !engine}, async () => {
+  const kept = createOverviewSession(engine);
+  const sent = createOverviewSession(engine, {resident: false});
+  const both = async step => {
+    const [a, b] = [await step(kept), await step(sent)];
+    assert.equal(a.ok, true, a.error);
+    assert.deepEqual(a, b);
+    return a.overview;
+  };
+  const options = {communities: 0};
+  let o = await both(s => s.open(graph, {options, workBudget: 0}));
+  const packed = o.work.packed.filter(c => c >= 0);
+  assert.ok(packed.length > 0, JSON.stringify(o.work));
+  for (const c of packed) {
+    const next = await both(s => s.layOut({options, start: {fill: [o.ids[c]]}}));
+    assert.deepEqual(next.fill.filled, [c]);
+    assert.equal(next.stats.overlaps, 0);
+    // Nothing outside the filled container moved.
+    const inside = i => { for (let p = o.parent[i]; p >= 0; p = o.parent[p]) if (p === c) return true; return false; };
+    for (let i = 0; i < o.ids.length; i++) {
+      if (!inside(i)) assert.deepEqual([next.x[i], next.y[i], next.r[i]], [o.x[i], o.y[i], o.r[i]], o.ids[i]);
+    }
+    o = next;
+  }
+  const plain = await both(s => s.layOut({options, start: {}}));
+  assert.equal(plain.fill, undefined);
+  await kept.close();
+});
+
 test('an overview continued by id keeps its clusters over later layouts, in both kinds of session', {skip: !engine}, async () => {
   // Four dense rings without containers: communities. With the first ring last, clustering anew names them otherwise.
   const ids = Array.from({length: 160}, (_, i) => `r${Math.floor(i / 40)}n${i % 40}`);

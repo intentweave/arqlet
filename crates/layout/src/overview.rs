@@ -260,6 +260,45 @@ pub struct Previous {
     /// Provisional: containers that changed although no radius of a child tells it (a child left, or children no longer
     /// fit together): they make room, or settle, like those with a changed radius.
     pub changed: BTreeSet<Container>,
+    /// Provisional (#235): containers whose interior is arranged anew inside their disc, each with the radius of that
+    /// disc (`f64::INFINITY`: no disc to keep, the top level or a container without an earlier place). The children
+    /// are arranged as without a start (`arrange_metered` with `None`); when they lie inside the disc (the container's
+    /// padding may shrink), the container keeps
+    /// the disc's radius, so nothing outside it moves; otherwise it is arranged as without `fill` and says so
+    /// (`Arrangement::filled`). Not recursive: a filled container inside another keeps its own disc too.
+    pub fill: BTreeMap<Container, f64>,
+    /// Provisional (#235): a container kept as it was keeps its earlier radius exactly when that still holds its
+    /// children (up to rounding), instead of measuring it again from the rounded places (which can differ by a
+    /// hundredth, and shrinks a disc with free room, such as one filled earlier). Set with `fill`, so that every place
+    /// outside the filled containers is answered as it was given; such a kept container also costs no work
+    /// (`arrange_metered`), so that the budget of a fill goes to the fills.
+    pub keep_radii: bool,
+}
+
+/// Provisional (#235): what became of a container named in `Previous::fill`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Filled {
+    /// Arranged anew inside its disc, which kept its radius.
+    InDisc,
+    /// The new arrangement needed this radius, more than the disc has: arranged as without `fill`.
+    Unfit(f64),
+}
+
+impl Previous {
+    /// The radius of a container kept as it was: measured from its children, or with `keep_radii` its earlier radius
+    /// when that holds them (up to rounding).
+    fn kept_radius(&self, container: Container, measured: f64) -> f64 {
+        match container {
+            Container::Node(c)
+                if self.keep_radii
+                    && !self.anew.contains(&c)
+                    && measured <= self.radius[c] + SAME_RADIUS =>
+            {
+                self.radius[c]
+            }
+            _ => measured,
+        }
+    }
 }
 
 /// An arrangement after a move (`Previous::moved`): the whole arrangement follows the anchor back to where it was (the
@@ -298,6 +337,7 @@ fn anchored(
         radius: reach + options.padding,
         overlaps,
         shift: (cx, cy),
+        filled: None,
     })
 }
 
@@ -1129,6 +1169,8 @@ pub struct Arrangement {
     /// How far the container's centre moves from its previous place (with `Previous::moved`: the container is centred on
     /// its children again, and its parent places it this much further, so a held child stays where it was put).
     pub shift: (f64, f64),
+    /// Provisional (#235): for a container named in `Previous::fill`, whether it was filled; `None` otherwise.
+    pub filled: Option<Filled>,
 }
 
 /// The share of the velocity lost per tick (d3-force: 0.4). The model follows d3-force; no code is copied.
@@ -1242,7 +1284,45 @@ fn changed_in(
 /// Provisional (#211): `arrange` counting its work on `meter` (the start, every force tick, every separation round, the
 /// enclosing circle; ADR 0018, addendum of 2026-11-27). `None` when the meter stops it; otherwise the same arrangement
 /// as `arrange`.
+///
+/// A container named in `Previous::fill` (#235) is first arranged as without a start; that arrangement is taken when
+/// its children lie inside the disc, its padding giving way first (`Filled::InDisc`, the disc's radius kept), else the
+/// container is arranged as without `fill` (`Filled::Unfit`). Both attempts count on the meter.
 pub fn arrange_metered(
+    h: &Hierarchy,
+    container: Container,
+    radius: &[f64],
+    options: &OverviewOptions,
+    start: Option<&Previous>,
+    meter: &mut dyn Meter,
+) -> Option<Arrangement> {
+    let Some(&disc) = start.and_then(|p| p.fill.get(&container)) else {
+        return arrange_core(h, container, radius, options, start, meter);
+    };
+    let fresh = arrange_core(h, container, radius, options, None, meter)?;
+    // It fits when its children lie inside the disc: the container's own padding gives way first, never the disc.
+    let reach = h
+        .members(container)
+        .iter()
+        .zip(&fresh.positions)
+        .map(|(&m, p)| (p.0 * p.0 + p.1 * p.1).sqrt() + radius[m])
+        .fold(0., f64::max);
+    if reach <= disc {
+        return Some(Arrangement {
+            radius: if disc.is_finite() { disc } else { fresh.radius },
+            filled: Some(Filled::InDisc),
+            ..fresh
+        });
+    }
+    let kept = arrange_core(h, container, radius, options, start, meter)?;
+    Some(Arrangement {
+        filled: Some(Filled::Unfit(fresh.radius)),
+        ..kept
+    })
+}
+
+/// `arrange_metered` without `Previous::fill`.
+fn arrange_core(
     h: &Hierarchy,
     container: Container,
     radius: &[f64],
@@ -1260,6 +1340,7 @@ pub fn arrange_metered(
             radius: options.node_radius,
             overlaps: 0,
             shift: (0., 0.),
+            filled: None,
         });
     }
     if k == 1 {
@@ -1268,6 +1349,7 @@ pub fn arrange_metered(
             radius: r[0] + if options.chains { 0. } else { options.padding },
             overlaps: 0,
             shift: (0., 0.),
+            filled: None,
         });
     }
     let links: Vec<(usize, usize, f64)> = h
@@ -1275,8 +1357,16 @@ pub fn arrange_metered(
         .iter()
         .map(|&(a, b, w)| (local[&a], local[&b], w))
         .collect();
-    // The start: reading the children and their links (a kept arrangement costs no more).
-    if !meter.spend(k as u64 + links.len() as u64) {
+    // The start: reading the children and their links (a kept arrangement costs no more). In a fill request
+    // (`Previous::keep_radii`) a container kept as it was costs nothing: that work would repeat unchanged in every
+    // round of a host that fills container by container, and eat the budget its fills need (#235).
+    let free = start.is_some_and(|p| {
+        p.keep_radii
+            && p.moved.is_empty()
+            && members.iter().any(|m| !p.anew.contains(m))
+            && !changed_in(p, container, members, radius)
+    });
+    if !free && !meter.spend(k as u64 + links.len() as u64) {
         return None;
     }
     // Whether anything of a previous arrangement is there to continue from.
@@ -1355,9 +1445,10 @@ pub fn arrange_metered(
                     .fold(0., f64::max);
                 return Some(Arrangement {
                     positions: x,
-                    radius: reach + options.padding,
+                    radius: previous.kept_radius(container, reach + options.padding),
                     overlaps: 0,
                     shift: (0., 0.),
+                    filled: None,
                 });
             }
             if previous.settle {
@@ -1378,6 +1469,7 @@ pub fn arrange_metered(
                     radius: reach + options.padding,
                     overlaps,
                     shift: (0., 0.),
+                    filled: None,
                 });
             }
         }
@@ -1410,6 +1502,7 @@ pub fn arrange_metered(
         radius: reach + options.padding,
         overlaps,
         shift: (0., 0.),
+        filled: None,
     })
 }
 
@@ -1492,12 +1585,23 @@ pub fn fallback(
         .zip(&r)
         .map(|(p, ri)| (p.0 * p.0 + p.1 * p.1).sqrt() + ri)
         .fold(0., f64::max);
+    // Kept with no child moved: the radius as `arrange` keeps it.
+    let radius = match start {
+        Some(previous)
+            if kind == Fallback::Kept
+                && !members.iter().any(|m| previous.moved.contains_key(m)) =>
+        {
+            previous.kept_radius(container, reach + options.padding)
+        }
+        _ => reach + options.padding,
+    };
     (
         Arrangement {
             positions: x,
-            radius: reach + options.padding,
+            radius,
             overlaps: 0,
             shift: (0., 0.),
+            filled: None,
         },
         kind,
     )
@@ -2610,6 +2714,44 @@ mod tests {
                     <= a.radius - options.padding + 1e-9
             );
         }
+    }
+
+    /// #235: a filled container takes its new arrangement only when every child lies inside its disc, whatever the
+    /// padding; with padding 0 a disc a hair smaller than the children's reach leaves it unfit.
+    #[test]
+    fn a_fill_never_lets_a_child_stick_out_of_its_disc() {
+        let h = hierarchy(&sample());
+        let options = OverviewOptions {
+            padding: 0.,
+            ..OverviewOptions::default()
+        };
+        let a = Container::Node(0);
+        let radius = vec![options.node_radius; h.ids.len()];
+        let fresh = arrange(&h, a, &radius, &options, None);
+        let reach = fresh
+            .positions
+            .iter()
+            .map(|p| (p.0 * p.0 + p.1 * p.1).sqrt() + options.node_radius)
+            .fold(0., f64::max);
+        let n = h.ids.len();
+        let start = |disc: f64| Previous {
+            centre: vec![(0., 0.); n],
+            radius: vec![disc; n],
+            fill: [(a, disc)].into_iter().collect(),
+            keep_radii: true,
+            ..Previous::default()
+        };
+        let inside = arrange(&h, a, &radius, &options, Some(&start(reach)));
+        assert_eq!(inside.filled, Some(Filled::InDisc));
+        assert_eq!(inside.radius, reach);
+        // Within the old tolerance of the radius, yet a child would stick out: unfit.
+        let short = reach - 0.01;
+        let out = arrange(&h, a, &radius, &options, Some(&start(short)));
+        assert!(
+            matches!(out.filled, Some(Filled::Unfit(r)) if r >= reach),
+            "{:?}",
+            out.filled
+        );
     }
 }
 

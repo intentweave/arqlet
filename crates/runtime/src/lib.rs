@@ -28,6 +28,7 @@ pub mod query;
 pub mod session;
 pub mod session_store;
 pub mod settle;
+pub mod shared_sessions;
 pub mod trace;
 
 use execution::{

@@ -656,3 +656,53 @@ test('keepGeometry: false lays the view out again from the decisions, as before'
   assert.equal(back.ok, true);
   assert.equal(back.relaidOut, true);
 });
+
+// #209 part 2: the server computes the overview and sends only the answer (with `edgeData`); the browser opens a cluster
+// from that answer alone, in a view controller, as it would from the excerpt of the graph.
+test('a cluster of an overview answer opens in a view controller without the graph', {skip: !engine}, async () => {
+  const {overviewModel, structuredExcerpt, structuredExcerptOf, flowDirectionOf, resolvedEdgeIds, BORDER_PREFIX, EXCERPT_EDGE_PREFIX} = await import('../viewer/overview.js');
+  const nodes = [], edges = [];
+  for (let c = 0; c < 3; c++) {
+    nodes.push({id: `c${c}`, kind: 'dir', label: `C${c}`, parentId: null});
+    for (let l = 0; l < 12; l++) {
+      nodes.push({id: `c${c}/n${l}`, kind: l % 2 ? 'fn' : 'type', label: `n${l}`, parentId: `c${c}`});
+      edges.push({id: `c${c}/e${l}`, kind: l % 3 ? 'calls' : 'uses', source: `c${c}/n${l}`, target: `c${c}/n${(l + 1) % 12}`});
+    }
+    // Leaving edges: parallel ones, one with a weight, both directions.
+    const next = (c + 1) % 3;
+    edges.push({id: `x${c}`, kind: 'calls', source: `c${c}/n0`, target: `c${next}/n5`},
+      {id: `y${c}`, kind: 'calls', source: `c${c}/n0`, target: `c${next}/n6`, weight: 3},
+      {id: `z${c}`, kind: 'uses', source: `c${next}/n2`, target: `c${c}/n3`});
+  }
+  const graph = {nodes, edges};
+  // On the server: the overview with edge data; only its JSON travels.
+  const served = engine({op: 'overview', graph, edgeData: true});
+  assert.equal(served.ok, true, served.error);
+  const answer = JSON.parse(JSON.stringify(served.overview));
+  // In the browser: no graph.
+  const model = overviewModel(answer);
+  const direction = flowDirectionOf(model, model.index.get('c0'));
+  const excerpt = structuredExcerptOf(model, 'c0', {direction});
+  assert.equal(excerpt.edgeData, true);
+  assert.deepEqual([excerpt.inner, excerpt.leaving, excerpt.standIns], [12, 6, 2]);
+  const view = createViewController(createSession(engine, {resident: false}));
+  const opened = await view.import(excerpt.graph, {limit: excerpt.graph.nodes.length, options: excerpt.options});
+  assert.equal(opened.ok, true, JSON.stringify(opened.error));
+  const {scene} = view.getState();
+  assert.equal(scene.nodes.filter(n => n.parentId === 'c0').length, 12);
+  assert.deepEqual(scene.nodes.filter(n => n.id.startsWith(BORDER_PREFIX)).map(n => n.id).sort(), [`${BORDER_PREFIX}c1`, `${BORDER_PREFIX}c2`]);
+  // Every edge is drawn, under the excerpt's names, in its logical direction; the weighted one keeps its weight.
+  const drawnIds = new Set(scene.routes.flatMap(r => [r.id, ...(r.members ?? [])]));
+  for (const e of excerpt.graph.edges) assert.ok(drawnIds.has(e.id), `edge ${e.id} drawn`);
+  const k = resolvedEdgeIds(graph).indexOf('y0');
+  const weighted = excerpt.graph.edges.find(e => e.id === EXCERPT_EDGE_PREFIX + k);
+  assert.deepEqual([weighted.source, weighted.target, weighted.weight], ['c0/n0', `${BORDER_PREFIX}c1`, 3]);
+  const route = scene.routes.find(r => r.id === weighted.id);
+  assert.deepEqual([route.source, route.target], ['c0/n0', `${BORDER_PREFIX}c1`]);
+  // The same boxes as the excerpt of the graph, opened the same way.
+  const fromGraph = createViewController(createSession(engine, {resident: false}));
+  const full = structuredExcerpt(graph, model, 'c0', {direction});
+  assert.equal((await fromGraph.import(full.graph, {limit: full.graph.nodes.length, options: full.options})).ok, true);
+  const boxes = s => s.nodes.map(n => [n.id, n.bounds]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  assert.deepEqual(boxes(scene), boxes(fromGraph.getState().scene));
+});
