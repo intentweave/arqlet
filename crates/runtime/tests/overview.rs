@@ -525,6 +525,8 @@ fn every_answer_is_the_typed_overview_contract() {
                 top: None,
                 nodes: vec!["g1".into()],
             }),
+            community_algorithm: Some(arqlet_model::CommunityAlgorithm::Leiden),
+            community_resolution: Some(1.5),
         }),
         radii: Some([("g1".to_string(), 80.)].into()),
         threads: Some(2),

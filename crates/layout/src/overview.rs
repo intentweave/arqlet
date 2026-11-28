@@ -15,7 +15,41 @@ use arqlet_model::{Edge, Graph};
 use std::collections::{BTreeMap, BTreeSet};
 
 mod continuation;
+mod leiden;
+pub use arqlet_model::CommunityAlgorithm;
 pub use continuation::{carry, clusters_by_id, clusters_by_id_within, continue_by_id};
+
+/// Provisional (#237, ADR 0018 addendum of 2026-11-28): how communities are found: the algorithm (Louvain, the default,
+/// or Leiden) and the resolution γ of modularity (1, the default: larger values give smaller communities).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Detection {
+    pub algorithm: CommunityAlgorithm,
+    pub resolution: f64,
+}
+
+impl Default for Detection {
+    fn default() -> Self {
+        Self {
+            algorithm: CommunityAlgorithm::Louvain,
+            resolution: 1.,
+        }
+    }
+}
+
+/// Provisional (#237): the communities of `k` nodes with weighted links, level by level, as `detection` finds them
+/// (`result[l][c]`: the community at level l + 1 of community c at level l; numbered by their first node). The
+/// clustering of `with_communities` runs this per container; public for measurements. `None` when the meter stops it.
+pub fn community_levels(
+    k: usize,
+    links: &[(usize, usize, f64)],
+    detection: &Detection,
+    meter: &mut dyn Meter,
+) -> Option<Vec<Vec<usize>>> {
+    match detection.algorithm {
+        CommunityAlgorithm::Louvain => louvain(k, links, detection.resolution, meter),
+        CommunityAlgorithm::Leiden => leiden::leiden(k, links, detection.resolution, meter),
+    }
+}
 
 /// Provisional (#211, ADR 0018 addendum): counts deterministic units of work at the safe points of the overview's
 /// iterative phases (a Louvain sweep, a force tick, a separation round). `false` means the work must stop there; the
@@ -160,6 +194,8 @@ pub struct OverviewOptions {
     pub gravity: f64,
     /// Containers with more children than this are split into communities (`with_communities`); 0 never.
     pub communities: usize,
+    /// Provisional (#237): how the communities are found (Louvain at resolution 1 by default).
+    pub detection: Detection,
     /// Satellites are gathered with their hub (`with_satellites`) when at least this share of their edges goes to it;
     /// 0 (the default) never.
     pub satellites: f64,
@@ -182,6 +218,7 @@ impl Default for OverviewOptions {
             charge: 0.05,
             gravity: 0.1,
             communities: 120,
+            detection: Detection::default(),
             satellites: 0.,
             chains: false,
             rows: BTreeMap::new(),
@@ -539,7 +576,7 @@ pub const COMMUNITY_PREFIX: &str = "community:";
 /// Splits every container with more than `threshold` children (the root included; a flat graph is one such container)
 /// into communities of its children, found by Louvain on the links between them (Blondel, Guillaume, Lambiotte and
 /// Lefebvre, "Fast unfolding of communities in large networks", 2008; reimplemented, deterministic: nodes in index order,
-/// ties to the smaller community). Every level of the Louvain hierarchy becomes a level of clusters, so a flat graph gets
+/// ties to the smaller community number). Every level of the Louvain hierarchy becomes a level of clusters, so a flat graph gets
 /// the nested clusters the overview and the drill-down need. A community of fewer than `MIN_COMMUNITY` nodes is no
 /// cluster; children without links are gathered in one cluster. Added clusters come after the graph's nodes, with ids `community:<container>:<level>.<k>`.
 /// `threshold` 0 leaves the hierarchy as it is.
@@ -571,26 +608,36 @@ pub fn with_communities_except(
     threshold: usize,
     hubs: &Hubs,
 ) -> Result<Hierarchy, String> {
-    with_communities_where(h, threshold, hubs, &|_| true, &mut Budget::unlimited())
+    with_communities_where(
+        h,
+        threshold,
+        hubs,
+        &Detection::default(),
+        &|_| true,
+        &mut Budget::unlimited(),
+    )
 }
 
 /// Provisional (#211): `with_communities_except` within a work budget. Each container's Louvain is one piece: one that
 /// does not fit into what is left is discarded and its container, and every container after it, stays unsplit
-/// (`Budget::unclustered`). Within budget the same as `with_communities_except`.
+/// (`Budget::unclustered`). Within budget the same as `with_communities_except`. `detection` chooses the algorithm and
+/// the resolution (#237); its default is Louvain at resolution 1, as `with_communities_except`.
 pub fn with_communities_within(
     h: Hierarchy,
     threshold: usize,
     hubs: &Hubs,
+    detection: &Detection,
     budget: &mut Budget,
 ) -> Result<Hierarchy, String> {
-    with_communities_where(h, threshold, hubs, &|_| true, budget)
+    with_communities_where(h, threshold, hubs, detection, &|_| true, budget)
 }
 
-/// `with_communities_except`, splitting only the containers `split` names, within `budget`.
+/// `with_communities_except`, splitting only the containers `split` names, with `detection`, within `budget`.
 fn with_communities_where(
     h: Hierarchy,
     threshold: usize,
     hubs: &Hubs,
+    detection: &Detection,
     split: &dyn Fn(Container) -> bool,
     budget: &mut Budget,
 ) -> Result<Hierarchy, String> {
@@ -661,10 +708,10 @@ fn with_communities_where(
         if linked.iter().filter(|l| **l).count() * 2 < others {
             continue;
         }
-        // The levels of Louvain, from the members up: `levels[l][c]` is the community at level l + 1 of community c at
-        // level l (level 0: the members).
+        // The levels of Louvain (or Leiden), from the members up: `levels[l][c]` is the community at level l + 1 of
+        // community c at level l (level 0: the members).
         let Some(levels) = budget.piece("clustering", container, |meter| {
-            louvain(members.len(), &links, meter)
+            community_levels(members.len(), &links, detection, meter)
         }) else {
             // Over budget: the container stays as it is, its hubs included.
             budget.unclustered.push(container);
@@ -991,10 +1038,12 @@ fn add_cluster(
 /// Louvain on `k` nodes with weighted links: the community of every node, level by level (`result[l][c]`: the community
 /// at level l + 1 of community c at level l), until a level merges nothing. Communities are numbered in order of their
 /// first node, so the result depends only on the input. Nodes without links stay alone. `None` when the meter stops it
-/// (units: per level the links read and aggregated, per sweep the nodes and the links visited).
+/// (units: per level the links read and aggregated, per sweep the nodes and the links visited). `resolution` is the γ of
+/// modularity; at 1 the gain is multiplied by exactly 1, so the default results are those before it existed.
 fn louvain(
     k: usize,
     links: &[(usize, usize, f64)],
+    resolution: f64,
     meter: &mut dyn Meter,
 ) -> Option<Vec<Vec<usize>>> {
     let mut result = Vec::new();
@@ -1049,8 +1098,8 @@ fn louvain(
                     }
                     weight_to[c] += w;
                 }
-                // The gain of joining c, less what is common to all choices: k_i,in(c) - tot(c) k_i / 2m.
-                let gain = |c: usize, w: f64| w - tot[c] * degree[i] / total;
+                // The gain of joining c, less what is common to all choices: k_i,in(c) - γ tot(c) k_i / 2m.
+                let gain = |c: usize, w: f64| w - resolution * tot[c] * degree[i] / total;
                 let mut best = own;
                 let mut best_gain = gain(own, weight_to[own]);
                 touched.sort_unstable();
@@ -2080,8 +2129,15 @@ pub fn overview(
     options: &OverviewOptions,
     hints: &OverviewHints,
 ) -> (Hierarchy, Overview) {
-    let h = with_communities(hierarchy(graph), options.communities)
-        .unwrap_or_else(|_| hierarchy(graph));
+    let h = with_communities_where(
+        hierarchy(graph),
+        options.communities,
+        &Hubs::default(),
+        &options.detection,
+        &|_| true,
+        &mut Budget::unlimited(),
+    )
+    .unwrap_or_else(|_| hierarchy(graph));
     let mut arrangements = BTreeMap::new();
     let mut hints = hints.clone();
     for level in levels(&h) {
@@ -2802,14 +2858,27 @@ mod tests {
         let g = rings(4, 50);
         let full = with_communities(hierarchy(&g), 20).unwrap();
         let mut counted = Budget::unlimited();
-        let within =
-            with_communities_within(hierarchy(&g), 20, &Hubs::default(), &mut counted).unwrap();
+        let within = with_communities_within(
+            hierarchy(&g),
+            20,
+            &Hubs::default(),
+            &Detection::default(),
+            &mut counted,
+        )
+        .unwrap();
         assert_eq!(within.ids, full.ids);
         assert_eq!(within.parent, full.parent);
         assert!(counted.clustering > 0 && counted.used == counted.clustering);
         assert!(!counted.exhausted && counted.unclustered.is_empty());
         let mut short = Budget::new(counted.clustering - 1);
-        let cut = with_communities_within(hierarchy(&g), 20, &Hubs::default(), &mut short).unwrap();
+        let cut = with_communities_within(
+            hierarchy(&g),
+            20,
+            &Hubs::default(),
+            &Detection::default(),
+            &mut short,
+        )
+        .unwrap();
         assert_eq!(cut.ids.len(), 200, "the top level stays unsplit");
         assert_eq!(short.used, 0);
         assert!(short.exhausted);

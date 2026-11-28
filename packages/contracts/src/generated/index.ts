@@ -11,6 +11,7 @@ export * from './BusLine';
 export * from './BusStyle';
 export * from './BusTap';
 export * from './BusTapLayout';
+export * from './CommunityAlgorithm';
 export * from './CommunityHubs';
 export * from './ConfigSet';
 export * from './ContainerSizing';
