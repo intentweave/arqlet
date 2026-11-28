@@ -7,6 +7,20 @@ import {createEngine} from './wasm-client.js';
 /** The engine shipped with this package. Bundlers that understand `new URL(..., import.meta.url)` copy it along. */
 export const defaultWasmUrl = new URL('./arqlet.wasm', import.meta.url);
 
+/**
+ * Provisional (#210): the engine built with its cargo feature `query` (`arqlet-engine-query.wasm` beside this module): the
+ * default engine plus the operation `query`. A separate file, so that a host that does not ask for it downloads nothing more.
+ */
+export const queryWasmUrl = new URL('./arqlet-engine-query.wasm', import.meta.url);
+
+// The module a host asked for: a URL (the default engine when omitted), or `{query: true}` for the engine with the
+// operation `query`, or `{url}` for a module of the host's own.
+function moduleUrl(which) {
+  if (which === undefined || which === null) return defaultWasmUrl;
+  if (typeof which === 'string' || which instanceof URL) return which;
+  return which.url ?? (which.query ? queryWasmUrl : defaultWasmUrl);
+}
+
 // Reads the module: over HTTP(S) with `fetch`, and from a `file:` URL (Node) from disk. The module name is held in a
 // variable so that browser bundlers do not try to resolve the Node built-in.
 async function readWasm(url) {
@@ -22,9 +36,12 @@ async function readWasm(url) {
   return response.arrayBuffer();
 }
 
-/** Loads the WASM engine, by default the one shipped with this package. `fetchBytes` may be replaced in tests. */
-export async function loadEngine(url = defaultWasmUrl, fetchBytes = readWasm) {
-  return createEngine(await fetchBytes(url));
+/**
+ * Loads the WASM engine, by default the one shipped with this package. `{query: true}` loads the one with the operation
+ * `query` instead (`session.query()`, also with `view: true`). `fetchBytes` may be replaced in tests.
+ */
+export async function loadEngine(which = defaultWasmUrl, fetchBytes = readWasm) {
+  return createEngine(await fetchBytes(moduleUrl(which)));
 }
 
 // The scene of a snapshot object, per engine. A snapshot is replaced by every change and never edited in place, so the
@@ -66,11 +83,11 @@ export function importGraph(run, graph, limit, options = {}, {omitSource = false
 }
 
 /**
- * Starts a module worker that answers engine requests for the WASM at `wasmUrl`. The worker's own URL is
+ * Starts a module worker that answers engine requests for the WASM at `wasmUrl` (or, with `{query: true}`, for the engine with the operation `query`). The worker's own URL is
  * resolved from this module, so the same package works from any host page or import map.
  */
-export function createEngineWorker(wasmUrl = defaultWasmUrl) {
+export function createEngineWorker(which = defaultWasmUrl) {
   const url = new URL('./worker.js', import.meta.url);
-  url.searchParams.set('wasm', new URL(wasmUrl, document.baseURI).href);
+  url.searchParams.set('wasm', new URL(moduleUrl(which), document.baseURI).href);
   return new Worker(url, {type: 'module'});
 }

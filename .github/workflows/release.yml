@@ -60,6 +60,7 @@ jobs:
           for p in $NPM_PACKAGES; do (cd "packages/$p" && pnpm pack --pack-destination "$RUNNER_TEMP/pack"); done
           node tools/third-party-notices.mjs --check
           node tools/third-party-notices.mjs --check --package arqlet-query-wasm
+          node tools/third-party-notices.mjs --check --features query
           mkdir -p "$RUNNER_TEMP/try" && cd "$RUNNER_TEMP/try" && npm init -y >/dev/null
           npm install --no-audit --no-fund "$RUNNER_TEMP"/pack/*.tgz
           node --input-type=module -e "const m = await import('arqlet'); if (!Object.keys(m).length) throw Error('arqlet exports nothing');"

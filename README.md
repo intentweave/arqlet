@@ -418,7 +418,7 @@ macOS arm64, Windows x64) and WASM give identical responses (checked in CI by
 | `crates/node` | native Node.js adapter (napi-rs): dispatch and sessions on libuv's thread pool (ADR 0030, provisional) |
 | `crates/arqlet` | facade crate: re-exports the engine crates and `dispatch` |
 | `packages/arqlet` | npm entry point: re-exports engine client and viewer |
-| `packages/engine-client` | the WASM engine with loader, worker protocol, presets, ELK-style API |
+| `packages/engine-client` | the WASM engine with loader, worker protocol, presets, ELK-style API; a second module with the operation `query` (`loadEngine({query: true})`, provisional) |
 | `packages/viewer` | SVG rendering, navigation, React Flow adapter |
 | `packages/node` | `@arqlet/node`: the engine as a native Node.js module with a WASM fallback (provisional, unpublished) |
 | `packages/query` | `@arqlet/query`: the query layer as WASM, without the layout engine (provisional) |

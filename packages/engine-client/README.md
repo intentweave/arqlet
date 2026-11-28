@@ -3,6 +3,9 @@
 The Arqlet engine as WebAssembly (`arqlet.wasm`, included) and its JavaScript access:
 
 - `engine.js`: `loadEngine(url?)` (browser via `fetch`, Node from disk), `sceneOf(run, snapshot)`, `createEngineWorker(url?)`;
+  `loadEngine({query: true})` and `createEngineWorker({query: true})` load the second module, `arqlet-engine-query.wasm`
+  (provisional): the same engine plus the operation `query`, so that `session.query(text, {view: true})` answers.
+  It is only fetched when asked for; its notices (the parser `decypher`) are in `THIRD_PARTY_NOTICES-query.md`;
 - `wasm-client.js`: `createEngine(bytes, {onPublish})`, the raw binding;
 - `elk.js`: `createElkLayout(run)`, an `elk.layout(graph)`-style call;
 - `session.js`: `createSession(run)`, a layout session that keeps positions across changes (collapse, expand, …)
