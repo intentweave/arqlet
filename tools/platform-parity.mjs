@@ -148,17 +148,37 @@ const long = {version: 1, digest: ask({op: 'digest', snapshot: reshaped}).digest
 const reread = {op: 'readBookmark', snapshot: abstract, bookmark: long};
 if (ask(reread).sameSource !== true) { console.error('readBookmark: a changed view is not the same source'); process.exit(1); }
 requests.push(['readBookmark, long form of a changed view', reread]);
+// The memory estimate (ADR 0024, C3) is per target by design (type sizes differ between 64-bit builds and wasm32): native
+// and WASM must agree on what it measures (the operation, the view it lays out, the source, the jobs, the model), and
+// with `--digest` the native answer's hash compares the native platforms with each other.
+const sizesOnly = (answer) => {
+  if (!answer.ok) return answer;
+  const {bytes: _bytes, parts: _parts, target: _target, source: {heap: _heap, ...source}, ...rest} = answer.estimate;
+  return {ok: true, estimate: {...rest, source}};
+};
+const at = {snapshot: abstract, expectedRevision: abstract.revision, expectedLayoutVersion: abstract.layoutVersion};
+const container = abstract.collapsedIds.find((id) => abstract.graph.nodes.some((n) => n.id === id));
+requests.push(
+  ['estimate import', {op: 'estimate', request: {op: 'import', graph: graph('benchmarks/datasets/cloud-architecture.json'), limit: 100}}, sizesOnly],
+  ['estimate toggle', {op: 'estimate', request: {op: 'toggle', nodeId: container, ...at}}, sizesOnly],
+  ['estimate refine, 4 threads', {op: 'estimate', request: {op: 'refine', threads: 4, workBudget: 8, ...at}}, sizesOnly],
+  ['estimate overview', {op: 'estimate', request: {op: 'overview', graph: large}}, sizesOnly],
+);
 const digest = process.argv.includes('--digest');
 let differ = 0;
-for (const [name, request] of requests) {
+for (const [name, request, perTarget] of requests) {
+  const compared = perTarget ?? ((answer) => answer);
   const body = JSON.stringify(request);
-  const a = JSON.stringify(JSON.parse(execFileSync(native, {input: body, maxBuffer: 1 << 30}).toString()));
-  const b = JSON.stringify(run(request));
-  let same = a === b;
+  const nativeText = execFileSync(native, {input: body, maxBuffer: 1 << 30}).toString().trim();
+  const nativeAnswer = JSON.parse(nativeText);
+  const a = JSON.stringify(nativeAnswer);
+  let same = JSON.stringify(compared(nativeAnswer)) === JSON.stringify(compared(run(request)));
   if (node) {
-    // Byte for byte: the native Node module's text against the WASM module's text.
+    // Byte for byte: the native Node module's text against the WASM module's text; a per-target answer (the estimate)
+    // against the native command's text, a 64-bit build like the module.
     const n = await node.text(body);
-    if (n !== wasmText.run(body)) { same = false; console.error(`native Node module and WASM differ: ${name}`); }
+    const expected = perTarget ? nativeText : wasmText.run(body);
+    if (n !== expected) { same = false; console.error(`native Node module and ${perTarget ? 'native command' : 'WASM'} differ: ${name}`); }
   }
   if (!same) differ++;
   const hash = createHash('sha256').update(a).digest('hex').slice(0, 16);

@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 arqlet-model = { path = "../../crates/model" }
 arqlet-runtime = { path = "../../crates/runtime" }
+arqlet-layout = { path = "../../crates/layout" }
 serde_json = "1"
 dhat = { version = "=0.3.3", optional = true }
 

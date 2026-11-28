@@ -55,8 +55,32 @@ export interface SessionMemory {
   perNode: number;
   /** From the WASM engine: the module's live heap, counted. */
   heapBytes?: number;
+  /** Provisional (ADR 0024, C3), from the WASM engine: the highest live heap since the previous `memory` or `release`. */
+  heapPeakBytes?: number;
   /** From the WASM engine: the size of its linear memory, which is never given back. */
   linearMemoryBytes?: number;
+}
+
+/** Provisional (ADR 0024, C3): the heap a request will need at its peak, estimated before it runs. */
+export interface MemoryEstimate {
+  ok: true;
+  estimate: {
+    /** The estimated operation. */
+    op: string;
+    /** The engine's target: type sizes differ, so each build estimates for itself. */
+    target: 'native64' | 'wasm32';
+    /** The estimated peak in bytes: an upper bound within the factor recorded with the calibration. */
+    bytes: number;
+    /** The parts it adds up: the request text, reading it and the answer, the source graph's structure, the layout. */
+    parts: {request: number; input: number; structure: number; layout: number};
+    /** The view the operation lays out (not for an overview). */
+    view?: {nodes: number; edges: number; open: number};
+    source: {nodes: number; edges: number; heap: number};
+    /** Layouts held at the same time (a refinement's threads). */
+    jobs: number;
+    /** The version of the model and its coefficients. */
+    model: number;
+  };
 }
 
 /** Provisional (ADR 0023, R2): one change group: a patch of the structure, a payload of the content, or both. */
@@ -222,6 +246,11 @@ export interface Session {
   recycle(newEngine: Run): Promise<{ok: true; unchanged: true; sequence: number; contentRevision: number} | {ok: false; error?: string; stale?: true}>;
   /** Provisional (ADR 0023, R7): what the session holds, part by part (estimated), and from WASM the module's heap. */
   memory(): Promise<SessionMemory | {ok: false; error?: string}>;
+  /**
+   * Provisional (ADR 0024, C3, read only): the heap `request` will need at its peak, estimated before it runs, on the
+   * current view; `request` as the session would send it (`{op: 'toggle', nodeId}`). Changes nothing.
+   */
+  estimate(request: {op: string; [field: string]: unknown}): Promise<MemoryEstimate | {ok: false; error?: string}>;
   /** Provisional (ADR 0023, R7): gives parts back; the snapshot stays. */
   release(parts: Array<'content' | 'changeLog' | 'columns' | 'overview'>, init?: {keys?: string[]}): Promise<(SessionMemory & {released: number}) | {ok: false; error?: string; stale?: true}>;
   /** Provisional (ADR 0023, R2): the whole content and the log's sequence (for a resync). */

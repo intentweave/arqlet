@@ -330,6 +330,21 @@ export function createSession(engine, {onChange, resident: wanted = 'auto'} = {}
     },
 
     /**
+     * Provisional (ADR 0024, C3, read only): the heap `request` will need at its peak, estimated before it runs, on the
+     * session's current view (`{op, target, bytes, parts, view, source, jobs, model}`): an upper bound for admitting work
+     * by memory. `request` is what the session would send (`{op: 'toggle', nodeId}`, `{op: 'import', graph, limit}`);
+     * nothing changes. The engine estimates for its own target (`native64` or `wasm32`).
+     */
+    async estimate(request) {
+      if (resident) return (await opened).run({op: 'estimate', request});
+      const needsView = !['import', 'overview'].includes(request?.op);
+      if (needsView && !snapshot) return {ok: false, error: 'Nothing imported yet.'};
+      return run({op: 'estimate', request: needsView
+        ? {...request, snapshot, expectedRevision: snapshot.revision, expectedLayoutVersion: snapshot.layoutVersion}
+        : request});
+    },
+
+    /**
      * Provisional (ADR 0023, R7): gives parts back: `content` (all, or only `keys`), `changeLog` (a replica behind it then
      * resyncs), `columns`, `overview`. The snapshot stays; the answer is `memory` after it, with `released`.
      */

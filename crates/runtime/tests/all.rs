@@ -42,6 +42,8 @@ mod edge_weights;
 mod elk;
 #[path = "engine_choice.rs"]
 mod engine_choice;
+#[path = "estimate.rs"]
+mod estimate;
 #[path = "explicit_constraints.rs"]
 mod explicit_constraints;
 #[path = "filter.rs"]

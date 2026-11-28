@@ -201,15 +201,34 @@ pub fn with_adapter_heap(
     heap_bytes: usize,
     linear_memory_bytes: Option<u64>,
 ) -> String {
-    if !(request.contains("\"memory\"") || request.contains("\"release\""))
-        || !answer.contains("\"estimated\":true")
-        || !answer.ends_with('}')
-    {
+    with_adapter_heap_peak(request, answer, heap_bytes, None, linear_memory_bytes)
+}
+
+/// Whether an answer is one that `with_adapter_heap` completes: a session's `memory` or `release`.
+pub fn is_memory_answer(request: &str, answer: &str) -> bool {
+    (request.contains("\"memory\"") || request.contains("\"release\""))
+        && answer.contains("\"estimated\":true")
+        && answer.ends_with('}')
+}
+
+/// `with_adapter_heap` that also reports the adapter's highest live heap since the previous such answer
+/// (`heapPeakBytes`, provisional, ADR 0024 C3), where the adapter counts it.
+pub fn with_adapter_heap_peak(
+    request: &str,
+    answer: String,
+    heap_bytes: usize,
+    heap_peak_bytes: Option<usize>,
+    linear_memory_bytes: Option<u64>,
+) -> String {
+    if !is_memory_answer(request, &answer) {
         return answer;
     }
     let mut out = answer;
     out.pop();
     out.push_str(&format!(",\"heapBytes\":{heap_bytes}"));
+    if let Some(peak) = heap_peak_bytes {
+        out.push_str(&format!(",\"heapPeakBytes\":{peak}"));
+    }
     if let Some(linear) = linear_memory_bytes {
         out.push_str(&format!(",\"linearMemoryBytes\":{linear}"));
     }

@@ -7,6 +7,22 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **An estimate of a request's peak memory before it runs** (#224, provisional; ADR 0024 step C3): `{op: "estimate",
+  request}` through `dispatch` and in a resident session (`session.estimate(request)` in `engine-client`) answers the
+  heap an import, an edit (toggle, reveal, filter, configure, restore, direction and the other edits that keep the view,
+  patch, add), a refinement or an overview will need at its peak, with its parts (`request`, `input`, `structure`,
+  `layout`), the view the operation lays out and the target (`native64` or `wasm32`: each build estimates for itself).
+  It reads the request and finds the view the way the operation does (an import's selection and projection, the view
+  after opening a container), without laying out. Calibrated as an upper bound against the counted heap and the WASM
+  linear memory on the reference datasets and generated graphs up to 114k nodes: never below the
+  measured peak on the calibration rows; above 4 MB the median estimate is 1.2 to 2.1 times the peak for imports, edits
+  and overviews, at most 3.2 to 10.7 times (a from-scratch layout bounds an edit that continues the earlier one),
+  refinements higher; on graphs left out of the fit it held with its margin of 1.15 when graphs of the same shape stayed
+  in, and fell to a quarter of the peak when no graph of that shape was calibrated
+  ([results](benchmarks/results/memory-estimate-20261127.md)). The WASM engine's `memory` answer adds `heapPeakBytes`, the
+  counted peak since the previous `memory` or `release`. The integration guide has a section on a worker pool with
+  admission by memory, and `examples/worker-pool` a runnable Node example.
+
 - **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
   sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
   pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time
@@ -52,6 +68,11 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `CHANGELOG.md`, copied by `prepack` (`tools/npm-prepack.mjs`) as the licenses are.
 
 ### Fixed
+
+- **The WASM engine read every request as a JSON value before dispatching it** (`dispatch_streaming`, used by `lw_run`),
+  only to find out whether it was a progressive refinement: an import's graph as a value takes several times its typed
+  size, and in WASM that stays as the worker's linear memory. Only a request that names `refineProgressive` is read so
+  now; answers are unchanged. A WASM `dispatch` import of the 20k synthetic graph: 145.4 → 97.2 MB of linear memory.
 
 - **A `patch` into a view with buses draws what an import of the patched graph draws** (#228, ADR 0029 C). It started
   from the earlier drawing and drew far worse in layered views with bus lines and organic views with bus bars: on the

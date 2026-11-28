@@ -13,6 +13,7 @@ pub mod content;
 pub mod coordinator;
 pub mod details;
 pub mod engine_session;
+pub mod estimate;
 pub mod execution;
 pub mod filter;
 pub mod find;
@@ -740,10 +741,52 @@ fn select_visible(
 }
 
 pub fn import_graph_counted(
-    mut graph: Graph,
+    graph: Graph,
     limit: usize,
     options: &LayoutOptions,
 ) -> Result<(Snapshot, arqlet_layout::SearchCounters), String> {
+    layout_prepared(prepare_import(graph, limit, options)?)
+}
+
+/// What an import lays out, prepared without laying it out: the selection, the structure and the projection of the first
+/// view (`prepare_import`). The memory estimate (`estimate`) reads the size of the view from it; `layout_prepared` lays it
+/// out. Split from `import_graph_counted` without a change of what it computes.
+pub(crate) enum PreparedImport {
+    /// A view that abstracts or aggregates: the projection of the structured graph with its first collapsed containers.
+    Projected {
+        source: std::sync::Arc<Graph>,
+        shared: std::sync::Arc<Graph>,
+        index: std::sync::Arc<GraphIndex>,
+        collapsed: BTreeSet<String>,
+        projected: Graph,
+        options: LayoutOptions,
+        key: String,
+        omitted: usize,
+    },
+    /// The selected graph, laid out as it is.
+    Plain {
+        graph: Graph,
+        options: LayoutOptions,
+        omitted: usize,
+    },
+}
+
+impl PreparedImport {
+    /// The graph the import lays out.
+    pub(crate) fn laid_out(&self) -> &Graph {
+        match self {
+            PreparedImport::Projected { projected, .. } => projected,
+            PreparedImport::Plain { graph, .. } => graph,
+        }
+    }
+}
+
+/// The import up to its layout: validation, selection within the limit, the structure and the first view's projection.
+pub(crate) fn prepare_import(
+    mut graph: Graph,
+    limit: usize,
+    options: &LayoutOptions,
+) -> Result<PreparedImport, String> {
     if limit == 0 || limit > MAX_VIEW_LIMIT {
         return Err(format!("View limit must be between 1 and {MAX_VIEW_LIMIT}"));
     }
@@ -846,51 +889,91 @@ pub fn import_graph_counted(
         );
         let key = structure_key(options);
         let options = view_options(view, &collapsed, options, &weights);
-        let (mut snapshot, stages) =
-            arqlet_layout::compute_counted(&projected, None, &BTreeSet::new(), &options)?;
-        snapshot.source_graph = Some(source.clone());
-        snapshot.structure = Some(std::sync::Arc::new(ViewStructure {
+        return Ok(PreparedImport::Projected {
             source,
-            key,
+            shared,
             index,
-            view: shared,
-            validated: true,
-        }));
-        snapshot.collapsed_ids = collapsed.into_iter().collect();
-        snapshot.omitted_unresolved_edges = omitted;
-        // A first view over its budget says by how much and why: everything is collapsed that can be, so the rest is
-        // the top level (and the edges between what it shows).
-        if let Some(level) = options.level_of_detail.as_ref().filter(|l| l.budgeted()) {
-            let boxes = snapshot.graph.nodes.len();
-            let top = snapshot
-                .graph
-                .nodes
-                .iter()
-                .filter(|n| n.parent_id.is_none())
-                .count();
-            if let Some(budget) = level.nodes.filter(|&b| boxes > b) {
-                snapshot.layout_diagnostics.push(format!(
-                    "First view: {boxes} boxes, {} over the node budget of {budget}: the top level alone has {top} \
-                     (set communities to divide it)",
-                    boxes - budget
-                ));
-            }
-            let edges = snapshot.graph.edges.len();
-            if let Some(budget) = level.edges.filter(|&b| edges > b) {
-                snapshot.layout_diagnostics.push(format!(
-                    "First view: {edges} edges, {} over the edge budget of {budget}: the edges between the top-level \
-                     boxes alone are that many",
-                    edges - budget
-                ));
-            }
-        }
-        return Ok((snapshot, stages));
+            collapsed,
+            projected,
+            options,
+            key,
+            omitted,
+        });
     }
-    let (mut snapshot, stages) =
-        arqlet_layout::compute_counted(&graph, None, &BTreeSet::new(), options)?;
-    snapshot.source_graph = Some(graph.into());
-    snapshot.omitted_unresolved_edges = omitted;
-    Ok((snapshot, stages))
+    Ok(PreparedImport::Plain {
+        graph,
+        options: options.clone(),
+        omitted,
+    })
+}
+
+/// Lays out a prepared import (`prepare_import`).
+fn layout_prepared(
+    prepared: PreparedImport,
+) -> Result<(Snapshot, arqlet_layout::SearchCounters), String> {
+    match prepared {
+        PreparedImport::Projected {
+            source,
+            shared,
+            index,
+            collapsed,
+            projected,
+            options,
+            key,
+            omitted,
+        } => {
+            let (mut snapshot, stages) =
+                arqlet_layout::compute_counted(&projected, None, &BTreeSet::new(), &options)?;
+            snapshot.source_graph = Some(source.clone());
+            snapshot.structure = Some(std::sync::Arc::new(ViewStructure {
+                source,
+                key,
+                index,
+                view: shared,
+                validated: true,
+            }));
+            snapshot.collapsed_ids = collapsed.into_iter().collect();
+            snapshot.omitted_unresolved_edges = omitted;
+            // A first view over its budget says by how much and why: everything is collapsed that can be, so the rest is
+            // the top level (and the edges between what it shows).
+            if let Some(level) = options.level_of_detail.as_ref().filter(|l| l.budgeted()) {
+                let boxes = snapshot.graph.nodes.len();
+                let top = snapshot
+                    .graph
+                    .nodes
+                    .iter()
+                    .filter(|n| n.parent_id.is_none())
+                    .count();
+                if let Some(budget) = level.nodes.filter(|&b| boxes > b) {
+                    snapshot.layout_diagnostics.push(format!(
+                        "First view: {boxes} boxes, {} over the node budget of {budget}: the top level alone has {top} \
+                         (set communities to divide it)",
+                        boxes - budget
+                    ));
+                }
+                let edges = snapshot.graph.edges.len();
+                if let Some(budget) = level.edges.filter(|&b| edges > b) {
+                    snapshot.layout_diagnostics.push(format!(
+                        "First view: {edges} edges, {} over the edge budget of {budget}: the edges between the top-level \
+                         boxes alone are that many",
+                        edges - budget
+                    ));
+                }
+            }
+            Ok((snapshot, stages))
+        }
+        PreparedImport::Plain {
+            graph,
+            options,
+            omitted,
+        } => {
+            let (mut snapshot, stages) =
+                arqlet_layout::compute_counted(&graph, None, &BTreeSet::new(), &options)?;
+            snapshot.source_graph = Some(graph.into());
+            snapshot.omitted_unresolved_edges = omitted;
+            Ok((snapshot, stages))
+        }
+    }
 }
 pub fn add_node(
     snapshot: &Snapshot,
@@ -4184,6 +4267,11 @@ fn refine_request(
 /// running: `{ok, publication: {jobId, sequence, strategy, key, candidatesEvaluated, input, snapshot}}`. The response
 /// is the final `{ok, jobId, snapshot}`. Every other operation behaves exactly like `dispatch`.
 pub fn dispatch_streaming(input: &str, publish: &mut dyn FnMut(&str)) -> String {
+    // Only a request that names the operation is read as a JSON value here: reading every request so (an import's graph
+    // as a value takes several times its typed size) raised the WASM engine's peak for nothing (ADR 0024, C3).
+    if !input.contains("\"refineProgressive\"") {
+        return dispatch(input);
+    }
     let Ok(v) = serde_json::from_str::<serde_json::Value>(input) else {
         return dispatch(input);
     };
@@ -4340,6 +4428,10 @@ pub fn timed(run: impl FnOnce() -> String) -> String {
 }
 
 fn dispatch_untimed(input: &str) -> String {
+    // Provisional (ADR 0024, C3): the estimate reads the request it estimates in one pass, beside the protocol.
+    if estimate::is_estimate(input) {
+        return estimate::estimate_response(input);
+    }
     match protocol::Request::from_json_delivered(input) {
         Ok((request, delivery)) => delivery.deliver(protocol::handle(request)).to_json(),
         Err(error) => protocol::Response::Error(error).to_json(),

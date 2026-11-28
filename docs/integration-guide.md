@@ -96,8 +96,9 @@ run.kind;                                    // 'native' or 'wasm'
   of sessions; open one per client view and close it when the view goes.
 - **The pool is shared.** libuv's pool has 4 threads unless `UV_THREADPOOL_SIZE` (set before the pool is first used)
   says otherwise, and `fs`, `dns.lookup`, `crypto` and `zlib` use it too: a layout holds a thread for its duration. Admit
-  heavy operations (import, layout, refinement) by count, and raise the pool size to that count plus what the rest of
-  the server needs (ADR 0024, item 3).
+  heavy operations (import, layout, refinement) by count and by their estimated memory
+  ([section 10](#10-a-worker-pool-with-admission-by-memory-provisional)), and raise the pool size to that count plus what
+  the rest of the server needs (ADR 0024, item 3).
 - **Memory.** `sessionBytes` limits the sessions' estimated weight together: the least recently used idle session is
   dropped beyond it and answers `Unknown session` afterwards (a running one is never dropped, so the limit is soft while
   several grow at once). `session.memory()` adds the module's live heap (`heapBytes`). Native memory goes back to the
@@ -517,7 +518,79 @@ await session.recycle(workerRun(next));   // the session now lives in `next`
 oldWorker.terminate();                    // its high-water mark goes with it
 ```
 
-## 10. Checklist
+## 10. A worker pool with admission by memory (provisional)
+
+A server that runs several engines at once (WASM workers, `layout-command --sessions` processes, later the native Node
+adapter) has to decide how many requests fit into memory together and when one waits. The number of cores is the wrong
+bound: the peak of one large layout is hundreds of megabytes ([ADR 0024](adr/0024-concurrent-sessions-in-a-backend.md),
+item 3). The engine estimates a request's peak before it runs:
+
+```js
+const answer = run({op: 'estimate', request: {op: 'import', graph, limit: 100, options}});
+answer.estimate;   // {op, kind, target, bytes, parts: {request, input, structure, layout}, view, source, jobs, model}
+await session.estimate({op: 'toggle', nodeId});   // a resident session estimates on its own view
+```
+
+`estimate` takes the request exactly as it would be sent (to `dispatch` with its snapshot, or to a session without it),
+reads it into its types, finds the view the operation will lay out the way the operation finds it (an import's selection
+and projection, the view after opening a container) and adds up the parts with coefficients calibrated per target. It
+lays nothing out and changes nothing; the same request gives the same answer.
+
+**What it is worth** ([results](../benchmarks/results/memory-estimate-20261127.md); one Apple M3, reference datasets
+and generated graphs up to 114k nodes): on every calibration row the estimate was at or above the peak (natively the
+counted heap, in WASM the linear memory a fresh worker grew to). Above 4 MB its median was 1.3 to 2.1 times the peak for
+imports, edits and overviews (WASM 1.2 to 1.5), its maximum 3.2 to 10.7 times; refinements are estimated far higher
+(a layout per thread). On graphs left out of the fit it held, with its margin of 1.15, when graphs of the same shape stayed
+in; when no graph of their shape was calibrated (a large source with a small first view) it fell to a quarter of the
+peak. Check it against your own graphs before you rely on it: the WASM engine's `memory()` answers `heapPeakBytes`, the
+counted peak since the previous `memory`, and `benchmarks/memory-estimate/fit.py` refits the coefficients.
+
+Know these limits:
+
+- **Per target.** Type sizes differ between 64-bit builds and wasm32, so each build estimates for itself (`target`):
+  ask a WASM engine for a WASM worker. In WASM the estimate bounds the growth of a fresh worker's linear memory (the
+  memory a worker keeps, since WebAssembly never gives it back); natively it bounds the counted heap, and the resident
+  memory of the process is larger by the allocator's overhead: on macOS's system allocator up to 3 times the estimate (resident
+  against counted, in the results).
+- **Upper bound, not a forecast.** An edit that continues the earlier layout (`direction`, a drag) needs less than the
+  from-scratch layout the estimate assumes; a refinement holds a layout per thread (`jobs`).
+- **Not estimated:** reads (`scene`, `details`, `find`, `trace`, `query`, …), which are light, and a session's later
+  overview without its graph; they answer an error, and a host treats them as light (ADR 0024 item 3).
+- **The estimate itself costs** the reading of the request: on the largest graphs measured, 1.8 to 2 s and 90 MB of its own for the import of a 114k-node graph that
+takes 45 to 59 s and 554 MB, 0.7 s for a toggle through `dispatch` with a 38 MB snapshot, and milliseconds for an edit in
+a resident session. An import whose first view is small costs almost as much to estimate as to run. Run it
+  where the request would run, or in a light worker of its own.
+
+A pool built on it, in the order a request goes through it (a runnable Node example:
+[`examples/worker-pool`](../examples/worker-pool/README.md)):
+
+1. **Estimate, then queue.** Each request gets its estimate and waits, first come first served, until the sum of the
+   estimates of what runs plus its own fits the budget. A request larger than the whole budget runs alone when nothing
+   else runs, so it is never starved. Light requests (reads, `memory`, `changesSince`) bypass the queue.
+2. **Within a session, in order.** A session's requests run one after the other on the worker that holds it (ADR 0024
+   item 1); only a request that a newer one replaces completely (a drag position, a refinement) may be dropped from the
+   queue before it runs. Changes of the graph (`patch`, `change`, `payload`) are never dropped.
+3. **Stale answers are refused by revision** (section 3): an answer for a revision the view has moved past is
+   discarded, never applied; a queued edit that names an old `expectedRevision` is refused by the engine.
+4. **Overviews within a work budget.** Give `overview` a `workBudget` ([above](#bounding-an-overviews-work-provisional))
+   so its time is bounded without terminating the worker; its memory is estimated like any request.
+5. **Recycle a grown worker.** A WASM worker keeps its high-water mark. When its linear memory (`memory()` answers
+   `linearMemoryBytes`) is far above what its sessions hold, move them with `session.recycle(newEngine)` and end the old
+   worker; a stateless worker is simply replaced. `heapPeakBytes` in the same answer is the counted peak since the
+   previous `memory`, for checking the estimate against your own requests.
+6. **On a timeout, terminate.** The engine cannot be interrupted from outside. Terminate the worker (or the
+   `layout-command` process) that exceeded its time limit, answer the request as timed out, start a new worker, and let
+   the sessions it held reopen from their last snapshot. Prefer a work budget (`workBudget` on `overview` and `refine`)
+   where the operation has one: it ends in an answer, not in a lost worker.
+
+**Native or WASM workers.** WASM workers are isolated (a worker that dies takes only its sessions), give identical
+answers on every platform, and keep their high-water mark until they end. Native engines (`layout-command`, the Rust
+crate, the [Node module](#a-node-server-the-native-module-provisional)) give freed memory back to the allocator and run
+sessions in parallel threads, but a crash takes the whole process, and their resident memory is larger than the counted
+heap the estimate bounds (up to 3 times on macOS's allocator in the measurement). Budget each kind with its own estimate:
+a native engine answers `native64`, a WASM engine `wasm32`.
+
+## 11. Checklist
 
 - Every result you apply carries the revision it was computed for; you compare before applying.
 - Every operation goes through the engine (`dispatch` or a session), so it runs in all three modes.
