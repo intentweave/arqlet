@@ -390,7 +390,7 @@ Know these limits:
 - **Clustering comes first.** A large clustering (a big flat graph split into communities) can use up the budget, and
   then every container is packed.
 - **Packed stays packed.** A continuation (`start`) keeps an unchanged packed container as it is, like any unchanged
-  arrangement, until the host lays out without `start`.
+  arrangement, until the host lays out without `start` or fills it (`start.fill`, below).
 - **Threads.** With threads a level may take up to about twice its remaining budget in wall time (a container stopped
   by the shared counter is arranged again alone). On one thread and in WASM the work exceeds the budget by at most one
   step (one tick, round or sweep of one container).
@@ -402,6 +402,62 @@ Know these limits:
 An answer with `unclustered` containers has other nodes than the complete overview: continuing it by node index (and
 with `start: {}` in a session) is refused once the clustering completes (the number of values differs); lay out without
 `start` then. By id (`start.nodes`) it continues, and those containers are clustered as new ones.
+
+**Draw the top level first, fill the clusters later** (provisional, [#235](adr/0018-cluster-overview.md)). A
+continuation can arrange the interior of named containers anew inside their discs and keep every other place as it
+was, bit for bit:
+
+```js
+// 1. Something to show at once: a small budget packs what it does not reach. It must cover the clustering
+//    (work.unclustered empty), else continue by id (start.nodes), and the unsplit containers are clustered anew.
+let o = run({op: 'overview', graph, workBudget: 2_000_000}).overview;
+draw(o);
+// 2. Fill the packed containers one by one, the smallest first, or the one the user opens.
+const order = o.work.packed.filter(c => c >= 0).sort((a, b) => o.r[a] - o.r[b]);
+for (const c of order) {
+  o = run({op: 'overview', graph, start: {x: o.x, y: o.y, r: o.r, fill: [o.ids[c]]}}).overview;
+  morph(o);   // only what lies inside o.ids[c] moved
+}
+// The top level (-1 in work.packed) last: its children keep their discs and move with what they hold.
+o = run({op: 'overview', graph, start: {x: o.x, y: o.y, r: o.r, fillTop: true}}).overview;
+```
+
+| Field | Meaning |
+|---|---|
+| `start.fill` | container ids (added clusters included) whose children are arranged as a layout without `start` would arrange them, inside the container's disc |
+| `start.fillTop` | `true`: the top level too; it takes the radius its new arrangement needs |
+| `fill.filled` | containers filled (node indices, -1: the top level) |
+| `fill.unfit` | containers whose new arrangement reaches beyond their disc even without their padding: left as without `fill` |
+| `fill.needed` | the radius each of `unfit` needs; give it in `radii` together with `fill` and the disc grows, its neighbours make room |
+| `fill.overBudget` | named containers the work budget left out: they keep their places |
+| `fill.ignored` | only when not empty: ids that name no container (no node, or one without children), and every id when the start was left out (`work.startIgnored`) |
+
+- **Earlier places** come from `start.x`, `y`, `r`, from `start.nodes` (by id, also for a changed graph), or in a
+  session (and `createOverviewSession`) from the last overview: `layOut({start: {fill: ['src/app']}})`.
+- **The disc stays.** A filled container may keep free room, or its children may come closer to its border than the
+  padding (rows fill some small containers better than forces); lay out without `start` (with a budget large enough)
+  for the tight overview. Requests with `fill` keep that room; a later
+  continuation without `fill` measures the discs again, so a container with free room shrinks to its content (nothing
+  else moves, the gap stays open unless `settle`). Keep sending `fill: []` to keep every disc as it is.
+- **Not recursive.** Name nested containers too; one request with several gives what single requests one after another
+  give, from the inside out.
+- **With a work budget** the named containers are filled in a fixed order (from the leaves up, in index order) as long
+  as the budget lasts; those left out keep their places and are listed in `fill.overBudget`. Containers kept as they
+  were cost nothing in a fill request, so the budget goes to the fills. **Repeat with `fill.overBudget` while the last
+  round filled something**: each round fills at least the first one whose fill alone fits the budget, and a round that
+  fills nothing would give the same answer again, so stop there or raise the budget:
+
+  ```js
+  let left = ids;
+  while (left.length) {
+    const next = run({op: 'overview', graph, start: {x: o.x, y: o.y, r: o.r, fill: left}, workBudget}).overview;
+    if (!next.fill.filled.length) break;   // nothing fits this budget: stop, or raise it
+    o = next; left = next.fill.overBudget.map(c => o.ids[c]);
+  }
+  ```
+- `start.moved` of a node inside a filled container is refused; elsewhere it works as before. Places outside the filled
+  containers are answered as given only when nothing else changed (no `radii`, `moved` or changed graph in the same
+  request).
 
 **Choosing a budget.** The units are not time; calibrate them on your machine:
 

@@ -3716,6 +3716,10 @@ pub struct Overview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub work: Option<OverviewWork>,
+    /// Provisional (#235), for a request with `start.fill` or `start.fillTop`: what became of those containers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub fill: Option<OverviewFill>,
 }
 
 /// Provisional (#236, ADR 0018 addendum of 2026-11-28): per container (parallel arrays, the root first, then every node
@@ -4130,6 +4134,10 @@ pub struct OverviewPositions {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub work: Option<OverviewWork>,
+    /// For a request with `start.fill` (`Overview::fill`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub fill: Option<OverviewFill>,
 }
 
 impl OverviewPositions {
@@ -4147,6 +4155,7 @@ impl OverviewPositions {
             stats: overview.stats,
             continuation: overview.continuation,
             work: overview.work,
+            fill: overview.fill,
         }
     }
 }
@@ -4345,6 +4354,46 @@ pub struct OverviewStart {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub moved: Option<BTreeMap<String, Point>>,
+    /// Provisional (#235): containers, by id, whose interior is arranged anew inside their earlier disc, as a layout
+    /// without `start` would arrange it; everything else keeps its place (`Overview::fill` reports what became of
+    /// them). Needs earlier places, as `moved` does. Not recursive: name nested containers too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub fill: Option<Vec<String>>,
+    /// Provisional (#235): arrange the top level anew as well (its children keep their discs and what they hold).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub fill_top: Option<bool>,
+}
+
+/// Provisional (#235): what became of the containers a request named in `start.fill` (and `start.fillTop`). Containers
+/// are node indices, -1 for the top level, in index order (the top level first). Every named container is in exactly
+/// one of `filled`, `unfit` and `overBudget`.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewFill {
+    /// Arranged anew inside their disc, which kept its radius; their children may come closer to its border than the
+    /// padding (the top level takes the radius its arrangement needs).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub filled: Vec<i64>,
+    /// Their new arrangement reaches beyond their disc even without their padding: arranged as without `fill`
+    /// (unchanged, they keep their places).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub unfit: Vec<i64>,
+    /// The radius each of `unfit` needs, in the same order. Given in `radii` together with `fill`, the disc grows to it
+    /// and its neighbours make room.
+    pub needed: Vec<f64>,
+    /// Named containers the work budget left out: they keep their places (or are packed, and in `work.packed`, when
+    /// they changed too). Ask again with these; each round fills at least the first in the order whose fill alone fits
+    /// the budget, and a round that fills nothing would give the same answer again, so stop then or raise the budget.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub over_budget: Vec<i64>,
+    /// Ids in `fill` that name no container of the overview (no node, or one without children), in the order given.
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts", ts(optional, as = "Option<Vec<String>>"))]
+    pub ignored: Vec<String>,
 }
 
 /// Provisional: the disc of a node in an earlier overview (its `x`, `y` and `r`), and what held it.

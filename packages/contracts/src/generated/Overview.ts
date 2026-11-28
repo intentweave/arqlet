@@ -2,6 +2,7 @@
 import type { OverviewBusLine } from "./OverviewBusLine";
 import type { OverviewContainerStats } from "./OverviewContainerStats";
 import type { OverviewContinuation } from "./OverviewContinuation";
+import type { OverviewFill } from "./OverviewFill";
 import type { OverviewRepresentation } from "./OverviewRepresentation";
 import type { OverviewStats } from "./OverviewStats";
 import type { OverviewWork } from "./OverviewWork";
@@ -79,4 +80,8 @@ continuation?: OverviewContinuation,
 /**
  * Provisional (#211), for a request with `workBudget`: the work the overview used and what the budget left out.
  */
-work?: OverviewWork, };
+work?: OverviewWork,
+/**
+ * Provisional (#235), for a request with `start.fill` or `start.fillTop`: what became of those containers.
+ */
+fill?: OverviewFill, };

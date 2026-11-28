@@ -33,6 +33,15 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `unclustered`, `packed`); `overBudget: "refuse"` fails cleanly instead. The same answer for any thread count, natively
   and in WASM; without `workBudget` nothing changes. New contract types `OverviewWork` and `OverBudget`. How to choose
   a budget: [integration guide](docs/integration-guide.md#bounding-an-overviews-work-provisional).
+- **Filling given clusters of an overview later** (#235, provisional; ADR 0018 addendum "filling given containers
+  later"): a continuation with `start.fill` (container ids) and `start.fillTop` arranges the interior of those containers
+  anew inside their discs, as a layout without `start` would, and keeps every other place as given, bit for bit. A host
+  draws the top level first (for example with a small `workBudget`) and fills the packed clusters one by one or on
+  demand. The container's padding gives way first; content that reaches beyond the disc is left as it was and reported with the radius it needs (`fill.unfit`,
+  `fill.needed`; give that in `radii` to let it grow); with a work budget the named containers are filled in a fixed
+  order as long as it lasts, the rest listed in `fill.overBudget` (a round that fills nothing would repeat unchanged: stop or raise the budget). Through `dispatch`, in sessions (`start: {fill}`) and
+  `createOverviewSession`, identical for any thread count and natively and in WASM; requests without the fields answer
+  as before. New contract type `OverviewFill`.
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under
   a drill-down) without destroying it. While paused the renderer draws no frame and requests no animation frame
   (breathing, morphs, blends, lens and orbit updates), keeps its GPU resources, model, view and state, and takes every
