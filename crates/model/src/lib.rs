@@ -3703,6 +3703,11 @@ pub struct Overview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number[]"))]
     pub edge_weight: Option<Vec<u32>>,
+    /// Provisional (#236), for a request with `containerStats`: how well each container holds its edges, and the
+    /// modularity at each depth.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub container_stats: Option<OverviewContainerStats>,
     /// Provisional, for a request with `start.nodes`: what became of the earlier places.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
@@ -3737,6 +3742,48 @@ pub struct OverviewMovement {
     /// `median` and `max` divided by the answer's `rootRadius`, rounded to ten-thousandths.
     pub median_share: f64,
     pub max_share: f64,
+}
+
+/// Provisional (#236, ADR 0018 addendum of 2026-11-28): per container (parallel arrays, the root first, then every node
+/// with children in index order) how well it holds its edges, and the modularity of the partition at each depth.
+///
+/// Edges are the resolved edges of the overview (`edges`; unresolved ones are left out), undirected, each counting its
+/// weight (`Edge::weight`, 1 when left out); parallel edges count each. A container's block is the container node and
+/// everything below it. The partition at depth `d` has the blocks of the nodes at depth `d` (0: top level) and every
+/// node above as a block of its own. With `m = weight`, `in(B)` the weight of the edges with both ends in `B` (a
+/// self-loop once) and `deg(B)` the weight of the edge ends in `B` (a self-loop twice):
+/// `inner = in(B)`, `touching = deg(B) - in(B)`, `share = inner / touching` (0 when `touching` is 0),
+/// `modularity = in(B)/m - (deg(B)/(2m))^2`; `depthModularity[d]` sums the terms of all blocks at depth `d` (leaves
+/// and the nodes above included, so the containers' terms alone need not add up to it). An edge between a container
+/// and a node below it lies inside the container's block. With `m = 0` every share and modularity is 0.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OverviewContainerStats {
+    /// The sum of the weights of all resolved edges (`m`).
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
+    pub weight: u64,
+    /// The containers as node indices, -1 for the root (as `parent`).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub container: Vec<i64>,
+    /// Each container's depth: -1 for the root, 0 for a top-level node; the index into `depthModularity`.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub depth: Vec<i64>,
+    /// The weight of the edges with both ends in the container.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub inner: Vec<f64>,
+    /// The weight of the edges with at least one end in the container.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub touching: Vec<f64>,
+    /// `inner / touching`, 0 when no edge touches the container.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub share: Vec<f64>,
+    /// The container's term of the modularity at its depth (0 for the root).
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub modularity: Vec<f64>,
+    /// The modularity of the partition at each depth, from 0 to the deepest container's.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub depth_modularity: Vec<f64>,
 }
 
 /// Provisional (#211, ADR 0018 addendum of 2026-11-27): the work of an overview with a work budget (`workBudget`).
@@ -4086,8 +4133,9 @@ pub struct NeighbourhoodAnswer {
 }
 
 /// Provisional (sessions): the part of an overview that changes while the clusters stay the same, answered for a request
-/// with `positionsOnly` laid out on the clusters of the session's last overview, with the same `edgeData`. The host keeps
-/// ids, labels, parents, kinds, edges (with their data) and links from that answer.
+/// with `positionsOnly` laid out on the clusters of the session's last overview, with the same `edgeData` and
+/// `containerStats`. The host keeps ids, labels, parents, kinds, edges (with their data), links and the containers'
+/// stats from that answer.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -4226,7 +4274,7 @@ pub struct OverviewRequest {
     #[cfg_attr(feature = "ts", ts(optional))]
     pub start: Option<OverviewStart>,
     /// Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
-    /// last overview and `edgeData` is as it was there; otherwise the whole overview.
+    /// last overview and `edgeData` and `containerStats` are as they were there; otherwise the whole overview.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub positions_only: Option<bool>,
@@ -4235,6 +4283,11 @@ pub struct OverviewRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub edge_data: Option<bool>,
+    /// Provisional (#236): answer per container its inner and touching edges, their share and its modularity term, and
+    /// the modularity at each depth (`Overview::container_stats`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub container_stats: Option<bool>,
     /// Provisional (#211): a deterministic work budget in units (`Overview::work`); the answer reports the work. Without
     /// it the overview runs to the end, as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]

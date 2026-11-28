@@ -6,9 +6,9 @@ use arqlet_layout::overview::{
     Previous,
 };
 use arqlet_model::{
-    validate, ConfigSet, Graph, OverBudget, Overview, OverviewConfig, OverviewContinuation,
-    OverviewFill, OverviewIntent, OverviewMovement, OverviewPlace, OverviewPositions,
-    OverviewRepresentation, OverviewStats, OverviewWork,
+    validate, ConfigSet, Graph, OverBudget, Overview, OverviewConfig, OverviewContainerStats,
+    OverviewContinuation, OverviewFill, OverviewIntent, OverviewMovement, OverviewPlace,
+    OverviewPositions, OverviewRepresentation, OverviewStats, OverviewWork,
 };
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -712,6 +712,8 @@ fn lay_out(
     let mut over: Vec<i64> = Vec::new();
     // `edgeData`: each edge's kind and weight in the answer.
     let edge_data = edge_data_of(v)?;
+    // `containerStats` (#236): the inner-edge share and modularity per container, of the hierarchy alone.
+    let container_stats = flag_of(v, "containerStats")?.then(|| stats_of(h));
     // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
     let rows_wanted = options.rows.contains_key(&usize::MAX);
     let mut options = options.clone();
@@ -928,6 +930,7 @@ fn lay_out(
         edge_kinds,
         edge_kind,
         edge_weight,
+        container_stats,
         continuation,
         work,
         fill,
@@ -937,10 +940,30 @@ fn lay_out(
 
 /// The `edgeData` of a request.
 fn edge_data_of(v: &Value) -> Result<bool, String> {
-    match v.get("edgeData") {
+    flag_of(v, "edgeData")
+}
+
+/// A flag of a request (false when left out or null).
+fn flag_of(v: &Value, key: &str) -> Result<bool, String> {
+    match v.get(key) {
         None | Some(Value::Null) => Ok(false),
         Some(Value::Bool(b)) => Ok(*b),
-        Some(_) => Err("Overview edgeData must be true or false".into()),
+        Some(_) => Err(format!("Overview {key} must be true or false")),
+    }
+}
+
+/// The `containerStats` of an answer (#236): `overview::container_stats` with the containers as the answer names them.
+fn stats_of(h: &overview::Hierarchy) -> OverviewContainerStats {
+    let s = overview::container_stats(h);
+    OverviewContainerStats {
+        weight: s.weight,
+        container: s.containers.into_iter().map(container_index).collect(),
+        depth: s.depth,
+        inner: s.inner.into_iter().map(|w| w as f64).collect(),
+        touching: s.touching.into_iter().map(|w| w as f64).collect(),
+        share: s.share,
+        modularity: s.modularity,
+        depth_modularity: s.depth_modularity,
     }
 }
 
@@ -961,8 +984,8 @@ pub struct OverviewSession {
     /// whether its clustering was complete (a hierarchy with containers the budget left unsplit is not reused).
     clustering: (u64, bool),
     /// The cluster options and the positions (`x`, `y`, `r`, as answered) of the last layout, and whether it was
-    /// answered with the edges' data.
-    last: Option<(Value, Value, bool)>,
+    /// answered with the edges' data and with the containers' stats (`edgeData`, `containerStats`).
+    last: Option<(Value, Value, (bool, bool))>,
     /// The numbers of the last answer to a request with `columns: true`; dropped by the next request.
     columns: Option<crate::columns::OverviewColumns>,
 }
@@ -1139,8 +1162,9 @@ impl OverviewSession {
             work.map(|w| (w, budget)),
         )?;
         // The same clusters as the last overview of this session: its ids, labels, parents, kinds, edges and links hold,
-        // and so do the edges' data, which the host has when that answer had them.
-        let edge_data = edge_data_of(v)?;
+        // and so do the edges' data and the containers' stats (#236, of the hierarchy alone), which the host has when that
+        // answer was asked with the same flags.
+        let edge_data = (edge_data_of(v)?, flag_of(v, "containerStats")?);
         let same_clusters = new_graph.is_none()
             && self
                 .last

@@ -190,6 +190,30 @@ test('a columnar overview session gives the same overviews as one with JSON arra
   await typed.close();
 });
 
+test('a columnar overview puts the containers\' stats back into containerStats, as the JSON answer has them', {skip: !overviewEngine}, async () => {
+  const plain = createOverviewSession(overviewEngine);
+  const typed = createOverviewSession(overviewEngine, {columns: true});
+  const options = {communities: 0};
+  const a = await plain.open(overviewGraph, {options, containerStats: true});
+  const b = await typed.open(overviewGraph, {options, containerStats: true});
+  assert.equal(a.ok && b.ok, true, JSON.stringify(b).slice(0, 200));
+  const fields = ['container', 'depth', 'inner', 'touching', 'share', 'modularity', 'depthModularity'];
+  assert.deepEqual(Object.keys(b.overview.containerStats).sort(), ['weight', ...fields].sort());
+  assert.equal(b.overview.containerStats.weight, a.overview.containerStats.weight);
+  for (const key of fields) {
+    assert.ok(ArrayBuffer.isView(b.overview.containerStats[key]), `${key} is a typed array`);
+    assert.deepEqual(Array.from(b.overview.containerStats[key]), a.overview.containerStats[key], key);
+  }
+  assert.equal(Object.keys(b.overview).some(k => k.includes('.')), false, 'no dotted names at the top');
+  // Positions only on the same clusters: the session keeps the stats of the last whole answer.
+  const next = {options, containerStats: true, radii: {g1: 120}, start: {}};
+  const c = await plain.layOut(next), d = await typed.layOut(next);
+  assert.deepEqual(c.overview.containerStats, a.overview.containerStats);
+  assert.deepEqual(Array.from(d.overview.containerStats.share), a.overview.containerStats.share);
+  await plain.close();
+  await typed.close();
+});
+
 test('columns: true without an engine that offers them says so', async () => {
   const run = async () => ({ok: true});
   run.openSession = async () => ({run, close() {}});

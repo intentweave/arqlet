@@ -2097,6 +2097,161 @@ pub fn overview(
     (h, result)
 }
 
+/// Provisional (#236, ADR 0018 addendum of 2026-11-28): how well each container of a hierarchy holds its edges, and the
+/// modularity of the partition at each depth.
+///
+/// The edges are the hierarchy's resolved edges (`Hierarchy::edges`: unresolved edges are not in it), undirected, each
+/// counting its weight (`Hierarchy::weights`, `Edge::weight`, 1 when left out); parallel edges count each. A container's
+/// *block* is the container node itself and everything below it. At depth `d` the nodes form the partition whose blocks
+/// are the blocks of the nodes at depth `d` (top-level nodes have depth 0), with every node above depth `d` a block of
+/// its own; the root (all nodes, one block) is depth -1.
+///
+/// With `m` the sum of all weights, `in(B)` the weight of the edges with both ends in block `B` (a self-loop counts once)
+/// and `deg(B)` the sum of the weights of the edge ends in `B` (a self-loop counts twice, so `deg(B) = 2 in(B) + cut(B)`):
+///
+/// - `inner = in(B)`, `touching = deg(B) - in(B)` (edges with at least one end in `B`), `share = inner / touching` (0
+///   when no edge touches the block),
+/// - `modularity = in(B) / m - (deg(B) / 2m)^2`, the block's term of the modularity at its depth (Newman and Girvan),
+/// - per depth `d`: `Q_d`, the sum of the terms of all blocks of its partition (containers, leaves at depth `d` and the
+///   nodes above it as their own blocks), summed in node index order.
+///
+/// An edge between a container and a node below it lies inside the container's block (not inside the child's). With
+/// `m = 0` every share and modularity is 0. The counts are exact (`u64`); the quotients are computed in the same order
+/// on every target, so the numbers are the same natively and in WASM.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ContainerStats {
+    /// The sum of the weights of all edges (`m`).
+    pub weight: u64,
+    /// The root first, then every node with children in index order.
+    pub containers: Vec<Container>,
+    /// Each container's depth: -1 for the root, 0 for a top-level node.
+    pub depth: Vec<i64>,
+    pub inner: Vec<u64>,
+    pub touching: Vec<u64>,
+    pub share: Vec<f64>,
+    pub modularity: Vec<f64>,
+    /// `Q_d` for every depth from 0 to the deepest container's (empty without containers below the root).
+    pub depth_modularity: Vec<f64>,
+}
+
+/// The `ContainerStats` of a hierarchy.
+pub fn container_stats(h: &Hierarchy) -> ContainerStats {
+    let n = h.ids.len();
+    let depth: Vec<usize> = (0..n)
+        .map(|i| {
+            let (mut d, mut at) = (0usize, h.parent[i]);
+            while let Some(p) = at {
+                d += 1;
+                at = h.parent[p];
+            }
+            d
+        })
+        .collect();
+    // Per node: its block's inner weight and degree, and its own self-loops and degree (as a block of its own).
+    let (mut inner, mut deg) = (vec![0u64; n], vec![0u64; n]);
+    let (mut loops, mut own) = (vec![0u64; n], vec![0u64; n]);
+    let mut m = 0u64;
+    for (&(a, b), &w) in h.edges.iter().zip(&h.weights) {
+        // The weights are `Edge::count()` (a `u32` at most) as `f64`, so whole numbers: the cast is exact.
+        debug_assert!(
+            w.fract() == 0.0 && w >= 0.0,
+            "edge weight {w} is not a count"
+        );
+        let w = w as u64;
+        m += w;
+        own[a] += w;
+        own[b] += w;
+        if a == b {
+            loops[a] += w;
+        }
+        for end in [a, b] {
+            let mut at = Some(end);
+            while let Some(x) = at {
+                deg[x] += w;
+                at = h.parent[x];
+            }
+        }
+        // The lowest block holding both ends (a node is its own ancestor), if any below the root.
+        let (mut u, mut v) = (a, b);
+        while depth[u] > depth[v] {
+            u = h.parent[u].unwrap();
+        }
+        while depth[v] > depth[u] {
+            v = h.parent[v].unwrap();
+        }
+        let mut common = Some(u);
+        while u != v {
+            match (h.parent[u], h.parent[v]) {
+                (Some(p), Some(q)) => {
+                    u = p;
+                    v = q;
+                    common = Some(p);
+                }
+                _ => {
+                    common = None;
+                    break;
+                }
+            }
+        }
+        while let Some(x) = common {
+            inner[x] += w;
+            common = h.parent[x];
+        }
+    }
+    let term = |i: u64, d: u64| -> f64 {
+        if m == 0 {
+            return 0.;
+        }
+        let mf = m as f64;
+        let q = d as f64 / (2. * mf);
+        i as f64 / mf - q * q
+    };
+    let share = |i: u64, t: u64| if t == 0 { 0. } else { i as f64 / t as f64 };
+    let mut s = ContainerStats {
+        weight: m,
+        ..ContainerStats::default()
+    };
+    let push = |s: &mut ContainerStats, c: Container, d: i64, i: u64, dg: u64| {
+        let t = dg - i;
+        s.containers.push(c);
+        s.depth.push(d);
+        s.inner.push(i);
+        s.touching.push(t);
+        s.share.push(share(i, t));
+        s.modularity.push(term(i, dg));
+    };
+    push(&mut s, Container::Root, -1, m, 2 * m);
+    let mut deepest: Option<usize> = None;
+    for i in 0..n {
+        if !h.children[i].is_empty() {
+            push(
+                &mut s,
+                Container::Node(i),
+                depth[i] as i64,
+                inner[i],
+                deg[i],
+            );
+            deepest = Some(deepest.map_or(depth[i], |d| d.max(depth[i])));
+        }
+    }
+    if let Some(deepest) = deepest {
+        s.depth_modularity = (0..=deepest)
+            .map(|k| {
+                let mut q = 0.;
+                for i in 0..n {
+                    if depth[i] == k {
+                        q += term(inner[i], deg[i]);
+                    } else if depth[i] < k {
+                        q += term(loops[i], own[i]);
+                    }
+                }
+                q
+            })
+            .collect();
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
