@@ -347,7 +347,7 @@ edge of a container node to a node outside counts as touching it. The terms of a
   the positions, and are the same for any thread count, natively and in WASM.
 - **Columns:** with `columns: true` the arrays come as typed columns `containerStats.container` and
   `containerStats.depth` (`i32`) and `containerStats.inner`, `.touching`, `.share`, `.modularity`,
-  `.depthModularity` (`f64`); `weight` stays in the JSON. The engine client's `overview()` puts them back into
+  `.depthModularity` (`f64`); `weight` stays in the JSON. The engine client's `overview()` (and that of `@arqlet/node`) puts them back into
   `overview.containerStats`, so the answer is shaped like the JSON one.
 - **Positions only:** a `positionsOnly` answer does not carry them. A session answers one only while `containerStats`
   is the same as in its last answer (the host keeps the stats from there, as the engine client's overview session does);

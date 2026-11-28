@@ -1997,6 +1997,11 @@ pub fn container_stats(h: &Hierarchy) -> ContainerStats {
     let (mut loops, mut own) = (vec![0u64; n], vec![0u64; n]);
     let mut m = 0u64;
     for (&(a, b), &w) in h.edges.iter().zip(&h.weights) {
+        // The weights are `Edge::count()` (a `u32` at most) as `f64`, so whole numbers: the cast is exact.
+        debug_assert!(
+            w.fract() == 0.0 && w >= 0.0,
+            "edge weight {w} is not a count"
+        );
         let w = w as u64;
         m += w;
         own[a] += w;

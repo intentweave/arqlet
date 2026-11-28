@@ -330,3 +330,219 @@ fn the_stats_are_the_same_for_any_thread_count_and_cover_communities() {
     }
     assert!(numbers(&s["depthModularity"])[0] > 0.5, "{s}");
 }
+
+/// A seeded pseudo-random nested graph: 40 nodes up to depth 5 (a chain `n0` … `n5` reaches it; `n1` holds two dense
+/// groups that `communities: 4` turns into clusters), self-loops, parallel
+/// edges, edges between containers and their descendants, an unresolved edge, and weights up to `u32::MAX`, so that
+/// `m` exceeds `2^32`.
+fn random_nested(seed: u64) -> Value {
+    let mut state = seed;
+    let mut next = move |k: u64| {
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        (state >> 33) % k
+    };
+    let mut depth: Vec<usize> = Vec::new();
+    let mut nodes = Vec::new();
+    let mut parent_of: Vec<Option<usize>> = Vec::new();
+    for i in 0..40usize {
+        let parent = if i == 0 {
+            None
+        } else if i <= 5 {
+            Some(i - 1)
+        } else if i < 22 {
+            // 16 children of `n1` in two dense groups of 8 (below), which `communities: 4` divides.
+            Some(1)
+        } else {
+            // A node at depth < 5 as the parent, or the top level.
+            let choice = next(i as u64 + 1) as usize;
+            (choice < i && depth[choice] < 5).then_some(choice)
+        };
+        depth.push(parent.map_or(0, |p| depth[p] + 1));
+        parent_of.push(parent);
+        let parent_id = parent.map(|p| format!("n{p}"));
+        nodes.push(node(&format!("n{i}"), parent_id.as_deref()));
+    }
+    let mut edges = Vec::new();
+    let push = |edges: &mut Vec<Value>, a: usize, b: usize, w: u32| {
+        let id = format!("e{}", edges.len());
+        edges.push(edge(&id, &format!("n{a}"), Some(&format!("n{b}")), Some(w)));
+    };
+    for _ in 0..90 {
+        let (a, b) = (next(40) as usize, next(40) as usize);
+        let w = match next(4) {
+            0 => u32::MAX - next(1000) as u32,
+            1 => 1 + next(5) as u32,
+            _ => 1 + next(1_000_000) as u32,
+        };
+        push(&mut edges, a, b, w);
+        // Some parallel edges, with their own weights.
+        if next(6) == 0 {
+            push(&mut edges, b, a, 1 + next(100) as u32);
+        }
+    }
+    for group in [6usize, 14] {
+        for a in group..group + 8 {
+            for b in a + 1..group + 8 {
+                push(&mut edges, a, b, 3_000_000_000);
+            }
+        }
+    }
+    for i in [3usize, 11, 17, 29] {
+        push(&mut edges, i, i, 1 + next(1_000_000_000) as u32);
+    }
+    // Containers with their descendants, both directions.
+    for (i, p) in parent_of.iter().enumerate() {
+        if let Some(p) = *p {
+            if i % 3 == 0 {
+                let top = parent_of[p].unwrap_or(p);
+                push(&mut edges, top, i, 4_000_000_000);
+                push(&mut edges, i, p, 7);
+            }
+        }
+    }
+    edges.push(edge("open", "n2", None, Some(u32::MAX)));
+    json!({"nodes": nodes, "edges": edges})
+}
+
+/// The stats of an answer recomputed from scratch from its own `parent`, `edges` and `edgeWeight`: every block by
+/// checking ancestors, every edge against every block.
+#[test]
+fn the_stats_equal_a_brute_force_recount_from_the_answer() {
+    let mut added = 0;
+    for seed in [1u64, 2, 3] {
+        let graph = random_nested(seed);
+        for communities in [0, 4] {
+            let o = answer(&json!({"op": "overview", "graph": graph, "edgeData": true,
+                "containerStats": true, "options": {"communities": communities}}));
+            let s = &o["containerStats"];
+            added += o["stats"]["communities"].as_u64().unwrap();
+            let parent: Vec<Option<usize>> = o["parent"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| usize::try_from(p.as_i64().unwrap()).ok())
+                .collect();
+            let n = parent.len();
+            let flat: Vec<usize> = o["edges"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|e| e.as_u64().unwrap() as usize)
+                .collect();
+            let weights: Vec<u64> = match o["edgeWeight"].as_array() {
+                Some(w) => w.iter().map(|w| w.as_u64().unwrap()).collect(),
+                None => vec![1; flat.len() / 2],
+            };
+            let edges: Vec<(usize, usize, u64)> = flat
+                .chunks(2)
+                .zip(&weights)
+                .map(|(e, &w)| (e[0], e[1], w))
+                .collect();
+            let m: u64 = weights.iter().sum();
+            assert!(m > 1 << 32, "m = {m}");
+            assert_eq!(s["weight"].as_u64().unwrap(), m);
+            let depth = |mut v: usize| {
+                let mut d = 0i64;
+                while let Some(p) = parent[v] {
+                    d += 1;
+                    v = p;
+                }
+                d
+            };
+            // `v` in the block of `c`: `c` is `v` or one of its ancestors.
+            let within = |mut v: usize, c: usize| loop {
+                if v == c {
+                    return true;
+                }
+                match parent[v] {
+                    Some(p) => v = p,
+                    None => return false,
+                }
+            };
+            // In and degree of a set of nodes.
+            let count = |inside: &dyn Fn(usize) -> bool| {
+                let (mut i, mut d) = (0u64, 0u64);
+                for &(a, b, w) in &edges {
+                    let (x, y) = (inside(a), inside(b));
+                    if x && y {
+                        i += w;
+                    }
+                    d += w * (x as u64 + y as u64);
+                }
+                (i, d)
+            };
+            let term = |i: u64, d: u64| {
+                let mf = m as f64;
+                i as f64 / mf - (d as f64 / (2. * mf)).powi(2)
+            };
+            let close = |a: f64, b: f64, what: &str| {
+                assert!((a - b).abs() < 1e-12, "{what}: {a} against {b}");
+            };
+            // The containers: the root, then every node with children in index order.
+            let containers: Vec<usize> = (0..n)
+                .filter(|&c| parent.iter().any(|p| *p == Some(c)))
+                .collect();
+            let listed: Vec<i64> = std::iter::once(-1)
+                .chain(containers.iter().map(|&c| c as i64))
+                .collect();
+            assert_eq!(s["container"], json!(listed));
+            let depths: Vec<i64> = std::iter::once(-1)
+                .chain(containers.iter().map(|&c| depth(c)))
+                .collect();
+            assert_eq!(s["depth"], json!(depths));
+            // The chain's containers reach depth 4 (its leaf `n5` is at 5); added clusters may push them deeper.
+            let deepest = *depths.iter().max().unwrap();
+            assert!(deepest >= 4, "the deepest container: {deepest}");
+            let mut inner = vec![m];
+            let mut touching = vec![m];
+            let mut terms = vec![0.];
+            for &c in &containers {
+                let (i, d) = count(&|v| within(v, c));
+                inner.push(i);
+                touching.push(d - i);
+                terms.push(term(i, d));
+            }
+            assert_eq!(
+                s["inner"],
+                json!(inner.iter().map(|&x| x as f64).collect::<Vec<_>>())
+            );
+            assert_eq!(
+                s["touching"],
+                json!(touching.iter().map(|&x| x as f64).collect::<Vec<_>>())
+            );
+            let modularity = numbers(&s["modularity"]);
+            let share = numbers(&s["share"]);
+            assert_eq!(modularity.len(), terms.len());
+            for k in 0..terms.len() {
+                close(modularity[k], terms[k], &format!("term of {}", listed[k]));
+                let expected = if touching[k] == 0 {
+                    0.
+                } else {
+                    inner[k] as f64 / touching[k] as f64
+                };
+                close(share[k], expected, &format!("share of {}", listed[k]));
+            }
+            // Q per depth: the blocks of the nodes at that depth, every node above it alone; the degrees add up to 2m.
+            let per_depth = numbers(&s["depthModularity"]);
+            assert_eq!(per_depth.len() as i64, deepest + 1);
+            for (d, &q) in per_depth.iter().enumerate() {
+                let d = d as i64;
+                let (mut expected, mut degrees) = (0., 0u64);
+                for v in 0..n {
+                    let (i, g) = match depth(v) {
+                        x if x == d => count(&|u| within(u, v)),
+                        x if x < d => count(&|u| u == v),
+                        _ => continue,
+                    };
+                    expected += term(i, g);
+                    degrees += g;
+                }
+                assert_eq!(degrees, 2 * m, "the degrees at depth {d}");
+                close(q, expected, &format!("Q at depth {d}"));
+            }
+        }
+    }
+    assert!(added > 0, "communities: 4 added clusters to some graph");
+}
