@@ -8732,7 +8732,14 @@ fn place(
                     lines.entry(key).or_insert(line);
                 }
             }
-            tree::octilinear_arrange(&ids, &link_set, &sizes, grid, &lines)
+            tree::octilinear_arrange(
+                &ids,
+                &link_set,
+                &sizes,
+                grid,
+                &lines,
+                options.octilinear_refine,
+            )
         }
     };
     // A pinned child keeps its position in this container's frame whatever the arrangement (ADR 0009), and the container
