@@ -249,9 +249,9 @@ a layout fragment. The native estimate therefore does not cover resident memory;
 resident memory multiplies it (3 on this machine) or measures its own allocator. In WASM the estimate stands for the linear
 memory itself.
 
-The estimates of the final build were also checked against a fresh measurement on synthetic-20k (limit 100, depth 0)
-and full-1000, natively and in WASM: the same ratios as in the tables (for example 1.81 for the import, 1.14 for the WASM
-overview, 13.67 for a session's refinement), every estimate above its peak.
+The estimates of the final build (with the floor) were checked against a fresh measurement of code-50000 (limit 100,
+depth 0: import, toggle, direction, patch, natively and in WASM, and the WASM overview): every estimate equals what
+`fit.py`'s `predict` computes from the engine's tables to 0.1 MB, and lies 1.12 to 1.43 times above the measured peak.
 
 ## What the estimate costs
 
