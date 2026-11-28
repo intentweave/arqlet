@@ -56,6 +56,7 @@ The same Rust dispatcher answers every request in three places. A `run` is the f
 | The page | `await loadEngine()` | simplest; long computations block the page |
 | A worker | `workerRun(createEngineWorker())` | the page stays responsive; the usual choice in a browser |
 | A backend | `httpRun('/api')` | the backend runs `layout-command --sessions` (one long-running process, one message per line) or links the Rust crate |
+| A Node server, natively | `loadNativeEngine()` of `@arqlet/node` | provisional, unpublished: the engine in the Node process, every call on libuv's thread pool, sessions in parallel (below) |
 
 Sessions keep their snapshot inside the engine where the engine offers it (`resident: 'auto'`): a request then names the
 change, not the whole state. Without a resident session the snapshot travels with each request.
@@ -70,6 +71,41 @@ The product requirement is that all three **deployment modes** keep working:
 
 The playground (`apps/playground`) implements all three behind one switch; `app.js` routes every operation through one
 `execute()` by kind (edit, refine, import), and its UI tests run each mode.
+
+### A Node server: the native module (provisional)
+
+`@arqlet/node` (ADR 0030; unpublished for now, build the module with `node packages/node/build.mjs`) runs the engine in
+the Node process without WASM and without a child process. Every call that computes is an asynchronous task on libuv's
+thread pool, so the event loop keeps serving requests during a layout; the answers are the same bytes as the WASM
+engine's.
+
+```js
+import {loadEngine} from '@arqlet/node';
+import {createSession} from '@arqlet/engine-client/session.js';
+
+// 'native', 'wasm', or 'auto' (native where a module for this platform loads); default: ARQLET_ENGINE, else 'auto'.
+const run = await loadEngine({engine: 'auto', sessionBytes: 2 ** 30});
+const session = createSession(run);          // resident: the snapshot stays in the module
+await session.import(graph, {limit: 2000});
+await session.toggle('payments');
+run.kind;                                    // 'native' or 'wasm'
+```
+
+- **Sessions in parallel, each in order.** Different sessions run at the same time on the pool's threads; the requests of
+  one session run one after the other, in the order sent (the loader queues them). One `loadNativeEngine()` is one store
+  of sessions; open one per client view and close it when the view goes.
+- **The pool is shared.** libuv's pool has 4 threads unless `UV_THREADPOOL_SIZE` (set before the pool is first used)
+  says otherwise, and `fs`, `dns.lookup`, `crypto` and `zlib` use it too: a layout holds a thread for its duration. Admit
+  heavy operations (import, layout, refinement) by count, and raise the pool size to that count plus what the rest of
+  the server needs (ADR 0024, item 3).
+- **Memory.** `sessionBytes` limits the sessions' estimated weight together: the least recently used idle session is
+  dropped beyond it and answers `Unknown session` afterwards (a running one is never dropped, so the limit is soft while
+  several grow at once). `session.memory()` adds the module's live heap (`heapBytes`). Native memory goes back to the
+  system allocator, so recycling is not needed to shrink, but `session.recycle(otherEngine)` still moves a session to a
+  WASM engine and back.
+- **Not yet:** progressive publications (`refineProgressive` answers with its final result only), prebuilt binaries.
+  A crash in native code ends the process (panics are caught and answered as errors); a host that needs isolation keeps
+  `layout-command --sessions` processes.
 
 ## 3. Revisions: never apply a stale result
 

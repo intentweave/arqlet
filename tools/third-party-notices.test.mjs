@@ -39,6 +39,17 @@ test('the query module (@arqlet/query) has its own list, with the parser, and no
   assert.deepEqual(query.filter(c => c.files.length === 0).map(c => `${c.name} ${c.version}`), []);
 });
 
+test('the native Node module (crates/node) has no license file missing; napi-rs texts are supplied', () => {
+  for (const target of ['aarch64-apple-darwin', 'x86_64-unknown-linux-gnu', 'aarch64-unknown-linux-gnu', 'x86_64-pc-windows-msvc']) {
+    const node = collect('arqlet-node', target);
+    assert.deepEqual(node.filter(c => c.files.length === 0).map(c => `${c.name} ${c.version}`), [], target);
+    const napi = node.find(c => c.name === 'napi');
+    assert.match(napi.files[0].file, /napi-rs\/blob\/417375ad5ef1d8cb4c49edf13d2cc6c0204bb5b1\/LICENSE/);
+    assert.match(napi.files[0].text, /Copyright \(c\) 2020-present LongYinan/);
+  }
+  assert.match(render(collect('arqlet-node', 'aarch64-apple-darwin'), 'arqlet-node', 'aarch64-apple-darwin'), /The native module/);
+});
+
 test('the notices are the same on every run', () => {
   assert.equal(notices('arqlet-wasm', 'wasm32-unknown-unknown'), notices('arqlet-wasm', 'wasm32-unknown-unknown'));
 });

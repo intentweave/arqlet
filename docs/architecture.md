@@ -481,6 +481,43 @@ the project rules ask before third-party code is taken in. The `Cargo.lock` pins
   syntax tree). The fallback front end is https://github.com/a-poor/open-cypher (0.5.0, Apache-2.0); it is not a
   dependency, and the same record is made before it would become one.
 
+## Dependency of the native Node adapter (ADR 0030)
+
+A dependency of `crates/node` (`arqlet-node`, `publish = false`) only, recorded here before it was added (2026-11-27, issue
+#223). No other crate depends on it; the engine's crates stay free of Node. The `Cargo.lock` pins the crates below.
+
+- **napi-rs** (https://github.com/napi-rs/napi-rs, MIT; no code copied, used as a dependency): `napi` =3.16.1 (upstream
+  revision `417375ad5ef1d8cb4c49edf13d2cc6c0204bb5b1` as its `.cargo_vcs_info.json` names it; crates.io checksum
+  `907ff7366fb7182e28edd0f08ef8ac5d6b13b8d65a3c0b3a10bf3ac092437d6b`), `napi-derive` =3.7.0 (proc-macro; revision
+  `f89400d99b136c5c8a27818654b91256832b5bd6`; checksum `d32eb00f92f84cf462fc328f49082b29c2a7d2eebeb1d447d19c1f9fdd9f89ee`),
+  `napi-derive-backend` 7.0.0 (its code generator, same revision; checksum
+  `d1fe28c64d8fc12e69f9b817d0febdbe7914555760f1e353106281b8ff99cc90`; held at 7.0.0 in the lock file, since 7.0.1 emits
+  code that needs napi 3.16.2), `napi-sys` 3.4.1 (revision `d9cb526c15e63ba30e06b4d169068c9854180595`; checksum
+  `d153beb7d5c973f4b9395be8a83054a28968b61188f1dd1a2cc2321af22daea2`) and the build dependency `napi-build` =2.6.0
+  (revision `a94cef33f62e74682963dd085e283f52dcec2600`; checksum
+  `b899b545d3aa6dca985939059f258c5488d34e4ecf39c274e20009748f4b846d`). Features of `napi`: `napi4`, `dyn-symbols`
+  (default features off; the tokio-based `async` feature stays off). The newest releases at least two weeks old on
+  2026-11-27; MSRV 1.88, below the workspace's 1.94.
+- Runtime crates it adds to the module, with their license expressions as `cargo tree` printed them on 2026-11-27:
+  `bitflags` 2.13.2, `ctor` 1.0.14, `futures` 0.3.34 with `futures-channel`, `-core`, `-executor`, `-io`, `-sink`,
+  `-task`, `-util` (all `MIT OR Apache-2.0`), `nohash-hasher` 0.2.0, `pin-project-lite` 0.2.18, `rustc-hash` 2.1.3 (all
+  `Apache-2.0 OR MIT`), `slab` 0.4.12 (`MIT`), `libloading` 0.9.1 (`ISC`; it loads the Node-API symbols from the host
+  process) and on Windows `windows-link` 0.2.1 (`MIT OR Apache-2.0`). Build time only, not in the module: `napi-derive`,
+  `napi-derive-backend`, `napi-build`, `futures-macro` 0.3.34 (`MIT OR Apache-2.0`), `convert_case` 0.12.0 (`MIT`), `syn` 2
+  and 3, `quote`, `proc-macro2`, `unicode-segmentation`, `unicode-ident`. `napi-derive`, `napi-derive-backend` and
+  `napi-build` ship no license file either (checked 2026-11-27); they are not distributed, and their license is the same
+  MIT text of the napi-rs repository.
+- Notices: MIT and ISC require the copyright and license notice to accompany a distribution, and a native module
+  contains these crates. `tools/third-party-notices.mjs --package arqlet-node --target <triple>` collects them. `napi`
+  and `napi-sys` ship no license file in their crates, so their MIT text is supplied from the upstream repository:
+  `LICENSE` of https://github.com/napi-rs/napi-rs at revision `417375ad5ef1d8cb4c49edf13d2cc6c0204bb5b1` (napi 3.16.1)
+  and at `d9cb526c15e63ba30e06b4d169068c9854180595` (napi-sys 3.4.1). The two are identical ("Copyright (c)
+  2020-present LongYinan" and "Copyright (c) 2018 GitHub"; SHA-256 `3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215`),
+  fetched on 2026-11-27 and kept byte for byte in `tools/third-party-licenses/napi-rs-LICENSE`. The tool uses a supplied
+  text only for a crate without its own, keyed by exact version. `--check` passes for `arqlet-node` on the four targets of
+  `platforms.yml` (tested in `tools/third-party-notices.test.mjs`). Nothing is distributed yet: `@arqlet/node` is
+  `private`, and publishing is a separate issue (ADR 0030, section 9).
+
 ## Reuse candidates, not selected dependencies
 
 - https://github.com/paddison/rust-sugiyama

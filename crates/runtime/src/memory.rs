@@ -191,3 +191,28 @@ pub fn columns(c: &crate::columns::SceneColumns) -> usize {
             + c.route_flags.capacity())
             * 4
 }
+
+/// The answer to a session's `memory` or `release` with what only an adapter knows: the live heap of the whole module it
+/// counts (every session and the answer being written) as `heapBytes`, and in WASM the size of the linear memory, which
+/// WebAssembly never gives back, as `linearMemoryBytes`. Any other answer is passed through unchanged.
+pub fn with_adapter_heap(
+    request: &str,
+    answer: String,
+    heap_bytes: usize,
+    linear_memory_bytes: Option<u64>,
+) -> String {
+    if !(request.contains("\"memory\"") || request.contains("\"release\""))
+        || !answer.contains("\"estimated\":true")
+        || !answer.ends_with('}')
+    {
+        return answer;
+    }
+    let mut out = answer;
+    out.pop();
+    out.push_str(&format!(",\"heapBytes\":{heap_bytes}"));
+    if let Some(linear) = linear_memory_bytes {
+        out.push_str(&format!(",\"linearMemoryBytes\":{linear}"));
+    }
+    out.push('}');
+    out
+}

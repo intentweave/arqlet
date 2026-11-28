@@ -9,18 +9,52 @@
 //   python3 benchmarks/generate.py --no-manifest
 //   python3 benchmarks/overview/generate.py --nodes 10000 --seed 1 --out benchmarks/datasets/overview-10000.json
 //   node tools/platform-parity.mjs [--digest]
+//
+// With `--node` (ADR 0030) the native Node module (`crates/node`, built with
+//   cargo build --release -p arqlet-node --features query --locked
+// ) answers every request too, and its answer text must be the same bytes as the WASM engine's answer text (not only the
+// same JSON value); a sequence of session requests is compared the same way. The printed lines and digests do not change.
 import {readFileSync, existsSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
 import {createEngine} from '../packages/engine-client/wasm-client.js';
+import {loadNativeEngine} from '../packages/node/index.js';
 
 const ROOT = new URL('../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const exe = process.platform === 'win32' ? '.exe' : '';
 const native = join(ROOT, `target/release/layout-command${exe}`);
 const wasm = join(ROOT, 'target/wasm32-unknown-unknown/release/arqlet_wasm.wasm');
-for (const f of [native, wasm]) if (!existsSync(f)) { console.error(`Missing ${f}; build it first (see the header).`); process.exit(2); }
+const withNode = process.argv.includes('--node');
+const addon = join(ROOT, 'target/release', {darwin: 'libarqlet_node.dylib', win32: 'arqlet_node.dll'}[process.platform] ?? 'libarqlet_node.so');
+for (const f of [native, wasm, ...(withNode ? [addon] : [])]) if (!existsSync(f)) { console.error(`Missing ${f}; build it first (see the header).`); process.exit(2); }
 const run = await createEngine(readFileSync(wasm));
+const node = withNode ? loadNativeEngine({path: addon}) : null;
+
+// The WASM engine's answers as text, exactly as the module writes them (no JSON round trip), for the byte comparison with
+// the native Node module: `dispatch`, and sessions by handle.
+async function rawWasm(bytes) {
+  const {instance} = await WebAssembly.instantiate(bytes, {env: {lw_now: () => 0, lw_publish: () => {}}});
+  const api = instance.exports;
+  const exchange = (text, call) => {
+    const encoded = new TextEncoder().encode(text);
+    const ptr = api.lw_alloc(encoded.length);
+    new Uint8Array(api.memory.buffer, ptr, encoded.length).set(encoded);
+    const result = call(ptr, encoded.length);
+    const out = Number(result & 0xffffffffn), len = Number(result >> 32n);
+    const answer = new TextDecoder().decode(new Uint8Array(api.memory.buffer, out, len));
+    api.lw_free(ptr, encoded.length);
+    api.lw_free(out, len);
+    return answer;
+  };
+  return {
+    run: text => exchange(text, (p, l) => api.lw_run(p, l)),
+    open: () => api.lw_session_open(),
+    session: (id, text) => exchange(text, (p, l) => api.lw_session_run(id, p, l)),
+    close: id => api.lw_session_close(id),
+  };
+}
+const wasmText = withNode ? await rawWasm(readFileSync(wasm)) : null;
 const graph = f => JSON.parse(readFileSync(join(ROOT, f), 'utf8'));
 const elk = {id: 'root', layoutOptions: {'elk.direction': 'RIGHT'},
   children: Array.from({length: 60}, (_, i) => ({id: `n${i}`, width: 40, height: 30})),
@@ -120,10 +154,58 @@ for (const [name, request] of requests) {
   const body = JSON.stringify(request);
   const a = JSON.stringify(JSON.parse(execFileSync(native, {input: body, maxBuffer: 1 << 30}).toString()));
   const b = JSON.stringify(run(request));
-  const same = a === b;
+  let same = a === b;
+  if (node) {
+    // Byte for byte: the native Node module's text against the WASM module's text.
+    const n = await node.text(body);
+    if (n !== wasmText.run(body)) { same = false; console.error(`native Node module and WASM differ: ${name}`); }
+  }
   if (!same) differ++;
   const hash = createHash('sha256').update(a).digest('hex').slice(0, 16);
   console.log(`${same ? 'same     ' : 'DIFFERENT'} ${name}${digest ? `  ${hash}` : ''}`);
 }
+let nodeSessionsDiffer = 0;
+if (node) {
+  // Sessions (ADR 0019 step 3) in the native Node module and in WASM: the same requests, the same answer texts. `memory` is
+  // not among them: its estimate counts sizes of Rust types, which differ between 64-bit and 32-bit (WASM) targets; it is
+  // compared with the native `layout-command --sessions` below instead.
+  const session = await node.openSession();
+  const handle = wasmText.open();
+  const organic = graph('benchmarks/datasets/organic-100.json');
+  const mixed = graph('benchmarks/datasets/mixed-layouts.json');
+  const script = [
+    {op: 'import', graph: mixed, limit: 200},
+    {op: 'direction', direction: 'lr'},
+    {op: 'toggle', nodeId: mixed.nodes.find(n => mixed.nodes.some(m => m.parentId === n.id)).id},
+    {op: 'scene'},
+    {op: 'columns'},
+    {op: 'payload', set: {nodes: {[mixed.nodes[0].id]: {tag: 'x'}}}},
+    {op: 'details', nodeId: mixed.nodes[0].id},
+    {op: 'export'},
+    {op: 'overview', graph: organic},
+    {op: 'intent'},
+  ];
+  let sessionDiffer = 0;
+  for (const request of script) {
+    const body = JSON.stringify(request);
+    const mine = await session.text(body);
+    if (JSON.parse(mine).ok !== true) { sessionDiffer++; console.error(`session request failed: ${request.op}: ${mine.slice(0, 200)}`); }
+    if (mine !== wasmText.session(handle, body)) {
+      sessionDiffer++;
+      console.error(`native Node module and WASM differ in a session: ${request.op}`);
+    }
+  }
+  // The session's memory estimate, against the native binary's session of the same requests (the module's own heap count,
+  // `heapBytes`, is the adapter's and left out).
+  const memory = (await session.text('{"op":"memory"}')).replace(/,"heapBytes":\d+/, '');
+  const lines = [{session: 'open'}, ...script.map(request => ({session: 1, request})), {session: 1, request: {op: 'memory'}}];
+  const binary = execFileSync(native, ['--sessions'], {input: lines.map(l => JSON.stringify(l)).join('\n') + '\n', maxBuffer: 1 << 30})
+    .toString().trim().split('\n').at(-1);
+  if (memory !== binary) { sessionDiffer++; console.error('native Node module and layout-command differ in a session: memory'); }
+  await session.close();
+  wasmText.close(handle);
+  nodeSessionsDiffer = sessionDiffer;
+  console.error(`native Node module: ${requests.length} requests and ${script.length} session requests compared with WASM byte for byte (memory with layout-command), ${sessionDiffer ? 'DIFFERENT' : 'same'}`);
+}
 console.log(`${process.platform}-${process.arch}: ${requests.length - differ} of ${requests.length} identical between native and WASM`);
-process.exit(differ ? 1 : 0);
+process.exit(differ || nodeSessionsDiffer ? 1 : 0);

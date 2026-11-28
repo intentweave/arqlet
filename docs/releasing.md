@@ -15,13 +15,15 @@ Provisional. Arqlet is a prototype; releases are `0.x` and may break any API.
 | npm | `@arqlet/query` (provisional) | `arqlet-query.wasm` (built by `prepack`), loader and types: queries without the layout engine |
 
 Not published: `arqlet-wasm` (its output ships in `@arqlet/engine-client`), `arqlet-contracts` (tooling), `arqlet-node`
-(placeholder), `arqlet-query-cli` (provisional tool of the query layer), `arqlet-query-wasm` (its output ships in
+(the native Node adapter; its module would ship in per-platform packages of `@arqlet/node`, ADR 0030), `@arqlet/node`
+(`private` until the owner decides to publish it; the plan for its binaries is in ADR 0030, section 3), `arqlet-query-cli` (provisional tool of the query layer), `arqlet-query-wasm` (its output ships in
 `@arqlet/query`), `@arqlet/containment-tree`, `@arqlet/playground`, the examples and the Intentweave exporter.
 
 ## Version bump
 
 1. Set `version` in `[workspace.package]` and every `=x.y.z` in `[workspace.dependencies]` of `Cargo.toml`.
-2. Set `version` in `packages/{arqlet,engine-client,viewer,contracts,query}/package.json`. Internal npm dependencies use
+2. Set `version` in `packages/{arqlet,engine-client,viewer,contracts,query}/package.json` (and in the unpublished
+   `packages/node/package.json`, which keeps the workspace's version). Internal npm dependencies use
    `workspace:^`; pnpm replaces them with the released version.
 3. In `CHANGELOG.md`, move the entries under *Unreleased* to a section `## x.y.z — <date>` with a short summary and,
    when anything breaks, an *Upgrading from* section; keep an empty *Unreleased* above it. Update the version in

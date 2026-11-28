@@ -3,5 +3,32 @@ name = "arqlet-node"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
 publish = false
-description = "Native Node adapter boundary. napi-rs integration is not implemented."
+description = "Native Node.js adapter of the Arqlet engine (Node-API through napi-rs): dispatch and sessions, asynchronous on libuv's thread pool. Built into the npm package @arqlet/node. Provisional."
+
+[lib]
+crate-type = ["cdylib"]
+# The module links against Node-API symbols that only a running Node provides; a test binary cannot load them. Its
+# tests are JavaScript (`packages/node/index.test.mjs`); the store it wraps is tested in `arqlet-runtime`.
+test = false
+doctest = false
+
+# `query` adds the operation `query` (ADR 0021, M5b), as for the WASM engine; off by default.
+[features]
+query = ["arqlet-runtime/query"]
+
+[dependencies]
+arqlet-runtime = { workspace = true }
+arqlet-model = { workspace = true }
+serde_json = "1"
+# Node-API binding (ADR 0030; source, license and notices recorded in docs/architecture.md). Exact versions: the
+# generated glue must match between the runtime crate and its macros.
+napi = { version = "=3.16.1", default-features = false, features = ["napi4", "dyn-symbols"] }
+napi-derive = { version = "=3.7.0", default-features = false }
+
+[build-dependencies]
+napi-build = "=2.6.0"
