@@ -130,6 +130,9 @@ const changed = {
   ],
 };
 requests.push(['overview with edge data', {op: 'overview', graph: changed, edgeData: true}]);
+// The edges' ids (#241), alone and with the edge data: strings in the answer, in the same order natively and in WASM.
+requests.push(['overview with edge ids', {op: 'overview', graph: changed, edgeIds: true}]);
+requests.push(['overview with edge ids and edge data, continued by id', {op: 'overview', graph: changed, edgeIds: true, edgeData: true, start: {nodes: places}, threads: 4}]);
 // The containers' inner-edge share and modularity (#236): sums of f64 in a fixed order, the same natively and in WASM.
 requests.push(['overview with container stats', {op: 'overview', graph: changed, containerStats: true}]);
 for (const settle of [false, true]) {
@@ -236,6 +239,8 @@ if (node) {
     {op: 'details', nodeId: mixed.nodes[0].id},
     {op: 'export'},
     {op: 'overview', graph: organic},
+    // #241: a new graph with `start: {}` continues from the session's own places by id; edge ids in the answer.
+    {op: 'overview', graph: {...organic, nodes: [...organic.nodes, {id: 'extra', kind: organic.nodes[0].kind, label: 'extra', parentId: null}]}, start: {}, edgeIds: true},
     {op: 'intent'},
   ];
   let sessionDiffer = 0;

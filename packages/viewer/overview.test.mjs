@@ -767,3 +767,51 @@ test('the scene view of a structured cluster shows it where the overview does, a
   const back = overviewViewOf(m, 0, scene, sv);
   for (const k of ['centreX', 'centreY', 'scale']) assert.ok(Math.abs(back[k] - view[k]) < 1e-9);
 });
+
+// #241: edge ids named by the answer, added clusters on a hand-made answer, and `bundle` with a graph.
+test('with the answer’s edge ids the excerpt names its edges by their input ids, and says so', () => {
+  const g = {
+    nodes: [{id: 'c', kind: 'dir', label: 'c', parentId: null}, {id: 'a', kind: 'fn', label: 'a', parentId: 'c'}, {id: 'b', kind: 'fn', label: 'b', parentId: 'c'},
+      {id: 'd', kind: 'dir', label: 'd', parentId: null}, {id: 'e', kind: 'fn', label: 'e', parentId: 'd'}],
+    edges: [{id: 'x1', kind: 'calls', source: 'a', target: 'b'}, {id: 'gone', kind: 'calls', source: 'a', target: null}, {id: 'x2', kind: 'calls', source: 'a', target: 'e'}],
+  };
+  const answer = {...answerOf(g), edgeIds: ['x1', 'x2']};
+  const named = overviewModel(answer), unnamed = overviewModel({...answer, edgeIds: undefined});
+  assert.deepEqual(named.edgeIds, ['x1', 'x2']);
+  assert.equal(unnamed.edgeIds, null);
+  assert.deepEqual(overviewModel(answer, ['y1', 'y2']).edgeIds, ['y1', 'y2'], 'given ids win');
+  const excerpt = structuredExcerptOf(named, 'c');
+  assert.deepEqual(excerpt.graph.edges.map(e => e.id), ['x1', 'x2']);
+  assert.equal(excerpt.edgeIds, true);
+  // Equal to the excerpt of the graph itself, edge ids included.
+  assert.deepEqual(structuredExcerpt(g, named, 'c').graph.edges.map(e => e.id), excerpt.graph.edges.map(e => e.id));
+  assert.deepEqual(structuredExcerptOf(unnamed, 'c').graph.edges.map(e => e.id), ['edge:0', 'edge:1']);
+  assert.equal(structuredExcerptOf(unnamed, 'c').edgeIds, false);
+  // An answer path names input edges: they are found among the excerpt's.
+  assert.deepEqual([...pathOf(named, {nodes: ['a', 'e'], edges: ['x2']}).edges], [1]);
+  // Ids that do not fit the edges are not used.
+  assert.equal(structuredExcerptOf(overviewModel({...answer, edgeIds: ['x1']}), 'c').edgeIds, false);
+});
+
+test('added clusters of a hand-made answer are recognised without stats.communities', () => {
+  const g = {nodes: [{id: 'c', kind: 'dir', label: 'c', parentId: null}, {id: 'a', kind: 'fn', label: 'a', parentId: 'c'}], edges: []};
+  const base = answerOf(g, {added: [['community:c:1.0', 'c']], into: {a: 'community:c:1.0'}});
+  const label = o => structuredExcerptOf(overviewModel(o), 'c').graph.nodes.find(n => n.id === 'community:c:1.0');
+  const expected = {id: 'community:c:1.0', kind: 'community', label: '≈ 1.0', parentId: 'c'};
+  assert.deepEqual(label(base), expected);
+  const {stats: _stats, ...without} = base;
+  assert.deepEqual(label(without), expected, 'no stats');
+  assert.deepEqual(label({...base, stats: {}}), expected, 'stats without the number');
+  assert.deepEqual(label({...base, stats: {communities: 'one'}}), expected, 'a number that is none');
+  assert.deepEqual(label({...base, stats: {communities: 99}}), expected, 'a number that does not fit');
+  // A node of the graph is not taken for one when the number says so.
+  assert.equal(structuredExcerptOf(overviewModel({...base, stats: {communities: 1}}), 'c').graph.nodes.find(n => n.id === 'a').kind, 'fn');
+});
+
+test('structuredExcerpt with a graph refuses bundle instead of ignoring it', () => {
+  const g = {nodes: [{id: 'c', kind: 'dir', label: 'c', parentId: null}], edges: []};
+  const m = overviewModel(answerOf(g));
+  assert.throws(() => structuredExcerpt(g, m, 'c', {bundle: true}), /bundle is only available without a graph/);
+  assert.doesNotThrow(() => structuredExcerpt(g, m, 'c', {bundle: false}));
+  assert.doesNotThrow(() => structuredExcerpt(null, m, 'c', {bundle: true}));
+});

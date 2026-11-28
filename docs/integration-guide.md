@@ -160,6 +160,15 @@ kinds. With `columns: true`, `edgeKind` and `edgeWeight` are two more `u32` colu
 the JSON. A positions-only answer leaves them out with the edges: a session answers one only while `edgeData` is the same
 as in its last overview, and a whole overview when it changed.
 
+**Edge ids** (#241, provisional). `edgeIds: true` adds `edgeIds`: each resolved edge's input id, indexed as `edges`
+(entry `k` for the pair `edges[2k]`, `edges[2k + 1]`; unresolved edges are not in it, as they are not in `edges`).
+`overviewTrace` and `overviewNeighbourhood` answer edge ids, so a host without the graph maps them onto the answer's edges
+through it (`overviewModel(answer)` takes `answer.edgeIds` as `model.edgeIds`, which `pathOf` reads). Without the flag
+the answer is as before, byte for byte. With `columns: true` it stays in the JSON beside `ids` (a string table, not a
+column). The ids cost about the size of the `ids` of the edges' nodes again, so ask only when needed (no measurement
+claimed). A positions-only answer leaves it out: a session answers one only while `edgeIds` is the same as in its last
+overview.
+
 **Continuing a changed graph, without a session.** Keep the places of an answer by id and send them with the next graph:
 
 ```js
@@ -245,13 +254,17 @@ not carry (checked on generated graphs and on engine answers with communities, `
 
 | | From the graph | From the answer alone |
 |---|---|---|
-| edge ids | the input ids | `edge:k`, `k` the edge's index in the answer's `edges` (`EXCERPT_EDGE_PREFIX`) |
+| edge ids | the input ids | the input ids when the answer has `edgeIds` (request with `edgeIds: true`; `excerpt.edgeIds` is true); else `edge:k`, `k` the edge's index in the answer's `edges` (`EXCERPT_EDGE_PREFIX`) |
 | edge kinds and weights | the input edge's | `edgeKinds[edgeKind[k]]` and `edgeWeight[k]`; without `edgeData`, kind `''` and weight 1 for every edge, and `excerpt.edgeData` is false |
 | nodes | the input nodes, every field | `id`, `kind`, `label` (from `kinds`/`kind` and `labels`) and `parentId`; no `shape` or other field, so a graph that uses them lays out differently |
 
-`overviewTrace` and `overviewNeighbourhood` answer input edge ids, which the excerpt's names cannot be mapped onto without
-the ids; the answer does not carry them yet (open in [#209](https://github.com/intentweave/arqlet/issues/209)). A host
-with the ids maps `edge:k` back through them (`resolvedEdgeIds(graph)[k]`).
+`overviewTrace` and `overviewNeighbourhood` answer input edge ids. Ask the overview with `edgeIds: true` and the excerpt's
+edges carry those ids, so the answers map onto them; without them `edge:k` is mapped back through
+`resolvedEdgeIds(graph)[k]`. The equality with `structuredExcerpt` holds up to `weight: 1` (an edge that counts once has
+no `weight` in the excerpt of the answer; an input edge may carry `weight: 1`) and `shape` (see the table). Added
+clusters are recognised by `stats.communities` where it is a number that fits, else by their id prefix `community:`, so a
+hand-made answer works too. `structuredExcerpt(graph, …, {bundle: true})` throws: bundling belongs to the excerpt of the
+answer alone.
 
 `bundle: true` draws the leaving edges of one inner node to one stand-in, of one kind and direction, as one edge whose
 `weight` is the sum of theirs, for a cluster with many leaving edges: fewer routes, each weighted. The graph then differs
@@ -467,6 +480,18 @@ Know these limits:
 An answer with `unclustered` containers has other nodes than the complete overview: continuing it by node index (and
 with `start: {}` in a session) is refused once the clustering completes (the number of values differs); lay out without
 `start` then. By id (`start.nodes`) it continues, and those containers are clustered as new ones.
+
+**A session given a new graph, and positions by index** (#241, provisional). In a session, a new `graph` with
+`start: {}` continues from the session's own last places by id, exactly as `start: {nodes}` with the places of its last
+answer (with their parents) does, and the answer reports `continuation`. Without a last overview it is refused
+(`No overview to continue from`). `start: {x, y, r}` without a graph, after a continuation by id, belongs to the clusters
+of that answer, which the session keeps: the arrays must have its length, and a different length is refused (`Overview
+start x has N values for M nodes; it must come from the same graph`). `createOverviewSession` without a resident session
+does the same: it converts them to places by id (and answers without `continuation`, as the resident session does) or
+refuses with that error. Other cluster options than the last answer's cluster again anew, in both. A plain `dispatch`
+request with a graph and `x`, `y`, `r` has no earlier clusters: they apply to the clustering of that graph. Entries of
+`start.nodes` accept `x`, `y`, `r` and `parent` only; any other key is refused (`Overview start nodes <id> has an unknown
+key`), as the typed `OverviewPlace` does.
 
 **Draw the top level first, fill the clusters later** (provisional, [#235](adr/0018-cluster-overview.md)). A
 continuation can arrange the interior of named containers anew inside their discs and keep every other place as it

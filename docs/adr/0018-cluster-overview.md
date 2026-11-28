@@ -507,6 +507,35 @@ Open: whether carrying should become the behaviour of `start.nodes` for switches
 switch from an edit); spreading the seeds of clusters made now inside a new group (they start on one point today),
 or a full temperature for them, which measured better there; a host-given weight per node for the seeds.
 
+## Addendum (2026-11-28): leftovers of the server result (#241)
+
+What #209 left open, provisional; requests without the new field are answered exactly as before.
+
+1. **Edge ids on request.** `edgeIds: true` adds `Overview::edge_ids`, the resolved edges' input ids indexed as `edges`.
+   A separate flag, not part of `edgeData`: ids are the largest of the edge fields, and a host that only needs kinds
+   should not pay for them. In a columnar answer it stays in the JSON (strings), as `ids` do. A positions-only answer
+   is given only while the flag is as in the session's last answer, as for `edgeData`. `overviewModel` takes the
+   answer's `edgeIds` when the host passes none, and `structuredExcerptOf` then names its edges by them, so an
+   `overviewTrace` answer maps onto the excerpt (`excerpt.edgeIds`). Rejected: replacing `edge:k` always (an answer
+   without ids has none to give).
+2. **A session given a new graph with `start: {}`** continues from its own last places by id (the places of its last
+   answer with their parents, as `carry` does) instead of refusing: the graph may have changed, and by id is the only way
+   that works then. Without a last overview it is still refused.
+3. **A start by index after a continuation by id.** Cluster ids are positional, so arrays by index only mean something
+   for the clusters they came from. The resident session already lays out on the hierarchy it has, and refuses arrays of
+   another length; a session without an engine session sent the graph again and clustered it anew, applying the arrays
+   to other clusters when the lengths happened to match. `createOverviewSession` now converts them to places by id
+   (ids and parents of its last answer) or refuses with the engine's error, so both agree. Rejected: refusing every
+   `x`, `y`, `r` after a continuation by id (a host that animates from the last answer sends exactly that).
+   Not changed: `dispatch` with a graph and arrays has no earlier clusters, and the arrays apply to its clustering.
+4. **`start.nodes` entries** accept `x`, `y`, `r` and `parent` only; another key is refused, as the typed
+   `OverviewPlace` (`deny_unknown_fields`) does. A request that sent a misspelt key now fails instead of being read as
+   a place without it.
+5. **Excerpt from the answer alone.** `structuredExcerptOf` equals `structuredExcerpt` up to `weight: 1` and `shape`
+   (what the answer does not carry; an edge that counts once has no `weight`). Added clusters are recognised by
+   `stats.communities` where that is a number that fits the answer, else by the id prefix `community:`.
+   `structuredExcerpt(graph, …, {bundle: true})` throws instead of ignoring `bundle`.
+
 ## Real data (2026-11-11)
 
 On two real exports (Intentweave, 8 874 nodes; Backstage, 31 758 nodes; `benchmarks/results/overview-real-20261111.md`)

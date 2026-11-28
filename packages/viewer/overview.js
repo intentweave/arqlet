@@ -5,8 +5,9 @@ import {parseColour, sceneBuffers, BOX_STRIDE, SEGMENT_STRIDE, TRIANGLE_STRIDE} 
 
 /**
  * Indexes an overview result (`{ids, parent, x, y, r, edges, links, rootRadius}`) for drawing and picking. `edgeIds`
- * names the result's edges (the resolved edges of the graph, in input order; see `resolvedEdgeIds`); without them, edges
- * that leave a structured cluster start at their box instead of at their border port.
+ * names the result's edges (the resolved edges of the graph, in input order; see `resolvedEdgeIds`), else the result's own
+ * `edgeIds` (a request with `edgeIds: true`, #241) are taken; without either, edges that leave a structured cluster start
+ * at their box instead of at their border port.
  */
 export function overviewModel(overview, edgeIds = null) {
   if (overview?.schemaVersion !== 1) throw Error('Unsupported overview schema');
@@ -59,7 +60,8 @@ export function overviewModel(overview, edgeIds = null) {
     chainTop[i] = p >= 0 && children[p].length === 1 && same(p, i) ? chainTop[p] : i;
   }
   const index = new Map(overview.ids.map((id, i) => [id, i]));
-  return {overview, n, children, roots, tops, depth, cluster, leaves, size, index, edgeIds, chainTop};
+  const named = edgeIds ?? overview.edgeIds ?? null;
+  return {overview, n, children, roots, tops, depth, cluster, leaves, size, index, edgeIds: named, chainTop};
 }
 
 /** The ids of a graph's resolved edges, in input order: the edges of its `overview` result. */
@@ -827,6 +829,9 @@ export function flowDirectionOf(model, i) {
  */
 export function structuredExcerpt(graph, model, id, options = {}) {
   if (graph == null) return structuredExcerptOf(model, id, options);
+  // `bundle` is the overview-alone excerpt's (edges of one kind and direction to one stand-in as one); the excerpt of a
+  // graph keeps every edge under its own id, so a caller asking for it is refused instead of getting it silently ignored.
+  if (options.bundle) throw Error('structuredExcerpt: bundle is only available without a graph (structuredExcerptOf)');
   const {direction = null} = options;
   const c = model.index.get(id);
   if (c === undefined) throw Error(`Unknown node: ${id}`);
@@ -883,9 +888,11 @@ export const EXCERPT_EDGE_PREFIX = 'edge:';
  * to or from the stand-in (`BORDER_PREFIX` + id) of the cluster outside, direction kept. Where both can run, the graph
  * is the one `structuredExcerpt` gives, except for what the answer does not carry:
  *
- * - Edge ids: edge `k` of the overview (`edges[2k]` → `edges[2k + 1]`) is named `EXCERPT_EDGE_PREFIX + k`, so a host
- *   that has the ids (`model.edgeIds`) can map it back; an `overviewTrace` or `overviewNeighbourhood` answer, which names
- *   input edges, cannot be mapped onto them without those ids.
+ * - Edge ids: with the answer's edge ids (`model.edgeIds`: a request with `edgeIds: true`, #241) edge `k` of the overview
+ *   (`edges[2k]` → `edges[2k + 1]`) keeps its input id, so an `overviewTrace` or `overviewNeighbourhood` answer maps onto
+ *   it; without them it is named `EXCERPT_EDGE_PREFIX + k` (and the result says `edgeIds: false`).
+ * - Equality with `structuredExcerpt` holds up to `weight: 1` (an edge counting once has no `weight` here, an input edge
+ *   may carry `weight: 1`) and `shape` (nodes carry no shape; see below), and the fields of the input the answer lacks.
  * - Edge kinds and weights come from the answer's edge data (a request with `edgeData: true`). Without them every edge has
  *   the kind `''` and counts once, and the result says so (`edgeData: false`).
  * - Nodes carry `id`, `kind` and `label` from the answer (`kinds`/`kind`, `labels`) and `parentId`, nothing else
@@ -905,8 +912,11 @@ export function structuredExcerptOf(model, id, {direction = null, bundle = false
   below.sort((a, b) => a - b);
   const inside = new Uint8Array(model.n);
   for (const k of below) inside[k] = 1;
-  // The clusters the overview added come after the graph's nodes (`stats.communities` of them); without stats, by id.
-  const added = o.stats ? i => i >= model.n - o.stats.communities : i => ids[i].startsWith(COMMUNITY_PREFIX);
+  // The clusters the overview added come after the graph's nodes (`stats.communities` of them). A hand-made answer may lack
+  // that number or give a wrong one: then the engine's id prefix says, which every added cluster has.
+  const count = o.stats?.communities;
+  const added = Number.isInteger(count) && count >= 0 && count <= model.n
+    ? i => i >= model.n - count : i => ids[i].startsWith(COMMUNITY_PREFIX);
   const kindOf = i => (o.kinds && o.kind ? o.kinds[o.kind[i]] : 'node');
   const nodes = below.map(k => ({
     id: ids[k],
@@ -916,7 +926,8 @@ export function structuredExcerptOf(model, id, {direction = null, bundle = false
   const edgeData = !!(o.edgeKinds && o.edgeKind);
   const edgeKind = k => (edgeData ? o.edgeKinds[o.edgeKind[k]] : '');
   const edgeWeight = k => o.edgeWeight?.[k] ?? 1;
-  const edge = (k, source, target, weight) => ({id: EXCERPT_EDGE_PREFIX + k, kind: edgeKind(k), source, target, ...(weight > 1 ? {weight} : {})});
+  const named = !!model.edgeIds && model.edgeIds.length * 2 === o.edges.length;
+  const edge = (k, source, target, weight) => ({id: named ? model.edgeIds[k] : EXCERPT_EDGE_PREFIX + k, kind: edgeKind(k), source, target, ...(weight > 1 ? {weight} : {})});
   const standInOf = standInRule(model, c);
   const standIns = new Map(), bundles = new Map(), edges = [];
   let leaving = 0, inner = 0;
@@ -935,7 +946,7 @@ export function structuredExcerptOf(model, id, {direction = null, bundle = false
     } else edges.push(edge(k, source, target, edgeWeight(k)));
   }
   const excerpt = {nodes: [...nodes, ...standIns.values()], edges, ...(direction ? {defaultDirection: direction} : {})};
-  return {graph: excerpt, options: {isolatedGrid: true}, leaving, inner, standIns: standIns.size, edgeData};
+  return {graph: excerpt, options: {isolatedGrid: true}, leaving, inner, standIns: standIns.size, edgeData, edgeIds: named};
 }
 
 /**

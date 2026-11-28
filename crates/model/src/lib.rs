@@ -3761,6 +3761,12 @@ pub struct Overview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional, type = "number[]"))]
     pub edge_weight: Option<Vec<u32>>,
+    /// Provisional (#241), for a request with `edgeIds`: each edge's id, indexed as `edges` (entry `k` belongs to the edge
+    /// `edges[2k]` to `edges[2k + 1]`), so that a host without the graph can name an edge the engine's other answers
+    /// (`overviewTrace`) give by id. In a columnar answer it stays in the JSON beside `ids`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub edge_ids: Option<Vec<String>>,
     /// Provisional (#236), for a request with `containerStats`: how well each container holds its edges, and the
     /// modularity at each depth.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -4332,7 +4338,7 @@ pub struct OverviewRequest {
     #[cfg_attr(feature = "ts", ts(optional))]
     pub start: Option<OverviewStart>,
     /// Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
-    /// last overview and `edgeData` and `containerStats` are as they were there; otherwise the whole overview.
+    /// last overview and `edgeData`, `edgeIds` and `containerStats` are as they were there; otherwise the whole overview.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub positions_only: Option<bool>,
@@ -4341,6 +4347,10 @@ pub struct OverviewRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub edge_data: Option<bool>,
+    /// Provisional (#241): answer each edge's id too (`Overview::edge_ids`), for a host that does not have the graph.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub edge_ids: Option<bool>,
     /// Provisional (#236): answer per container its inner and touching edges, their share and its modularity term, and
     /// the modularity at each depth (`Overview::container_stats`).
     #[serde(default, skip_serializing_if = "Option::is_none")]

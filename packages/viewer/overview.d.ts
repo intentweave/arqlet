@@ -24,7 +24,7 @@ export interface OverviewModel {
   /** The number of nodes below every node. */
   size: Int32Array;
   index: Map<string, number>;
-  /** The result's edge ids (see `resolvedEdgeIds`), or null. */
+  /** The result's edge ids (see `resolvedEdgeIds`, else the result's own `edgeIds` of a request with `edgeIds: true`), or null. */
   edgeIds: string[] | null;
   /** The outermost node of every node's chain: a node that is its parent's only child and has the same disc (overview
    * option `chains`) is drawn, named and picked with its parent. The node itself when it is in no chain. */
@@ -40,7 +40,8 @@ export interface OverviewView {
   scale: number;
 }
 
-/** `edgeIds` (from `resolvedEdgeIds`) lets edges that leave a structured cluster start at their border port. */
+/** `edgeIds` (from `resolvedEdgeIds`, else the result's own `edgeIds`, #241) lets edges that leave a structured cluster
+ * start at their border port, and names an excerpt's edges by their input ids. */
 export function overviewModel(overview: OverviewResult, edgeIds?: string[] | null): OverviewModel;
 /** The ids of a graph's resolved edges, in input order: the edges of its overview. */
 export function resolvedEdgeIds(graph: InputGraph): string[];
@@ -229,7 +230,8 @@ export interface InputGraph {
 /**
  * The excerpt a structured cluster lays out: the cluster as a top-level container with everything below it, its inner
  * edges, and its leaving edges (id and direction kept) to stand-ins for the clusters outside, so that they cross its box
- * at border ports. With `graph` null, the excerpt from the overview alone (`structuredExcerptOf`).
+ * at border ports. With `graph` null, the excerpt from the overview alone (`structuredExcerptOf`). `bundle` is that
+ * excerpt's alone: an untyped caller passing `bundle: true` with a graph gets an error, not a silent no-op.
  */
 export function structuredExcerpt(
   graph: InputGraph,
@@ -278,8 +280,8 @@ export type ExcerptNode = {
 
 /** An edge of an excerpt from the overview alone. */
 export type ExcerptEdge = {
-  /** `EXCERPT_EDGE_PREFIX` + the index of the overview edge (of the first one, bundled). Not an input edge id: an
-   * `overviewTrace` answer cannot be mapped onto it without the input edge ids (`model.edgeIds`). */
+  /** The input id of the overview edge (of the first one, bundled) when the model has edge ids (`edgeIds: true` in the
+   * request, #241); else `EXCERPT_EDGE_PREFIX` + its index, which an `overviewTrace` answer cannot be mapped onto. */
   id: string;
   /** From the answer's edge data (`edgeKinds[edgeKind[k]]`); `''` without it. */
   kind: string;
@@ -293,12 +295,14 @@ export interface StructuredExcerptOf extends StructuredExcerpt {
   graph: {nodes: ExcerptNode[]; edges: ExcerptEdge[]; defaultDirection?: FlowDirection};
   /** Whether the answer had edge data (`edgeData: true`); without it every edge has the kind `''` and counts once. */
   edgeData: boolean;
+  /** Whether the edges are named by their input ids (the model has `edgeIds`); else `EXCERPT_EDGE_PREFIX` + index. */
+  edgeIds: boolean;
 }
 
 /**
  * Provisional (#209): the excerpt of `structuredExcerpt` from the overview answer alone, without the input graph (the
- * overview computed on a server). The same rule and, where both run, the same graph, except: edges are named
- * `EXCERPT_EDGE_PREFIX` + their overview index, their kinds and weights come from the answer's edge data, and nodes
+ * overview computed on a server). The same rule and, where both run, the same graph up to `weight: 1` and `shape`,
+ * except: edges are named by their input ids when the model has them, else `EXCERPT_EDGE_PREFIX` + their overview index, their kinds and weights come from the answer's edge data, and nodes
  * carry only `id`, `kind`, `label` and `parentId`.
  */
 export function structuredExcerptOf(model: OverviewModel, id: string, options?: ExcerptOfOptions): StructuredExcerptOf;

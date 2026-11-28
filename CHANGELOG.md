@@ -7,6 +7,18 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **The overview as a server result: leftovers** (#241, provisional; ADR 0018 addendum): `edgeIds: true` adds `edgeIds`,
+  each resolved edge's input id indexed as `edges`, so a host without the graph maps `overviewTrace` answers onto the
+  edges (`overviewModel` takes them; `structuredExcerptOf` then names its edges by them instead of `edge:k`, and
+  `excerpt.edgeIds` says so). A session given a new graph with `start: {}` continues from its own last places by id
+  instead of refusing. After a continuation by id, `start: {x, y, r}` by index belongs to that answer's clusters: the
+  resident session uses its hierarchy, `createOverviewSession` without one converts the arrays to places by id (or
+  refuses arrays of another length with the engine's error), so both agree. Entries of `start.nodes` now refuse unknown
+  keys, as the typed `OverviewPlace` does (a misspelt key was ignored before). `structuredExcerptOf` equals
+  `structuredExcerpt` up to `weight: 1` and `shape` (the wording of the #209 entry below says "the same graph" for what
+  the answer carries); it recognises added clusters by `stats.communities` where that is a number that fits, else by
+  their id prefix; `structuredExcerpt(graph, …, {bundle: true})` throws instead of ignoring `bundle`. Requests without
+  the new field are answered byte for byte as before.
 - **An estimate of a request's peak memory before it runs** (#224, provisional; ADR 0024 step C3): `{op: "estimate",
   request}` through `dispatch` and in a resident session (`session.estimate(request)` in `engine-client`) answers the
   heap an import, an edit (toggle, reveal, filter, configure, restore, direction and the other edits that keep the view,
@@ -128,6 +140,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   pinned by a test in `crates/runtime/tests/overview.rs`. Mentioned in the READMEs and ADR 0018.
 - Every npm package (`arqlet`, `@arqlet/contracts`, `@arqlet/engine-client`, `@arqlet/viewer`, `@arqlet/query`) ships
   `CHANGELOG.md`, copied by `prepack` (`tools/npm-prepack.mjs`) as the licenses are.
+
+### Changed
+
+- **Overview: `start.nodes` entries refuse unknown keys** (#241, behaviour change): an entry accepts `x`, `y`, `r` and
+  `parent` only (as the typed `OverviewPlace`); a request that sent another key (a misspelling, say) was answered before
+  with the key ignored and is now refused (`Overview start nodes <id> has an unknown key: …`). A session given a new
+  graph with `start: {}` used to be refused (`No overview to continue from`) and now continues by id from its own last
+  places.
 
 ### Fixed
 

@@ -588,3 +588,47 @@ test('a session estimates a request before it runs, on its current view, residen
     assert.equal((await session.collapse('root')).ok, true);
   }
 });
+
+// #241: a session given a new graph with `start: {}`, and a start by index after a continuation by id.
+test('an overview session continues a new graph with an empty start by id, and a start by index after it, resident or not', {skip: !engine}, async () => {
+  const ids = Array.from({length: 160}, (_, i) => `r${Math.floor(i / 40)}n${i % 40}`);
+  const rings = {nodes: ids.map(id => ({id, kind: 'fn', label: id})), edges: ids.flatMap((id, i) => [1, 2, 3].map(d => (
+    {id: `${id}-${d}`, kind: 'call', source: id, target: ids[i - i % 40 + (i + d) % 40]})))};
+  const grown = {nodes: [...rings.nodes, {id: 'r0new', kind: 'fn', label: 'new'}],
+    edges: [...rings.edges, {id: 'new-edge', kind: 'call', source: 'r0new', target: 'r0n1'}]};
+  const kept = createOverviewSession(engine);
+  const sent = createOverviewSession(engine, {resident: false});
+  const both = async step => {
+    const [a, b] = [await step(kept), await step(sent)];
+    assert.equal(a.ok, true, a.error);
+    assert.deepEqual(a, b);
+    return a.overview;
+  };
+  const first = await both(s => s.open(rings, {edgeIds: true}));
+  assert.deepEqual(first.edgeIds, rings.edges.map(e => e.id));
+  // The same graph, then a changed one, with `start: {}`: by id, which reports what became of the places.
+  const second = await both(s => s.open(grown, {edgeIds: true, start: {}}));
+  assert.equal(second.continuation.anew, 1);
+  assert.equal(second.ids.length, first.ids.length + 1);
+  // As the engine without a session answers for the places by id.
+  const places = Object.fromEntries(first.ids.map((id, i) => [id, {x: first.x[i], y: first.y[i], r: first.r[i], ...(first.parent[i] >= 0 ? {parent: first.ids[first.parent[i]]} : {})}]));
+  const direct = engine({op: 'overview', graph: grown, edgeIds: true, start: {nodes: places}});
+  assert.deepEqual(direct.overview, second);
+  // After it, positions by index are those of that answer's clusters, not of a fresh clustering: converted or refused alike.
+  const same = await both(s => s.layOut({edgeIds: true, start: {x: second.x, y: second.y, r: second.r}}));
+  assert.deepEqual(same.ids, second.ids);
+  assert.deepEqual(same.x, second.x);
+  const wrong = [await kept.layOut({start: {x: first.x, y: first.y, r: first.r}}), await sent.layOut({start: {x: first.x, y: first.y, r: first.r}})];
+  assert.equal(wrong[0].ok, false);
+  assert.equal(wrong[0].error, wrong[1].error);
+  assert.match(wrong[0].error, /values for \d+ nodes; it must come from the same graph/);
+  // Without a last overview there is nothing to continue from.
+  for (const fresh of [createOverviewSession(engine), createOverviewSession(engine, {resident: false})]) {
+    const refused = await fresh.open(rings, {start: {}});
+    assert.equal(refused.ok, false);
+    assert.match(refused.error, /No overview to continue from/);
+    await fresh.close();
+  }
+  await kept.close();
+  await sent.close();
+});

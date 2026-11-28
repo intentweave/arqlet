@@ -366,7 +366,10 @@ export function httpRun(
 /**
  * An overview request without `op` and `graph` (`OverviewRequest` in `@arqlet/contracts`): `start` without positions
  * continues from the last overview, `start.nodes` (places by node id) from the places given, also on a new graph, and
- * keeps their clusters.
+ * keeps their clusters. Provisional (#241): a new graph (`open`) with `start: {}` continues from the session's own last
+ * places by id; `start: {x, y, r}` by index after a continuation by id belongs to the clusters of that answer (the
+ * session converts it to places by id where it keeps no engine session, and refuses arrays of another length); with
+ * `edgeIds: true` the answer names its edges (`edgeIds`, aligned with `edges`; ask each time).
  */
 export type OverviewSessionRequest = Omit<OverviewRequest, 'graph'>;
 
@@ -384,7 +387,7 @@ export interface OverviewSession {
   /** Lays out `graph`; replaces the graph the session had. */
   open(graph: Graph, request?: OverviewSessionRequest): Promise<OverviewAnswer>;
   /** Lays out the graph again; `start` without positions continues from the last overview (same cluster options).
-   * With `edgeData: true` the answer has each edge's kind and weight (ask each time). With `containerStats: true` it has
+   * With `edgeData: true` the answer has each edge's kind and weight, with `edgeIds: true` each edge's id (ask each time). With `containerStats: true` it has
    * each container's inner-edge share and modularity term and the modularity per depth (`containerStats`, ask each
    * time). Provisional: `workBudget` bounds
    * the work deterministically and the answer reports it (`work`); `overBudget: 'refuse'` refuses instead of packing
