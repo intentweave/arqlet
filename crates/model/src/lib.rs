@@ -4314,8 +4314,8 @@ pub struct OverviewStart {
 }
 
 /// Provisional (#235): what became of the containers a request named in `start.fill` (and `start.fillTop`). Containers
-/// are node indices, -1 for the top level, in index order (the top level first). A named container the work budget
-/// left out is in none of these lists: it keeps its places and is listed in `work.packed`.
+/// are node indices, -1 for the top level, in index order (the top level first). Every named container is in exactly
+/// one of `filled`, `unfit` and `overBudget`.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -4331,6 +4331,11 @@ pub struct OverviewFill {
     /// The radius each of `unfit` needs, in the same order. Given in `radii` together with `fill`, the disc grows to it
     /// and its neighbours make room.
     pub needed: Vec<f64>,
+    /// Named containers the work budget left out: they keep their places (or are packed, and in `work.packed`, when
+    /// they changed too). Ask again with these; each round fills at least the first in the order whose fill alone fits
+    /// the budget, and a round that fills nothing would give the same answer again, so stop then or raise the budget.
+    #[cfg_attr(feature = "ts", ts(type = "number[]"))]
+    pub over_budget: Vec<i64>,
     /// Ids in `fill` that name no container of the overview (no node, or one without children), in the order given.
     /// Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -280,6 +280,13 @@ fn hints_of(
         }
         !ignored.start
     });
+    // A start left out takes its fill along: every id it names is reported as ignored (#235; with an empty index
+    // none names a container, and `fillTop` is left out with the start).
+    if ignored.start {
+        if let Some(named) = v.get("start") {
+            fill_of(named, h, &BTreeMap::new(), &mut ignored)?;
+        }
+    }
     if let Some(start) = start {
         let mut previous = match from_places {
             Some((places, kept)) => {
@@ -634,6 +641,7 @@ fn lay_out(
     let mut packed: Vec<i64> = Vec::new();
     // What became of the containers to fill (#235).
     let (mut filled, mut unfit): (Vec<i64>, Vec<(i64, f64)>) = (Vec::new(), Vec::new());
+    let mut over: Vec<i64> = Vec::new();
     // `edgeData`: each edge's kind and weight in the answer.
     let edge_data = edge_data_of(v)?;
     // `busRows`: the members of every node of shape `busLine`, from the resolved edges (other buses left out).
@@ -685,9 +693,14 @@ fn lay_out(
                                 overview::fallback(&h, container, &radius, &options, start);
                             // A container to fill that the budget left out keeps its places, and is listed as
                             // packed so that the host asks again (#235).
-                            let unfilled = a.filled.is_none()
-                                && start.is_some_and(|p| p.fill.contains_key(&container));
-                            if how == Fallback::Packed || unfilled {
+                            // A container to fill that the budget left out (#235): kept, or packed if it changed
+                            // too; reported in `fill.overBudget`.
+                            if a.filled.is_none()
+                                && start.is_some_and(|p| p.fill.contains_key(&container))
+                            {
+                                over.push(container_index(container));
+                            }
+                            if how == Fallback::Packed {
                                 packed.push(container_index(container));
                             }
                             a
@@ -711,8 +724,10 @@ fn lay_out(
     packed.sort_unstable();
     filled.sort_unstable();
     unfit.sort_unstable_by_key(|&(c, _)| c);
+    over.sort_unstable();
     let fill = ignored.fill.map(|ignored| OverviewFill {
         filled,
+        over_budget: over,
         unfit: unfit.iter().map(|&(c, _)| c).collect(),
         needed: unfit.iter().map(|&(_, r)| r).collect(),
         ignored,

@@ -383,7 +383,8 @@ o = run({op: 'overview', graph, start: {x: o.x, y: o.y, r: o.r, fillTop: true}})
 | `fill.filled` | containers filled (node indices, -1: the top level) |
 | `fill.unfit` | containers whose new arrangement reaches beyond their disc even without their padding: left as without `fill` |
 | `fill.needed` | the radius each of `unfit` needs; give it in `radii` together with `fill` and the disc grows, its neighbours make room |
-| `fill.ignored` | only when not empty: ids that name no container (no node, or one without children) |
+| `fill.overBudget` | named containers the work budget left out: they keep their places |
+| `fill.ignored` | only when not empty: ids that name no container (no node, or one without children), and every id when the start was left out (`work.startIgnored`) |
 
 - **Earlier places** come from `start.x`, `y`, `r`, from `start.nodes` (by id, also for a changed graph), or in a
   session (and `createOverviewSession`) from the last overview: `layOut({start: {fill: ['src/app']}})`.
@@ -395,8 +396,19 @@ o = run({op: 'overview', graph, start: {x: o.x, y: o.y, r: o.r, fillTop: true}})
 - **Not recursive.** Name nested containers too; one request with several gives what single requests one after another
   give, from the inside out.
 - **With a work budget** the named containers are filled in a fixed order (from the leaves up, in index order) as long
-  as the budget lasts; those left out keep their places and are listed in `work.packed`. Repeat with `work.packed` until
-  it is empty.
+  as the budget lasts; those left out keep their places and are listed in `fill.overBudget`. Containers kept as they
+  were cost nothing in a fill request, so the budget goes to the fills. **Repeat with `fill.overBudget` while the last
+  round filled something**: each round fills at least the first one whose fill alone fits the budget, and a round that
+  fills nothing would give the same answer again, so stop there or raise the budget:
+
+  ```js
+  let left = ids;
+  while (left.length) {
+    const next = run({op: 'overview', graph, start: {x: o.x, y: o.y, r: o.r, fill: left}, workBudget}).overview;
+    if (!next.fill.filled.length) break;   // nothing fits this budget: stop, or raise it
+    o = next; left = next.fill.overBudget.map(c => o.ids[c]);
+  }
+  ```
 - `start.moved` of a node inside a filled container is refused; elsewhere it works as before. Places outside the filled
   containers are answered as given only when nothing else changed (no `radii`, `moved` or changed graph in the same
   request).

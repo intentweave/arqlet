@@ -31,7 +31,7 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   draws the top level first (for example with a small `workBudget`) and fills the packed clusters one by one or on
   demand. The container's padding gives way first; content that reaches beyond the disc is left as it was and reported with the radius it needs (`fill.unfit`,
   `fill.needed`; give that in `radii` to let it grow); with a work budget the named containers are filled in a fixed
-  order as long as it lasts, the rest listed in `work.packed`. Through `dispatch`, in sessions (`start: {fill}`) and
+  order as long as it lasts, the rest listed in `fill.overBudget` (a round that fills nothing would repeat unchanged: stop or raise the budget). Through `dispatch`, in sessions (`start: {fill}`) and
   `createOverviewSession`, identical for any thread count and natively and in WASM; requests without the fields answer
   as before. New contract type `OverviewFill`.
 - Overview renderer: `pause()` and `resume()` (provisional, #221), for a host that hides the overview (for example under

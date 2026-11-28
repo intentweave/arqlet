@@ -158,6 +158,14 @@ fn packed_overview(g: &Value) -> Value {
     o
 }
 
+fn ids_of(list: &Value) -> Vec<i64> {
+    list.as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_i64().unwrap())
+        .collect()
+}
+
 fn radius_of(o: &Value, c: i64) -> f64 {
     if c < 0 {
         o["rootRadius"].as_f64().unwrap()
@@ -225,7 +233,7 @@ fn filling_every_packed_container_one_by_one_keeps_everything_else_bit_for_bit()
 }
 
 #[test]
-fn a_budget_fills_as_much_as_fits_in_a_fixed_order_and_lists_the_rest_as_packed() {
+fn a_budget_fills_as_much_as_fits_in_a_fixed_order_and_lists_the_rest_as_over_budget() {
     let g = graph(3, 4, 30);
     let mut o = packed_overview(&g);
     let all: Vec<i64> = o["work"]["packed"]
@@ -257,16 +265,12 @@ fn a_budget_fills_as_much_as_fits_in_a_fixed_order_and_lists_the_rest_as_packed(
             .iter()
             .map(|c| c.as_i64().unwrap())
             .collect();
-        let packed: Vec<i64> = work["packed"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|c| c.as_i64().unwrap())
-            .collect();
-        // Every container named is either filled or listed as packed, never both; nothing else is packed.
-        let mut both: Vec<i64> = filled.iter().chain(&packed).copied().collect();
+        let over = ids_of(&next["fill"]["overBudget"]);
+        // Every container named is either filled or over the budget, never both; nothing is packed.
+        let mut both: Vec<i64> = filled.iter().chain(&over).copied().collect();
         both.sort_unstable();
         assert_eq!(both, left, "{work}");
+        assert_eq!(work["packed"], json!([]), "{work}");
         assert!(!filled.is_empty(), "no progress: {work}");
         assert_kept_outside(&o, &next, &filled);
         for threads in [2, 4] {
@@ -274,7 +278,7 @@ fn a_budget_fills_as_much_as_fits_in_a_fixed_order_and_lists_the_rest_as_packed(
             threaded["threads"] = json!(threads);
             assert_eq!(answer(&threaded), next, "threads {threads}");
         }
-        left = packed;
+        left = over;
         o = next;
     }
     assert!(rounds > 1, "the budget left nothing out");
@@ -492,4 +496,147 @@ fn without_fill_nothing_changes() {
     let null = answer(&json!({"op": "overview", "graph": g, "options": options(),
         "start": {"x": o["x"], "y": o["y"], "r": o["r"], "fill": null, "fillTop": null}}));
     assert_eq!(null, plain);
+    // Also with a budget, and for the overview itself: the same answer as a request without the fields (answers of
+    // requests without them are compared byte for byte against a build of main outside the tests).
+    for budget in [0u64, 5_000, u64::MAX] {
+        let request = json!({"op": "overview", "graph": g, "options": options(),
+            "start": start_of(&o), "workBudget": budget});
+        let mut with_null = request.clone();
+        with_null["start"]["fill"] = Value::Null;
+        with_null["start"]["fillTop"] = Value::Null;
+        let a = answer(&request);
+        assert!(a.get("fill").is_none());
+        assert_eq!(answer(&with_null), a, "{budget}");
+    }
+}
+
+#[test]
+fn a_fill_the_budget_cannot_hold_is_reported_and_a_repeat_changes_nothing() {
+    let g = graph(3, 4, 30);
+    let o = packed_overview(&g);
+    // The largest packed container of the graph (not the top level).
+    let c = ids_of(&o["work"]["packed"])
+        .into_iter()
+        .filter(|&c| c >= 0)
+        .max_by(|&a, &b| {
+            radius_of(&o, a)
+                .total_cmp(&radius_of(&o, b))
+                .then(b.cmp(&a))
+        })
+        .unwrap();
+    let fill = |o: &Value, budget: u64| {
+        answer(&json!({"op": "overview", "graph": g, "options": options(),
+            "start": with_fill(start_of(o), o, &[c]), "workBudget": budget}))
+    };
+    // What the fill costs alone: kept containers cost nothing in a fill request.
+    let cost = fill(&o, u64::MAX)["work"]["used"].as_u64().unwrap();
+    let plain = answer(&json!({"op": "overview", "graph": g, "options": options(),
+        "start": start_of(&o), "workBudget": u64::MAX}));
+    let kept = plain["work"]["used"].as_u64().unwrap();
+    assert!(cost > kept + 5, "{cost} {kept}");
+    for budget in [kept + 5, cost - 1] {
+        let first = fill(&o, budget);
+        assert_valid(&first);
+        assert_eq!(
+            first["fill"]["filled"],
+            json!([]),
+            "{budget}: {}",
+            first["fill"]
+        );
+        assert_eq!(first["fill"]["overBudget"], json!([c]));
+        assert_eq!(first["work"]["packed"], json!([]));
+        assert_kept_outside(&o, &first, &[]);
+        // A round that fills nothing gives the same answer again: the host stops or raises the budget.
+        assert_eq!(fill(&first, budget), first);
+    }
+    // With what it costs, it is filled in one round.
+    let done = fill(&o, cost);
+    assert_eq!(done["fill"]["filled"], json!([c]));
+    assert_eq!(done["fill"]["overBudget"], json!([]));
+}
+
+#[test]
+fn a_fill_of_an_ignored_start_is_reported_as_ignored() {
+    let g = graph(3, 4, 30);
+    let plain = answer(&json!({"op": "overview", "graph": g, "options": options()}));
+    let start = json!({"x": plain["x"], "y": plain["y"], "r": plain["r"], "fill": ["g1", "nobody"], "fillTop": true});
+    let o = answer(
+        &json!({"op": "overview", "graph": g, "options": options(), "start": start,
+        "workBudget": 10}),
+    );
+    assert_eq!(o["work"]["startIgnored"], true, "{}", o["work"]);
+    assert_eq!(o["fill"]["filled"], json!([]));
+    assert_eq!(o["fill"]["overBudget"], json!([]));
+    assert_eq!(o["fill"]["ignored"], json!(["g1", "nobody"]));
+    assert_valid(&o);
+}
+
+#[test]
+fn nested_containers_named_together_are_filled_as_one_after_another_inside_out() {
+    let g = graph(3, 4, 30);
+    let o = packed_overview(&g);
+    let at = |id: &str| index_of(&o, id) as i64;
+    let (outer, inner) = (at("g1"), at("g1/f2"));
+    let together = answer(&json!({"op": "overview", "graph": g, "options": options(),
+        "start": with_fill(start_of(&o), &o, &[outer, inner])}));
+    assert_eq!(together["fill"]["filled"], json!([outer, inner]));
+    let first = answer(&json!({"op": "overview", "graph": g, "options": options(),
+        "start": with_fill(start_of(&o), &o, &[inner])}));
+    let second = answer(&json!({"op": "overview", "graph": g, "options": options(),
+        "start": with_fill(start_of(&first), &first, &[outer])}));
+    assert_valid(&together);
+    assert_kept_outside(&o, &together, &[outer]);
+    // The same, up to the rounding of the places the second request starts from.
+    for k in ["x", "y", "r"] {
+        for (a, b) in together[k]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(second[k].as_array().unwrap())
+        {
+            assert!(
+                (a.as_f64().unwrap() - b.as_f64().unwrap()).abs() <= 0.02,
+                "{k}: {a} {b}"
+            );
+        }
+    }
+}
+
+#[test]
+fn with_padding_zero_every_filled_child_stays_inside_its_disc() {
+    let g = graph(2, 3, 25);
+    let options = json!({"communities": 0, "padding": 0});
+    let o = answer(&json!({"op": "overview", "graph": g, "options": options, "workBudget": 0}));
+    let containers: Vec<i64> = ids_of(&o["work"]["packed"]);
+    let next = answer(&json!({"op": "overview", "graph": g, "options": options,
+        "start": with_fill(start_of(&o), &o, &containers)}));
+    let mut named = ids_of(&next["fill"]["filled"]);
+    named.extend(ids_of(&next["fill"]["unfit"]));
+    named.sort_unstable();
+    assert_eq!(named, containers);
+    // Children inside their parents up to the rounding of the answer (hundredths).
+    let f = |k: &str, i: usize| next[k][i].as_f64().unwrap();
+    for i in 0..next["ids"].as_array().unwrap().len() {
+        let p = next["parent"][i].as_i64().unwrap();
+        if p >= 0 {
+            let p = p as usize;
+            let d = (f("x", i) - f("x", p)).hypot(f("y", i) - f("y", p));
+            assert!(
+                d + f("r", i) <= f("r", p) + 0.015,
+                "{} sticks out",
+                next["ids"][i]
+            );
+        }
+    }
+    assert_kept_outside(&o, &next, &containers);
+}
+
+/// The index of a node in an answer.
+fn index_of(o: &Value, id: &str) -> usize {
+    o["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|x| x == id)
+        .unwrap()
 }

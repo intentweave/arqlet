@@ -233,7 +233,8 @@ pub struct Previous {
     /// Provisional (#235): a container kept as it was keeps its earlier radius exactly when that still holds its
     /// children (up to rounding), instead of measuring it again from the rounded places (which can differ by a
     /// hundredth, and shrinks a disc with free room, such as one filled earlier). Set with `fill`, so that every place
-    /// outside the filled containers is answered as it was given.
+    /// outside the filled containers is answered as it was given; such a kept container also costs no work
+    /// (`arrange_metered`), so that the budget of a fill goes to the fills.
     pub keep_radii: bool,
 }
 
@@ -1250,14 +1251,14 @@ pub fn arrange_metered(
         return arrange_core(h, container, radius, options, start, meter);
     };
     let fresh = arrange_core(h, container, radius, options, None, meter)?;
-    // It fits when its children lie inside the disc: the container's own padding gives way first.
+    // It fits when its children lie inside the disc: the container's own padding gives way first, never the disc.
     let reach = h
         .members(container)
         .iter()
         .zip(&fresh.positions)
         .map(|(&m, p)| (p.0 * p.0 + p.1 * p.1).sqrt() + radius[m])
         .fold(0., f64::max);
-    if fresh.radius <= disc + SAME_RADIUS || reach <= disc {
+    if reach <= disc {
         return Some(Arrangement {
             radius: if disc.is_finite() { disc } else { fresh.radius },
             filled: Some(Filled::InDisc),
@@ -1307,8 +1308,16 @@ fn arrange_core(
         .iter()
         .map(|&(a, b, w)| (local[&a], local[&b], w))
         .collect();
-    // The start: reading the children and their links (a kept arrangement costs no more).
-    if !meter.spend(k as u64 + links.len() as u64) {
+    // The start: reading the children and their links (a kept arrangement costs no more). In a fill request
+    // (`Previous::keep_radii`) a container kept as it was costs nothing: that work would repeat unchanged in every
+    // round of a host that fills container by container, and eat the budget its fills need (#235).
+    let free = start.is_some_and(|p| {
+        p.keep_radii
+            && p.moved.is_empty()
+            && members.iter().any(|m| !p.anew.contains(m))
+            && !changed_in(p, container, members, radius)
+    });
+    if !free && !meter.spend(k as u64 + links.len() as u64) {
         return None;
     }
     // Whether anything of a previous arrangement is there to continue from.
@@ -2636,6 +2645,44 @@ mod tests {
                     <= a.radius - options.padding + 1e-9
             );
         }
+    }
+
+    /// #235: a filled container takes its new arrangement only when every child lies inside its disc, whatever the
+    /// padding; with padding 0 a disc a hair smaller than the children's reach leaves it unfit.
+    #[test]
+    fn a_fill_never_lets_a_child_stick_out_of_its_disc() {
+        let h = hierarchy(&sample());
+        let options = OverviewOptions {
+            padding: 0.,
+            ..OverviewOptions::default()
+        };
+        let a = Container::Node(0);
+        let radius = vec![options.node_radius; h.ids.len()];
+        let fresh = arrange(&h, a, &radius, &options, None);
+        let reach = fresh
+            .positions
+            .iter()
+            .map(|p| (p.0 * p.0 + p.1 * p.1).sqrt() + options.node_radius)
+            .fold(0., f64::max);
+        let n = h.ids.len();
+        let start = |disc: f64| Previous {
+            centre: vec![(0., 0.); n],
+            radius: vec![disc; n],
+            fill: [(a, disc)].into_iter().collect(),
+            keep_radii: true,
+            ..Previous::default()
+        };
+        let inside = arrange(&h, a, &radius, &options, Some(&start(reach)));
+        assert_eq!(inside.filled, Some(Filled::InDisc));
+        assert_eq!(inside.radius, reach);
+        // Within the old tolerance of the radius, yet a child would stick out: unfit.
+        let short = reach - 0.01;
+        let out = arrange(&h, a, &radius, &options, Some(&start(short)));
+        assert!(
+            matches!(out.filled, Some(Filled::Unfit(r)) if r >= reach),
+            "{:?}",
+            out.filled
+        );
     }
 }
 

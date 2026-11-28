@@ -2,8 +2,8 @@
 
 /**
  * Provisional (#235): what became of the containers a request named in `start.fill` (and `start.fillTop`). Containers
- * are node indices, -1 for the top level, in index order (the top level first). A named container the work budget
- * left out is in none of these lists: it keeps its places and is listed in `work.packed`.
+ * are node indices, -1 for the top level, in index order (the top level first). Every named container is in exactly
+ * one of `filled`, `unfit` and `overBudget`.
  */
 export type OverviewFill = {
 /**
@@ -21,6 +21,12 @@ unfit: number[],
  * and its neighbours make room.
  */
 needed: Array<number>,
+/**
+ * Named containers the work budget left out: they keep their places (or are packed, and in `work.packed`, when
+ * they changed too). Ask again with these; each round fills at least the first in the order whose fill alone fits
+ * the budget, and a round that fills nothing would give the same answer again, so stop then or raise the budget.
+ */
+overBudget: number[],
 /**
  * Ids in `fill` that name no container of the overview (no node, or one without children), in the order given.
  * Omitted when empty.
