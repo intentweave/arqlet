@@ -9,6 +9,9 @@ const shipped = new URL('./arqlet.wasm', import.meta.url);
 const built = new URL('../../target/wasm32-unknown-unknown/release/arqlet_wasm.wasm', import.meta.url);
 const wasm = existsSync(shipped) ? shipped : built;
 const engine = existsSync(wasm) ? await createEngine(readFileSync(wasm)) : null;
+// The engine with the operation `query` (the second module of the package; `build.sh` and `pnpm pack` put it there).
+const queryWasm = new URL('./arqlet-engine-query.wasm', import.meta.url);
+const queryEngine = existsSync(queryWasm) ? await createEngine(readFileSync(queryWasm)) : null;
 const graph = JSON.parse(readFileSync(new URL('../../examples/fixtures/small.json', import.meta.url), 'utf8'));
 
 test('a session imports, collapses and expands a container, each time on the newest snapshot', {skip: !engine}, async () => {
@@ -547,15 +550,14 @@ for (const resident of [false, true]) {
   });
 }
 
-test('query: rows over the source graph and the content, in a resident and a plain session', {skip: !engine}, async () => {
-  const resident = createSession(engine, {resident: engine.openSession ? true : false});
+test('query: rows over the source graph and the content, in a resident and a plain session', {skip: !queryEngine}, async () => {
+  const resident = createSession(queryEngine, {resident: true});
   await resident.import(graph);
   const first = await resident.query('MATCH (n) RETURN count(*)');
-  // An engine without the cargo feature `query` refuses it; an older shipped engine does not know the operation at all.
-  if (!first.ok && /not built into|expected struct Snapshot/.test(first.error)) return;
   assert.equal(first.ok, true, first.error);
   assert.equal(first.rows[0][0], first.graph.nodes);
-  if (engine.openSession) {
+  assert.equal(typeof queryEngine.openSession, 'function');
+  {
     assert.equal((await resident.payload({set: {nodes: {a: {loc: 5}}}})).ok, true);
     const q = await resident.query('MATCH (n) WHERE n.loc > $min RETURN n', {params: {min: 1}, view: true});
     assert.deepEqual(q.rows, [[{node: 'a'}]]);
@@ -565,5 +567,5 @@ test('query: rows over the source graph and the content, in a resident and a pla
   const bad = await resident.query('MATCH (n RETURN n');
   assert.equal(bad.ok, false);
   assert.match(bad.error, /^query syntax:/);
-  assert.equal((await createSession(engine).query('RETURN 1')).ok, false, 'nothing imported yet');
+  assert.equal((await createSession(queryEngine).query('RETURN 1')).ok, false, 'nothing imported yet');
 });

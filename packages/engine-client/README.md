@@ -23,6 +23,10 @@ The Arqlet engine as WebAssembly (`arqlet.wasm`, included) and its JavaScript ac
 - `presets.js`: `presetState` and `applyPreset`.
 
 Most users want the [`arqlet`](https://www.npmjs.com/package/arqlet) package, which re-exports these.
+Note for bundlers (Vite, webpack 5, esbuild): `engine.js` names both modules with a top-level `new URL('./…wasm', import.meta.url)`
+(`defaultWasmUrl`, `queryWasmUrl`), and a bundler emits every file it finds that way, so an app that imports `engine.js` gets
+`arqlet-engine-query.wasm` (about 2.2 MB gzip) as an asset too, although nothing downloads it unless the app asks for it.
+Making the URL lazy would not help: bundlers detect the pattern statically. Pass your own URL to `loadEngine` to avoid it.
 Bundlers that understand `new URL('./arqlet.wasm', import.meta.url)` (Vite, webpack 5,
 esbuild with a loader) copy the engine along; otherwise pass its URL to `loadEngine`.
 

@@ -63,8 +63,12 @@ test('the query module answers query, with view: true mapped onto drawn boxes an
     assert.equal((await session.query('MATCH (n RETURN n')).ok, false);
   }
   // Without view: true the answer has no mapping.
-  const plain = await createSession(run).query('RETURN 1');
-  assert.equal(plain.ok, false, 'nothing imported yet');
+  const plain = createSession(run);
+  await plain.import(graph);
+  const rows = await plain.query('MATCH (n) RETURN n');
+  assert.equal(rows.ok, true, rows.error);
+  assert.equal(rows.shown, undefined);
+  assert.equal((await createSession(run).query('RETURN 1')).ok, false, 'nothing imported yet');
 });
 
 test('the query module answers through the worker, which loads the module named in its URL', {skip: !hasQuery}, async () => {
