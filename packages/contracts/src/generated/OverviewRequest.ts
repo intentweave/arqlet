@@ -17,7 +17,7 @@ export type OverviewRequest = { graph?: Graph, options?: OverviewLayoutOptions, 
 radii?: { [key in string]: number }, start?: OverviewStart,
 /**
  * Provisional (sessions): answer only what moves (`OverviewPositions`) when the clusters are those of the session's
- * last overview and `edgeData` is as it was there; otherwise the whole overview.
+ * last overview and `edgeData` and `containerStats` are as they were there; otherwise the whole overview.
  */
 positionsOnly?: boolean,
 /**
@@ -25,6 +25,11 @@ positionsOnly?: boolean,
  * host that does not have the graph.
  */
 edgeData?: boolean,
+/**
+ * Provisional (#236): answer per container its inner and touching edges, their share and its modularity term, and
+ * the modularity at each depth (`Overview::container_stats`).
+ */
+containerStats?: boolean,
 /**
  * Provisional (#211): a deterministic work budget in units (`Overview::work`); the answer reports the work. Without
  * it the overview runs to the end, as before.

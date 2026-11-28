@@ -56,15 +56,23 @@ export async function createEngine(bytes,{onPublish}={}) {
         return {...result,...viewsOf(listed,index=>api.lw_session_column(id,index),false)};
       };
       // Provisional: an `overview` request whose numbers come back as typed arrays instead of JSON arrays (`parent`, `x`,
-      // `y`, `r`, `kind`, `edges`, `links`, and with `edgeData` `edgeKind` and `edgeWeight`; a continuation with
-      // `positionsOnly` only `x`, `y` and `r`), in an answer shaped
+      // `y`, `r`, `kind`, `edges`, `links`, with `edgeData` `edgeKind` and `edgeWeight`, and with `containerStats` its
+      // arrays; a continuation with `positionsOnly` only `x`, `y` and `r`), in an answer shaped
       // like the JSON one. `copy` (default false) copies them out of the module's memory, for a host that keeps them past
       // its next request; views are valid only until then.
       const overview=(request,{copy=false}={})=>{
         const answer=run({...request,columns:true});
         if(!answer.ok) return answer;
         const {columns:listed,...rest}=answer.overview;
-        return {...answer,overview:{...rest,...viewsOf(listed,index=>api.lw_session_overview_column(id,index),copy)}};
+        const result={...rest};
+        // A column named `object.field` (`containerStats.share`) goes into that object, beside its JSON fields.
+        for(const [name,view] of Object.entries(viewsOf(listed,index=>api.lw_session_overview_column(id,index),copy))){
+          const dot=name.indexOf('.');
+          if(dot<0){result[name]=view;continue;}
+          const key=name.slice(0,dot);
+          result[key]={...result[key],[name.slice(dot+1)]:view};
+        }
+        return {...answer,overview:result};
       };
       return {run,close:()=>api.lw_session_close(id),...(api.lw_session_column?{columns}:{}),...(api.lw_session_overview_column?{overview}:{})};
     };
