@@ -11,7 +11,7 @@ export interface StyleTheme {
 }
 /** What a rule sets on a node: colours may be CSS colours, a token (`$route`) or `auto` (categorical by kind). */
 /** `radius`: the corner radius, a number or `'pill'` (half the shorter side). */
-export interface NodeStyle { fill?: string; stroke?: string; strokeWidth?: number; text?: string; dash?: string; radius?: number | 'pill'; /** `'dot'`: a station dot of `glyphSize` (default 7) instead of the box, the name outside. */ glyph?: 'dot'; glyphSize?: number }
+export interface NodeStyle { fill?: string; stroke?: string; strokeWidth?: number; text?: string; dash?: string; radius?: number | 'pill'; /** `'dot'`: a station dot of `glyphSize` (default 7) instead of the box, the name outside. Provisional `'tick'`: a stub of `glyphSize` (default 9) and `strokeWidth` (default 4) in `stroke`, across the station's line (`orientGlyphs`), the name beyond its tip. Provisional `'pill'`: a pill `glyphSize` thick (default 11) and 2.4 times as long, `fill` with a `strokeWidth` border (default 3), across the station's lines, the name beyond its end. */ glyph?: 'dot' | 'tick' | 'pill'; glyphSize?: number }
 /** What a rule sets on an edge (route). `width` and `opacity` replace the weight-based defaults; `arrow: 'none'` draws no arrowhead. */
 export interface EdgeStyle { stroke?: string; arrow?: string; width?: number; opacity?: number; dash?: string }
 /**
@@ -47,7 +47,18 @@ export function themeFromCss(element: Element, view?: Window): Partial<StyleThem
  * interchanges; light), `light` (needs a light background). */
 export const STYLE_PRESETS: Readonly<Record<'default' | 'byKind' | 'metro' | 'light', StyleSheet>>;
 
-/** Provisional: a node's glyph (`glyph: 'dot'`): the dot's middle and radius and where its name goes; null for a box. */
-export function glyphOf(look: NodeStyle | null | undefined, bounds: {x: number; y: number; width: number; height: number}): {cx: number; cy: number; r: number; labelX: number; labelY: number} | null;
+/** Provisional: a glyph's geometry. A dot: middle, radius and where its name goes. A tick: from the middle along the unit
+ * normal (`nx`, `ny`) to (`x2`, `y2`), `width` wide. A pill: `length` along the normal and `thickness` across, centred,
+ * a border `width` wide, its end at (`x2`, `y2`). A tick's or pill's name at (`labelX`, `labelY`) with canvas `align`
+ * and `baseline`. */
+export interface Glyph { kind: 'dot' | 'tick' | 'pill'; cx: number; cy: number; r: number; labelX: number; labelY: number;
+  length?: number; thickness?: number; width?: number; nx?: number; ny?: number; x2?: number; y2?: number; align?: 'left' | 'right' | 'center'; baseline?: 'middle' | 'top' | 'bottom' }
+/** Provisional: a node's glyph (`glyph: 'dot'`, `'tick'` or `'pill'`); null for a box. Ticks and pills point up until
+ * `orientGlyphs`. */
+export function glyphOf(look: NodeStyle | null | undefined, bounds: {x: number; y: number; width: number; height: number}): Glyph | null;
+/** Provisional: turns every tick and pill in `glyphs` (node id → glyph) across the lines of its routes (those of an
+ * explicit bus first; with more than two, their main axis), to the right of the line or up when it runs across; in
+ * place, returns `glyphs`. */
+export function orientGlyphs(glyphs: Map<string, Glyph>, scene: {routes?: {id: string; source: string; target: string; points: {x: number; y: number}[]}[]; buses?: string[][]}): Map<string, Glyph>;
 /** The points a route is drawn with when an end is a glyph (to the dot's middle). */
 export function routeToGlyphs(points: {x: number; y: number}[], sourceGlyph: {cx: number; cy: number} | null | undefined, targetGlyph: {cx: number; cy: number} | null | undefined): {x: number; y: number}[];

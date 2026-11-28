@@ -7,6 +7,16 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Added
 
+- **Metro style: stations as ticks** (viewer, provisional): a style's new `glyph: 'tick'` draws a station on one line as a
+  short stub in the line's colour across the line, its name beyond the tip, as metro maps draw stations without changes;
+  `orientGlyphs` turns each tick from the station's routes (explicit buses first; to the right of the line, or up when it
+  runs across). `glyph: 'pill'` draws an interchange as a white pill across its lines (with more than two, across their
+  main axis), its name beyond its end. The `metro` preset: ticks for `leaf[bus]`, pills for `leaf[interchange]`, for a
+  station where its line branches (`leaf[branch]`, new derived field: three or more routes of one bus) and for
+  `leaf[bus][kind=gateway]`; a plain end station keeps its tick. A glyph and its name take the side where no line leaves
+  (at a crossing the name goes diagonally between the lines); a pill on three or more lines lies at a multiple of 45°.
+  SVG, GPU layer (pills as triangle fans, at any angle) and React Flow (looks `tick` and `pill`, drawn by the example)
+  draw them alike; `browser-checks/metro-glyphs.mjs` compares them in Chrome and writes before/after pictures.
 - **A native Node.js adapter (provisional, unpublished; ADR 0030, #223).** `crates/node` wraps `dispatch` and the engine
   sessions through Node-API (napi-rs 3.16.1); every call that computes runs as an asynchronous task on libuv's thread
   pool, so the event loop stays free during a layout, and sessions run in parallel with each other and one at a time

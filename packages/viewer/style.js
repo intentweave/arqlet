@@ -104,7 +104,13 @@ export function createStyle(sheet = {}) {
       if (bound.has(scene)) return bound.get(scene);
       const {routeBus, nodeBuses} = busData(scene);
       const out = {
-        node: n => { const b = nodeBuses.get(n.id); return node(b ? {...n, bus: b.size === 1 ? [...b][0] : undefined, buses: b.size, interchange: b.size > 1} : n); },
+        node: n => {
+          const b = nodeBuses.get(n.id);
+          if (!b) return node(n);
+          // `branch`: a line branches at the node (three or more of one bus's routes end there), as at a gateway.
+          const branch = [...b.values()].some(count => count >= 3);
+          return node({...n, bus: b.size === 1 ? [...b.keys()][0] : undefined, buses: b.size, interchange: b.size > 1, ...(branch ? {branch} : {})});
+        },
         edge: r => (routeBus.has(r.id) ? edge({...r, bus: routeBus.get(r.id)}) : edge(r)),
       };
       bound.set(scene, out);
@@ -113,14 +119,15 @@ export function createStyle(sheet = {}) {
   };
 }
 
-// The explicit buses of a scene: the bus of each route, and the buses each node is an end of.
+// The explicit buses of a scene: the bus of each route, and the buses each node is an end of (with how many of each
+// bus's routes end there).
 function busData(scene) {
   const routeBus = new Map(), nodeBuses = new Map();
   (scene.buses ?? []).forEach((edges, b) => { for (const id of edges) if (!routeBus.has(id)) routeBus.set(id, b); });
   for (const r of scene.routes ?? []) {
     const b = routeBus.get(r.id);
     if (b === undefined) continue;
-    for (const end of [r.source, r.target]) { if (!nodeBuses.has(end)) nodeBuses.set(end, new Set()); nodeBuses.get(end).add(b); }
+    for (const end of [r.source, r.target]) { if (!nodeBuses.has(end)) nodeBuses.set(end, new Map()); const m = nodeBuses.get(end); m.set(b, (m.get(b) ?? 0) + 1); }
   }
   return {routeBus, nodeBuses};
 }
@@ -131,9 +138,96 @@ function busData(scene) {
  * it). `null` for a node drawn as its box.
  */
 export function glyphOf(look, bounds) {
-  if (look?.glyph !== 'dot') return null;
-  const r = look.glyphSize ?? 7, cx = bounds.x + bounds.width / 2, cy = bounds.y + bounds.height / 2;
-  return {cx, cy, r, labelX: cx + r + 3, labelY: cy + r + 11};
+  if (look?.glyph !== 'dot' && look?.glyph !== 'tick' && look?.glyph !== 'pill') return null;
+  const cx = bounds.x + bounds.width / 2, cy = bounds.y + bounds.height / 2;
+  if (look.glyph === 'tick') return placeGlyph({kind: 'tick', cx, cy, r: 0, length: look.glyphSize ?? 9, width: look.strokeWidth ?? 4}, 0, -1);
+  if (look.glyph === 'pill') {
+    const thickness = look.glyphSize ?? 11;
+    return placeGlyph({kind: 'pill', cx, cy, r: thickness / 2, thickness, length: thickness * 2.4, width: look.strokeWidth ?? 3}, 0, -1);
+  }
+  const r = look.glyphSize ?? 7;
+  return {kind: 'dot', cx, cy, r, labelX: cx + r + 3, labelY: cy + r + 11};
+}
+
+// A tick standing out from its middle along the unit normal (nx, ny), or a pill lying along it across its middle (x2,
+// y2: the tip, or the pill's end). Its name goes in the unit direction (lx, ly), by default the normal, just beyond the
+// glyph's outline: beside it (left- or right-aligned) when that points sideways, centred above or below when it points
+// up or down, at a corner when it points diagonally.
+function placeGlyph(g, nx, ny, lx = nx, ly = ny) {
+  const pill = g.kind === 'pill', reach = pill ? g.length / 2 : g.length;
+  const x2 = g.cx + nx * reach, y2 = g.cy + ny * reach, gap = 4;
+  // How far the outline reaches in the name's direction: a pill's half length along its axis, half its thickness across.
+  const along = lx * nx + ly * ny, out = (pill ? Math.abs(along) * g.length / 2 + Math.abs(lx * ny - ly * nx) * g.thickness / 2 : Math.max(0, along) * g.length) + gap;
+  const sideways = Math.abs(lx) > 0.38, vertical = Math.abs(ly) > 0.38;
+  return {...g, nx, ny, x2, y2, labelX: g.cx + lx * out, labelY: g.cy + ly * out,
+    align: sideways ? (lx > 0 ? 'left' : 'right') : 'center', baseline: vertical ? (ly < 0 ? 'bottom' : 'top') : 'middle'};
+}
+
+// The eight compass directions in the order a name prefers them (right of and above first, as the glyphs point).
+const R2 = Math.SQRT1_2;
+const NAME_DIRECTIONS = [[R2, -R2], [1, 0], [0, -1], [R2, R2], [0, 1], [-R2, -R2], [-1, 0], [-R2, R2]];
+const OCTANTS = [[1, 0], [R2, R2], [0, 1], [-R2, R2], [-1, 0], [-R2, -R2], [0, -1], [R2, -R2]];
+
+/**
+ * Provisional: turns every tick (`glyph: 'tick'`, a station on one line drawn as a short stub, as metro maps draw
+ * stations without changes) and every pill (`glyph: 'pill'`, an interchange or a branching station lying across its
+ * lines) across the lines at the station. Their direction comes from the station's routes as drawn (`routeToGlyphs`),
+ * those of an explicit bus first: with two, the direction from one neighbour to the other; with one, that route; with
+ * more, their main axis (a line running through counts once, whichever way). The glyph points to the right of the line,
+ * or up when the line runs across; a station without routes keeps it pointing up. Replaces them in `glyphs` (a map of
+ * node id to glyph) and returns it.
+ */
+export function orientGlyphs(glyphs, scene) {
+  const turned = g => g?.kind === 'tick' || g?.kind === 'pill';
+  if (![...glyphs.values()].some(turned)) return glyphs;
+  const {routeBus} = busData(scene);
+  const away = new Map();
+  for (const r of scene.routes ?? []) {
+    const gs = glyphs.get(r.source), gt = glyphs.get(r.target);
+    if (!turned(gs) && !turned(gt)) continue;
+    const p = routeToGlyphs(r.points, gs, gt);
+    if (!p?.length) continue;
+    const onBus = routeBus.has(r.id);
+    for (const [id, g, ordered] of [[r.source, gs, p], [r.target, gt, [...p].reverse()]]) {
+      if (!turned(g)) continue;
+      // The first point of the route that is not the station's middle: where the line leaves it.
+      const next = ordered.find(q => Math.hypot(q.x - g.cx, q.y - g.cy) > 1e-6);
+      if (!next) continue;
+      const l = Math.hypot(next.x - g.cx, next.y - g.cy);
+      if (!away.has(id)) away.set(id, {bus: [], other: []});
+      away.get(id)[onBus ? 'bus' : 'other'].push([(next.x - g.cx) / l, (next.y - g.cy) / l]);
+    }
+  }
+  for (const [id, {bus, other}] of away) {
+    const v = bus.length ? bus : other, g = glyphs.get(id);
+    // Along the line: from the second neighbour to the first, or the one route's direction; with more, the main axis of
+    // their directions (summed with doubled angles, so opposite directions agree: (x² - y², 2xy) for a unit vector),
+    // or the first one's when they balance out (a crossing), turned to the nearest multiple of 45°, as a metro map's
+    // lines run.
+    let [dx, dy] = v.length === 2 ? [v[0][0] - v[1][0], v[0][1] - v[1][1]] : v[0];
+    if (v.length > 2) {
+      const c = v.reduce((sum, [x, y]) => sum + x * x - y * y, 0), s2 = v.reduce((sum, [x, y]) => sum + 2 * x * y, 0), m = Math.hypot(c, s2);
+      if (m > 1e-6) [dx, dy] = [Math.sqrt(Math.max(0, (1 + c / m) / 2)), Math.sign(s2) * Math.sqrt(Math.max(0, (1 - c / m) / 2))];
+      [dx, dy] = OCTANTS[((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8];
+    }
+    let l = Math.hypot(dx, dy);
+    // Two neighbours on the same side (a line that turns back): across their middle instead.
+    if (l < 1e-6) { [dx, dy] = [-v[0][1], v[0][0]]; l = 1; }
+    let nx = -dy / l, ny = dx / l;
+    if (Math.abs(nx) > 0.38 ? nx < 0 : ny > 0) { nx = -nx; ny = -ny; }
+    // Where no line runs: how far a direction stays from every line leaving the station (0 along one, 2 opposite it).
+    const all = [...bus, ...other], clear = (x, y) => Math.min(...all.map(([a, b]) => 1 - (a * x + b * y)));
+    // The glyph points to the freer side (on a tie, as above); a pill's name, when even that side has a line within
+    // 30°, goes to the freest of the eight compass directions instead (a crossing: between its lines).
+    if (clear(-nx, -ny) > clear(nx, ny) + 1e-9) { nx = -nx; ny = -ny; }
+    let [lx, ly] = [nx, ny];
+    if (g.kind === 'pill' && clear(lx, ly) < 1 - Math.cos(Math.PI / 6)) {
+      let best = -1;
+      for (const [x, y] of NAME_DIRECTIONS) { const c = clear(x, y); if (c > best + 1e-9) { best = c; [lx, ly] = [x, y]; } }
+    }
+    glyphs.set(id, placeGlyph(g, nx + 0, ny + 0, lx + 0, ly + 0));
+  }
+  return glyphs;
 }
 
 /**
@@ -170,7 +264,8 @@ export const STYLE_PRESETS = Object.freeze({
   // Routes and arrowheads coloured by the edge's kind, leaf outlines by the node's kind.
   byKind: {rules: [{selector: 'edge', style: {stroke: 'auto', arrow: 'auto'}}, {selector: 'leaf', style: {stroke: 'auto'}}]},
   // Metro map (with explicit buses, busStyle 'lines'): every bus a coloured line without arrowheads, the nodes on one
-  // bus stations in its colour, a node on several buses an interchange; on a light background.
+  // line ticks across it in its colour, interchanges (on several buses) and branching stations white pills across their
+  // lines; on a light background.
   metro: {
     palette: ['#e32017', '#0098d4', '#00782a', '#00a4a7', '#9b0056', '#ffd300', '#894e24', '#ee7c0e', '#6950a1', '#95cdba'],
     theme: {frameFill: '#f7f7f5', frameStroke: '#d0d0cc', title: '#55554f', leafFill: '#ffffff', leafStroke: '#9a9a94', text: '#1b1b1b', row: '#55554f',
@@ -178,8 +273,11 @@ export const STYLE_PRESETS = Object.freeze({
       junctionFill: '#ffffff', junctionStroke: '#1b1b1b', hover: '#0019a8', trace: '#e32017', pin: '#ee7c0e', crossing: '#ee7c0e'},
     rules: [
       {selector: 'edge[bus]', style: {stroke: 'auto(bus)', arrow: 'none', width: 5, opacity: 1}},
-      {selector: 'leaf[bus]', style: {fill: '#ffffff', stroke: 'auto(bus)', strokeWidth: 3, text: '#1b1b1b', radius: 'pill', glyph: 'dot', glyphSize: 7}},
-      {selector: 'leaf[interchange]', style: {fill: '#ffffff', stroke: '#1b1b1b', strokeWidth: 4, text: '#1b1b1b', radius: 'pill', glyph: 'dot', glyphSize: 10}},
+      {selector: 'leaf[bus]', style: {fill: '#ffffff', stroke: 'auto(bus)', strokeWidth: 4, text: '#1b1b1b', radius: 'pill', glyph: 'tick', glyphSize: 9}},
+      // A station where its line branches, or a gateway, and an interchange: a white pill across the lines.
+      {selector: 'leaf[branch]', style: {fill: '#ffffff', stroke: '#1b1b1b', strokeWidth: 3, text: '#1b1b1b', glyph: 'pill', glyphSize: 11}},
+      {selector: 'leaf[bus][kind=gateway]', style: {fill: '#ffffff', stroke: '#1b1b1b', strokeWidth: 3, text: '#1b1b1b', glyph: 'pill', glyphSize: 11}},
+      {selector: 'leaf[interchange]', style: {fill: '#ffffff', stroke: '#1b1b1b', strokeWidth: 3, text: '#1b1b1b', glyph: 'pill', glyphSize: 11}},
     ],
   },
   // A light theme (the host's background must be light too).
