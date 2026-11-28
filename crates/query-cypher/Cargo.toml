@@ -11,13 +11,13 @@ keywords.workspace = true
 categories.workspace = true
 readme = "README.md"
 include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE-APACHE", "LICENSE-MIT"]
-description = "Provisional: the openCypher front end of the Arqlet query layer (ADR 0021): decypher behind a guard over its syntax tree."
+description = "Provisional: the openCypher front end of the Arqlet query layer (ADR 0021): decypher behind a guard over its syntax tree and HIR, and the lowering of its HIR into a plan."
 
 # The one third-party dependency of the query layer (ADR 0021; record in docs/architecture.md): exact version, default
 # features. It has no host API (no filesystem, network, process, thread or clock) and builds for wasm32.
 [dependencies]
 arqlet-query = { workspace = true }
-decypher = { version = "=0.2.0" }
+decypher = { version = "=0.4.1" }
 
 [dev-dependencies]
 # Tests read the fixtures of `examples/cypher/`.

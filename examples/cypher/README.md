@@ -42,8 +42,8 @@ items and is informational until the engine's column naming rule is decided. Val
 The cases are chosen to hit what goes wrong first: a self-loop (matched once when undirected), parallel edges,
 relationship uniqueness within a pattern (`*2`, two hops), null in a filter and as an output value, grouping by a value
 rather than by a node (two nodes labelled `run` form one group), type alternatives, edge types with a space (backticks),
-and an unresolved edge that must not be counted. Four `later` cases are the constructs decypher drops silently (upstream
-issues #132 to #134); the syntax-tree guard must reject them.
+and an unresolved edge that must not be counted. Four `later` cases are the constructs decypher 0.2 dropped silently
+(upstream issues #132 to #134, fixed in 0.3); the guard must reject them until the executor runs them.
 
 ## Corpus verdicts
 

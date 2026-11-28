@@ -79,6 +79,20 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
   `benchmarks/results/patch-as-import-20261127.md`; measured before the faster second pass of #229). Revisions and stale
   checks are unchanged.
 
+### Changed
+
+- The Cypher front end uses decypher 0.4.0 (was 0.2.0). Since 0.3.0 it keeps inline `WHERE`, path selectors and quantified paths
+  in its HIR instead of dropping them (upstream #132 to #134). The guard now rejects these constructs from the HIR rather
+  than from the syntax tree, which also covers the GQL selectors 0.3.0 parses (`ANY`, `ANY SHORTEST`, `SHORTEST k`,
+  `SHORTEST k GROUPS`), and `MATCH ALL …` runs like a pattern without a selector. They are still unsupported. 0.4.0 gives
+  the column order in the HIR, so the lowering no longer reads the syntax tree; a column without `AS` keeps its written
+  name, which lets `` RETURN `my node`.`a b` `` run (it was refused), and `RETURN *` is rejected by name. No other plan of
+  a supported query changes (`crates/query-cypher/tests/grid.rs` pins the outcome of about 1 600 queries).
+- decypher 0.4.1: a column without `AS` is named by its expression without the whitespace and comments that follow it
+  (`RETURN a.age + 1 LIMIT 1` names `a.age + 1`; 0.9.0 refused such a query), so two items that differ only in them are
+  refused as duplicate columns. The `WHERE` of a `WITH` comes after its `ORDER BY`, `SKIP` and `LIMIT` in the HIR, so the
+  lowering no longer reorders them.
+
 ## 0.10.0 — 2026-11-27
 
 A query and grouping release. The read-only openCypher layer grows by the scalar functions, `UNION`, maps and list

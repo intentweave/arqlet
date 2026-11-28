@@ -457,10 +457,16 @@ layout scheduling.
 A dependency of `arqlet-query-cypher` since stage M1 began (ADR 0021 accepted 2026-11-21). It was recorded here first, as
 the project rules ask before third-party code is taken in. The `Cargo.lock` pins the crates below.
 
-- `decypher` 0.2.0 (exact; `EUPL-1.2 OR MIT OR Apache-2.0`, used under `MIT OR Apache-2.0`;
+- `decypher` 0.4.1 (exact; `EUPL-1.2 OR MIT OR Apache-2.0`, used under `MIT OR Apache-2.0`;
   https://github.com/sunsided/decypher), a Rust parser for openCypher with a lossless syntax tree, a typed AST and a
-  scope-resolved HIR. Upstream revision `8b40b52a787a599e0d0e8d23ec78e41fb7cb9850` (tag `v0.2.0`, 2026-11-13, "Release
-  0.2.0 (#131)"; the revision is also what the crate's `.cargo_vcs_info.json` names). crates.io checksum
+  scope-resolved HIR. Upstream revision `1a6e02625fc23b91777f99a75c0ff47aee047f15` (tag `v0.4.1`, 2026-11-27; the revision
+  is what the crate's `.cargo_vcs_info.json` names). crates.io checksum
+  `f67fafc43c4107ba8b9cfc28e318ef6ae39aad1178d1082b36604b4256b10772`. Before it: 0.4.0, revision
+  `88c74b064fc73aa0a567e4ce8e504c9f96f4d09c`, checksum `f921cb0f868e9a961613782974cc4a60a76648a3e4f7719991cbdd53d35eaeed`;
+  0.3.0, revision
+  `6b4d0e48c384ae824a3aaed240e7c3b38bba9ee1`, checksum `ecc716d11c4e78ddf6c7c11d350a9b55d3ca440b88fe71f86ce491f09110a4ba`;
+  and (recorded 2026-11-21) 0.2.0,
+  revision `8b40b52a787a599e0d0e8d23ec78e41fb7cb9850`, checksum
   `76d97d5e8591358e7aa4be91d531cbdccd0bad9f24dc48455087b7fe7f941e76`. A fork and complete re-implementation of
   https://github.com/a-poor/open-cypher. It is a dependency of `arqlet-query-cypher` only, with default features
   (`hir`; `serde` and `miette` stay off). Declares edition 2024 and `rust-version = "1.94"`, which is why the workspace
@@ -477,8 +483,8 @@ the project rules ask before third-party code is taken in. The `Cargo.lock` pins
   a linked crate ships no license file (the `Unicode-3.0` file of `unicode-ident` is then the thing to look at). The
   npm package `@arqlet/query` links these crates and gets its notices the same way; every one of them ships its license
   files (checked 2026-11-25). The project distributes no native binaries today; if it does, they need the same.
-- Known defects that shape its use are listed in ADR 0021 (upstream issues #132 to #134, mitigated by a guard over the
-  syntax tree). The fallback front end is https://github.com/a-poor/open-cypher (0.5.0, Apache-2.0); it is not a
+- The defects that shaped its use (upstream issues #132 to #134: constructs dropped between the syntax tree and the HIR)
+  are fixed in 0.3.0, 0.4.0 gives the column order in the HIR, and 0.4.1 orders a `WITH`'s `WHERE` after its `ORDER BY`, `SKIP` and `LIMIT`; ADR 0021 records them and how the guard changed. The fallback front end is https://github.com/a-poor/open-cypher (0.5.0, Apache-2.0); it is not a
   dependency, and the same record is made before it would become one.
 
 ## Dependency of the native Node adapter (ADR 0030)

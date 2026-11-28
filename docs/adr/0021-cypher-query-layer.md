@@ -449,13 +449,65 @@ projection, pattern comprehension, `all`/`any`/`none`/`single`, `reduce`.
 The cases `fn-*`, `union-*` and `expr-*` of `examples/cypher/` carry the oracle's expectations. Unlike the earlier cases
 they have not been compared with Grafeo; that is part of M6.
 
+## decypher 0.3.0 and 0.4.0: the drops are fixed upstream (2026-11-25)
+
+decypher 0.3.0 fixes #132 to #134: inline `WHERE` (`predicate` on the HIR's node and relationship patterns), path
+selectors (`PathPattern::selector`: `shortestPath`, `allShortestPaths` and the GQL forms `ANY`, `ANY SHORTEST`,
+`SHORTEST k`, `SHORTEST k GROUPS`) and quantified paths (`GraphPattern::quantified`) now reach the HIR. The front end
+pins 0.3.0, and the part of item 4 that worked around the drops changes:
+
+- The guard reads these constructs from the HIR, not from the syntax tree: a selector other than `ALL`, a quantified
+  pattern, a pattern predicate or a path variable in a `MATCH` or `OPTIONAL MATCH` (also inside a `UNION` branch) is
+  rejected with a message that names it. The syntax-tree arms for the `shortestPath` token, `WHERE` inside a pattern
+  and the quantifier nodes are gone. The syntax-tree guard keeps what is a choice of scope, not a workaround: writes,
+  administration, `CALL`, subqueries, `=~` and the function table.
+- Reading the HIR is needed, not only simpler: 0.3.0 parses the GQL selectors, which have no `shortestPath` token, so the
+  old syntax-tree check would have let `MATCH ANY SHORTEST (a)-[*]-(b)` through to a lowering that ignores the selector.
+- `ALL` keeps every path and lowers like a pattern without a selector.
+- The constructs stay rejected: the executor does not run them yet (item 5, "Later"). With the HIR keeping them, each can
+  move to "supported" with its own semantic tests and oracle cases; inline `WHERE` is the smallest step (a filter on the
+  pattern's variables).
+- `crates/query-cypher/tests/grid.rs` pins the outcome of `lower` (a plan hash or an error class) for every fixture query
+  and about 1 500 pattern combinations in `tests/pinned.tsv`. Across the upgrade every plan stayed identical; the only
+  changes were queries that 0.2.0 refused as syntax errors (GQL selectors, `+` and `*` quantifiers), which are now
+  rejected as unsupported, or lower, for `ALL`, to the plan without the selector.
+
+Item 9, criterion 2 no longer applies, and the open question about contributing the fixes is settled.
+
+decypher 0.4.0 (pinned since, same day) adds `ReturnOp::columns`, the result columns in output order. The lowering takes
+the column order from it and no longer reads the syntax tree at all; the guard is now the only reader of the tree. Two
+outcomes follow, both recorded in `tests/pinned.tsv`:
+
+- A column is named by the HIR alias, which for an item without `AS` is the item as written. The corpus query
+  `` MATCH (`my node`:`My Label`) RETURN `my node`.`a b` `` (verdict `supported`) was refused before, because the old
+  reading of the tree unquoted the name and then found no alias for it; it now lowers, with the column
+  `` `my node`.`a b` ``.
+- `RETURN *` would now lower as well. It stays out of scope (it was refused as a side effect of reading the tree), so the
+  syntax-tree guard rejects it by name, like `=~`.
+
+The other changes of 0.4.0 need nothing here: `||` falls to the lowering's refusal of unknown operators (lowering it as
+`+` would add numbers that `||` refuses), `trim(… FROM …)` becomes a call of `btrim`, `ltrim` or `rtrim`, which the
+function table rejects, and the `SET` and `REMOVE` changes are behind the rejection of writes.
+
+decypher 0.4.1 (pinned since 2026-11-27) fixes three defects found in review of the upgrade (upstream #154 to #156):
+
+- An item without `AS` is named by its text up to its last token. With 0.4.0 its name took in the whitespace and comments
+  that followed it (`RETURN a.age + 1 LIMIT 1` named the column `a.age + 1 `); 0.9.0 had refused such queries ("cannot
+  place the column"). Items that differ only in that trivia are now duplicate columns, which decypher refuses.
+- The HIR puts the `WHERE` of a `WITH` after its `ORDER BY`, `SKIP` and `LIMIT`, the order in which they apply. The
+  lowering reordered them itself (#184); it now takes the operations in the HIR's order.
+- Text inside a comprehension, quantifier or `reduce` that names the construct's own variable is no longer replaced by a
+  projected column. The refusal of a comprehension variable named like a variable outside it (under *Maps and lists*)
+  is therefore no longer needed; lifting it is left to a follow-up with its own cases.
+
+No plan in `tests/pinned.tsv` changes.
+
 ## Not decided here
 
 - Syntax and scoring of search operators; hybrid ranking; embedding source.
 - Structure similarity (neighbourhood fingerprints, Weisfeiler-Lehman) and comparison of two graphs.
 - A SQL backend (mapping of entity tables and JSONB payload, GIN pushdown) and any virtual-graph variant of it.
 - Whether to propose the planner change to Grafeo upstream, and whether to fork.
-- Whether and when to contribute fixes for decypher #132 to #134 (item 9 sets the conditions).
 - The names of the traits and types (the crate names are fixed in M0).
 - A native Node binding for queries (section M5c), and a smaller graph-only crate split from `arqlet-model` (item 12).
 - How the graph is shared between functions, processes, backend and browser, and any coordination or replication
