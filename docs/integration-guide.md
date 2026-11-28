@@ -283,7 +283,7 @@ const leiden = run({op: 'overview', graph, options: {communities: 0, groups: {
   included, inside it: in a group of 500 modules the communities are clusters `community:group:#:core:<level>.<k>`
   (kind `community`, labelled after their most connected member, `≈ <name>`). Groups with fewer children are shown as
   given. Use `communities: 0` when the partition is to be shown as it is.
-- `edgeData`, `columns`, `positionsOnly`, the work per container (`ticks`, the force steps of each container's
+- `edgeData`, `containerStats`, `columns`, `positionsOnly`, the work per container (`ticks`, the force steps of each container's
   simulation), `radii`, `intent` and the level of detail of a `configSet` work as without `groups`. A session lays out
   again on the clusters it has while `groups` (with `communities`, `satellites`, `hubs`) stays the same.
 
@@ -306,6 +306,52 @@ answer, with their parents, as `start.nodes` (the `places` function above). A se
 To switch back without moving anything, keep the places of each partition's last answer and send those: partition A
 with the places of A's answer continues all of it (`anew: 0`) and nothing moves. Sent with the places of B's answer
 instead, what B shares with A continues and the rest is placed anew again.
+
+### Marking weak containers (provisional)
+
+A container is weak when its children are not much more connected among themselves than to the outside: a group of
+your partition that holds little, or a community that is a remnant. Ask for `containerStats: true` and the answer holds,
+per container, how much of its edges it keeps inside and its term of the modularity at its depth (#236):
+
+```js
+const {overview: o} = run({op: 'overview', graph, containerStats: true,
+  options: {communities: 0, groups}});
+const s = o.containerStats;
+// Parallel arrays: s.container[k] is a node index (-1: the root), s.depth[k] its depth (0: top level).
+const weak = [];
+for (let k = 0; k < s.container.length; k++) {
+  if (s.container[k] < 0 || s.touching[k] === 0) continue;
+  // Less than half of the edges that touch it stay inside, or it adds nothing to the modularity of its depth.
+  if (s.share[k] < 0.5 || s.modularity[k] <= 0) weak.push(o.ids[s.container[k]]);
+}
+// The modularity of the partition at each depth: s.depthModularity[d].
+```
+
+| Field | Per container `B` (its node and everything below it) |
+| --- | --- |
+| `container`, `depth` | node index (-1 the root) and depth (-1 the root, 0 top level); the root first, then every node with children in index order |
+| `inner` | weight of the edges with both ends in `B` |
+| `touching` | weight of the edges with at least one end in `B` (`inner` plus those that leave it) |
+| `share` | `inner / touching`; 0 when nothing touches `B` |
+| `modularity` | `in(B)/m − (deg(B)/2m)²`, `B`'s term of the modularity at its depth; 0 for the root |
+| `depthModularity[d]` | `Q` of the partition at depth `d`: the blocks of the nodes at depth `d`, every node above as a block of its own |
+| `weight` | `m`, the weight of all resolved edges |
+
+How edges count: undirected; each with its `weight` (1 when left out), so parallel edges add up; unresolved edges are
+left out (as from `edges`). `deg(B)` adds each end in `B`, so a self-loop counts once in `in(B)` and twice in `deg(B)`.
+An edge between a container and a node below it lies inside the container (not inside the child holding the node); an
+edge of a container node to a node outside counts as touching it. The terms of a depth's containers need not add up to
+`depthModularity[d]`: leaves at that depth and the nodes above it are blocks too. With no edge every number is 0.
+
+- Without `containerStats` the answer is exactly as before. The stats depend only on the clusters and the edges, not on
+  the positions, and are the same for any thread count, natively and in WASM.
+- **Columns:** with `columns: true` the arrays come as typed columns `containerStats.container` and
+  `containerStats.depth` (`i32`) and `containerStats.inner`, `.touching`, `.share`, `.modularity`,
+  `.depthModularity` (`f64`); `weight` stays in the JSON. The engine client's `overview()` (and that of `@arqlet/node`) puts them back into
+  `overview.containerStats`, so the answer is shaped like the JSON one.
+- **Positions only:** a `positionsOnly` answer does not carry them. A session answers one only while `containerStats`
+  is the same as in its last answer (the host keeps the stats from there, as the engine client's overview session does);
+  otherwise it answers the whole overview.
 
 ### Bounding an overview's work (provisional)
 
