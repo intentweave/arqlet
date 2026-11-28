@@ -471,7 +471,13 @@ fn structure_key(options: &LayoutOptions) -> String {
         &options.community_hubs,
         options.community_algorithm,
         options.community_resolution,
-        &options.partial,
+        // What is shown in part is derived from the structure (`structure_of`), except under a compacting filter, which
+        // removes nodes after the rests are made.
+        if options.hidden.compacts() {
+            Some(&options.partial)
+        } else {
+            None
+        },
         &options.hidden,
         &options.grouping_priority,
     ))
@@ -498,25 +504,71 @@ pub(crate) fn structure_of(
         return Ok((std::sync::Arc::new(view), None, false));
     };
     let key = structure_key(options);
+    // Shown in part: derived from the structure without it (a compacting filter keeps `partial` in the key instead).
+    let derive = !options.partial.is_empty() && !options.hidden.compacts();
+    let none = BTreeMap::new();
+    let wanted = if derive { &options.partial } else { &none };
+    let mut base = None;
     if let Some(kept) = snapshot
         .structure
         .as_ref()
         .filter(|kept| std::sync::Arc::ptr_eq(&kept.source, source) && kept.key == key)
     {
-        return Ok((kept.view.clone(), Some(kept.clone()), kept.validated));
+        if kept.partial == *wanted {
+            return Ok((kept.view.clone(), Some(kept.clone()), kept.validated));
+        }
+        let under = kept.base.as_ref().unwrap_or(kept);
+        if !derive {
+            return Ok((under.view.clone(), Some(under.clone()), under.validated));
+        }
+        base = Some(under.clone());
     }
-    let view = match structured(source, options)? {
-        std::borrow::Cow::Borrowed(_) => source.clone(),
-        std::borrow::Cow::Owned(view) => std::sync::Arc::new(view),
+    let base = match base {
+        Some(base) => base,
+        None => {
+            let structure_options = LayoutOptions {
+                partial: if derive {
+                    BTreeMap::new()
+                } else {
+                    options.partial.clone()
+                },
+                ..options.clone()
+            };
+            let view = match structured(source, &structure_options)? {
+                std::borrow::Cow::Borrowed(_) => source.clone(),
+                std::borrow::Cow::Owned(view) => std::sync::Arc::new(view),
+            };
+            std::sync::Arc::new(ViewStructure {
+                source: source.clone(),
+                key,
+                index: std::sync::Arc::new(GraphIndex::of(&view)),
+                view,
+                validated: false,
+                partial: BTreeMap::new(),
+                base: None,
+            })
+        }
     };
+    if !derive {
+        return Ok((base.view.clone(), Some(base), false));
+    }
+    // The rests are made on the structure's view: the same graph `structured` makes with `partial`.
+    let view = std::sync::Arc::new(arqlet_layout::communities::with_partial(
+        &base.view,
+        &options.partial,
+    )?);
     let kept = std::sync::Arc::new(ViewStructure {
         source: source.clone(),
-        key,
+        key: base.key.clone(),
         index: std::sync::Arc::new(GraphIndex::of(&view)),
         view: view.clone(),
-        validated: false,
+        // A view made of a valid one by rests (unique ids checked) is valid.
+        validated: base.validated,
+        partial: options.partial.clone(),
+        base: Some(base.clone()),
     });
-    Ok((view, Some(kept), false))
+    let validated = kept.validated;
+    Ok((view, Some(kept), validated))
 }
 
 /// Provisional: with a node budget (`LevelOfDetail::nodes`) and no `communities` of its own, a container with more
@@ -954,6 +1006,8 @@ fn layout_prepared(
                 index,
                 view: shared,
                 validated: true,
+                partial: BTreeMap::new(),
+                base: None,
             }));
             snapshot.collapsed_ids = collapsed.into_iter().collect();
             snapshot.omitted_unresolved_edges = omitted;
@@ -1206,6 +1260,22 @@ pub fn toggle_container(
     relayout_collapsed(snapshot, &options, collapsed, &opened)
 }
 
+/// `kept` marked as validated (with its base): a projection of it succeeded, so the next views skip its validation.
+fn validated_structure(kept: &std::sync::Arc<ViewStructure>) -> std::sync::Arc<ViewStructure> {
+    if kept.validated {
+        return kept.clone();
+    }
+    std::sync::Arc::new(ViewStructure {
+        source: kept.source.clone(),
+        key: kept.key.clone(),
+        view: kept.view.clone(),
+        validated: true,
+        index: kept.index.clone(),
+        partial: kept.partial.clone(),
+        base: kept.base.as_ref().map(validated_structure),
+    })
+}
+
 /// The view with `collapsed` as its collapsed containers, `opened` the ones that were expanded (`toggle`, `reveal`).
 fn relayout_collapsed(
     snapshot: &Snapshot,
@@ -1266,19 +1336,7 @@ fn relayout_collapsed(
             .unwrap_or_else(|| std::sync::Arc::new(canonical.clone())),
     );
     // Projected once without error: the structured graph is valid, and the next views skip its validation.
-    result.structure = kept.map(|kept| {
-        if kept.validated {
-            kept
-        } else {
-            std::sync::Arc::new(ViewStructure {
-                source: kept.source.clone(),
-                key: kept.key.clone(),
-                view: kept.view.clone(),
-                validated: true,
-                index: kept.index.clone(),
-            })
-        }
-    });
+    result.structure = kept.map(|kept| validated_structure(&kept));
     result.collapsed_ids = collapsed.into_iter().collect();
     result.revision = snapshot.revision;
     result.base_revision = Some(snapshot.revision);
@@ -1311,7 +1369,8 @@ pub fn reveal_nodes(
     // The view without its rests: the way from each node up to the top.
     let mut options = snapshot.options.clone();
     let shown_in_part = std::mem::take(&mut options.partial);
-    let base = structured(canonical, &options)?;
+    // The snapshot's own structure when it has one (its base, when shown in part): not structured again.
+    let (base, _, _) = structure_of(snapshot, &options)?;
     let parent: BTreeMap<&str, Option<&str>> = base
         .nodes
         .iter()
@@ -1406,10 +1465,9 @@ pub fn reveal_more(
             ))
         }
     };
-    let canonical = snapshot.source_graph.as_deref().unwrap_or(&snapshot.graph);
     let mut base_options = snapshot.options.clone();
     base_options.partial.clear();
-    let base = structured(canonical, &base_options)?;
+    let (base, _, _) = structure_of(snapshot, &base_options)?;
     let next: Vec<String> = base
         .nodes
         .iter()

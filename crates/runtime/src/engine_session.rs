@@ -412,6 +412,9 @@ impl EngineSession {
                     total += memory::graph(&structure.view);
                 }
                 total += memory::index(&structure.index);
+                if let Some(base) = &structure.base {
+                    total += memory::graph(&base.view) + memory::index(&base.index);
+                }
             }
         }
         total
@@ -445,6 +448,12 @@ impl EngineSession {
                     "structureIndex".into(),
                     json!(memory::index(&structure.index)),
                 );
+                if let Some(base) = &structure.base {
+                    parts.insert(
+                        "structureBase".into(),
+                        json!(memory::graph(&base.view) + memory::index(&base.index)),
+                    );
+                }
             }
             parts.insert("boxes".into(), json!(memory::boxes(&s.boxes)));
             parts.insert(

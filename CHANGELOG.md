@@ -131,6 +131,14 @@ Arqlet is a prototype: every release may change the API, the JSON protocol and t
 
 ### Fixed
 
+- **A reveal no longer structures the whole source graph again** (#261, pure speedup, answers byte-identical): `partial`
+  (the containers shown in part) was part of the key of the kept structure, so every reveal rebuilt communities, index
+  and validation of the source graph. The structure is kept under what is shown in part (`ViewStructure::base`), and a
+  reveal derives only the rests and their index. Native session, generated code-index graphs, medians of three on a
+  loaded machine: reveal 7.9 → 3.3 s at 1M nodes, 2.5 → 1.3 s at 300k, 1.0 → 0.6 s at 100k; toggles unchanged
+  ([results](benchmarks/results/reveal-structure-20261128.md)). A view shown in part holds the structure's view and index
+  twice. Under a compacting filter the key still holds `partial`.
+
 - **The WASM engine read every request as a JSON value before dispatching it** (`dispatch_streaming`, used by `lw_run`),
   only to find out whether it was a progressive refinement: an import's graph as a value takes several times its typed
   size, and in WASM that stays as the worker's linear memory. Only a request that names `refineProgressive` is read so
